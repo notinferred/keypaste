@@ -1,7 +1,6 @@
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.VisualTree;
@@ -43,15 +42,15 @@ public sealed class SearchByTheListTests
         new Rect(control.Bounds.Size).TransformToAABB(control.TransformToVisual(shell.Window)!.Value);
 
     [Fact]
-    public Task Typing_in_the_title_bars_search_filters_the_list() => HeadlessSession.On(() =>
+    public Task Typing_in_the_search_atop_the_list_filters_it() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-search-header-", Seed);
         var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
-        var search = shell.Named<TextBox>("ShellSearch");
+        var search = shell.Named<TextBox>("ListSearch");
 
-        Assert.Equal("Search vault", search.PlaceholderText);
+        Assert.Equal("Search", search.PlaceholderText);
         Assert.Equal("Search", AutomationProperties.GetName(search));
-        Assert.Contains(search, shell.Named<Border>("TitleBar").GetVisualDescendants());
+        Assert.Contains(search, shell.Named<Border>("ListColumn").GetVisualDescendants());
         Assert.True(Bounds(shell, search).Bottom <= Bounds(shell, shell.Named<TextBlock>("ListTitle")).Top);
 
         Find(shell);
@@ -95,26 +94,7 @@ public sealed class SearchByTheListTests
         Find(shell);
 
         Assert.Equal(DestinationKind.Entries, shell.Shell.Current.Kind);
-        Assert.True(shell.Named<TextBox>("ShellSearch").IsFocused);
-    });
-
-    [Fact]
-    public Task The_keyboard_on_the_search_leaves_a_place_where_it_is_and_typing_searches_items() => HeadlessSession.On(() =>
-    {
-        using var shell = new RenderedShell("keypaste-search-elsewhere-", Seed);
-        shell.Shell.GoTo(2);
-        RenderedShell.Drain();
-        var search = shell.Named<TextBox>("ShellSearch");
-
-        search.Focus();
-        RenderedShell.Drain();
-        Assert.Equal(DestinationKind.AgentActivity, shell.Shell.Current.Kind);
-
-        WindowInput.Type(shell.Window, "box");
-        RenderedShell.Drain();
-
-        Assert.Equal(DestinationKind.Entries, shell.Shell.Current.Kind);
-        Assert.Equal(["box"], Assert.IsType<EntriesViewModel>(shell.Shell.Content).Rows.Select(row => row.Title));
+        Assert.True(shell.Named<TextBox>("ListSearch").IsFocused);
     });
 
     [Fact]
@@ -130,7 +110,7 @@ public sealed class SearchByTheListTests
         Find(shell);
 
         Assert.False(shell.Shell.SidebarOverlays);
-        Assert.True(shell.Named<TextBox>("ShellSearch").IsFocused);
+        Assert.True(shell.Named<TextBox>("ListSearch").IsFocused);
     });
 
     [Fact]
@@ -138,7 +118,7 @@ public sealed class SearchByTheListTests
     {
         using var shell = new RenderedShell("keypaste-search-keycap-", Seed);
 
-        Assert.Equal($"Search, {(OperatingSystem.IsMacOS() ? "⌘F" : "Ctrl F")}", ToolTip.GetTip(shell.Named<TextBox>("ShellSearch")));
+        Assert.Equal($"Search, {(OperatingSystem.IsMacOS() ? "⌘F" : "Ctrl F")}", ToolTip.GetTip(shell.Named<TextBox>("ListSearch")));
     });
 
     [Fact]
@@ -224,7 +204,7 @@ public sealed class SearchByTheListTests
     {
         using var shell = new RenderedShell("keypaste-search-draft-", Seed);
         var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
-        var search = shell.Named<TextBox>("ShellSearch");
+        var search = shell.Named<TextBox>("ListSearch");
         entries.Selected = entries.Rows.Single(row => row.Title == "box");
         entries.Detail!.EditCommand.Press();
         entries.Detail.DraftUsername = "half typed";
@@ -255,26 +235,22 @@ public sealed class SearchByTheListTests
         var rebuilt = Assert.IsType<EntriesViewModel>(shell.Shell.Content);
         Assert.Equal("s", rebuilt.Search);
         Assert.Null(rebuilt.Detail);
-        Assert.True(shell.Named<TextBox>("ShellSearch").IsFocused);
+        Assert.True(shell.Named<TextBox>("ListSearch").IsFocused);
     });
 
     [Fact]
-    public Task A_search_leaves_a_form_or_a_comparison_that_holds_nothing_for_the_list() => HeadlessSession.On(() =>
+    public Task A_search_keeps_history_open_beside_the_list_and_closes_an_empty_new_item() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-search-whole-view-", Seed);
         var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
 
         entries.Selected = entries.Rows.Single(row => row.Title == "box");
         entries.Detail!.History.ToggleCommand.Press();
-        Assert.False(entries.ShowsList);
         shell.Shell.Search = "box";
-        Assert.True(entries.ShowsList);
-        Assert.False(entries.Detail!.History.IsOpen);
+        Assert.True(entries.Detail!.History.IsOpen);
         shell.Shell.Search = string.Empty;
 
-        // The new-item form stands beside the list, and an empty one still gives way to a search.
         entries.BeginAddCommand.Press();
-        Assert.True(entries.ShowsList);
         shell.Shell.Search = "box";
         Assert.Null(entries.NewItem);
     });
@@ -316,61 +292,20 @@ public sealed class SearchByTheListTests
     });
 
     [Fact]
-    public Task The_sidebars_button_hides_and_shows_it_and_over_a_narrow_window_opens_it_over_the_content() => HeadlessSession.On(() =>
-    {
-        using var shell = new RenderedShell("keypaste-search-sidebar-", Seed);
-        var button = shell.Named<Button>("ShowSidebar");
-        shell.Frame();
-
-        Assert.True(button.IsEffectivelyVisible);
-        Assert.Equal("Show sidebar", AutomationProperties.GetName(button));
-        Assert.True(Bounds(shell, button).Bottom <= WindowChrome.TitleBarHeight, "the button is in the title bar");
-        Assert.True(Bounds(shell, button).X >= WindowChrome.LeadingInset(InterfaceZoom.Factor), "the button lies after the traffic lights or the menu button");
-
-        shell.Press(button);
-        shell.Release(button);
-        RenderedShell.Drain();
-        Assert.True(shell.Shell.SidebarHidden);
-        Assert.False(shell.Named<Border>("Sidebar").IsEffectivelyVisible);
-
-        shell.Press(button);
-        shell.Release(button);
-        RenderedShell.Drain();
-        Assert.True(shell.Named<Border>("Sidebar").IsEffectivelyVisible);
-
-        shell.Window.Width = 720;
-        shell.Frame();
-        Assert.True(button.IsEffectivelyVisible);
-        Assert.False(shell.Named<Border>("Sidebar").IsEffectivelyVisible);
-
-        shell.Press(button);
-        shell.Release(button);
-        RenderedShell.Drain();
-        Assert.True(shell.Shell.SidebarOverlays);
-        Assert.False(shell.Shell.SidebarHidden, "opening it over a narrow window is not the kept choice");
-
-        AccentElements.AssertAtMostOne(shell.Window, "the sidebar over the content");
-
-        shell.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
-        RenderedShell.Drain();
-        Assert.False(shell.Shell.SidebarOverlays);
-    });
-
-    [Fact]
     public Task Copy_password_holds_the_views_amber_and_New_stays_quiet() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-search-amber-", SeedWithAPassword);
         var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
-        var add = shell.Named<ToggleButton>("AddEntry");
+        var add = shell.Named<Button>("SidebarNew");
         shell.Frame();
         Assert.DoesNotContain("primary", add.Classes);
         AccentElements.AssertOne(shell.Window, null, "Items at rest");
-        var fieldAtRest = Bounds(shell, shell.Named<TextBox>("ShellSearch"));
+        var fieldAtRest = Bounds(shell, shell.Named<TextBox>("ListSearch"));
 
         Find(shell);
         shell.Frame();
         AccentElements.AssertOne(shell.Window, null, "the search focused");
-        Assert.Equal(fieldAtRest, Bounds(shell, shell.Named<TextBox>("ShellSearch")));
+        Assert.Equal(fieldAtRest, Bounds(shell, shell.Named<TextBox>("ListSearch")));
 
         entries.Selected = entries.Rows.Single(row => row.Title == "box");
         RenderedShell.Drain();

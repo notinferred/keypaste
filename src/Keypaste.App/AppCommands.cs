@@ -109,6 +109,7 @@ internal sealed class AppCommands
     internal static string GenerateHeader => Strings.GeneratePasswordXf22f07;
     internal const string HelpAddress = "https://keypaste.com/docs/";
     internal const string ProblemAddress = "https://github.com/notinferred/keypaste/issues";
+    internal const string SourceAddress = "https://github.com/notinferred/keypaste";
 
     private static readonly AppMenuSeparator _line = new();
 
@@ -258,7 +259,7 @@ internal sealed class AppCommands
 
         var screens = Folder(
             Strings.SettingsScreens,
-            [.. Destinations.All.Where(screen => screen.Parent is DestinationKind.Settings or DestinationKind.Advanced).Select(screen => new AppCommand(screen.Title, [], () => Unmodal() is not null, () => Go(screen.Kind)))]);
+            [.. Destinations.All.Where(screen => screen.Parent is DestinationKind.Settings).Select(screen => new AppCommand(screen.Title, [], () => Unmodal() is not null, () => Go(screen.Kind)))]);
 
         var back = Routed(Strings.Back, Unmodal, shell => shell.BackCommand);
 
@@ -298,7 +299,7 @@ internal sealed class AppCommands
         var copyUsername = Routed(Strings.CopyUsername, Pane, detail => detail.CopyUsernameCommand);
         var copyPassword = Routed(Strings.CopyPassword, Pane, detail => detail.CopyPasswordCommand);
         var copyUrl = Routed(Strings.CopyUrl, Pane, detail => detail.CopyUrlCommand);
-        var copyReference = Routed(Strings.CopyTheReference, Pane, detail => detail.CopyReferenceCommand);
+        var copyReference = Routed(Strings.CopyReference, Pane, detail => detail.CopyReferenceCommand);
         var openUrl = Routed(Strings.OpenUrl, Pane, detail => detail.OpenUrlCommand);
         var rotate = Routed(Strings.Rotate, Pane, detail => detail.RotateCommand);
         var generatePassword = Routed(Strings.GenerateANewPasswordLabel, Pane, detail => detail.GeneratePasswordCommand);
@@ -350,27 +351,28 @@ internal sealed class AppCommands
             () => Agents() is { } agents && Target<AgentRow>() is { HasSettings: true } row && (!agents.IsOpened || agents.Selected != row),
             OpenAgentSettings);
         var connect = Routed(Strings.ConnectLabel, Agents, agents => agents.ConnectCommand, _ => AgentWithoutPane()) with { Says = () => AgentWithoutPane()?.ConnectLabel ?? Strings.ConnectLabel };
-        var connectAgain = Routed(Strings.ConnectAgainLabel, Agents, agents => agents.ConnectAgainCommand, _ => AgentWithoutPane()) with { Says = () => AgentWithoutPane()?.ConnectAgainLabel ?? Strings.ConnectAgainLabel };
+        var repair = Routed(Strings.RepairLabel, Agents, agents => agents.RepairCommand, _ => AgentWithoutPane()) with { Says = () => AgentWithoutPane()?.RepairLabel ?? Strings.RepairLabel };
         var disconnect = Routed(Strings.DisconnectLabel, Agents, agents => agents.DisconnectCommand, _ => AgentWithoutPane());
         var showPrompt = Routed(Strings.ShowThePrompt, () => Agents() is { HasWaiting: true } agents ? agents : null, agents => agents.ShowPromptCommand, agents => agents.Waiting[0]);
         var openActivity = Routed(Strings.Activity, Agents, agents => agents.OpenActivityCommand);
         var newToken = new AppCommand(Strings.NewTokenLabel, [], () => Unmodal() is not null, NewToken);
         var revokeToken = Routed(Strings.RevokeToken, Tokens, tokens => tokens.AskRevokeCommand, _ => Target<ScopedTokenRow>());
-        var verifyChain = Routed(Strings.VerifyChain, Log, log => log.VerifyCommand) with { Says = () => Log()?.VerifyLabel ?? Strings.VerifyChain };
+        var checkLog = Routed(Strings.CheckLogIntegrity, Log, log => log.VerifyCommand);
         var refreshLog = Routed(Strings.Refresh, Log, log => log.RefreshCommand);
         var copyHash = Routed(Strings.CopyLatestHash, Log, log => log.CopyHashCommand);
         var showWholeLog = Routed(Strings.ShowAll, () => Log() is { OffersShowAll: true } log ? log : null, log => log.ShowWholeLogCommand);
         var removeTag = Routed(Strings.RemoveTag, () => Items() is not null ? Target<EntryTagChip>() : null, chip => chip.RemoveCommand) with { Says = () => Target<EntryTagChip>()?.RemoveLabel ?? Strings.RemoveTag };
-        var moveNoteKey = Routed(Strings.MoveToAField, () => Recommendations() is not null && Target<RecommendationRow>() is { NeedsReview: true } row ? row : null, row => row.MoveCommand);
+        var moveNoteKey = Routed(Strings.MoveToFields, () => Recommendations() is not null && Target<RecommendationRow>() is { NeedsReview: true } row ? row : null, row => row.MoveCommand);
+        var moveNoteKeyToStage = Routed(Strings.MoveToStage, () => Recommendations() is not null && Target<RecommendationRow>() is { NeedsReview: true } row ? row : null, row => row.AskMoveToStageCommand);
         var restoreLostTag = Routed(Strings.RestoreTag, () => Recommendations() is not null && Target<LostTagRow>() is { NeedsReview: true } row ? row : null, row => row.RestoreCommand);
         var openFindingItem = Routed(
             Strings.OpenItem,
-            () => Recommendations() is null ? null : (Target<PasswordRow>()?.OpenCommand ?? Target<ReminderRow>()?.OpenCommand),
+            () => Recommendations() is null ? null : Target<IRecommendationRow>()?.OpenCommand,
             open => open);
         var openReminderPage = Routed(Strings.OpenUrl, () => Recommendations() is not null ? Target<ReminderRow>() : null, row => row.OpenPageCommand) with { Says = () => Target<ReminderRow>()?.PageLabel ?? Strings.OpenUrl };
         var dismissFinding = Routed(Strings.Dismiss, () => Finding() is { NeedsReview: true } finding ? finding : null, finding => finding.DismissCommand);
         var reviewFindingAgain = Routed(Strings.ReviewAgain, () => Finding() is { IsDismissed: true } finding ? finding : null, finding => finding.ReviewAgainCommand);
-        var selectAllFindings = Routed(Strings.SelectAll, () => Recommendations() is { HasNoteKeys: true } recommendations ? recommendations : null, recommendations => recommendations.SelectAllCommand);
+        var selectAllFindings = Routed(Strings.SelectAll, () => Recommendations() is { OffersBulkMove: true } recommendations ? recommendations : null, recommendations => recommendations.SelectAllCommand);
         var moveSelectedFindings = Routed(Strings.MoveSelected, () => Recommendations() is { HasSelectedKeys: true } recommendations ? recommendations : null, recommendations => recommendations.MoveSelectedCommand);
         var checkLinks = Routed(Strings.CheckStatus, Links, links => links.RefreshCommand);
         var revokeLink = Routed(Strings.RevokeLink, Links, links => links.RevokeRowCommand, _ => Target<SharingRow>()) with { Says = () => Target<SharingRow>()?.RevokeLabel ?? Strings.RevokeLink };
@@ -381,7 +383,7 @@ internal sealed class AppCommands
         _revisionMenu = [copyRevision, restoreRevision];
         _projectMenu = [openProject, _line, addKey, addStage, addItem, _line, runInTerminal, openTerminal, copyRunCommand, exportReferences];
         _vaultMenu = [new AppCommand(Strings.LockThisVault, [], () => Unmodal() is not null && Target<VaultRow>() is { IsLocked: false }, LockVault), _line, new AppCommand(Strings.CloseVault, [], () => Unmodal() is { Vaults: not null } && Target<VaultRow>() is not null, CloseVault)];
-        _agentMenu = [agentSettings, connect, connectAgain, _line, disconnect];
+        _agentMenu = [agentSettings, connect, repair, _line, disconnect];
         _fieldMenu = [copyField, replaceField, generateField, renameField, protectField, _line, removeField];
         _attachmentMenu = [saveAttachment, replaceAttachment, _line, removeAttachment];
         _variableMenu = [copyVariable, replaceVariable, _line, removeVariable];
@@ -390,8 +392,8 @@ internal sealed class AppCommands
         _linkMenu = [checkLinks, _line, revokeLink];
         _reportMenu = [deleteReport];
         _tagMenu = [removeTag];
-        _noteKeyMenu = [moveNoteKey, _line, dismissFinding, reviewFindingAgain];
-        _lostTagMenu = [restoreLostTag, _line, dismissFinding, reviewFindingAgain];
+        _noteKeyMenu = [openFindingItem, moveNoteKey, moveNoteKeyToStage, _line, dismissFinding, reviewFindingAgain];
+        _lostTagMenu = [openFindingItem, restoreLostTag, _line, dismissFinding, reviewFindingAgain];
         _weakPasswordMenu = [openFindingItem, _line, dismissFinding, reviewFindingAgain];
         _reminderMenu = [openReminderPage, openFindingItem, _line, dismissFinding, reviewFindingAgain];
         _pairingMenu = [removePairing];
@@ -410,7 +412,7 @@ internal sealed class AppCommands
             _line,
             Folder(Strings.Trash, restore, purge, _line, emptyTrash),
             Folder(Strings.ShareLinks, checkLinks, revokeLink),
-            Folder(Strings.Security, moveNoteKey, restoreLostTag, openFindingItem, openReminderPage, _line, dismissFinding, reviewFindingAgain, _line, selectAllFindings, moveSelectedFindings),
+            Folder(Strings.Security, moveNoteKey, moveNoteKeyToStage, restoreLostTag, openFindingItem, openReminderPage, _line, dismissFinding, reviewFindingAgain, _line, selectAllFindings, moveSelectedFindings),
         ]);
 
         var projects = new AppMenuGroup(Strings.Project,
@@ -423,14 +425,13 @@ internal sealed class AppCommands
         ]);
 
         var copySetupPrompt = Routed(Strings.CopySetupPrompt, () => Agents(), agents => agents.CopySetupPromptCommand);
-        var connectAnApp = Routed(Strings.ConnectAnApp, () => Agents(), agents => agents.ConnectAnAppCommand);
-        var addMcpManually = Routed(Strings.AddMcpManually, () => Agents(), agents => agents.AddMcpManuallyCommand);
+        var connectAnAITool = Routed(Strings.ConnectAnAIToolEllipsis, () => Agents(), agents => agents.StartConnectCommand);
         var agents = new AppMenuGroup(Strings.Agents,
         [
-            agentSettings, connect, connectAgain, disconnect, _line,
-            copySetupPrompt, connectAnApp, addMcpManually, _line,
+            agentSettings, connect, repair, disconnect, _line,
+            connectAnAITool, copySetupPrompt, _line,
             showPrompt, _line,
-            openActivity, verifyChain, copyHash, refreshLog, showWholeLog, _line,
+            openActivity, checkLog, copyHash, refreshLog, showWholeLog, _line,
             newToken, revokeToken, _line,
             deleteReport,
         ]);
@@ -743,7 +744,7 @@ internal sealed class AppCommands
 
     private EntryAttachmentRow? Attachment() => Items() is not null ? Target<EntryAttachmentRow>() : null;
 
-    private AgentRow? AgentWithoutPane() => Target<AgentRow>() is { HasConnection: false } row ? row : null;
+    private AgentRow? AgentWithoutPane() => Agents() is { HasSheet: false } ? Target<AgentRow>() : null;
 
     private SettingsViewModel? Settings() => Unmodal()?.Content as SettingsViewModel;
 

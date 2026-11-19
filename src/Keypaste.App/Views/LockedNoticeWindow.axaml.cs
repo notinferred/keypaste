@@ -6,7 +6,7 @@ using Keypaste.App.ViewModels;
 
 namespace Keypaste.App.Views;
 
-/// <summary>Tells the person, without taking focus, that an agent asked for a vault while the app was locked (D-0466).</summary>
+/// <summary>Tells the person, without taking focus, that an agent asked for a vault while the app was locked.</summary>
 internal sealed partial class LockedNoticeWindow : PromptWindow
 {
     /// <summary>How far the notice keeps from its screen's edges, in device-independent pixels.</summary>
@@ -24,7 +24,7 @@ internal sealed partial class LockedNoticeWindow : PromptWindow
         Opened += (_, _) => PlaceWhereNotificationsSit();
     }
 
-    /// <summary>A notice naming the vault an agent asked for, whose Open keypaste is armed a moment after it opens.</summary>
+    /// <summary>A notice naming the vault an agent asked for, whose Unlock… is armed a moment after it opens.</summary>
     /// <param name="vaultName">The vault's file name.</param>
     /// <param name="open">Shows the unlock screen; called once the notice has closed.</param>
     /// <param name="clock">The clock the arming delay runs on.</param>
@@ -35,7 +35,7 @@ internal sealed partial class LockedNoticeWindow : PromptWindow
         ArgumentNullException.ThrowIfNull(open);
         ArgumentNullException.ThrowIfNull(clock);
 
-        this.FindControl<TextBlock>("HeadText")!.Text = $"An agent asked for {vaultName}";
+        this.FindControl<TextBlock>("HeadText")!.Text = $"{Path.GetFileNameWithoutExtension(vaultName)} is locked";
         this.FindControl<Button>("Open")!.Click += (_, _) =>
         {
             Close();
@@ -61,8 +61,12 @@ internal sealed partial class LockedNoticeWindow : PromptWindow
         Position = new PixelPoint(area.Right - width - edge, area.Y + edge);
     }
 
-    /// <summary>Lets Open keypaste be pressed, as <see cref="PromptViewModel.ArmingDelay"/> after opening does.</summary>
-    internal void Arm() => this.FindControl<Button>("Open")!.IsEnabled = true;
+    /// <summary>Lets Unlock… be pressed, as <see cref="PromptViewModel.ArmingDelay"/> after opening does.</summary>
+    internal void Arm()
+    {
+        this.FindControl<Button>("Open")!.IsEnabled = true;
+        this.FindControl<Border>("Card")!.Classes.Remove("arming");
+    }
 
     private async Task ArmAsync(TimeProvider clock)
     {

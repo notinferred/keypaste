@@ -94,7 +94,7 @@ public sealed class AppCommandsTests : IDisposable
 
         var item = commands.Menus.Single(group => group.Header == "Item").Entries.OfType<AppSubmenu>().Single(submenu => submenu.Header == "Security").Entries();
         Assert.Equal(
-            ["Move to a field", "Restore tag", "Open item", "Open website", "Dismiss", "Review again", "Select all", "Move selected"],
+            ["Move to fields", "Move to stage…", "Restore tag", "Open item", "Open website", "Dismiss", "Review again", "Select all", "Move selected"],
             item.OfType<AppCommand>().Select(command => command.Header));
     }
 
@@ -139,15 +139,15 @@ public sealed class AppCommandsTests : IDisposable
 
         foreach (var header in new[]
         {
-            "Rotate", "Show history", "Copy the reference", "Add field…", "New project…", "Export .env.keypaste…", "Run in a terminal", "Empty Trash",
-            "New token…", "Revoke token", "Revoke link", "Activity", "Copy the one-time code", "Verify chain", "Check status", "Clear the clipboard now", "Remove field", "Save attachment…", "Remove key",
+            "Rotate", "Show history", "Copy reference", "Add field…", "New project…", "Export .env.keypaste…", "Run in a terminal", "Empty Trash",
+            "New token…", "Revoke token", "Revoke link", "Activity", "Copy the one-time code", "Check log integrity", "Check status", "Clear the clipboard now", "Remove field", "Save attachment…", "Remove key",
             "Add one-time code…", "Replace the one-time code…", "Remove the one-time code",
         })
         {
             Assert.NotNull(Find(commands, header));
         }
 
-        foreach (var header in new[] { "Rotate", "Add field…", "Empty Trash", "Revoke token", "Revoke link", "Copy the one-time code", "Verify chain", "Check status", "Clear the clipboard now", "Run in a terminal", "Add one-time code…", "Replace the one-time code…", "Remove the one-time code" })
+        foreach (var header in new[] { "Rotate", "Add field…", "Empty Trash", "Revoke token", "Revoke link", "Copy the one-time code", "Check log integrity", "Check status", "Clear the clipboard now", "Run in a terminal", "Add one-time code…", "Replace the one-time code…", "Remove the one-time code" })
         {
             Assert.False(Find(commands, header).CanRun(), $"{header} is on with nothing to act on");
         }

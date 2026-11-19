@@ -1,5 +1,4 @@
 using Avalonia.Automation;
-using Avalonia.Automation.Peers;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -16,13 +15,13 @@ using Xunit;
 namespace Keypaste.App.Tests.Views;
 
 /// <summary>
-/// Agents in a real visual tree: a found tool's row offers Connect by the tool's name, its pane shows the
-/// plan text the model holds, and the chosen row's detail hosts the agent's settings panel.
+/// Agents in a real visual tree: a found tool's row offers Connect by the tool's name, its sheet shows the entry to copy
+/// and says what its action runs, and the chosen row's detail hosts the agent's settings panel.
 /// </summary>
 public sealed class AgentActivityViewTests
 {
     [Fact]
-    public Task A_tools_pane_shows_the_plan_it_will_run_and_its_detail_hosts_the_settings_panel() => HeadlessSession.On(async () =>
+    public Task A_tools_sheet_says_what_it_will_run_and_its_detail_hosts_the_settings_panel() => HeadlessSession.On(async () =>
     {
         using var fixture = new TempVault();
         using var authority = new AppAuthority(new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home), null, () => new NobodyToAsk());
@@ -42,18 +41,19 @@ public sealed class AgentActivityViewTests
         model.Choose(row);
         WindowInput.Drain();
         var connect = window.GetVisualDescendants().OfType<Button>().Single(button => button is { Name: "ConnectTool", IsEffectivelyVisible: true } && button.DataContext == row);
-        Assert.Equal("Connect Claude Code", AutomationProperties.GetName(connect));
+        Assert.Equal("Connect Claude Code…", AutomationProperties.GetName(connect));
 
         connect.Command!.Press(connect.CommandParameter);
         await model.Opening;
         WindowInput.Drain();
 
+        Assert.True(window.GetVisualDescendants().OfType<Border>().Single(border => border.Name == "ConnectSheet").IsEffectivelyVisible);
         var shown = window.GetVisualDescendants().OfType<SelectableTextBlock>().Where(block => block.IsEffectivelyVisible).Select(block => block.Text).ToList();
-        Assert.Contains(model.Connection!.Preview, shown);
-        ConfirmationButtons.AssertCancelComesFirst(window);
+        Assert.Contains(model.Connection!.ConfigText, shown);
         Assert.Contains("claude mcp add --scope user --transport stdio keypaste --", model.Connection.Preview, StringComparison.Ordinal);
-        var plan = window.GetVisualDescendants().OfType<SelectableTextBlock>().Single(block => block.Name == "ConnectPlan");
-        Assert.Equal(model.Connection.Preview, ControlAutomationPeer.CreatePeerForElement(plan).GetName());
+        var note = window.GetVisualDescendants().OfType<TextBlock>().Single(block => block.Name == "ConnectNote");
+        Assert.True(note.IsEffectivelyVisible);
+        Assert.StartsWith(model.Connection.Preview, AutomationProperties.GetHelpText(note), StringComparison.Ordinal);
 
         Assert.True(row.IsOpen);
         var panel = Assert.Single(window.GetVisualDescendants().OfType<AgentSettingsView>(), panel => panel.IsEffectivelyVisible);

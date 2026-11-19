@@ -1,18 +1,18 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
 using Keypaste.App.Navigation;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
+using Keypaste.Core;
 using Xunit;
 
 namespace Keypaste.App.Tests.Views;
 
 /// <summary>
 /// With an entry open, Items keeps its list and the entry side by side and whole at the main window's default size and its minimum, a comparison of two revisions
-/// takes the whole view, and where both cannot fit the entry replaces the list with a way back.
+/// takes the whole view, where both cannot fit the entry replaces the list with a way back, and an Environments line keeps its remove button however narrow it is.
 /// </summary>
 /// <remarks>
 /// Observed on Linux in F.2b3b: in the default window the toolbar was wider than the list's column,
@@ -58,14 +58,14 @@ public sealed class EntriesViewLayoutTests
             shell.Frame();
             var at = $"{width}×{height}{(comparing ? ", comparing" : string.Empty)}";
 
-            // The search in the list header is the only one, under the name it has always had.
+            // The search at the top of the list column is the only one.
             Assert.DoesNotContain(shell.Window.GetVisualDescendants().OfType<TextBox>(), box => box.Name == "Search");
             var controls = new Dictionary<string, Rect>
             {
                 ["the entry's title"] = Bounds(shell, shell.Named<TextBlock>("EntryTitle")),
                 ["Copy"] = Bounds(shell, shell.Named<Button>("CopyPassword")),
                 ["Edit"] = Bounds(shell, shell.Named<Button>("EditItem")),
-                ["the entry's menu"] = Bounds(shell, shell.Named<ToggleButton>("EntryMenu")),
+                ["the entry's menu"] = Bounds(shell, shell.Named<Button>("EntryMenu")),
             };
             var rows = shell.Named<ListBox>("Rows");
             var pane = Bounds(shell, shell.Named<ContentControl>("EntryPane"));
@@ -76,31 +76,24 @@ public sealed class EntriesViewLayoutTests
 
             var panes = new Dictionary<string, Rect> { ["the entry's pane"] = pane };
 
-            if (comparing)
-            {
-                // Two sets of fields side by side need the whole view: the list steps away.
-                Assert.False(rows.IsEffectivelyVisible, $"the list shows beside a comparison at {at}");
-            }
-            else
-            {
-                var list = Bounds(shell, rows);
-                var search = Bounds(shell, shell.Named<TextBox>("ShellSearch"));
-                panes["the list"] = list;
-                controls["Search"] = search;
-                controls["New"] = Bounds(shell, shell.Named<ToggleButton>("AddEntry"));
-                Assert.True(search.Width >= _searchMinimum, $"the search box is {search.Width:0} px wide at {at}");
-                Assert.Equal(shell.Named<ListDetail>("Split").ListWidth, shell.Named<Border>("ListColumn").Bounds.Width, 0.5);
-                Assert.True(list.Height >= _listMinimum, $"the list is {list.Height:0} px tall at {at}");
-                Assert.True(list.Right <= pane.Left, $"the list {list} is not left of the entry {pane} at {at}");
+            // History opens beside the list, which stays.
+            var list = Bounds(shell, rows);
+            var search = Bounds(shell, shell.Named<TextBox>("ListSearch"));
+            panes["the list"] = list;
+            controls["Search"] = search;
+            controls["New"] = Bounds(shell, shell.Named<Button>("SidebarNew"));
+            Assert.True(search.Width >= _searchMinimum, $"the search box is {search.Width:0} px wide at {at}");
+            Assert.Equal(shell.Named<ListDetail>("Split").ListWidth, shell.Named<Border>("ListColumn").Bounds.Width, 0.5);
+            Assert.True(list.Height >= _listMinimum, $"the list is {list.Height:0} px tall at {at}");
+            Assert.True(list.Right <= pane.Left, $"the list {list} is not left of the entry {pane} at {at}");
 
-                // The web address's Copy and Open fit the entry's width, apart.
-                var copy = Bounds(shell, shell.Named<Button>("CopyUrl"));
-                var open = Bounds(shell, shell.Named<Button>("OpenUrl"));
-                Assert.True(copy.Right <= open.Left, $"the web address {copy} runs into its Open {open} at {at}");
-                Assert.True(pane.Left <= copy.Left && open.Right <= pane.Right, $"the web address row leaves the entry {pane} at {at}");
+            // The web address's Copy and Open fit the entry's width, apart.
+            var copy = Bounds(shell, shell.Named<Button>("CopyUrl"));
+            var open = Bounds(shell, shell.Named<Button>("OpenUrl"));
+            Assert.True(copy.Right <= open.Left, $"the web address {copy} runs into its Open {open} at {at}");
+            Assert.True(pane.Left <= copy.Left && open.Right <= pane.Right, $"the web address row leaves the entry {pane} at {at}");
 
-                Assert.False(shell.Named<Button>("BackToList").IsEffectivelyVisible, $"a Back shows beside the list at {at}");
-            }
+            Assert.False(shell.Named<Button>("BackToList").IsEffectivelyVisible, $"a Back shows beside the list at {at}");
 
             foreach (var (name, bounds) in controls)
             {
@@ -149,6 +142,25 @@ public sealed class EntriesViewLayoutTests
             Assert.Null(entries.Detail);
             Assert.True(rows.IsEffectivelyVisible);
             Assert.False(back.IsEffectivelyVisible);
+        });
+
+    [Theory]
+    [InlineData(32)]
+    [InlineData(120)]
+    public Task An_environment_line_keeps_its_remove_button_inside_however_narrow(double width) =>
+        HeadlessSession.On(() =>
+        {
+            using var shell = new RenderedShell("keypaste-entries-environment-", vault =>
+                vault.AddTag(new EntryName(string.Empty, "github"), "env:a-project-whose-name-runs-on-and-on:production"));
+            var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
+            entries.Selected = entries.Rows.Single(row => row.Title == "github");
+            RenderedShell.Drain();
+            var lines = shell.Named<ItemsControl>("EnvironmentLines");
+            lines.Width = width;
+            shell.Frame();
+
+            var remove = lines.GetVisualDescendants().OfType<Button>().Single(button => button.IsEffectivelyVisible);
+            Assert.True(Bounds(shell, lines).Contains(Bounds(shell, remove)), $"the remove button {Bounds(shell, remove)} leaves its line {Bounds(shell, lines)} at {width}");
         });
 
     private static void AssertApart(Dictionary<string, Rect> placed, string at)

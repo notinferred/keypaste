@@ -105,7 +105,7 @@ public sealed partial class InteractionRulesTests
         using var shell = new RenderedShell("keypaste-hidden-pane-");
         var entries = OpenGithub(shell);
         AppCommand Command(string header) => Flat(shell.Commands.Menus.SelectMany(menu => menu.Entries)).First(command => command.Header == header);
-        string[] pane = ["Rotate", "Edit fields…", "Add field…", "Show history", "Copy password", "Copy website", "Copy the reference", "Rename…", "Duplicate", "Share…"];
+        string[] pane = ["Rotate", "Edit fields…", "Add field…", "Show history", "Copy password", "Copy website", "Copy reference", "Rename…", "Duplicate", "Share…"];
 
         Assert.All(pane, header => Assert.True(Command(header).CanRun(), $"{header} is off on an open item"));
 

@@ -36,7 +36,7 @@ public sealed class AgentActivityViewModelTests
         Assert.Equal("example · password", waiting.What);
         Assert.Equal("claude-code · label ci-probe", waiting.Who);
         Assert.Equal("answered for you in 45 s", waiting.Left);
-        Assert.Equal("45s left", waiting.LeftText);
+        Assert.Equal("Denies in 0:45", waiting.LeftText);
         Assert.True(model.HasWaiting);
         Assert.True(model.IsAvailable);
 
@@ -66,7 +66,7 @@ public sealed class AgentActivityViewModelTests
         var waiting = Assert.Single(model.Waiting);
         Assert.Equal("example · password, example · url", waiting.Asked);
         Assert.Equal("claude-code · label ci-probe", waiting.Who);
-        Assert.Equal("45s left", waiting.LeftText);
+        Assert.Equal("Denies in 0:45", waiting.LeftText);
 
         app.Clock.Advance(TimeSpan.FromSeconds(45));
         await pending.WaitAsync(_connect, Token);
@@ -89,7 +89,7 @@ public sealed class AgentActivityViewModelTests
         var waiting = Assert.Single(model.Waiting);
         Assert.Equal("Save API_TOKEN in example", waiting.Asked);
         Assert.Equal("claude-code · label ci-probe", waiting.Who);
-        Assert.Equal("45s left", waiting.LeftText);
+        Assert.Equal("Denies in 0:45", waiting.LeftText);
 
         app.Clock.Advance(TimeSpan.FromSeconds(45));
         await pending.WaitAsync(_connect, Token);
@@ -189,7 +189,7 @@ public sealed class AgentActivityViewModelTests
         await model.Looking.WaitAsync(_connect, Token);
 
         Assert.False(model.IsLooking);
-        Assert.False(model.HasNoTools);
+        Assert.False(model.IsEmpty);
         var claude = model.Rows.Single(row => row.Key == "claude-code");
         Assert.Equal(("Claude Code", "Connected", true), (claude.Title, claude.Status, claude.IsLive));
 
@@ -199,7 +199,7 @@ public sealed class AgentActivityViewModelTests
     }
 
     [Fact]
-    public async Task With_no_tool_found_the_screen_names_those_it_looks_for()
+    public async Task With_no_tool_found_the_Connect_sheet_offers_the_prompt_and_an_entry_without_a_name()
     {
         await using var app = await App.StartAsync();
         var tools = app.Tools();
@@ -207,9 +207,14 @@ public sealed class AgentActivityViewModelTests
         using var model = app.Model(tools.Connector());
         await model.Looking.WaitAsync(_connect, Token);
 
-        Assert.True(model.HasNoTools);
-        Assert.StartsWith("None of the AI tools keypaste connects was found on this computer: Claude Code, Codex, ", model.NoTools, StringComparison.Ordinal);
-        Assert.EndsWith("Install one, then open Agents again.", model.NoTools, StringComparison.Ordinal);
+        Assert.Equal(model.Rows.Count == 0, model.IsEmpty);
+        Assert.DoesNotContain(AgentListHeading.Found, model.Listed);
+
+        model.StartConnectCommand.Press();
+
+        Assert.True(model.HasSheet);
+        Assert.Empty(model.Sheet!.Found);
+        Assert.Contains("\"args\": [\"mcp\"]", model.Sheet.Config, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -234,11 +239,11 @@ public sealed class AgentActivityViewModelTests
     }
 
     /// <summary>
-    /// The agents that asked come first, then the tools found, connected before not and in catalogue order,
-    /// then Every other agent; each tool says whether it holds keypaste and offers what fits.
+    /// The agents connected come first under Connected, then the tools merely found under Found on this computer; each
+    /// tool says whether it holds keypaste and offers what fits.
     /// </summary>
     [Fact]
-    public async Task Rows_hold_the_agents_that_asked_then_the_tools_found_then_every_other_agent()
+    public async Task Rows_hold_the_agents_connected_then_the_tools_found()
     {
         await using var app = await App.StartAsync();
         app.Person.Answer = ApprovalAnswer.ApprovedOnce;
@@ -248,20 +253,24 @@ public sealed class AgentActivityViewModelTests
         using var model = app.Model(tools.Connector());
         await model.Looking.WaitAsync(_connect, Token);
 
-        string[] ours = ["ci-probe", "claude-code", "gemini-cli", "vscode", "cursor", AgentNames.Any];
+        string[] ours = ["ci-probe", "claude-code", "gemini-cli", "vscode", "cursor"];
         Assert.Equal(ours, model.Rows.Select(row => row.Key).Where(ours.Contains));
-        Assert.Equal(AgentNames.Any, model.Rows[^1].Key);
+        Assert.DoesNotContain(model.Rows, row => row.Key == AgentNames.Any);
+        Assert.Equal(
+            ["Connected", "ci-probe", "claude-code", "Found on this computer", "gemini-cli", "vscode", "cursor"],
+            model.Listed.Select(listed => listed is AgentRow row ? row.Key : listed.ToString()!).Where(key => ours.Contains(key) || key is "Connected" or "Found on this computer"));
 
         var claude = Row(model, "claude-code");
-        Assert.Equal(("Connected", false, true, true), (claude.Status, claude.OffersConnect, claude.OffersConnectAgain, claude.OffersDisconnect));
+        Assert.Equal(("Connected", false, true), (claude.Status, claude.OffersConnect, claude.OffersDisconnect));
         var gemini = Row(model, "gemini-cli");
-        Assert.StartsWith("keypaste can't tell whether Gemini CLI has it: ", gemini.Status, StringComparison.Ordinal);
-        Assert.Equal((true, false, true), (gemini.OffersConnect, gemini.OffersConnectAgain, gemini.OffersDisconnect));
+        Assert.Equal("Can't read its settings", gemini.Status);
+        Assert.False(string.IsNullOrEmpty(gemini.StatusDetail));
+        Assert.Equal((true, false, true), (gemini.OffersConnect, gemini.OffersRepair, gemini.OffersDisconnect));
         var vscode = Row(model, "vscode");
-        Assert.Contains("VSCODE_APPDATA is set", vscode.Status, StringComparison.Ordinal);
-        Assert.Equal((false, false, false), (vscode.OffersConnect, vscode.OffersConnectAgain, vscode.OffersDisconnect));
+        Assert.Contains("VSCODE_APPDATA is set", vscode.StatusDetail, StringComparison.Ordinal);
+        Assert.Equal((false, false, false), (vscode.OffersConnect, vscode.OffersRepair, vscode.OffersDisconnect));
         var cursor = Row(model, "cursor");
-        Assert.Equal(("Not connected", true, false, false), (cursor.Status, cursor.OffersConnect, cursor.OffersConnectAgain, cursor.OffersDisconnect));
+        Assert.Equal(("Not connected", true, false, false), (cursor.Status, cursor.OffersConnect, cursor.OffersRepair, cursor.OffersDisconnect));
         Assert.True(model.ConnectCommand.CanExecute(cursor));
         Assert.False(model.ConnectCommand.CanExecute(vscode));
         Assert.False(model.DisconnectCommand.CanExecute(cursor));
@@ -269,11 +278,11 @@ public sealed class AgentActivityViewModelTests
     }
 
     /// <summary>
-    /// One pane is open at a time; while its plan runs no other Connect, Connect again or Disconnect can start and it
-    /// cannot be closed, and once it has run the tools are looked for again.
+    /// One tool's part of the sheet is open at a time; while its plan runs no other Connect or Disconnect can start and the
+    /// sheet cannot be closed, and once it has run the tools are looked for again.
     /// </summary>
     [Fact]
-    public async Task While_a_panes_plan_runs_no_other_Connect_or_Disconnect_can_start()
+    public async Task While_a_sheets_plan_runs_no_other_Connect_or_Disconnect_can_start()
     {
         await using var app = await App.StartAsync();
         var tools = app.Tools().ClaudeCode(connected: true).Cursor(connected: false).GeminiUnreadable();
@@ -285,15 +294,13 @@ public sealed class AgentActivityViewModelTests
 
         model.ConnectCommand.Press(cursor);
         await model.Opening.WaitAsync(_connect, Token);
-        var first = model.Connection!;
-        Assert.Same(first, cursor.Connection);
+        Assert.Equal("cursor", model.Connection!.Client.Id);
 
-        model.ConnectAgainCommand.Press(claude);
+        model.ConnectCommand.Press(gemini);
         await model.Opening.WaitAsync(_connect, Token);
 
-        Assert.Null(cursor.Connection);
-        Assert.Same(model.Connection, claude.Connection);
-        Assert.True(model.Connection!.HasPreview);
+        Assert.Equal("gemini-cli", model.Connection!.Client.Id);
+        Assert.True(model.Connection.HasPlan);
 
         using var held = new ManualResetEventSlim();
         tools.Runner.HoldChanges = held;
@@ -301,23 +308,22 @@ public sealed class AgentActivityViewModelTests
 
         Assert.True(model.Connection.IsBusy);
         Assert.False(model.ConnectCommand.CanExecute(cursor));
-        Assert.False(model.DisconnectCommand.CanExecute(gemini));
-        Assert.False(model.ConnectAgainCommand.CanExecute(claude));
-        Assert.False(model.CloseConnectionCommand.CanExecute(null));
+        Assert.False(model.DisconnectCommand.CanExecute(claude));
+        Assert.False(model.CloseSheetCommand.CanExecute(null));
 
         held.Set();
         await running.WaitAsync(_connect, Token);
         await model.Looking.WaitAsync(_connect, Token);
 
-        Assert.StartsWith("Connected.", model.Connection.Message, StringComparison.Ordinal);
+        Assert.StartsWith("Connected Gemini CLI", model.Connection.Message, StringComparison.Ordinal);
         Assert.True(model.ConnectCommand.CanExecute(cursor));
-        Assert.True(model.CloseConnectionCommand.CanExecute(null));
+        Assert.True(model.CloseSheetCommand.CanExecute(null));
         Assert.True(Probes(tools) > 3, "the tools were not looked for again after the plan ran");
 
-        model.CloseConnectionCommand.Press();
+        model.CloseSheetCommand.Press();
 
         Assert.Null(model.Connection);
-        Assert.Null(claude.Connection);
+        Assert.False(model.HasSheet);
     }
 
     private static AgentRow Row(AgentActivityViewModel model, string key) => model.Rows.Single(row => row.Key == key);

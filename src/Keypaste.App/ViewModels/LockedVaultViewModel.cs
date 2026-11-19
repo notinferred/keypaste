@@ -22,11 +22,5 @@ internal sealed class LockedVaultViewModel : IDisposable
 
     internal UnlockViewModel Unlock { get; }
 
-    /// <summary>The form's heading.</summary>
-    internal string Heading => $"{Vault.Title} is locked";
-
-    /// <summary>The vault's file name under the heading; its folder is the tooltip.</summary>
-    internal string FileName => Vault.FileName;
-
     public void Dispose() => Unlock.Dispose();
 }

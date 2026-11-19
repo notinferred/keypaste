@@ -93,7 +93,7 @@ public sealed class DesktopApprovalTests
             set.Send(edited);
             set.CloseInput();
             Assert.Contains(
-                $"command=keypaste set item={_entry} asked=asked from a terminal; any program you run could have typed it",
+                $"command=keypaste set title=Let a terminal change {_entry}? warning=Any program you run could have sent this. Allow only a change you made.",
                 app.WaitFor("^edit-prompt command="),
                 StringComparison.Ordinal);
             Assert.DoesNotContain(app.Driver.Output, line => line.Contains(edited, StringComparison.Ordinal));

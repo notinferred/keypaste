@@ -6,10 +6,11 @@ namespace Keypaste.App.ViewModels;
 /// <param name="Title">Its title, sanitized.</param>
 /// <param name="Details">Its group, username and URL, those it has, sanitized.</param>
 /// <param name="Field">The field the agent asked for.</param>
-internal sealed record PickRow(string Title, string Details, string Field)
+/// <param name="Protected">Whether it belongs to a protected environment, asked every time.</param>
+internal sealed record PickRow(string Title, string Details, string Field, bool Protected)
 {
     /// <summary>What a screen reader says of the row: its names, never a value.</summary>
-    internal string Spoken => $"{Title}, {Details}";
+    internal string Spoken => Protected ? $"{Title}, {Details}, protected" : $"{Title}, {Details}";
 }
 
 /// <summary>
@@ -35,14 +36,13 @@ internal sealed partial class ItemPickViewModel : PromptViewModel
         _offersAlways = prompt.OffersAlways;
         _agent = prompt.Label;
         _candidates = prompt.Candidates;
-        Rows = [.. _candidates.Select(candidate => new PickRow(candidate.Title, Details(candidate), prompt.Field))];
+        Rows = [.. _candidates.Select(candidate => new PickRow(candidate.Title, Details(candidate), prompt.Field, candidate.Protected))];
 
         Client = prompt.Client;
         Label = prompt.Label ?? "none configured";
         Entry = prompt.Entry;
         Field = prompt.Field;
         _itemTitle = prompt.ItemTitle;
-        Instruction = $"{_candidates.Count} items answer to this. Pick the one to send.";
         Reason = prompt.Reason;
         Scrubbed = ApprovalViewModel.ScrubbedText(prompt);
         Truncation = ApprovalViewModel.TruncationText(prompt);
@@ -53,7 +53,14 @@ internal sealed partial class ItemPickViewModel : PromptViewModel
 
     /// <summary>The row the person picked, or null until they pick one.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PickedIsProtected))]
     internal partial PickRow? Picked { get; set; }
+
+    /// <summary>Whether any item is protected, so the card keeps room for its Protected line.</summary>
+    internal bool AnyProtected => Rows.Any(row => row.Protected);
+
+    /// <summary>Whether the row picked is protected, which the card says on its Protected line.</summary>
+    internal bool PickedIsProtected => Picked?.Protected == true;
 
     partial void OnPickedChanged(PickRow? value)
     {
@@ -70,10 +77,12 @@ internal sealed partial class ItemPickViewModel : PromptViewModel
     internal override bool OffersAlways => _offersAlways;
 
     /// <inheritdoc/>
-    internal override string AlwaysTip => $"Don't ask again for {Agent} and this key: it gets the item you pick whenever it asks for {_itemTitle}. Change in Settings \u203a Agents.";
+    internal override string AlwaysTip => $"Don't ask again for {Agent} and this key: it gets the item you pick whenever it asks for {_itemTitle}. Change it in Agents \u203a {Agent}.";
 
     /// <inheritdoc/>
-    internal override string NoAlways => ApprovalViewModel.NoAlwaysText(_offersAlways, _agent);
+    internal override string NoAlways => AnyProtected
+        ? "Always allow: not offered, because an item here is protected and asked about every time."
+        : ApprovalViewModel.NoAlwaysText(_offersAlways, _agent);
 
     /// <summary>The question's first words: Give, or Always give while confirming.</summary>
     internal string Verb => IsConfirming ? "Always give " : "Give ";
@@ -84,8 +93,20 @@ internal sealed partial class ItemPickViewModel : PromptViewModel
     /// <summary>The name every candidate shares, with the vault, as the card names it.</summary>
     internal string Item => InVault(_itemTitle);
 
+    /// <summary>The question after the agent: a standard field in words with the name the items share.</summary>
+    internal string Asked => ApprovalViewModel.FieldWords(Field) is { } words ? $" {words} {ApprovalViewModel.Titled(_itemTitle)}" : " ";
+
+    /// <summary>A key the question names as it is, in the mono, or nothing for a standard field.</summary>
+    internal string Key => ApprovalViewModel.FieldWords(Field) is null ? Field : string.Empty;
+
+    /// <summary>What allowing does, in one plain line.</summary>
+    internal string Consequence => $"{Agent} gets it and can pass it on.";
+
     /// <summary>Whose words the quote is.</summary>
-    internal string SaysLabel => ApprovalViewModel.Says(Agent);
+    internal string SaysLabel => ApprovalViewModel.Says(Agent, Scrubbed, Truncation);
+
+    /// <summary>What keypaste altered or cut in the quote, or null.</summary>
+    internal string? QuoteNote => ApprovalViewModel.NoteOn(Scrubbed, Truncation);
 
     /// <summary>The agent's words, quoted.</summary>
     internal string Quoted => ApprovalViewModel.Quote(Reason);
@@ -118,16 +139,15 @@ internal sealed partial class ItemPickViewModel : PromptViewModel
     internal string Client { get; }
 
     /// <inheritdoc/>
-    protected override string Asks => $"Give {Agent} {Field}? {Rows.Count} items named {_itemTitle} answer to it";
+    protected override string Asks => ApprovalViewModel.FieldWords(Field) is { } words
+        ? $"Give {Agent} {words} {_itemTitle}? {Rows.Count} items answer to it"
+        : $"Give {Agent} {Field}? {Rows.Count} items named {_itemTitle} answer to it";
 
     /// <summary>The label the client's configuration gave its bridge.</summary>
     internal string Label { get; }
 
     /// <summary>The name the agent asked for, which every candidate has.</summary>
     internal string Entry { get; }
-
-    /// <summary>What the person is to do, said above the list.</summary>
-    internal string Instruction { get; }
 
     /// <summary>The agent's words, already sanitized and capped. Untrusted text.</summary>
     internal string Reason { get; }

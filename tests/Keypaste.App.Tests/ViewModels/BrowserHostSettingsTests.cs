@@ -31,15 +31,15 @@ public sealed partial class BrowserHostSettingsTests : IDisposable
     private static partial Regex Retired();
 
     [Fact]
-    public void Five_browsers_none_set_up_each_offer_Turn_on()
+    public void Five_browsers_none_installed_go_quiet_and_leave_the_disclosure_closed()
     {
         var screen = Screen();
 
         Assert.True(screen.IsAvailable);
         Assert.Equal(["Chrome", "Chromium", "Edge", "Brave", "Firefox"], screen.Rows.Select(row => row.Name));
-        Assert.All(screen.Rows, row => Assert.Equal($"Not set up. Turn on so {row.Name} can start keypaste for its extension.", row.Answer));
-        Assert.All(screen.Rows, row => Assert.Equal($"{row.Name} isn't installed.", row.Extension));
-        Assert.All(screen.Rows, row => Assert.Equal(("Turn on", $"Turn on for {row.Name}"), (row.ActionLabel, row.ActionName)));
+        Assert.All(screen.Rows, row => Assert.Equal(("Not installed", false, false), (row.Status, row.HasHint, row.OffersSwitch)));
+        Assert.All(screen.Rows, row => Assert.Equal($"Turn on for {row.Name}", row.ActionName));
+        Assert.False(screen.IsOpen);
         Assert.Equal(OperatingSystem.IsLinux() ? string.Empty : "Chrome and Brave read one setting, so they turn on and off together.", screen.SharedText);
         Assert.False(screen.HasMessage);
     }
@@ -54,14 +54,14 @@ public sealed partial class BrowserHostSettingsTests : IDisposable
 
         Assert.True(File.Exists(manifest));
         Assert.Contains(_browsers.Program.Replace(@"\", @"\\", StringComparison.Ordinal), File.ReadAllText(manifest), StringComparison.Ordinal);
-        Assert.Equal($"Firefox starts keypaste at {_browsers.Program}.", Row(screen, HostBrowser.Firefox).Answer);
-        Assert.Equal(("Turn off", "Turn off for Firefox"), (Row(screen, HostBrowser.Firefox).ActionLabel, Row(screen, HostBrowser.Firefox).ActionName));
+        Assert.Equal((true, _browsers.Program), (Row(screen, HostBrowser.Firefox).SwitchedOn, Row(screen, HostBrowser.Firefox).Program));
+        Assert.Equal("Turn off for Firefox", Row(screen, HostBrowser.Firefox).ActionName);
         Assert.Equal($"Firefox now starts keypaste at {_browsers.Program}.", screen.Message);
 
         screen.ChangeCommand.Press(Row(screen, HostBrowser.Firefox));
 
         Assert.False(File.Exists(manifest));
-        Assert.Equal("Not set up. Turn on so Firefox can start keypaste for its extension.", Row(screen, HostBrowser.Firefox).Answer);
+        Assert.False(Row(screen, HostBrowser.Firefox).SwitchedOn);
         Assert.Equal("Firefox no longer starts keypaste.", screen.Message);
     }
 
@@ -84,16 +84,17 @@ public sealed partial class BrowserHostSettingsTests : IDisposable
         var screen = Screen();
         var edge = Row(screen, HostBrowser.Edge);
 
-        Assert.Equal($"Edge starts another program for keypaste's extension: {_other}.", edge.Answer);
-        Assert.Equal("Turn on", edge.ActionLabel);
+        Assert.Equal((_other, false), (edge.Program, edge.SwitchedOn));
 
         screen.ChangeCommand.Press(edge);
         Assert.True(edge.IsConfirmingReplace);
+        Assert.True(edge.SwitchedOn);
         Assert.Equal($"Turning on replaces {_other} for Edge, and keypaste can't put it back.", edge.ReplacePrompt);
         Assert.Equal(HostState.Other, _browsers.Hosts().Read(HostBrowser.Edge).State);
 
         screen.CancelReplaceCommand.Press(edge);
         Assert.False(edge.IsConfirmingReplace);
+        Assert.False(edge.SwitchedOn);
         Assert.Equal(HostState.Other, _browsers.Hosts().Read(HostBrowser.Edge).State);
 
         screen.ChangeCommand.Press(edge);
@@ -101,7 +102,7 @@ public sealed partial class BrowserHostSettingsTests : IDisposable
 
         Assert.Equal(HostState.Keypaste, _browsers.Hosts().Read(HostBrowser.Edge).State);
         Assert.Equal($"Edge now starts keypaste at {_browsers.Program}, in place of {_other}.", screen.Message);
-        Assert.Equal($"Edge starts keypaste at {_browsers.Program}.", Row(screen, HostBrowser.Edge).Answer);
+        Assert.Equal((true, _browsers.Program), (Row(screen, HostBrowser.Edge).IsOn, Row(screen, HostBrowser.Edge).Program));
     }
 
     [Fact]
@@ -111,16 +112,15 @@ public sealed partial class BrowserHostSettingsTests : IDisposable
         Assert.Equal(HostOutcome.On, _browsers.Hosts(new HostProgram(gone)).TurnOn(HostBrowser.Chromium).Outcome);
         var screen = Screen();
 
-        Assert.Equal($"Chromium looks for keypaste at {gone}, which no longer exists. Turn on to point it at this keypaste.", Row(screen, HostBrowser.Chromium).Answer);
-        Assert.Equal("Turn on", Row(screen, HostBrowser.Chromium).ActionLabel);
+        Assert.Equal((gone, false), (Row(screen, HostBrowser.Chromium).Program, Row(screen, HostBrowser.Chromium).IsOn));
 
         screen.ChangeCommand.Press(Row(screen, HostBrowser.Chromium));
 
-        Assert.Equal($"Chromium starts keypaste at {_browsers.Program}.", Row(screen, HostBrowser.Chromium).Answer);
+        Assert.Equal((true, _browsers.Program), (Row(screen, HostBrowser.Chromium).IsOn, Row(screen, HostBrowser.Chromium).Program));
     }
 
     [Fact]
-    public void The_extension_line_reads_the_browsers_folders_and_names_the_store_to_get_it_from()
+    public void The_status_reads_the_browsers_folders_names_the_store_and_opens_the_disclosure_for_an_unanswered_extension()
     {
         _browsers.Profile(HostBrowser.Chrome, withExtension: false);
         _browsers.Profile(HostBrowser.Edge, withExtension: false);
@@ -129,11 +129,12 @@ public sealed partial class BrowserHostSettingsTests : IDisposable
         TempBrowserHosts.Made(Path.Combine(firefox, "prefs.js"));
         var screen = Screen();
 
-        Assert.Equal("keypaste's extension isn't installed in Chrome. Get it from the Chrome Web Store.", Row(screen, HostBrowser.Chrome).Extension);
-        Assert.Equal("keypaste's extension isn't installed in Edge. Get it from Microsoft Edge Add-ons.", Row(screen, HostBrowser.Edge).Extension);
-        Assert.Equal("keypaste's extension isn't installed in Firefox. Get it from Firefox Add-ons.", Row(screen, HostBrowser.Firefox).Extension);
-        Assert.Equal("keypaste's extension is installed in Brave.", Row(screen, HostBrowser.Brave).Extension);
-        Assert.Equal("Chromium isn't installed.", Row(screen, HostBrowser.Chromium).Extension);
+        Assert.Equal(("Extension not installed", "Get it from the Chrome Web Store."), (Row(screen, HostBrowser.Chrome).Status, Row(screen, HostBrowser.Chrome).Hint));
+        Assert.Equal(("Extension not installed", "Get it from Microsoft Edge Add-ons."), (Row(screen, HostBrowser.Edge).Status, Row(screen, HostBrowser.Edge).Hint));
+        Assert.Equal(("Extension not installed", "Get it from Firefox Add-ons."), (Row(screen, HostBrowser.Firefox).Status, Row(screen, HostBrowser.Firefox).Hint));
+        Assert.Equal(("Extension installed", true), (Row(screen, HostBrowser.Brave).Status, Row(screen, HostBrowser.Brave).OffersSwitch));
+        Assert.Equal(("Not installed", false), (Row(screen, HostBrowser.Chromium).Status, Row(screen, HostBrowser.Chromium).OffersSwitch));
+        Assert.True(screen.IsOpen);
     }
 
     [Fact]
@@ -174,8 +175,9 @@ public sealed partial class BrowserHostSettingsTests : IDisposable
     }
 
     [Fact]
-    public Task Settings_lists_the_browsers_above_the_pairings_and_names_each_button() => HeadlessSession.On(() =>
+    public Task Settings_lists_the_browsers_after_the_pairings_open_while_one_needs_attention_and_names_each_switch() => HeadlessSession.On(() =>
     {
+        _browsers.Profile(HostBrowser.Chrome, withExtension: true);
         using var fixture = new TempVault();
         using var authority = new AppAuthority(new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home), null, () => new NobodyToAsk());
 
@@ -194,11 +196,14 @@ public sealed partial class BrowserHostSettingsTests : IDisposable
 
         var hosts = window.GetVisualDescendants().OfType<StackPanel>().Single(panel => panel.Name == "BrowserHosts");
         Assert.True(hosts.IsEffectivelyVisible);
-        Assert.True(AppCommands.HasContextMenu(settings.BrowserHosts!.Rows[0]));
+        Assert.True(settings.BrowserHosts!.IsOpen);
+        Assert.True(AppCommands.HasContextMenu(settings.BrowserHosts.Rows[0]));
+        var sections = window.GetVisualDescendants().OfType<StackPanel>().Single(panel => panel.Name == "BrowserFillCard").Children;
+        Assert.Equal(sections.Count - 1, sections.IndexOf(hosts));
 
         var names = hosts.GetVisualDescendants().OfType<Button>().Where(button => button.IsEffectivelyVisible)
             .Select(button => ControlAutomationPeer.CreatePeerForElement(button).GetName()).ToList();
-        Assert.Equal(["Turn on for Chrome", "Turn on for Chromium", "Turn on for Edge", "Turn on for Brave", "Turn on for Firefox"], names);
+        Assert.Equal(["Browsers", "Turn on for Chrome"], names);
 
         var said = hosts.GetVisualDescendants().OfType<TextBlock>().Where(block => block.IsEffectivelyVisible)
             .Select(block => (block.Text ?? string.Empty).Replace(_browsers.Root, string.Empty, StringComparison.Ordinal)).ToList();

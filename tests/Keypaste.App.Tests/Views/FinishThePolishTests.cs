@@ -97,7 +97,7 @@ public sealed class FinishThePolishTests
     [InlineData(720, 200)]
     [InlineData(840, 100)]
     [InlineData(1280, 100)]
-    public Task Toasts_sit_under_the_titlebar_and_clear_of_the_search_and_New(int width, int percent) => HeadlessSession.On(() =>
+    public Task One_toast_sits_under_the_titlebar_and_clear_of_the_search(int width, int percent) => HeadlessSession.On(() =>
     {
         InterfaceZoom.Set(percent);
         using var shell = new RenderedShell("keypaste-toast-place-");
@@ -111,9 +111,9 @@ public sealed class FinishThePolishTests
         var root = (Visual)shell.Window.GetVisualDescendants().OfType<ShellView>().Single();
         var toasts = BoundsIn(root, stack);
 
+        Assert.Equal("And a second one under it.", Assert.Single(shell.Shell.Toasts.Shown).Message);
         Assert.True(toasts.Top >= WindowChrome.TitleBarHeight, $"toasts start at {toasts.Top}, in the titlebar");
-        Assert.False(toasts.Intersects(BoundsIn(root, shell.Named<TextBox>("ShellSearch"))), "a toast covers the search");
-        Assert.False(toasts.Intersects(BoundsIn(root, shell.Named<ToggleButton>("AddEntry"))), "a toast covers New");
+        Assert.False(toasts.Intersects(BoundsIn(root, shell.Named<TextBox>("ListSearch"))), "a toast covers the search");
     });
 
     [Fact]
@@ -176,8 +176,7 @@ public sealed class FinishThePolishTests
         using var hidden = new RenderedShell("keypaste-theme-hidden-");
         hidden.Show<SettingsViewModel>(DestinationKind.Settings);
         hidden.Frame();
-        var themeChoice = hidden.Window.GetLogicalDescendants().OfType<ListBox>().Single(box => box.Name == "ThemeChoice");
-        Assert.False(themeChoice.IsVisible && themeChoice.GetLogicalAncestors().OfType<Control>().All(ancestor => ancestor.IsVisible));
+        Assert.DoesNotContain(hidden.Window.GetVisualDescendants().OfType<ListBox>(), box => box is { Name: "ThemeChoice", IsEffectivelyVisible: true });
 
         using var offered = new RenderedShell("keypaste-theme-offered-", offersTheme: true);
         offered.Show<SettingsViewModel>(DestinationKind.Settings);

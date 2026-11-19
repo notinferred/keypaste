@@ -34,13 +34,13 @@ public sealed class AlwaysPromptWindowTests
             var window = await screen.ShownAsync();
             await screen.ArmAsync(window, "AllowOnce");
 
-            Assert.Equal("Don't ask again for Claude Code and this key. Change in Settings \u203a Agents.", ToolTip.GetTip(window.FindControl<Button>("AlwaysAllow")!));
+            Assert.Equal("Don't ask again for Claude Code and this key. Change it in Agents \u203a Claude Code.", ToolTip.GetTip(window.FindControl<Button>("AlwaysAllow")!));
             Click(window, "AlwaysAllow");
             WindowInput.Drain();
 
             Assert.False(asking.IsCompleted);
-            Assert.Equal("Always give Claude Code password?", Drawn(window, "TitleText"));
-            Assert.Equal("keypaste won't ask again for this key. Change it in Settings \u203a Agents.", Text(window, "ConfirmText"));
+            Assert.Equal("Always give Claude Code the password for github?", Drawn(window, "TitleText"));
+            Assert.Equal("keypaste won't ask again for this key. Change it in Agents \u203a Claude Code.", Text(window, "ConfirmText"));
             Assert.False(window.FindControl<Button>("ConfirmAlways")!.IsEffectivelyEnabled);
             Assert.False(window.FindControl<Button>("AllowOnce")!.IsEffectivelyVisible);
             Assert.False(window.FindControl<Button>("Deny")!.IsEffectivelyVisible);
@@ -70,7 +70,7 @@ public sealed class AlwaysPromptWindowTests
             WindowInput.Drain();
 
             Assert.True(window.FindControl<Button>("AlwaysAllow")!.IsEffectivelyVisible);
-            Assert.Equal("Give Claude Code password?", Drawn(window, "TitleText"));
+            Assert.Equal("Give Claude Code the password for github?", Drawn(window, "TitleText"));
 
             await screen.ArmAsync(window, "AlwaysAllow");
             Click(window, "AlwaysAllow");

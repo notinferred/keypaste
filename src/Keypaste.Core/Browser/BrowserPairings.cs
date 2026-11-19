@@ -61,7 +61,7 @@ public static class PairingNames
             return "the name cannot contain invisible or unassigned characters";
         }
 
-        return taken.Contains(name, StringComparer.Ordinal) ? "another pairing already has this name" : null;
+        return taken.Contains(name, StringComparer.Ordinal) ? "Another pairing has this name." : null;
     }
 
     /// <summary>A name to offer for a new pairing: the browser a build most likely runs in and this computer's name, made unique.</summary>

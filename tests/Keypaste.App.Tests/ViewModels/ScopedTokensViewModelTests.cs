@@ -65,7 +65,6 @@ public sealed class ScopedTokensViewModelTests : IDisposable
         Assert.Equal("ci-staging", row.Name);
         Assert.Equal($"kpt_{id}…", row.Prefix);
         Assert.Equal("read:acme-api/staging/*, read:acme-api/staging/DATABASE_URL", row.Scope);
-        Assert.Equal("inject-only", row.Mode);
         Assert.Equal("29 days", row.Expires);
         Assert.False(row.IsExpired);
         Assert.DoesNotContain(token![13..], row.ToString(), StringComparison.Ordinal);
@@ -233,7 +232,7 @@ public sealed class ScopedTokensViewModelTests : IDisposable
 
         var asking = Assert.Single(screen.Rows);
         Assert.True(asking.IsConfirming);
-        Assert.Equal("Revoke ci? Anything using it stops working.", asking.ConfirmText);
+        Assert.Equal("Revoke ci? It stops working for good.", asking.ConfirmText);
 
         screen.CancelRevokeCommand.Press();
 
@@ -264,7 +263,7 @@ public sealed class ScopedTokensViewModelTests : IDisposable
         string.Join(
             '\n',
             [
-                screen.Name, screen.Scope, screen.FormError, screen.Message, screen.Minted?.Name ?? string.Empty, screen.Minted?.Note ?? string.Empty,
+                screen.Name, screen.Scope, screen.FormError, screen.Message, screen.Minted?.Name ?? string.Empty,
                 .. screen.Rows.Select(row => row.ToString()),
             ]);
 }

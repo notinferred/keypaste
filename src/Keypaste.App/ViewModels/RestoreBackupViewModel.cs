@@ -14,11 +14,14 @@ internal sealed class BackupRow(VaultBackup backup, bool isDamaged)
     internal string Taken { get; } =
         PersonTime.Moment(backup.TakenAt.ToLocalTime());
 
+    /// <summary>The row as the backup pop-up names it.</summary>
+    internal string Label => $"Backup from {Taken}";
+
     /// <summary>Whether the file has no KDBX header, which needs no password to find out.</summary>
     internal bool IsDamaged { get; } = isDamaged;
 
     /// <summary>The row's name for a screen reader, which reads a list item by its content's text.</summary>
-    public override string ToString() => IsDamaged ? $"{Taken}, damaged" : Taken;
+    public override string ToString() => IsDamaged ? $"{Label}, damaged" : Label;
 }
 
 /// <summary>
@@ -50,10 +53,9 @@ internal sealed partial class RestoreBackupViewModel : ObservableObject, IDispos
         "Close anything else that has this vault open first, KeePassXC and keypaste approve in a terminal " +
         "included: they keep their own copy and will not notice the change.";
 
-    private const string _refused = "That password doesn't open this backup, or the backup is damaged. Try another copy.";
+    private const string _refused = "That password doesn't open this backup, or the backup is damaged.";
 
-    private const string _refusedWithKeyfile =
-        "That password and key file don't open this backup, or the backup is damaged. Try another copy.";
+    private const string _refusedWithKeyfile = "That password and key file don't open this backup, or the backup is damaged.";
 
     private const string _expired = "That was left waiting a while, so the password was cleared. Nothing was changed. Type it again.";
 
@@ -173,8 +175,7 @@ internal sealed partial class RestoreBackupViewModel : ObservableObject, IDispos
         : string.Empty;
 
     internal string Holds => Validated is { } summary
-        ? $"It holds {Count(summary.Entries, "item", "items")} in {Count(summary.Groups, "group", "groups")}, " +
-          $"and {Count(summary.EnvProjects, "env project", "env projects")}."
+        ? $"It holds {Count(summary.Entries, "item", "items")} and {Count(summary.EnvProjects, "project", "projects")}."
         : string.Empty;
 
     internal string Replaces => Validated switch
@@ -264,7 +265,8 @@ internal sealed partial class RestoreBackupViewModel : ObservableObject, IDispos
         }
         catch (InvalidMasterPasswordException)
         {
-            Forget(KeyfilePath is null ? _refused : _refusedWithKeyfile);
+            var refused = KeyfilePath is null ? _refused : _refusedWithKeyfile;
+            Forget(Rows.Count > 1 ? $"{refused} Try another copy." : refused);
         }
         catch (VaultException e)
         {

@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.VisualTree;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
+using Keypaste.Core.Audit;
 using Xunit;
 
 namespace Keypaste.App.Tests.Views;
@@ -34,8 +35,37 @@ public sealed class LogViewTests
 
         Assert.Contains("STRIPE_KEY", model.Rows[0].Subject, StringComparison.Ordinal);
         Assert.Contains(model.Rows[0].Subject, shown);
-        Assert.Contains(model.Summary, shown);
-        Assert.Contains(model.ShortPath, shown);
+        Assert.Contains(model.Status, shown);
         Assert.Contains(model.Rows[0].Result, shown);
+        Assert.Equal(model.LogPath, ToolTip.GetTip(window.GetVisualDescendants().OfType<StackPanel>().Single(panel => panel.Name == "LogStatus")));
     });
+
+    /// <summary>The unread reason's warning carries its sentence itself, beside the result, so no footnote explains it.</summary>
+    [Fact]
+    public Task The_unread_reasons_warning_says_its_sentence_on_the_row() => HeadlessSession.On(() =>
+    {
+        using var home = new TempAuditHome();
+        home.Write(Release(AuditMethod.Prompt, "run the migration"), Release(AuditMethod.AlwaysAllowed, "send it somewhere else"));
+
+        var model = new LogViewModel(home.Home);
+        Assert.True(model.Rows[0].ReasonUnread);
+        Assert.False(model.Rows[1].ReasonUnread);
+        var window = new Window { Content = new LogView { DataContext = model } };
+        window.Show();
+
+        var mark = Assert.Single(window.GetVisualDescendants().OfType<Border>(), border => border is { Name: "UnreadReason", IsEffectivelyVisible: true });
+        Assert.Equal(Resources.Strings.ServedFromAnEarlierApprovalUnderAXde6ddd, ToolTip.GetTip(mark));
+        Assert.Equal(Resources.Strings.ServedFromAnEarlierApprovalUnderAXde6ddd, Avalonia.Automation.AutomationProperties.GetName(mark));
+        Assert.DoesNotContain(Resources.Strings.ServedFromAnEarlierApprovalUnderAXde6ddd, window.GetVisualDescendants().OfType<TextBlock>().Select(block => block.Text));
+    });
+
+    private static AuditRecord Release(AuditMethod method, string reason) => new()
+    {
+        Tool = "request_credential",
+        Client = new AuditClient("claude-code", "1.2.3", null),
+        Args = AuditArgs.ForCredentialRequest("env/dev/STRIPE_KEY", "password", reason),
+        Decision = AuditDecision.Granted,
+        Method = method,
+        Reason = reason,
+    };
 }

@@ -27,7 +27,6 @@ public sealed class AssistiveTechnologyTests
         (int)DestinationKind.Trash,
         (int)DestinationKind.Tokens,
         (int)DestinationKind.Sharing,
-        (int)DestinationKind.Advanced,
     };
 
     [Theory]
@@ -109,11 +108,11 @@ public sealed class AssistiveTechnologyTests
     {
         var agents = new NavItem(Destinations.All.Single(destination => destination.Kind == DestinationKind.AgentActivity)) { HasDot = true };
 
-        Assert.Empty(agents.DotWords);
+        Assert.Equal("Not answering agents", agents.DotWords);
         agents.DotLive = true;
-        Assert.Equal("live", agents.DotWords);
+        Assert.Equal("Answering agents", agents.DotWords);
         agents.DotDanger = true;
-        Assert.Equal("refusing", agents.DotWords);
+        Assert.Equal("Refusing agents", agents.DotWords);
 
         Assert.Equal("billing · prod, protected", new EntryTagChip("env:billing:prod", _ => { }).Spoken);
         Assert.EndsWith(", malformed", new EntryTagChip("env:", _ => { }).Spoken);
@@ -180,7 +179,7 @@ public sealed class AssistiveTechnologyTests
         WindowInput.Drain();
 
         var line = Assert.Single(said);
-        Assert.StartsWith("Give claude-code password from DEPLOY_KEY? ", line, StringComparison.Ordinal);
+        Assert.StartsWith("Give claude-code the password for DEPLOY_KEY? ", line, StringComparison.Ordinal);
         Assert.EndsWith("2 minutes to answer.", line);
         window.Close();
     });

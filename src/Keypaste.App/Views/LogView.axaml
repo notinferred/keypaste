@@ -9,7 +9,7 @@
              views:TableColumns.Table="{Binding Table}"
              Background="{DynamicResource KpBgApp}">
 
-  <!-- With the content tight the table has no room to scroll to its Result, so Where gives way to it and moves to the Secrets cell's tooltip. -->
+  <!-- With the content tight the table has no room to scroll to its Result, so Where gives way to it and moves to the Values cell's tooltip. -->
   <UserControl.Styles>
     <Style Selector="ListBox#Rows > ListBoxItem">
       <Setter Property="Padding" Value="0" />
@@ -25,7 +25,7 @@
     <Style Selector="Grid.tight-content views|LogColumns">
       <Setter Property="ShowsWhere" Value="False" />
     </Style>
-    <Style Selector="Grid.tight-content TextBlock.where, Grid.tight-content Button.where, Grid.tight-content views|ColumnGrip.where">
+    <Style Selector="Grid.tight-content TextBlock.where, Grid.tight-content views|ColumnGrip.where">
       <Setter Property="IsVisible" Value="False" />
     </Style>
     <Style Selector="Grid.tight-content TextBlock.secrets">
@@ -35,24 +35,22 @@
 
   <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
     <Grid Name="LogPage" Margin="24,16,24,24">
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="*" MaxWidth="880" />
-      </Grid.ColumnDefinitions>
       <StackPanel Spacing="16">
 
-        <!-- The actions go on a line of their own under the title when the two do not fit side by side. -->
+        <!-- The heading, then whether the log holds and how many records show, the file's path on its tooltip. -->
         <ctl:HeaderRow Spacing="16">
           <!-- Not the handoff's "stored inside the vault, signed": the log is plaintext machine state, hash-chained. -->
-          <TextBlock Classes="list-title" Text="{x:Static res:Strings.Activity}" ToolTip.Tip="{x:Static vm:LogViewModel.Subtitle}" VerticalAlignment="Bottom" />
+          <TextBlock Classes="h1" Text="{x:Static res:Strings.Activity}" ToolTip.Tip="{x:Static vm:LogViewModel.Subtitle}" VerticalAlignment="Center" />
 
-          <StackPanel Orientation="Horizontal"
-                      Spacing="8"
-                      VerticalAlignment="Bottom">
-            <Button Classes="ghost sm"
-                    Name="VerifyChain"
-                    IsVisible="{Binding OffersVerify}"
-                    Content="{Binding VerifyLabel}"
-                    Command="{Binding VerifyCommand}" />
+          <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+            <StackPanel Name="LogStatus" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Background="Transparent"
+                        IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                        ToolTip.Tip="{Binding LogPath}" AutomationProperties.Name="{Binding Status}">
+              <ctl:KpIcon Icon="check" Size="14" IsVisible="{Binding !StatusIsEdited}" Foreground="{DynamicResource KpOk}" />
+              <ctl:KpIcon Icon="alert-triangle" Size="14" IsVisible="{Binding StatusIsEdited}" Foreground="{DynamicResource KpDanger}" />
+              <TextBlock Name="StatusText" Classes="size-13" Text="{Binding Status}" VerticalAlignment="Center"
+                         Classes.danger="{Binding StatusIsEdited}" Classes.secondary="{Binding !StatusIsEdited}" />
+            </StackPanel>
             <Button Classes="icon ghost sm"
                     Name="RefreshLog"
                     ToolTip.Tip="{x:Static res:Strings.ReadTheLogAgain}"
@@ -72,7 +70,7 @@
           </StackPanel>
         </Border>
 
-        <!-- One sentence about a file that is unreadable, unchecked or edited. A log never written to is the empty state below. -->
+        <!-- One sentence about a file that is unreadable or unchecked; an edited one says so in the status. A log never written to is the empty state below. -->
         <Border Classes="card filled"
                 Padding="12,8"
                 IsVisible="{Binding HasNotice}">
@@ -99,132 +97,76 @@
           </Grid>
         </Border>
 
-        <!-- The chain's verdict on request: a status line, the hash worth keeping, and what the check proves. -->
+        <!-- Check log integrity's verdict: a line, at most one sentence, and behind Learn more the breaks and what the check can't prove. -->
         <Border Classes="card"
                 Name="Verdict"
-                Padding="16,12"
-                IsVisible="{Binding VerdictShown}">
-          <StackPanel Spacing="12">
-            <StackPanel Spacing="6">
-            <Grid ColumnDefinitions="Auto,*,Auto">
-              <Border Grid.Column="0"
-                      Classes="dot"
-                      Classes.ok="{Binding Verdict.IsOk}"
-                      Classes.danger="{Binding Verdict.IsDanger}"
-                      Margin="0,0,8,0" />
-              <TextBlock Grid.Column="1"
-                         Text="{Binding Verdict.Headline}"
-                         Classes="size-14"
-                         FontWeight="SemiBold"
-                         TextTrimming="CharacterEllipsis"
-                         VerticalAlignment="Center"
-                         Foreground="{DynamicResource KpTextPrimary}" />
-              <Button Grid.Column="2"
-                      Classes="ghost sm"
-                      Name="CopyHash"
-                      Margin="12,-4,-6,-4"
-                      IsVisible="{Binding Verdict.HasHash}"
-                      Command="{Binding CopyHashCommand}"
-                      AutomationProperties.Name="{x:Static res:Strings.CopyLatestHash}">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                  <ctl:KpIcon Icon="copy" Size="14" />
-                  <TextBlock Text="{x:Static res:Strings.CopyLatestHash}" VerticalAlignment="Center" />
-                </StackPanel>
-              </Button>
-            </Grid>
-
-            <SelectableTextBlock Text="{Binding Verdict.Hash}"
-                                 IsVisible="{Binding Verdict.HasHash}"
-                                 Margin="16,0,0,0"
-                                 FontFamily="{DynamicResource KpMono}"
-                                 Classes="size-12"
-                                 TextTrimming="CharacterEllipsis"
-                                 Foreground="{DynamicResource KpTextMuted}" />
+                Padding="14,12"
+                IsVisible="{Binding VerdictShown}"
+                ToolTip.Tip="{Binding Verdict.Path}">
+          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+            <Panel VerticalAlignment="Top" Margin="0,2,0,0">
+              <ctl:KpIcon Icon="check" Size="14" IsVisible="{Binding Verdict.IsOk}" Foreground="{DynamicResource KpOk}" />
+              <ctl:KpIcon Icon="alert-triangle" Size="14" IsVisible="{Binding Verdict.IsDanger}" Foreground="{DynamicResource KpDanger}" />
+            </Panel>
+            <StackPanel Grid.Column="1" Spacing="6">
+              <TextBlock Name="VerdictHeadline" Text="{Binding Verdict.Headline}" Classes="size-13" FontWeight="SemiBold" TextWrapping="Wrap"
+                         Foreground="{DynamicResource KpTextPrimary}" ctl:Announcer.Says="{Binding Verdict.Headline}" />
+              <TextBlock Text="{Binding Verdict.Sentence}" IsVisible="{Binding Verdict.HasSentence}" Classes="size-13" TextWrapping="Wrap"
+                         Foreground="{DynamicResource KpTextSecondary}" />
+              <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button Name="LearnMore" Classes="link" Content="{x:Static res:Strings.LearnMore}" Command="{Binding LearnMoreCommand}" />
+                <Button Name="CopyHash" Classes="link" Content="{x:Static res:Strings.CopyLatestHash}"
+                        IsVisible="{Binding Verdict.HasHash}" Command="{Binding CopyHashCommand}" />
+              </StackPanel>
+              <StackPanel Name="VerdictLimits" Spacing="8" IsVisible="{Binding LimitsShown}">
+                <ItemsControl ItemsSource="{Binding Verdict.Breaks}" IsVisible="{Binding Verdict.HasBreaks}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <StackPanel Spacing="4" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                      <TextBlock Text="{Binding}" TextWrapping="Wrap" Classes="size-13" Foreground="{DynamicResource KpTextPrimary}" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <ItemsControl ItemsSource="{Binding Verdict.Paragraphs}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <StackPanel Spacing="8" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                      <TextBlock ctl:MachineRuns.InText="True" Text="{Binding}" TextWrapping="Wrap" Classes="size-13" LineHeight="19"
+                                 MaxWidth="640" HorizontalAlignment="Left" Foreground="{DynamicResource KpTextSecondary}" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
             </StackPanel>
-
-            <ItemsControl ItemsSource="{Binding Verdict.Breaks}" IsVisible="{Binding Verdict.HasBreaks}">
-              <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                  <StackPanel Spacing="4" />
-                </ItemsPanelTemplate>
-              </ItemsControl.ItemsPanel>
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="x:String">
-                  <TextBlock Text="{Binding}"
-                             TextWrapping="Wrap"
-                             Classes="size-13"
-                             FontWeight="Medium"
-                             Foreground="{DynamicResource KpTextPrimary}" />
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-
-            <ItemsControl ItemsSource="{Binding Verdict.Paragraphs}">
-              <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                  <StackPanel Spacing="8" />
-                </ItemsPanelTemplate>
-              </ItemsControl.ItemsPanel>
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="x:String">
-                  <TextBlock ctl:MachineRuns.InText="True" Text="{Binding}"
-                             TextWrapping="Wrap"
-                             Classes="size-13"
-                             LineHeight="19"
-                             MaxWidth="760"
-                             HorizontalAlignment="Left"
-                             Foreground="{DynamicResource KpTextSecondary}" />
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-
-            <Grid ColumnDefinitions="Auto,*" ToolTip.Tip="{Binding Verdict.Path}">
-              <ctl:KpIcon Grid.Column="0"
-                          Icon="file-lock-2"
-                          Size="14"
-                          Margin="0,0,8,0"
-                          Foreground="{DynamicResource KpTextMuted}" />
-              <TextBlock Grid.Column="1"
-                         Text="{Binding ShortPath}"
-                         FontFamily="{DynamicResource KpMono}"
-                         Classes="size-12"
-                         TextTrimming="PathSegmentEllipsis"
-                         VerticalAlignment="Center"
-                         Foreground="{DynamicResource KpTextMuted}" />
-            </Grid>
-          </StackPanel>
+            <Button Grid.Column="2" Name="HideVerdict" Classes="ghost sm" VerticalAlignment="Top" Content="{x:Static res:Strings.Hide}" Command="{Binding HideVerdictCommand}" />
+          </Grid>
         </Border>
 
         <!-- Nothing has been written yet, which is normal: said once, in the middle of the page. -->
-        <StackPanel Name="Empty"
-                    IsVisible="{Binding IsEmpty}"
-                    HorizontalAlignment="Center"
-                    Margin="0,56,0,0"
-                    Spacing="8">
-          <Border Classes="tile" Width="44" Height="44" CornerRadius="10" HorizontalAlignment="Center">
-            <ctl:KpIcon Icon="activity" Size="20" Foreground="{DynamicResource KpTextMuted}" />
-          </Border>
-          <TextBlock Text="{x:Static res:Strings.NoActivityYet}"
-                     Margin="0,4,0,0"
-                     Classes="dialog-title"
-                     HorizontalAlignment="Center" />
-          <TextBlock ctl:MachineRuns.InText="True" Text="{Binding Message}"
-                     MaxWidth="380"
-                     TextWrapping="Wrap"
-                     TextAlignment="Center"
-                     Classes="size-13"
-                     Foreground="{DynamicResource KpTextSecondary}" />
-          <Button Name="OpenAgentsFromLog"
+        <ctl:EmptyState Name="Empty"
+                        Icon="activity"
+                        Text="{x:Static res:Strings.NoActivityYet}"
+                        Helper="{Binding Message}"
+                        IsVisible="{Binding IsEmpty}"
+                        VerticalAlignment="Top"
+                        Margin="0,56,0,0">
+          <Button Name="ConnectFromLog"
                   Classes="sm"
-                  HorizontalAlignment="Center"
-                  Margin="0,4,0,0"
-                  Content="{x:Static res:Strings.OpenAgents}"
-                  IsVisible="{Binding OffersAgents}"
-                  Command="{Binding OpenAgentsCommand}" />
-        </StackPanel>
+                  Content="{x:Static res:Strings.ConnectAnAIToolEllipsis}"
+                  IsVisible="{Binding OffersConnect}"
+                  Command="{Binding ConnectCommand}" />
+        </ctl:EmptyState>
 
         <StackPanel Spacing="12">
-        <!-- The table's heads sort it and the edges between them size it; neither touches the chain or the file. -->
+        <!-- The heads are labels; the edges between them size the columns. Nothing here sorts. -->
         <Border Classes="table" IsVisible="{Binding HasTable}">
           <ScrollViewer Name="TableScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
             <!-- As wide as the table when it fits, so its star columns trim; at most 680 narrower, where it scrolls. -->
@@ -296,31 +238,46 @@
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource KpTextSecondary}" />
 
+                            <!-- Value names are machine words; "names only" is a note about them, in the interface face. -->
                             <TextBlock Grid.Column="3"
                                        Text="{Binding Secrets}"
+                                       IsVisible="{Binding !NamesOnly}"
                                        FontFamily="{DynamicResource KpMono}"
                                        Classes="size-12 secrets"
                                        TextTrimming="CharacterEllipsis"
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource KpTextPrimary}" />
+                            <TextBlock Grid.Column="3"
+                                       Text="{Binding Secrets}"
+                                       IsVisible="{Binding NamesOnly}"
+                                       Classes="size-13 muted"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center" />
 
                             <TextBlock Grid.Column="4"
                                        Text="{Binding Where}"
-                                       FontFamily="{DynamicResource KpMono}"
-                                       Classes="size-12 where"
+                                       ToolTip.Tip="{Binding WhereInFull}"
+                                       Classes="size-13 where"
                                        TextTrimming="CharacterEllipsis"
                                        VerticalAlignment="Center"
-                                       Foreground="{DynamicResource KpTextMuted}" />
+                                       Foreground="{DynamicResource KpTextSecondary}" />
 
-                            <Grid Grid.Column="5" ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                            <!-- What came of it, its marks beside it: Edited where the chain breaks, unchecked where it can't vouch, and the unread reason's warning. -->
+                            <Grid Grid.Column="5" ColumnDefinitions="Auto,Auto,*,Auto" VerticalAlignment="Center">
                               <Border Grid.Column="0"
                                       Classes="dot"
                                       Margin="0,0,6,0"
+                                      IsVisible="{Binding !Edited}"
                                       Classes.ok="{Binding IsOk}"
                                       Classes.danger="{Binding IsDanger}"
                                       Classes.info="{Binding IsInfo}" />
+                              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" Margin="0,0,6,0" Background="Transparent"
+                                          IsVisible="{Binding Edited}" ToolTip.Tip="{Binding EditedWords}">
+                                <ctl:KpIcon Icon="alert-triangle" Size="14" Foreground="{DynamicResource KpDanger}" />
+                                <TextBlock Text="{x:Static res:Strings.Edited}" Classes="size-13 danger" FontWeight="Medium" VerticalAlignment="Center" />
+                              </StackPanel>
                               <!-- It may run into the row's end padding before it trims. -->
-                              <TextBlock Grid.Column="1"
+                              <TextBlock Grid.Column="2"
                                          Text="{Binding Result}"
                                          Margin="0,0,-12,0"
                                          Classes="size-13"
@@ -331,24 +288,27 @@
                                          Classes.danger="{Binding IsDanger}"
                                          Classes.info="{Binding IsInfo}"
                                          Classes.muted="{Binding IsMuted}" />
-                              <Border Grid.Column="2"
-                                      Margin="4,0,0,0"
-                                      Background="Transparent"
-                                      IsVisible="{Binding ReasonUnread}"
-                                      ToolTip.Tip="{x:Static res:Strings.ServedFromAnEarlierApprovalUnderAXde6ddd}">
-                                <ctl:KpIcon Icon="alert-triangle" Size="14" Foreground="{DynamicResource KpTextSecondary}" />
-                              </Border>
+                              <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4" Margin="16,0,0,0">
+                                <Border Name="UnreadReason"
+                                        Background="Transparent"
+                                        IsVisible="{Binding ReasonUnread}"
+                                        ToolTip.Tip="{x:Static res:Strings.ServedFromAnEarlierApprovalUnderAXde6ddd}"
+                                        AutomationProperties.Name="{x:Static res:Strings.ServedFromAnEarlierApprovalUnderAXde6ddd}">
+                                  <ctl:KpIcon Icon="alert-triangle" Size="14" Foreground="{DynamicResource KpTextSecondary}" />
+                                </Border>
+                                <Border Name="UncheckedRecord"
+                                        Background="Transparent"
+                                        IsVisible="{Binding Unchecked}"
+                                        ToolTip.Tip="{x:Static res:Strings.KeypasteCantVouchForThisRecord}"
+                                        AutomationProperties.Name="{x:Static res:Strings.KeypasteCantVouchForThisRecord}">
+                                  <ctl:KpIcon Icon="info" Size="14" Foreground="{DynamicResource KpTextMuted}" />
+                                </Border>
+                              </StackPanel>
                             </Grid>
 
                           </views:LogColumns>
                         </Border>
 
-                        <!-- A row the chain cannot vouch for is marked at its edge, so the TIME column stays aligned. Red, not amber: several rows can be marked. -->
-                        <Border IsVisible="{Binding Unverified}"
-                                Width="2"
-                                Margin="0,2,0,0"
-                                HorizontalAlignment="Left"
-                                Background="{DynamicResource KpDanger}" />
                       </Panel>
 
                       <!-- A chosen line opens to keypaste's account of it and the full time. -->
@@ -386,57 +346,11 @@
           </ScrollViewer>
         </Border>
 
-        <!-- What the marks mean, and how much of the log is shown. -->
-        <StackPanel Spacing="6" IsVisible="{Binding HasTable}">
-          <StackPanel Name="Notes" Spacing="4" IsVisible="{Binding HasNotes}">
-            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasUnverifiedNote}">
-              <Border Width="2" Height="12" Margin="4,0" VerticalAlignment="Center" Background="{DynamicResource KpDanger}" />
-              <TextBlock Classes="size-13"
-                         VerticalAlignment="Center"
-                         Foreground="{DynamicResource KpTextSecondary}"
-                         Text="{x:Static vm:LogViewModel.UnverifiedLegend}" />
-            </StackPanel>
-            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8" IsVisible="{Binding HasUnreadNote}">
-              <ctl:KpIcon Icon="alert-triangle" Size="14" VerticalAlignment="Center" Foreground="{DynamicResource KpTextSecondary}" />
-              <TextBlock Grid.Column="1"
-                         Classes="size-13"
-                         VerticalAlignment="Center"
-                         Foreground="{DynamicResource KpTextSecondary}"
-                         TextWrapping="Wrap"
-                         Text="{x:Static res:Strings.ServedFromAnEarlierApprovalUnderAXde6ddd}" />
-            </Grid>
-            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasUnreadableNote}">
-              <ctl:KpIcon Icon="info" Size="14" VerticalAlignment="Center" Foreground="{DynamicResource KpTextMuted}" />
-              <TextBlock Classes="size-13"
-                         VerticalAlignment="Center"
-                         Foreground="{DynamicResource KpTextSecondary}"
-                         Text="{Binding UnreadableNote}" />
-            </StackPanel>
-          </StackPanel>
-
-          <Grid ColumnDefinitions="Auto,Auto,*">
-            <TextBlock Grid.Column="0"
-                       Name="Summary"
-                       Text="{Binding Summary}"
-                       Classes="size-13"
-                       VerticalAlignment="Center"
-                       Foreground="{DynamicResource KpTextMuted}" />
-            <TextBlock Grid.Column="1"
-                       Text="·"
-                       Margin="8,0"
-                       Classes="size-13"
-                       VerticalAlignment="Center"
-                       Foreground="{DynamicResource KpTextMuted}" />
-            <TextBlock Grid.Column="2"
-                       Text="{Binding ShortPath}"
-                       ToolTip.Tip="{Binding LogPath}"
-                       FontFamily="{DynamicResource KpMono}"
-                       Classes="size-12"
-                       TextTrimming="PathSegmentEllipsis"
-                       VerticalAlignment="Center"
-                       Foreground="{DynamicResource KpTextMuted}" />
-          </Grid>
-        </StackPanel>
+        <!-- Lines of the file that are not records, said once under the table. -->
+        <Grid Name="Notes" ColumnDefinitions="Auto,*" ColumnSpacing="8" IsVisible="{Binding HasUnreadableNote}">
+          <ctl:KpIcon Icon="info" Size="14" VerticalAlignment="Center" Foreground="{DynamicResource KpTextMuted}" />
+          <TextBlock Grid.Column="1" Classes="size-13 secondary" VerticalAlignment="Center" TextWrapping="Wrap" Text="{Binding UnreadableNote}" />
+        </Grid>
         </StackPanel>
 
       </StackPanel>

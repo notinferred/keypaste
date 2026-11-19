@@ -20,34 +20,31 @@
     <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
   </Window.Styles>
 
-  <!-- A claim card with no requester line: the build is what the browser named, never proof of it (THREATS.md T-48), so
-       it waits under Details, the code is the person's check, drawn large, and no key is drawn. Fixed heights, as in the other cards. No button is
+  <!-- A claim card whose requester line says Not verified: the build is what the browser named, never proof of it (THREATS.md
+       T-48), so it waits under Details, the code is the person's check, drawn large, and no key is drawn. Fixed heights, as in the other cards. No button is
        the default: Enter pairs nothing, and Escape denies. -->
 
-  <Border Classes="claim">
+  <Border Classes="claim" Classes.arming="{Binding IsArming}">
     <StackPanel>
       <StackPanel Classes="claim-body">
         <TextBlock Classes="live" ctl:Announcer.Says="{Binding Opening}" />
-        <StackPanel Orientation="Horizontal" Spacing="6" Height="20">
-          <ctl:BrandMark Height="16" VerticalAlignment="Center" />
-          <TextBlock Classes="claim-label size-11" Text="keypaste" VerticalAlignment="Center" />
-        </StackPanel>
+        <views:PromptHead />
 
-        <TextBlock Name="TitleText" Classes="claim-title size-16" Text="{Binding Title}" />
+        <TextBlock Name="TitleText" Classes="claim-title size-15" Text="{Binding Title}" />
 
         <Border Classes="claim-block" Padding="20,12">
           <StackPanel Spacing="8" HorizontalAlignment="Center">
-            <TextBlock Name="CodeText" Classes="size-24" Text="{Binding Code}" FontFamily="{DynamicResource KpMono}" FontWeight="SemiBold" LineHeight="32"
+            <TextBlock Name="CodeText" Classes="size-20" Text="{Binding Code}" FontFamily="{DynamicResource KpMono}" FontWeight="SemiBold" LineHeight="32"
                        LetterSpacing="4" Foreground="{DynamicResource KpTextPrimary}" HorizontalAlignment="Center"
                        AutomationProperties.Name="{Binding Code, StringFormat='Code {0}'}" />
-            <TextBlock Name="CheckText" Classes="claim-line size-12-5" Text="{Binding Check}" HorizontalAlignment="Center" TextAlignment="Center" />
+            <TextBlock Name="CheckText" Classes="claim-line size-13" Text="{Binding Check}" HorizontalAlignment="Center" TextAlignment="Center" />
           </StackPanel>
         </Border>
 
         <StackPanel Spacing="6">
           <TextBlock Classes="label" Text="Name" />
           <TextBox Name="NameBox" Text="{Binding Name}" MaxLength="64" AutomationProperties.Name="Name of this pairing" />
-          <TextBlock Name="NameProblemText" Height="18" Classes="size-12-5" Foreground="{DynamicResource KpDanger}"
+          <TextBlock Name="NameProblemText" Height="18" Classes="size-13" Foreground="{DynamicResource KpDanger}"
                      ctl:Announcer.Says="{Binding NameProblem}" Text="{Binding NameProblem}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
         </StackPanel>
 
@@ -55,10 +52,10 @@
           <ToggleButton Name="DetailsToggle" Classes="claim-details" AutomationProperties.Name="Details">
             <StackPanel Orientation="Horizontal" Spacing="4">
               <ctl:KpIcon Icon="chevron-right" Size="14" VerticalAlignment="Center" RenderTransformOrigin="50%,50%" />
-              <TextBlock Classes="size-12-5" Text="Details" VerticalAlignment="Center" />
+              <TextBlock Classes="size-13" Text="Details" VerticalAlignment="Center" />
             </StackPanel>
           </ToggleButton>
-          <Grid Classes="claim-facts size-12-5" ColumnDefinitions="Auto,*" ColumnSpacing="12" Margin="20,0,0,0"
+          <Grid Classes="claim-facts size-13" ColumnDefinitions="Auto,*" ColumnSpacing="12" Margin="20,0,0,0"
                 IsVisible="{Binding #DetailsToggle.IsChecked}">
             <TextBlock Classes="fact" Text="Extension" />
             <TextBlock Grid.Column="1" Name="IdentityText" Text="{Binding Identity}" />
@@ -68,15 +65,13 @@
 
       <Border Classes="claim-rule" />
 
-      <ctl:HeaderRow Classes="claim-foot" Spacing="8">
-        <ctl:SteadyDigits Name="CountdownText" Classes="claim-muted size-12-5" Text="{Binding DeniesIn}" VerticalAlignment="Center" TextWrapping="NoWrap" />
-        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <Button Name="Deny" Classes="claim keyed" Content="Deny" Tag="esc"
-                  IsCancel="True" Command="{Binding DenyCommand}" />
-          <Button Name="Allow" Classes="claim primary" Content="Pair"
-                  Command="{Binding AllowCommand}" />
-        </StackPanel>
-      </ctl:HeaderRow>
+      <StackPanel Classes="claim-foot">
+        <Button Name="Deny" Classes="claim keyed" Content="Deny" Tag="esc"
+                IsCancel="True" Command="{Binding DenyCommand}" />
+        <Button Name="Allow" Classes="claim primary" Content="Pair"
+                Command="{Binding AllowCommand}" />
+      </StackPanel>
+      <ProgressBar Name="TimeBar" Classes="claim-time" Value="{Binding TimeLeft}" AutomationProperties.Name="{Binding DeniesIn}" />
     </StackPanel>
   </Border>
 

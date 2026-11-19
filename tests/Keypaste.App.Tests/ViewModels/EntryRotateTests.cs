@@ -53,7 +53,7 @@ public sealed class EntryRotateTests : IDisposable
         detail.RotateCommand.Press();
 
         Assert.True(detail.IsConfirmingRotate);
-        Assert.Contains("20-character one? keypaste only changes its copy", detail.RotatePrompt, StringComparison.Ordinal);
+        Assert.Equal("Rotate token's password? Change it where you use it too.", detail.RotatePrompt);
         Assert.Equal(_old, _session.Unlocked!.Find(new EntryName("api", "token"))!.Password);
 
         detail.ConfirmRotateCommand.Press();

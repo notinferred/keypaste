@@ -148,6 +148,9 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
     /// <summary>The path as a sentence names this item, with its tell when another item has the path too.</summary>
     internal string DisplayPath => SameNameTells.WithTell(EntryNameSanitizer.SanitizePath(Path).Text, SharedNameTell);
 
+    /// <summary>The title as a sentence names this item, with its tell when another item has the path too.</summary>
+    internal string DisplayName => SameNameTells.WithTell(DisplayTitle, SharedNameTell);
+
     /// <summary>The entry's full path, as a person reads and types it.</summary>
     /// <remarks>
     /// <b>A label and a lookup, not an identity</b> — see <see cref="Name"/>. It carries the title
@@ -176,8 +179,12 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
     /// <summary>The URL column, scrubbed as the item's preview scrubs it.</summary>
     internal string DisplayUrl => DisplayTextSanitizer.Sanitize(Url, DisplayTextSanitizer.MaximumLength).Text;
 
-    /// <summary>The row's second line: why it is in a result, its username, or its kind; never a password or a field's value.</summary>
-    internal string SecondLine => Why.Length > 0 ? Why : DisplayUsername.Length > 0 ? DisplayUsername : KindLabel;
+    /// <summary>The row's second line: why it is in a result, what tells it from another of its title, its username, or its kind; never a password or a field's value.</summary>
+    internal string SecondLine =>
+        Why.Length > 0 ? Why
+        : SharedNameTell is { Length: > 0 } tell ? tell
+        : DisplayUsername.Length > 0 ? DisplayUsername
+        : KindLabel;
 
     /// <summary>Whether the item carries the favorite tag, which lists it in Favorites.</summary>
     internal bool IsFavorite { get; init; }
@@ -217,30 +224,22 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
     /// <summary>The kind column: login, note and so on.</summary>
     internal string KindLabel => EntryKinds.Label(Kind);
 
-    /// <summary>
-    /// Which fields beside the title and the group the query was found in, worded for the list, with the
-    /// tags it was in by name.
-    /// </summary>
-    /// <remarks>
-    /// A title or a group match shows its own evidence in the columns beside this one, and labelling
-    /// those would be noise on every row of an ordinary search. A username or a URL column can be cut
-    /// short, so a match there is still named. Field names are constants; a tag is a label, scrubbed as
-    /// a name is (D-0485).
-    /// </remarks>
+    /// <summary>What a match the row does not draw was found in, the website or tags by name; empty when the title or the username shows it.</summary>
+    /// <remarks>A tag is a label, scrubbed as a name is.</remarks>
     internal string Why
     {
         get
         {
-            List<string> reasons = [];
-
-            if (Fields.HasFlag(MatchedFields.Username))
+            if (Fields.HasFlag(MatchedFields.Title) || Fields.HasFlag(MatchedFields.Username))
             {
-                reasons.Add("username");
+                return string.Empty;
             }
+
+            List<string> reasons = [];
 
             if (Fields.HasFlag(MatchedFields.Url))
             {
-                reasons.Add("URL");
+                reasons.Add(Resources.Strings.URL);
             }
 
             if (Fields.HasFlag(MatchedFields.Tag) && Tags.Count > 0)

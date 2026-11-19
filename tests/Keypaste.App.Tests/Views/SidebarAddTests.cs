@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
 using Avalonia.VisualTree;
 using Keypaste.App.Navigation;
 using Keypaste.App.Resources;
@@ -18,10 +17,10 @@ public sealed class SidebarAddTests
     {
         using var shell = new RenderedShell("keypaste-sidebar-new-");
         shell.Show<TrashViewModel>(DestinationKind.Trash);
-        var add = shell.Named<Button>("SidebarNew");
-        Assert.Equal(Strings.New, Avalonia.Automation.AutomationProperties.GetName(add));
+        Assert.Equal(Strings.New, Avalonia.Automation.AutomationProperties.GetName(shell.Named<Button>("SidebarNew")));
 
-        shell.Tap(add);
+        var (menu, _) = shell.OpenMenu("SidebarNew");
+        Menus.Choose(menu, Menus.Item(menu, "MoreTemplates"));
         RenderedShell.Drain();
 
         Assert.True(Assert.IsType<EntriesViewModel>(shell.Shell.Content).NewItem?.IsChoosingTemplate);
@@ -86,17 +85,15 @@ public sealed class SidebarAddTests
 
         var copy = shell.Named<Button>("CopyPassword");
         var edit = shell.Named<Button>("EditItem");
-        var more = shell.Named<ToggleButton>("EntryMenu");
+        var more = shell.Named<Button>("EntryMenu");
         Assert.True(copy.TranslatePoint(default, shell.Window)!.Value.X < edit.TranslatePoint(default, shell.Window)!.Value.X);
         Assert.True(edit.TranslatePoint(default, shell.Window)!.Value.X < more.TranslatePoint(default, shell.Window)!.Value.X);
 
-        shell.Tap(more);
-        RenderedShell.Drain();
-        var share = shell.Named<Button>("ShareEntry");
+        var (menu, _) = shell.OpenMenu("EntryMenu");
+        var share = Menus.Item(menu, "ShareEntry");
         Assert.True(share.IsEffectivelyVisible);
-        Assert.Equal(Strings.Share, Avalonia.Automation.AutomationProperties.GetName(share));
-        shell.Tap(share);
-        RenderedShell.Drain();
+        Assert.Equal(Strings.Share, share.Header);
+        Menus.Choose(menu, share);
 
         Assert.True(shell.Shell.HasShare);
     });

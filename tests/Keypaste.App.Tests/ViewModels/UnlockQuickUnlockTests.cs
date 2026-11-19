@@ -56,17 +56,21 @@ public sealed class UnlockQuickUnlockTests : IDisposable
     }
 
     [Fact]
-    public async Task After_an_idle_lock_the_screen_offers_Windows_Hello_beside_the_password_and_it_opens_the_vault()
+    public async Task After_an_idle_lock_the_screen_offers_Windows_Hello_alone_with_the_password_a_step_away_and_it_opens_the_vault()
     {
         await UnlockAndLockAsync(VaultLockReason.Idle);
         using var model = Screen(VaultLockReason.Idle);
 
         Assert.True(model.OffersQuickUnlock);
         Assert.Equal("Windows Hello", model.QuickUnlockName);
-        Assert.Equal("Unlock it with Windows Hello or its master password.", model.Subtitle);
         Assert.True(model.QuickUnlockIsPrimary);
-        Assert.False(model.UnlockIsPrimary);
+        Assert.True(model.ShowsQuickUnlockAlone);
+        Assert.False(model.ShowsPasswordForm);
         Assert.True(model.CanTypePassword);
+
+        model.UsePasswordCommand.Press();
+        Assert.True(model.ShowsPasswordForm);
+        Assert.True(model.UnlockIsPrimary);
         Assert.True(model.ResumeCommand.CanExecute(null));
 
         await model.ResumeAsync();
@@ -103,7 +107,7 @@ public sealed class UnlockQuickUnlockTests : IDisposable
         Assert.False(model.OffersQuickUnlock);
         Assert.False(model.ResumeCommand.CanExecute(null));
         Assert.True(model.UnlockIsPrimary);
-        Assert.Equal("Enter its master password to open it.", model.Subtitle);
+        Assert.True(model.ShowsPasswordForm);
     }
 
     [Fact]
@@ -154,7 +158,7 @@ public sealed class UnlockQuickUnlockTests : IDisposable
             "This vault's password or key file was changed after it locked, so Windows Hello can't unlock it. Unlock it with the new ones.",
             model.Message);
         Assert.False(model.OffersQuickUnlock);
-        Assert.Equal("Enter its master password to open it.", model.Subtitle);
+        Assert.True(model.ShowsPasswordForm);
     }
 
     [Fact]

@@ -50,7 +50,7 @@ internal sealed partial class ActivityRow : ObservableObject
     /// <summary>What was asked for, as the Agents table's second line: the entry and field, or a change's words.</summary>
     internal string Detail { get; private init; } = string.Empty;
 
-    /// <summary>A waiting request's time left as the Agents screen says it: <c>42m left</c>.</summary>
+    /// <summary>A waiting request's time left as its prompt counts it down: <c>Denies in 0:45</c>.</summary>
     [ObservableProperty]
     internal partial string LeftText { get; private set; } = string.Empty;
 
@@ -59,6 +59,11 @@ internal sealed partial class ActivityRow : ObservableObject
 
     /// <summary>The client and its label on one line.</summary>
     internal string Who => $"{Client} · label {Label}";
+
+    /// <summary>Who wants what, as Agents' waiting row says it: the tool's name, else the agent's, and what was asked for.</summary>
+    internal string Wants => UseText.Wants(
+        Core.Clients.McpClientCatalog.Find(Label)?.DisplayName ?? Core.Clients.McpClientCatalog.Find(Client)?.DisplayName ?? Client,
+        Asked);
 
     /// <summary>The entry and field on one line.</summary>
     internal string What => $"{Entry} · {Field}";
@@ -155,16 +160,11 @@ internal sealed partial class ActivityRow : ObservableObject
         };
     }
 
-    /// <summary>Whole minutes under an hour, then hours and minutes; rounded up, as <see cref="Seconds"/> is.</summary>
+    /// <summary>Minutes and seconds, as the prompt counts down; rounded up, as <see cref="Seconds"/> is.</summary>
     private static string Humanized(TimeSpan remaining)
     {
         var seconds = (int)Math.Ceiling(Math.Max(0, remaining.TotalSeconds));
-        var minutes = (seconds + 59) / 60;
-
-        return seconds < 60 ? string.Create(CultureInfo.InvariantCulture, $"{seconds}s left")
-            : minutes < 60 ? string.Create(CultureInfo.InvariantCulture, $"{minutes}m left")
-            : minutes % 60 == 0 ? string.Create(CultureInfo.InvariantCulture, $"{minutes / 60}h left")
-            : string.Create(CultureInfo.InvariantCulture, $"{minutes / 60}h {minutes % 60}m left");
+        return string.Create(CultureInfo.InvariantCulture, $"Denies in {seconds / 60}:{seconds % 60:00}");
     }
 
     // Rounded up, so a request with half a second left does not read as over.

@@ -2,12 +2,12 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:ctl="using:Keypaste.App.Controls">
 
-  <!-- Control themes for this app's own controls. Stock controls are restyled by class in
+  <!-- Control themes for this app's own controls; ctl:EmptyState is what an empty list or page shows. Stock controls are restyled by class in
        Buttons.axaml, Inputs.axaml, Lists.axaml, Surfaces.axaml and Typography.axaml. -->
 
   <ControlTheme x:Key="{x:Type ctl:MaskedInput}" TargetType="ctl:MaskedInput">
     <Setter Property="Focusable" Value="True" />
-    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="MinHeight" Value="32" />
     <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
     <Setter Property="FontSize" Value="14" />
     <Setter Property="Template">
@@ -19,6 +19,12 @@
                 CornerRadius="{DynamicResource KpRadiusField}"
                 Padding="{DynamicResource KpFieldPadding}">
           <Panel>
+            <TextBlock Text="{TemplateBinding PlaceholderText}"
+                       FontFamily="{DynamicResource KpSans}"
+                       FontSize="13"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource KpTextMuted}"
+                       IsVisible="{TemplateBinding Display, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
             <TextBlock Text="{TemplateBinding Display}"
                        VerticalAlignment="Center"
                        Foreground="{DynamicResource KpTextPrimary}" />
@@ -41,6 +47,44 @@
     <Style Selector="^:disabled /template/ Border#Frame">
       <Setter Property="Opacity" Value="0.5" />
     </Style>
+  </ControlTheme>
+
+  <ControlTheme x:Key="{x:Type ctl:EmptyState}" TargetType="ctl:EmptyState">
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="MaxWidth" Value="380" />
+    <Setter Property="Margin" Value="24" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <StackPanel Spacing="6">
+          <ctl:KpIcon Icon="{TemplateBinding Icon}"
+                      Size="20"
+                      HorizontalAlignment="Center"
+                      Foreground="{DynamicResource KpTextMuted}"
+                      IsVisible="{TemplateBinding Icon, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <TextBlock Name="PART_Text"
+                     Text="{TemplateBinding Text}"
+                     FontSize="15"
+                     FontWeight="SemiBold"
+                     TextAlignment="Center"
+                     TextWrapping="Wrap"
+                     Foreground="{DynamicResource KpTextPrimary}" />
+          <TextBlock Name="PART_Helper"
+                     Classes="caption"
+                     ctl:MachineRuns.InText="True"
+                     ctl:MachineRuns.Words="{TemplateBinding HelperWords}"
+                     Text="{TemplateBinding Helper}"
+                     TextAlignment="Center"
+                     IsVisible="{TemplateBinding Helper, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <ContentPresenter Name="PART_ContentPresenter"
+                            Margin="0,6,0,0"
+                            HorizontalAlignment="Center"
+                            Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            IsVisible="{TemplateBinding Content, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        </StackPanel>
+      </ControlTemplate>
+    </Setter>
   </ControlTheme>
 
   <ControlTheme x:Key="KpCard" TargetType="Border">

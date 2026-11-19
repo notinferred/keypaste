@@ -11,7 +11,7 @@
     shadows are for overlays only.
 
     The accent is not here: App derives KpAccent, KpAccentHover, KpAccentPress, KpOnAccent, KpAccentText,
-    KpFocusRing, KpAccentTint, KpAccentHalo, KpFieldGlow, KpWaitingHalo and Fluent's accent keys from the system's
+    KpFocusRing, KpFocusRingInset, KpAccentTint, KpAccentHalo, KpFieldGlow, KpWaitingHalo and Fluent's accent keys from the system's
     accent for each variant (AccentPalette), and follows it as it changes.
 
     Semantic brushes (KpBg*, KpBorder*, KpText*, status) change with the theme and are what views use. The raw
@@ -59,6 +59,7 @@
       <SolidColorBrush x:Key="KpInfo" Color="#A09EFF" />
       <SolidColorBrush x:Key="KpDangerTint" Color="#24FF6961" />
       <SolidColorBrush x:Key="KpDangerTintHover" Color="#38FF6961" />
+      <SolidColorBrush x:Key="KpDangerTintPressed" Color="#4DFF6961" />
 
       <!-- The terminal stays dark in every palette; these are here, not with the raw palette, because a key outside a palette would win over high contrast's. -->
       <SolidColorBrush x:Key="KpLine1" Color="#26282C" />
@@ -101,6 +102,7 @@
       <SolidColorBrush x:Key="KpInfo" Color="#5856D6" />
       <SolidColorBrush x:Key="KpDangerTint" Color="#1AC4261F" />
       <SolidColorBrush x:Key="KpDangerTintHover" Color="#2BC4261F" />
+      <SolidColorBrush x:Key="KpDangerTintPressed" Color="#3DC4261F" />
 
       <SolidColorBrush x:Key="KpLine1" Color="#26282C" />
       <SolidColorBrush x:Key="KpLine2" Color="#2C2E33" />
@@ -218,7 +220,7 @@
   <CornerRadius x:Key="KpRadiusMd">10</CornerRadius>
 
   <Thickness x:Key="KpCardPadding">20</Thickness>
-  <Thickness x:Key="KpFieldPadding">12,8</Thickness>
+  <Thickness x:Key="KpFieldPadding">12,0</Thickness>
   <Thickness x:Key="KpScreenPadding">32,24</Thickness>
 
   <BoxShadows x:Key="KpShadowDialog">0 22 60 0 #59000000, 0 0 0 0.5 #2E000000</BoxShadows>

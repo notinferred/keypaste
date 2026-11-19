@@ -75,16 +75,18 @@ public sealed class EntriesOrganizeTests : IDisposable
         }
     }
 
-    /// <summary>
-    /// Renaming can change which places an agent sees cover an entry.
-    /// </summary>
+    /// <summary>The rename form names what it renames, and says nothing of agents while none sees the item by its title.</summary>
     [Fact]
-    public void The_rename_form_says_what_a_path_change_does_to_access()
+    public void The_rename_form_names_the_item_and_warns_only_when_an_agent_sees_it_by_title()
     {
         using var context = New();
+        var entries = context.Entries;
+        entries.Selected = entries.Rows.Single(row => row.Title == "github");
 
-        Assert.Contains("What an agent can see by place is matched against paths", EntriesViewModel.AccessNoteText, StringComparison.Ordinal);
-        Assert.Equal(EntriesViewModel.AccessNoteText, context.Entries.AccessNote, StringComparer.Ordinal);
+        entries.OrganizeCommand.Press();
+
+        Assert.Equal("Rename github", entries.RenamePrompt);
+        Assert.Null(entries.RenameAgentNote);
     }
 
     // ---------------------------------------------------------------- one entry, one write
@@ -271,7 +273,7 @@ public sealed class EntriesOrganizeTests : IDisposable
     }
 
     /// <summary>
-    /// A title or a group match shows its own evidence, so only the invisible fields are named.
+    /// A title or a group match shows its own evidence, so only fields the row does not draw are named.
     /// </summary>
     [Fact]
     public void A_row_matched_on_a_visible_field_says_nothing_extra()
@@ -286,7 +288,7 @@ public sealed class EntriesOrganizeTests : IDisposable
     }
 
     [Fact]
-    public void A_row_matched_on_both_invisible_fields_names_both()
+    public void A_row_matched_on_its_username_shows_the_username_and_names_no_field()
     {
         using var context = New();
         var entries = context.Entries;
@@ -294,7 +296,20 @@ public sealed class EntriesOrganizeTests : IDisposable
         entries.Search = "example";
 
         var row = Assert.Single(entries.Rows);
-        Assert.Equal("username, URL", row.Why);
+        Assert.Empty(row.Why);
+        Assert.Equal("dba@example.test", row.SecondLine);
+    }
+
+    [Fact]
+    public void A_row_matched_on_its_website_alone_names_the_website()
+    {
+        using var context = New();
+        var entries = context.Entries;
+
+        entries.Search = "admin";
+
+        var row = Assert.Single(entries.Rows);
+        Assert.Equal("Website", row.Why);
     }
 
     /// <summary>A tag the query was in labels the row with that tag, which is a label and not a value (D-0485).</summary>

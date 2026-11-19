@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.IO.Pipes;
 using System.Security.Cryptography;
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
@@ -909,13 +910,17 @@ public sealed class DesktopApprovalTests
             var reply = app.Ask();
             var window = await app.PromptAsync();
 
-            Assert.Equal("Denies in 0:45", Text(window, "CountdownText"));
+            var bar = window.FindControl<ProgressBar>("TimeBar")!;
+            var prompt = (PromptViewModel)window.DataContext!;
+            Assert.Equal(("Denies in 0:45", 1d), (AutomationProperties.GetName(bar), prompt.TimeLeft));
 
             app.Clock.Advance(TimeSpan.FromSeconds(1));
-            await PromptedApp.UntilAsync(() => Text(window, "CountdownText") == "Denies in 0:44");
+            await PromptedApp.UntilAsync(() => AutomationProperties.GetName(bar) == "Denies in 0:44");
+            Assert.Equal(44d / 45, prompt.TimeLeft, 0.02);
 
             app.Clock.Advance(TimeSpan.FromSeconds(10));
-            await PromptedApp.UntilAsync(() => Text(window, "CountdownText") == "Denies in 0:34");
+            await PromptedApp.UntilAsync(() => AutomationProperties.GetName(bar) == "Denies in 0:34");
+            Assert.Equal(34d / 45, prompt.TimeLeft, 0.02);
 
             Click(window, "Deny");
             await reply.WaitAsync(_wait, Token);

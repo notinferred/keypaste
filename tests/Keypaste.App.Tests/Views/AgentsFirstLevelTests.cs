@@ -36,8 +36,9 @@ public sealed class AgentsFirstLevelTests
     private static readonly string[] _kinds =
     [
         "Button/AddAnAgent", "ListBox/AgentRows", "Button/OpenActivity", "Button/ShowPrompt", "Button/BackToList",
-        "Button/ConnectTool", "Button/ConnectToolAgain", "Button/DisconnectTool", "ChoiceSegment/RunChoice",
-        "ChoiceSegment/CategoryChoice", "ChoiceSegment/RuleChoice", "Button/RemoveAnswer",
+        "Button/ConnectTool", "Button/RepairTool", "Button/DisconnectTool", "Button/GiveItAName", "Button/ChangeCanSee",
+        "Button/ChangeAsks", "Button/ChangeRun", "Button/ChangeAnswers",
+        "Button/ConnectFromEmpty", "Button/OtherToolFromEmpty",
     ];
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
@@ -59,16 +60,19 @@ public sealed class AgentsFirstLevelTests
     });
 
     [Fact]
-    public Task Add_MCP_manually_shows_the_configuration_in_the_detail() => HeadlessSession.On(async () =>
+    public Task The_add_button_opens_the_Connect_sheet_whose_name_fills_the_entry() => HeadlessSession.On(async () =>
     {
         await using var agents = await Agents.StartAsync();
         var model = agents.Model;
 
-        model.AddMcpManuallyCommand.Execute(null);
+        model.StartConnectCommand.Execute(null);
+        agents.Settle();
 
-        Assert.True(model.ShowsManualConfig);
-        Assert.Null(model.Selected);
-        Assert.Contains("\"keypaste\"", model.ManualConfigText, StringComparison.Ordinal);
+        Assert.True(model.HasSheet);
+        Assert.Contains("\"keypaste\"", model.Sheet!.Config, StringComparison.Ordinal);
+        model.Sheet.Name = "work";
+        Assert.Contains("\"--client-label\", \"work\"", model.Sheet.Config, StringComparison.Ordinal);
+        Assert.Contains(model.Sheet.Found, row => row.Key == "cursor" && row.OffersConnect);
     });
 
     [Fact]
@@ -109,6 +113,8 @@ public sealed class AgentsFirstLevelTests
 
         model.Choose(claude);
         agents.Settle();
+        claude.Settings!.ExpandCommand.Execute("run");
+        agents.Settle();
         var panels = Panels(agents.Window);
         Assert.Single(panels);
         var controls = PanelControls(agents.Window);
@@ -133,10 +139,9 @@ public sealed class AgentsFirstLevelTests
         await model.Opening.WaitAsync(_wait, Token);
         agents.Settle();
 
-        Assert.Null(cursor.Connection);
-        Assert.NotNull(gemini.Connection);
+        Assert.Equal("gemini-cli", model.Connection!.Client.Id);
         Assert.Same(gemini, model.Selected);
-        Assert.Single(agents.Window.GetVisualDescendants().OfType<Button>(), button => button is { Name: "CloseConnection", IsEffectivelyVisible: true });
+        Assert.Single(agents.Window.GetVisualDescendants().OfType<Button>(), button => button is { Name: "CloseSheet", IsEffectivelyVisible: true });
     });
 
     /// <summary>A waiting request's Show the prompt stays the same button as they count down, so a press or the focus on one is not lost at a tick.</summary>
@@ -289,7 +294,10 @@ public sealed class AgentsFirstLevelTests
             await model.Looking.WaitAsync(_wait, Token);
 
             var agents = new Agents(fixture, clock, person, authority, model, window);
-            model.ConnectAnAppCommand.Execute(null);
+            if (model.Rows.FirstOrDefault(row => row.OffersConnect) is { } tool)
+            {
+                model.Open(tool);
+            }
             agents.Settle();
             return agents;
         }

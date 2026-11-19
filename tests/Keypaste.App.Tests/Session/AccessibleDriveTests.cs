@@ -1,6 +1,6 @@
 using Avalonia.Automation.Peers;
 using Avalonia.Automation.Provider;
-using Avalonia.Controls.Primitives;
+using Avalonia.Controls;
 using Keypaste.App.Navigation;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
@@ -26,7 +26,7 @@ public sealed class AccessibleDriveTests
         shell.Show<EntriesViewModel>(DestinationKind.Entries);
 
         Select(shell, "github");
-        Named<IToggleProvider>(shell, "More actions", AutomationControlType.Button).Toggle();
+        Named<IInvokeProvider>(shell, "More actions", AutomationControlType.Button).Invoke();
         Named<IInvokeProvider>(shell, "Edit fields", AutomationControlType.Button).Invoke();
         After(shell, "Username").SetValue("edited-by-name");
         Named<IInvokeProvider>(shell, "Save", AutomationControlType.Button).Invoke();
@@ -54,11 +54,16 @@ public sealed class AccessibleDriveTests
         var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
         entries.Selected = entries.Rows.Single(row => row.Title == "github");
         RenderedShell.Drain();
-        shell.Named<ToggleButton>("EntryMenu").IsChecked = true;
-        shell.Named<ToggleButton>("AddEntry").IsChecked = true;
         AssertNamedByText(shell, "Items");
 
-        foreach (var kind in new[] { DestinationKind.AgentActivity, DestinationKind.Trash, DestinationKind.Settings, DestinationKind.Advanced, DestinationKind.Log, DestinationKind.Sharing, DestinationKind.Tokens, DestinationKind.Diagnostics })
+        foreach (var button in new[] { "EntryMenu", "SidebarNew" })
+        {
+            var (menu, drawn) = shell.OpenMenu(button);
+            AssertNamedByText(drawn, "Items' menus");
+            menu.Hide();
+        }
+
+        foreach (var kind in new[] { DestinationKind.AgentActivity, DestinationKind.Trash, DestinationKind.Settings, DestinationKind.Log, DestinationKind.Sharing, DestinationKind.Tokens, DestinationKind.Diagnostics })
         {
             shell.Shell.Current = Destinations.Of(kind);
             AssertNamedByText(shell, kind.ToString());
@@ -80,10 +85,12 @@ public sealed class AccessibleDriveTests
     /// Fails on a name a reader would say that is a type rather than words: a control whose content is
     /// an icon and text, or a row whose content is a record, is otherwise announced by its type's name.
     /// </summary>
-    private static void AssertNamedByText(RenderedShell shell, string where)
+    private static void AssertNamedByText(RenderedShell shell, string where) => AssertNamedByText(shell.Window, where);
+
+    private static void AssertNamedByText(TopLevel root, string where)
     {
         RenderedShell.Drain();
-        var window = ControlAutomationPeer.CreatePeerForElement(shell.Window);
+        var window = ControlAutomationPeer.CreatePeerForElement(root);
         var types = Visible(window)
             .Select(peer => peer.GetName() ?? string.Empty)
             .Where(name => name.StartsWith("Avalonia.", StringComparison.Ordinal)

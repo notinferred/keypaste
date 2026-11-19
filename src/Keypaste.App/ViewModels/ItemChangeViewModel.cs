@@ -74,7 +74,10 @@ internal sealed class ItemChangeViewModel : PromptViewModel
     internal string Reason { get; }
 
     /// <summary>Whose words the quote is.</summary>
-    internal string SaysLabel => ApprovalViewModel.Says(Agent);
+    internal string SaysLabel => ApprovalViewModel.Says(Agent, Scrubbed, Truncation);
+
+    /// <summary>What keypaste altered or cut in the quote, or null.</summary>
+    internal string? QuoteNote => ApprovalViewModel.NoteOn(Scrubbed, Truncation);
 
     /// <summary>The agent's words, quoted.</summary>
     internal string Quoted => ApprovalViewModel.Quote(Reason);

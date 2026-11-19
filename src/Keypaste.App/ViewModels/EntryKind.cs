@@ -73,7 +73,7 @@ internal static class EntryKinds
     /// <summary>The kind with its tags read too: a card's or an identity's tag makes it one whatever its icon, as agent field categories read it.</summary>
     internal static EntryKind Of(VaultEntry entry, IEnumerable<string> tags) => Tagged(Of(entry), tags);
 
-    /// <summary>A kind read from the icon, made a card or an identity by the tag that makes one.</summary>
+    /// <summary>A kind read from the icon, made a card or an identity by the tag that makes one, and a password a project holds made its environment.</summary>
     internal static EntryKind Tagged(EntryKind kind, IEnumerable<string> tags)
     {
         ArgumentNullException.ThrowIfNull(tags);
@@ -81,6 +81,7 @@ internal static class EntryKinds
         List<string> held = [.. tags];
         return held.Contains(FieldCategories.CardTag, StringComparer.OrdinalIgnoreCase) ? EntryKind.Card
             : held.Contains(FieldCategories.IdentityTag, StringComparer.OrdinalIgnoreCase) ? EntryKind.Identity
+            : kind == EntryKind.Password && held.Any(tag => ProjectTag.Read(tag).Kind == ProjectTagKind.Member) ? EntryKind.Environment
             : kind;
     }
 

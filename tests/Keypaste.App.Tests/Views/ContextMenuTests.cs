@@ -37,7 +37,7 @@ public sealed class ContextMenuTests
         var menu = RightClick(shell.Window, row);
         Assert.Equal("github", entries.Selected?.Title);
         Assert.Equal(
-            ["Copy username", "Copy password", "Copy the one-time code", "Copy website", "Copy the reference", "Open website", "-", "Add to Favorites", "Edit fields…", "Rename…", "Change kind", "Duplicate", "Share…", "Rotate", "Generate a new password…", "Add one-time code…", "Replace the one-time code…", "Remove the one-time code", "Show history", "-", "Delete"],
+            ["Copy username", "Copy password", "Copy the one-time code", "Copy website", "Copy reference", "Open website", "-", "Add to Favorites", "Edit fields…", "Rename…", "Change kind", "Duplicate", "Share…", "Rotate", "Generate a new password…", "Add one-time code…", "Replace the one-time code…", "Remove the one-time code", "Show history", "-", "Delete"],
             Headers(menu));
         string[] needATotp = ["Copy the one-time code", "Replace the one-time code…", "Remove the one-time code"];
         Assert.All(menu.Items.OfType<MenuItem>().Where(item => !needATotp.Contains(item.Header as string)), item => Assert.True(item.IsEffectivelyEnabled, $"{item.Header} is off"));
@@ -174,7 +174,7 @@ public sealed class ContextMenuTests
         var drawn = shell.Window.GetVisualDescendants().OfType<Control>().First(control => Equals(control.DataContext, row));
 
         var menu = RightClick(shell.Window, drawn);
-        Assert.Equal(["Move to a field", "-", "Dismiss", "Review again"], Headers(menu));
+        Assert.Equal(["Open item", "Move to fields", "Move to stage…", "-", "Dismiss", "Review again"], Headers(menu));
         Assert.False(Item(menu, "Review again").IsEffectivelyEnabled);
         Choose(menu, "Dismiss");
         RenderedShell.Drain();
@@ -183,7 +183,7 @@ public sealed class ContextMenuTests
         Assert.True(dismissed.IsDismissed);
 
         var again = RightClick(shell.Window, shell.Window.GetVisualDescendants().OfType<Control>().First(control => Equals(control.DataContext, dismissed)));
-        Assert.False(Item(again, "Move to a field").IsEffectivelyEnabled);
+        Assert.False(Item(again, "Move to fields").IsEffectivelyEnabled);
         Choose(again, "Review again");
         Assert.False(recommendations.Rows.Single().IsDismissed);
     });
@@ -270,12 +270,12 @@ public sealed class ContextMenuTests
     {
         await using var agents = await AgentsInShell.StartAsync();
         var claude = agents.Model.Rows.Single(row => row.Key == "claude-code");
-        agents.Model.Choose(agents.Model.Rows.Single(row => row.IsEveryOther));
+        agents.Model.Choose(agents.Model.Rows.First(row => row != claude));
         WindowInput.Drain();
         var card = agents.Card(claude);
 
         var menu = RightClick(agents.Window, card);
-        Assert.Equal(["Agent settings…", "Connect Claude Code…", "Connect Claude Code again…", "-", "Disconnect…"], Headers(menu));
+        Assert.Equal(["Agent settings…", "Connect Claude Code…", "Repair Claude Code…", "-", "Disconnect…"], Headers(menu));
         Choose(menu, "Agent settings…");
         Assert.Same(claude, agents.Model.Selected);
         WindowInput.Drain();
@@ -287,7 +287,7 @@ public sealed class ContextMenuTests
         Assert.True(agents.Model.IsOpened);
         WindowInput.Drain();
 
-        var inside = agents.Window.GetVisualDescendants().OfType<Button>().First(button => button is { Name: "ConnectToolAgain", IsEffectivelyVisible: true });
+        var inside = agents.Window.GetVisualDescendants().OfType<Button>().First(button => button is { Name: "DisconnectTool", IsEffectivelyVisible: true });
         inside.Focus(NavigationMethod.Tab);
         WindowInput.Drain();
         var open = FromTheKeyboard(agents.Window, inside, PhysicalKey.F10, RawInputModifiers.Shift);
@@ -303,10 +303,10 @@ public sealed class ContextMenuTests
         await agents.Model.Opening;
         WindowInput.Drain();
 
-        // On its name, since the middle of an open card is one of the pane's own controls.
-        var whilePaneIsOpen = RightClick(agents.Window, card.GetVisualDescendants().OfType<TextBlock>().First(text => text.Text == claude.Title));
-        Assert.False(Item(whilePaneIsOpen, "Disconnect…").IsEffectivelyEnabled);
-        whilePaneIsOpen.Hide();
+        // The Connect sheet covers the screen, so nothing behind it acts on an agent until it closes.
+        Assert.True(agents.Model.HasSheet);
+        inside.Focus(NavigationMethod.Tab);
+        Assert.False(disconnect.CanRun());
     });
 
     [Fact]

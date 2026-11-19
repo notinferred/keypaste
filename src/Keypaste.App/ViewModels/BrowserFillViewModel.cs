@@ -6,30 +6,38 @@ namespace Keypaste.App.ViewModels;
 
 /// <summary>A browser's pairing as Settings lists it.</summary>
 /// <param name="name">The pairing's name, as the extension lists it.</param>
-/// <param name="identity">The build that paired.</param>
-/// <param name="used">When it was paired, and when it was last proven here.</param>
-internal sealed partial class PairingItem(string name, string identity, string used) : ObservableObject
+/// <param name="browser">The browser the paired build runs in.</param>
+/// <param name="identity">The build that paired, with its extension ID.</param>
+/// <param name="used">When it was last proven here.</param>
+internal sealed partial class PairingItem(string name, string browser, string identity, string used) : ObservableObject
 {
     internal string Name { get; } = name;
 
     internal string Identity { get; } = identity;
 
-    internal string Used { get; } = used;
+    /// <summary>The browser and its last use: Chrome · last used 2026-11-17 14:02.</summary>
+    internal string Summary { get; } = $"{browser} · {used}";
 
     [ObservableProperty]
     internal partial bool IsConfirmingRemove { get; set; }
 }
 
-/// <summary>A login filled on a site before, as Settings lists it: the item, the page and the browser, forgotten in one press since a fill asked again undoes it.</summary>
+/// <summary>A login that fills on a site without asking, as Settings lists it: the item, the site and the browser, stopped after a confirmation.</summary>
 /// <param name="allowance">The allowance.</param>
 /// <param name="item">Its item's title.</param>
-internal sealed class AllowanceItem(Keypaste.Core.Agents.BrowserAllowance allowance, string item)
+internal sealed partial class AllowanceItem(Keypaste.Core.Agents.BrowserAllowance allowance, string item) : ObservableObject
 {
     internal Keypaste.Core.Agents.BrowserAllowance Allowance { get; } = allowance;
 
     internal string Item { get; } = item;
 
-    internal string Where { get; } = $"on {allowance.Origin} in {allowance.Pairing}";
+    /// <summary>The site and the browser: github.com in work laptop.</summary>
+    internal string Place { get; } = $"{(Uri.TryCreate(allowance.Origin, UriKind.Absolute, out var origin) ? origin.Authority : allowance.Origin)} in {allowance.Pairing}";
+
+    internal string Where => $"{Place} · until you remove it";
+
+    [ObservableProperty]
+    internal partial bool IsConfirmingStop { get; set; }
 }
 
 /// <summary>
@@ -58,6 +66,8 @@ internal sealed partial class BrowserFillViewModel : ObservableObject, IDisposab
         CancelRemoveCommand = new RelayCommand<PairingItem>(row => SetConfirming(row, false), row => row is not null);
         RemoveCommand = new RelayCommand<PairingItem>(Remove, row => row is not null);
         UnallowCommand = new RelayCommand<AllowanceItem>(Unallow, row => row is not null);
+        AskUnallowCommand = new RelayCommand<AllowanceItem>(row => row!.IsConfirmingStop = true, row => row is not null);
+        CancelUnallowCommand = new RelayCommand<AllowanceItem>(row => row!.IsConfirmingStop = false, row => row is not null);
 
         Rows = Read();
         Allowances = ReadAllowances();
@@ -74,6 +84,11 @@ internal sealed partial class BrowserFillViewModel : ObservableObject, IDisposab
 
     /// <summary>Forgets that one item was filled on one page, so the next fill there is asked again.</summary>
     internal RelayCommand<AllowanceItem> UnallowCommand { get; }
+
+    /// <summary>Asks before a login stops filling without asking.</summary>
+    internal RelayCommand<AllowanceItem> AskUnallowCommand { get; }
+
+    internal RelayCommand<AllowanceItem> CancelUnallowCommand { get; }
 
     /// <summary>The items filled without asking, oldest first.</summary>
     [ObservableProperty]
@@ -139,8 +154,8 @@ internal sealed partial class BrowserFillViewModel : ObservableObject, IDisposab
         }
 
         Message = _authority.Unallow(row.Allowance, out var problem)
-            ? $"keypaste will ask before filling {row.Item} {row.Where} again."
-            : $"keypaste still fills {row.Item} {row.Where} without asking: {problem.TrimEnd('.')}. Try again.";
+            ? $"keypaste will ask before filling {row.Item} on {row.Place} again."
+            : $"keypaste still fills {row.Item} on {row.Place} without asking: {problem.TrimEnd('.')}. Try again.";
         Allowances = ReadAllowances();
     }
 
@@ -148,15 +163,9 @@ internal sealed partial class BrowserFillViewModel : ObservableObject, IDisposab
         [.. _authority.Allowances().Select(row => new AllowanceItem(row.Allowance, row.Item))];
 
     private IReadOnlyList<PairingItem> Read() =>
-        [.. _authority.Pairings().Select(row => new PairingItem(row.Pairing.Id, row.Pairing.Identity.Described, Used(row)))];
+        [.. _authority.Pairings().Select(row => new PairingItem(row.Pairing.Id, row.Pairing.Identity.Browser, row.Pairing.Identity.Described, Used(row)))];
 
-    private static string Used(PairingRow row)
-    {
-        var paired = PersonTime.Date(row.Pairing.Created.ToLocalTime());
-        var used = row.LastUsed is { } at
-            ? "last used " + PersonTime.Moment(at.ToLocalTime())
-            : "not used since keypaste started";
-
-        return $"Paired {paired} · {used}";
-    }
+    private static string Used(PairingRow row) => row.LastUsed is { } at
+        ? "last used " + PersonTime.Moment(at.ToLocalTime())
+        : "paired " + PersonTime.Date(row.Pairing.Created.ToLocalTime());
 }

@@ -18,6 +18,7 @@ internal sealed partial class LostTagRow : ObservableObject, IRecommendationRow
         Entry = owner.Named(finding.Entry);
         Tag = EntryNameSanitizer.Sanitize(finding.Tag).Text;
 
+        OpenCommand = new RelayCommand(() => owner.Open(this));
         RestoreCommand = new RelayCommand(() => owner.AskRestore(this));
         ConfirmRestoreCommand = new RelayCommand(() => owner.Restore(this));
         CancelRestoreCommand = new RelayCommand(() => Confirmation = []);
@@ -27,8 +28,11 @@ internal sealed partial class LostTagRow : ObservableObject, IRecommendationRow
 
     internal LostProjectTag Finding { get; }
 
-    /// <summary>The entry's path, sanitized for display.</summary>
+    /// <summary>The item's title as a sentence names it.</summary>
     internal string Entry { get; }
+
+    /// <summary>The item's group path and title, for its tooltip.</summary>
+    internal string EntryPath => RecommendationsViewModel.Shown(Finding.Entry);
 
     /// <summary>The tag the entry lost, sanitized for display.</summary>
     internal string Tag { get; }
@@ -46,12 +50,14 @@ internal sealed partial class LostTagRow : ObservableObject, IRecommendationRow
     /// <summary>What a screen reader hears for the row.</summary>
     internal string Description => $"{Tag} {Where}, {StateLabel.ToLowerInvariant()}";
 
-    /// <summary>What putting the tag back does, shown before it is written (D-0415), or empty when nothing is being asked.</summary>
+    /// <summary>What putting the tag back does, shown before it is written, or empty when nothing is being asked.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsConfirming), nameof(NeedsReview))]
     internal partial IReadOnlyList<string> Confirmation { get; set; } = [];
 
     internal bool IsConfirming => Confirmation.Count > 0;
+
+    public RelayCommand OpenCommand { get; }
 
     internal RelayCommand RestoreCommand { get; }
 

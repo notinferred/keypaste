@@ -10,11 +10,15 @@ namespace Keypaste.App.ViewModels;
 /// </remarks>
 internal sealed class EnvironmentRow
 {
-    internal EnvironmentRow(EntryEnvironment environment)
+    /// <param name="environment">The project and environment.</param>
+    /// <param name="tags">The item's tags, one of which puts it there and is removed from this line.</param>
+    internal EnvironmentRow(EntryEnvironment environment, IEnumerable<EntryTagChip> tags)
     {
         ArgumentNullException.ThrowIfNull(environment);
+        ArgumentNullException.ThrowIfNull(tags);
 
         Label = EntryNameSanitizer.Sanitize($"{environment.Project} · {environment.Environment}").Text;
+        Tag = tags.FirstOrDefault(chip => chip.IsProject && chip.Display == Label);
         RequiresApproval = environment.ApprovalRequired == true;
         Status = environment.ApprovalRequired switch
         {
@@ -26,6 +30,11 @@ internal sealed class EnvironmentRow
 
     /// <summary>The project and environment, as a project tag's chip names them.</summary>
     internal string Label { get; }
+
+    /// <summary>The tag that puts the item here, which the Tags row leaves to this line, or null.</summary>
+    internal EntryTagChip? Tag { get; }
+
+    internal bool HasTag => Tag is not null;
 
     /// <summary>Whether an agent gets the item here only once a person answers.</summary>
     internal bool RequiresApproval { get; }

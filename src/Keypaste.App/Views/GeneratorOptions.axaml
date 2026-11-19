@@ -7,7 +7,7 @@
              x:DataType="vm:GeneratorViewModel">
 
   <!-- What a generated password is made of (V.12): characters with their length and kinds, or words from the EFF list with their count and
-       separator, and what that is worth. One markup for every form and the Generate password dialog. It holds no
+       separator, and how strong that is, its bits in the tooltip. One markup for every form and the Generate password dialog. It holds no
        secret; the value goes straight into the field it was generated for. -->
 
   <StackPanel Spacing="8">
@@ -21,22 +21,13 @@
       <StackPanel Spacing="6">
         <TextBlock Classes="label" Text="{x:Static res:Strings.Length}" />
         <NumericUpDown HorizontalAlignment="Left"
-                       Width="76"
-                       ShowButtonSpinner="False"
+                       Width="104"
                        Minimum="{Binding MinimumLength}"
                        Maximum="{Binding MaximumLength}"
                        Increment="1"
                        FormatString="0"
                        AutomationProperties.Name="{x:Static res:Strings.Length}"
                        Value="{Binding Length}" />
-        <Slider HorizontalAlignment="Left"
-                Width="240"
-                Minimum="{Binding MinimumLength}"
-                Maximum="{Binding MaximumLength}"
-                TickFrequency="1"
-                IsSnapToTickEnabled="True"
-                AutomationProperties.Name="{x:Static res:Strings.Length}"
-                Value="{Binding Length}" />
       </StackPanel>
       <WrapPanel Orientation="Horizontal" ItemSpacing="16" LineSpacing="4">
         <CheckBox Content="{x:Static res:Strings.Letters}" IsChecked="{Binding Letters}" />
@@ -67,8 +58,7 @@
                  Text="{Binding Separator}" />
       </StackPanel>
     </StackPanel>
-    <TextBlock Classes="caption" Text="{Binding Strength}" />
-    <TextBlock Classes="caption" IsVisible="{Binding UseWords}" Text="{Binding Provenance}" />
+    <TextBlock Classes="caption" Text="{Binding Strength}" ToolTip.Tip="{Binding StrengthTip}" Background="Transparent" HorizontalAlignment="Left" />
     <TextBlock Classes="caption secondary"
                IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}"
                ctl:Announcer.Says="{Binding Error}" Text="{Binding Error}" />

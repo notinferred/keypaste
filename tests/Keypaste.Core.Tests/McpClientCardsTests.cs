@@ -72,9 +72,9 @@ public sealed class McpClientCardsTests
             []));
 
         Assert.Equal(2, card.Connections);
-        Assert.Equal(2, card.Folders.Count);
-        Assert.Contains("repo", card.Folders);
-        Assert.DoesNotContain(card.Folders, folder => folder.Contains('\u202E', StringComparison.Ordinal));
+        Assert.Equal(2, card.Sessions.Count);
+        Assert.Contains(card.Sessions, session => session.Folder == "repo");
+        Assert.DoesNotContain(card.Sessions, session => session.Folder?.Contains('\u202E', StringComparison.Ordinal) == true);
     }
 
     [Fact]

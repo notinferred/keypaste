@@ -99,7 +99,7 @@ internal static class Program
         "             restore <title>, notice, reload, merge,\n" +
         "             and with the app's own\n" +
         "             prompt: once, always, allow, deny, close, show-prompt; activity;\n" +
-        "             tools, connect <tool>, connect-remove <tool>, confirm, cancel, check, pick <n>; settings <label>,\n" +
+        "             tools, connect <tool>, connect-remove <tool>, confirm; settings <label>,\n" +
         "             setting <label> mode|values|run <word>, setting <label> see <selector,...>,\n" +
         "             setting <label> row <scope>, setting <label> row-mode <scope> <word>, setting <label> use-vault;\n" +
         "             pairings, unpair <name>, which list Settings › Browser fill's pairings and press Remove;\n" +
@@ -109,7 +109,7 @@ internal static class Program
         "             and on macOS with --terminal-bundle: terminal <run | open> <project> <directory> [command, the rest of the line])\n" +
         "       launch [--background]\n" +
         "            (runs the app as keypaste-app does, on a headless display, until standard input closes;\n" +
-        "             per line of standard input: notice open, which presses a locked notice's Open keypaste once armed;\n" +
+        "             per line of standard input: notice open, which presses a locked notice's Unlock… once armed;\n" +
         "             continue; unlock <vault>; copy <title>; lock; crash <text>)\n" +
         "       crash-endpoint <folder> [--silent]\n" +
         "            (answers crash reports on loopback 204 and keeps each in <folder>, or never answers, until standard input closes)\n" +
@@ -741,7 +741,7 @@ internal sealed class Driver(string home)
             foreach (var row in list.LostTags)
             {
                 var state = row.IsDismissed ? "dismissed" : "needs-review";
-                Console.Out.WriteLine($"lost entry={row.Entry} tag={row.Tag} state={state}");
+                Console.Out.WriteLine($"lost entry={row.EntryPath} tag={row.Tag} state={state}");
             }
 
             Console.Out.WriteLine(string.Create(CultureInfo.InvariantCulture, $"count {list.LostTags.Count(row => row.NeedsReview)}"));
@@ -752,7 +752,7 @@ internal sealed class Driver(string home)
     internal Task<int> RestoreLostTagAsync(string vault, string entry, string tag) =>
         WithRecommendationsAsync(vault, list =>
         {
-            var row = list.LostTags.SingleOrDefault(row => row.Entry == entry && row.Tag == tag && row.NeedsReview)
+            var row = list.LostTags.SingleOrDefault(row => row.EntryPath == entry && row.Tag == tag && row.NeedsReview)
                 ?? throw new DriverException($"no dropped {tag} needing review on '{entry}'");
 
             Press(row.RestoreCommand, "Restore tag");
@@ -770,7 +770,7 @@ internal sealed class Driver(string home)
     internal Task<int> DismissLostTagAsync(string vault, string entry, string tag) =>
         WithRecommendationsAsync(vault, list =>
         {
-            var row = list.LostTags.SingleOrDefault(row => row.Entry == entry && row.Tag == tag && row.NeedsReview)
+            var row = list.LostTags.SingleOrDefault(row => row.EntryPath == entry && row.Tag == tag && row.NeedsReview)
                 ?? throw new DriverException($"no dropped {tag} needing review on '{entry}'");
 
             Press(row.DismissCommand, "Dismiss");
@@ -781,7 +781,7 @@ internal sealed class Driver(string home)
     internal Task<int> ReviewLostTagAgainAsync(string vault, string entry, string tag) =>
         WithRecommendationsAsync(vault, list =>
         {
-            var row = list.LostTags.SingleOrDefault(row => row.Entry == entry && row.Tag == tag && row.IsDismissed)
+            var row = list.LostTags.SingleOrDefault(row => row.EntryPath == entry && row.Tag == tag && row.IsDismissed)
                 ?? throw new DriverException($"no dismissed {tag} on '{entry}'");
 
             Press(row.ReviewAgainCommand, "Review again");
@@ -1046,18 +1046,6 @@ internal sealed class Driver(string home)
                     await agents.ConfirmAsync().ConfigureAwait(true);
                     break;
 
-                case ["cancel"]:
-                    await agents.CancelAsync().ConfigureAwait(true);
-                    break;
-
-                case ["check"]:
-                    await agents.CheckAsync().ConfigureAwait(true);
-                    break;
-
-                case ["pick", var which]:
-                    await agents.PickAsync(which).ConfigureAwait(true);
-                    break;
-
                 case ["settings", var label]:
                     await agents.ShowSettingsAsync(label).ConfigureAwait(true);
                     break;
@@ -1121,7 +1109,7 @@ internal sealed class Driver(string home)
 
         foreach (var row in browserFill.Allowances)
         {
-            Console.Out.WriteLine($"allowance item={row.Item} {row.Where}");
+            Console.Out.WriteLine($"allowance item={row.Item} on {row.Allowance.Origin} in {row.Allowance.Pairing}");
         }
     }
 
@@ -1153,7 +1141,7 @@ internal sealed class Driver(string home)
 
         foreach (var row in hosts.Rows)
         {
-            Console.Out.WriteLine($"browser {row.Name.ToLowerInvariant()} on={Word(row.IsOn)} other={Word(row.ReplacesAnother)} answer={row.Answer} extension={row.Extension}");
+            Console.Out.WriteLine($"browser {row.Name.ToLowerInvariant()} on={Word(row.IsOn)} other={Word(row.ReplacesAnother)} status={row.Status} program={row.Program ?? "none"}");
         }
     }
 
@@ -1171,7 +1159,7 @@ internal sealed class Driver(string home)
 
         if (row.IsOn == on || !hosts.ChangeCommand.CanExecute(row))
         {
-            Console.Out.WriteLine($"{verb} {browser} not offered: Settings shows {row.ActionLabel} for {row.Name}");
+            Console.Out.WriteLine($"{verb} {browser} not offered: Settings shows {row.Name} {(row.IsOn ? "on" : "off")}");
             return;
         }
 
@@ -1212,7 +1200,7 @@ internal sealed class Driver(string home)
         }
 
         // What Agents › Activity draws, read by that screen's own view model, which shows the whole file.
-        using var history = new LogViewModel(home);
+        var history = new LogViewModel(home);
 
         if (history.HasMessage)
         {
@@ -1332,7 +1320,7 @@ internal sealed class Driver(string home)
             Console.Out.WriteLine("tools end");
         }
 
-        /// <summary>Presses a tool's Connect, or Connect again under its Settings when it is connected, and prints the plan.</summary>
+        /// <summary>Presses a tool's Connect, or Repair where its entry differs from what Connect writes, and prints the plan.</summary>
         internal async Task ConnectAsync(string tool)
         {
             var screen = await SettledAsync().ConfigureAwait(true);
@@ -1342,10 +1330,9 @@ internal sealed class Driver(string home)
             {
                 screen.ConnectCommand.Execute(row);
             }
-            else if (screen.ConnectAgainCommand.CanExecute(row))
+            else if (screen.RepairCommand.CanExecute(row))
             {
-                row.IsOpen = true;
-                screen.ConnectAgainCommand.Execute(row);
+                screen.RepairCommand.Execute(row);
             }
             else
             {
@@ -1371,32 +1358,14 @@ internal sealed class Driver(string home)
             await ShownAsync(screen).ConfigureAwait(true);
         }
 
+        /// <summary>Presses the action, prints what it did, and once connected the check's one line.</summary>
         internal async Task ConfirmAsync()
         {
             var model = await PaneAsync().ConfigureAwait(true);
             await PressAsync(model.ConfirmCommand, model.Title).ConfigureAwait(true);
             Console.Out.WriteLine($"message {model.Message}");
-        }
-
-        internal async Task CancelAsync()
-        {
-            var model = await PaneAsync().ConfigureAwait(true);
-            Press(model.CancelCommand, "Cancel");
-            Console.Out.WriteLine($"message {model.Message}");
-        }
-
-        /// <summary>Starts the check and returns; what it says arrives as it goes, ending with <c>check end</c>.</summary>
-        internal async Task CheckAsync() => Run((await PaneAsync().ConfigureAwait(true)).CheckCommand, "Check the connection");
-
-        internal async Task PickAsync(string which)
-        {
-            var model = await PaneAsync().ConfigureAwait(true);
-            var index = int.Parse(which, CultureInfo.InvariantCulture) - 1;
-            model.SelectedCheckEntry = index >= 0 && index < model.CheckEntries.Count
-                ? model.CheckEntries[index]
-                : throw new DriverException($"the check lists no item {which}");
-
-            Run(model.AskCommand, "Ask for it");
+            await model.Checking.ConfigureAwait(true);
+            Console.Out.WriteLine("check end");
         }
 
         /// <summary>Opens a row's Settings, as pressing its disclosure does, and prints what they hold.</summary>
@@ -1505,41 +1474,12 @@ internal sealed class Driver(string home)
 
         public void Dispose() => Close();
 
-        private static void Run(AsyncRelayCommand command, string button)
-        {
-            if (!command.CanExecute(null))
-            {
-                throw new DriverException($"the {button} button is disabled");
-            }
-
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await command.ExecuteAsync(null).ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    Console.Out.WriteLine($"check threw {ex.GetType().Name}: {ex.Message}");
-                }
-
-                Console.Out.WriteLine("check end");
-            });
-        }
-
         private static void Print(ConnectClientViewModel model, string? property)
         {
             switch (property)
             {
                 case nameof(ConnectClientViewModel.CheckMessage) when model.HasCheckMessage:
                     Console.Out.WriteLine($"check {model.CheckMessage}");
-                    break;
-                case nameof(ConnectClientViewModel.IsPicking) when model.IsPicking:
-                    foreach (var (entry, i) in model.CheckEntries.Select((entry, i) => (entry, i)))
-                    {
-                        Console.Out.WriteLine($"check-entry n={i + 1} {entry.Name}");
-                    }
-
                     break;
             }
         }

@@ -192,6 +192,41 @@ public sealed class VaultNoteMoveTests : IDisposable
         Assert.Equal(SavedRead.Current, vault.ReadSaved(out _));
     }
 
+    [Fact]
+    public void Chosen_keys_move_into_a_stage_as_one_revision_and_join_its_variables()
+    {
+        var path = Saved((_stripe, "A_KEY=1\nB_KEY=2\nC_KEY=3\nkeep this"));
+
+        using var vault = Vault.Open(path, _master);
+        using var check = new NoteKeyCheck();
+        var chosen = check.Scan(vault).Where(finding => finding.Field != "B_KEY").ToList();
+
+        var move = vault.MoveNoteKeysInto(check, chosen, "billing", "staging");
+
+        Assert.True(move.Moved);
+        Assert.Equal(["env:billing:staging"], vault.Tags(_stripe));
+        Assert.Equal("B_KEY=2\nkeep this", vault.Find(_stripe)!.Notes);
+        Assert.Single(vault.ReadHistory(_stripe)!);
+        Assert.Equal(
+            ["A_KEY", "C_KEY"],
+            EnvResolution.Members(vault.ReadEnvSnapshot(), "billing", "staging", out _).Select(member => member.Key).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void A_stage_name_the_tag_rules_refuse_changes_nothing()
+    {
+        var path = Saved((_stripe, "KEY=v"));
+
+        using var vault = Vault.Open(path, _master);
+        using var check = new NoteKeyCheck();
+        var edits = 0;
+        vault.Edited += (_, _) => edits++;
+
+        Assert.Throws<VaultException>(() => vault.MoveNoteKeysInto(check, check.Scan(vault), "billing", "Prod"));
+        AssertUnchanged(vault, edits, 0);
+        Assert.Equal("KEY=v", vault.Find(_stripe)!.Notes);
+    }
+
     private static void AssertUnchanged(Vault vault, int edits, int history)
     {
         Assert.Equal(0, edits);

@@ -274,6 +274,12 @@ internal sealed class RevealedValue : Control
 
         if (_shown is null)
         {
+            // A cell narrower than the mask draws as many whole dots as it holds, never half of one.
+            if (MaskedLength > 0 && text.Width > bounds.Width && bounds.Width > 0)
+            {
+                text = Layout(new string('•', (int)(bounds.Width / (text.Width / MaskedLength))));
+            }
+
             // Inside a mirrored cell the mask keeps to the cell's start, as its note expects; only the letters stay left to right.
             context.DrawText(text, HasMirrorTransform ? new Point(Math.Max(0, bounds.Width - text.Width), 0) : default);
             return;
@@ -453,9 +459,9 @@ internal sealed class RevealedValue : Control
     /// </remarks>
     protected override AutomationPeer OnCreateAutomationPeer() => new NoneAutomationPeer(this);
 
-    private FormattedText Layout() =>
+    private FormattedText Layout(string? drawn = null) =>
         new(
-            Rendered,
+            drawn ?? Rendered,
             CultureInfo.CurrentCulture,
             FlowDirection.LeftToRight,
             new Typeface(FontFamily),

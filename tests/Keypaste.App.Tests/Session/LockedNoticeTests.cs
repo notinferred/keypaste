@@ -16,7 +16,7 @@ namespace Keypaste.App.Tests.Session;
 
 /// <summary>
 /// With the app running locked in the menu bar or tray and holding its home, a bridge that finds it locked has it show
-/// one notice and no window; only the notice's Open keypaste shows the unlock screen, and the next notice waits for an
+/// one notice and no window; only the notice's Unlock… shows the unlock screen, and the next notice waits for an
 /// unlock and a lock.
 /// </summary>
 /// <remarks>
@@ -53,7 +53,7 @@ public sealed class LockedNoticeTests
             Assert.True(await TellAsync(vault.Path_), "the bridge did not reach the locked app");
             var notice = await NoticeAsync(notices);
 
-            Assert.Equal("An agent asked for test.kdbx", Text(notice, "HeadText"));
+            Assert.Equal("test is locked", Text(notice, "HeadText"));
             Assert.Same(notice, app.LockedNotice!.Showing);
             Assert.False(app.Main!.IsVisible, "a bridge showed the main window");
             Assert.Null(lifetime.MainWindow);
@@ -106,14 +106,14 @@ public sealed class LockedNoticeTests
             var open = notice.FindControl<Button>("Open")!;
 
             Click(notice, "Open");
-            Assert.True(notice.IsVisible, "a press before Open keypaste was armed closed the notice");
-            Assert.False(app.Main!.IsVisible, "a press before Open keypaste was armed showed the window");
+            Assert.True(notice.IsVisible, "a press before Unlock… was armed closed the notice");
+            Assert.False(app.Main!.IsVisible, "a press before Unlock… was armed showed the window");
 
             await Until(() => open.IsEffectivelyEnabled);
             Click(notice, "Open");
 
             await Until(() => !notice.IsVisible);
-            Assert.True(app.Main.IsVisible, "Open keypaste did not show the window");
+            Assert.True(app.Main.IsVisible, "Unlock… did not show the window");
             Assert.Same(app.Main, lifetime.MainWindow);
             Assert.Equal(vault.Path_, Screen(app).SelectedPath);
             Assert.Null(app.LockedNotice!.Showing);
@@ -182,7 +182,7 @@ public sealed class LockedNoticeTests
 
             Assert.True(await TellAsync(chosen), "the app did not listen for the chosen vault");
             var notice = await NoticeAsync(notices);
-            Assert.Equal("An agent asked for chosen.kdbx", Text(notice, "HeadText"));
+            Assert.Equal("chosen is locked", Text(notice, "HeadText"));
 
             Assert.True(await TellAsync(shown.Path_), "the app did not listen for the vault its unlock screen shows");
             await SettleAsync();
@@ -223,7 +223,7 @@ public sealed class LockedNoticeTests
 
             await TellUntilHeardAsync(after);
             var notice = await NoticeAsync(notices);
-            Assert.Equal("An agent asked for after.kdbx", Text(notice, "HeadText"));
+            Assert.Equal("after is locked", Text(notice, "HeadText"));
             Assert.False(await TellAsync(before), "the app still listened for the vault chosen before");
             Assert.True(await TellAsync(shown.Path_), "the app stopped listening for the vault its unlock screen shows");
             Assert.False(app.Main!.IsVisible);
@@ -362,7 +362,7 @@ public sealed class LockedNoticeTests
             var notice = await NoticeAsync(notices);
 
             Assert.Single(system.Posts);
-            Assert.Equal("An agent asked for test.kdbx", Text(notice, "HeadText"));
+            Assert.Equal("test is locked", Text(notice, "HeadText"));
             Assert.False(app.Main!.IsVisible);
             notice.Close();
         });

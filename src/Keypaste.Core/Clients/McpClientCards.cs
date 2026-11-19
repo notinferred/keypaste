@@ -39,9 +39,17 @@ public sealed record McpClientCard(
     /// <summary>Whether the tool was found on this computer and holds keypaste; null when it was not found, or the card is no tool's.</summary>
     public McpToolPresence? Presence { get; init; }
 
-    /// <summary>The folder each live session says it runs in; display only (T-3).</summary>
-    public IReadOnlyList<string> Folders { get; init; } = [];
+    /// <summary>What a found tool's own configuration starts for keypaste, or null when it holds none or it cannot be read.</summary>
+    public McpEntryLaunch? Launch { get; init; }
+
+    /// <summary>Each live session: the folder it says it runs in, display only (T-3), and when it last asked.</summary>
+    public IReadOnlyList<McpClientSession> Sessions { get; init; } = [];
 }
+
+/// <summary>One bridge of a client attached now.</summary>
+/// <param name="Folder">The folder it says it runs in, or null; display only (T-3).</param>
+/// <param name="LastRequestAt">When it last asked for anything.</param>
+public sealed record McpClientSession(string? Folder, DateTimeOffset LastRequestAt);
 
 /// <summary>
 /// The agents and AI tools of one vault: the agents attached now, those its audit lines name and those
@@ -109,10 +117,9 @@ public static class McpClientCards
 
             var draft = Card(key, Nonempty(client.Label), client.Name);
             draft.Connections++;
-            if (client.Folder is { Length: > 0 } folder)
-            {
-                draft.Folders.Add(EntryNameSanitizer.Sanitize(folder, AttachClient.MaximumLength).Text);
-            }
+            draft.Sessions.Add(new McpClientSession(
+                client.Folder is { Length: > 0 } folder ? EntryNameSanitizer.Sanitize(folder, AttachClient.MaximumLength).Text : null,
+                client.LastRequestAt));
 
             draft.Seen(client.LastRequestAt);
         }
@@ -161,7 +168,8 @@ public static class McpClientCards
                 draft.LastSeen,
                 rules.Runs(draft.Label))
             {
-                Folders = draft.Folders,
+                Sessions = draft.Sessions,
+                Launch = draft.Finding?.Reading?.Launch,
                 Tool = draft.Finding?.Tool ?? McpClientCatalog.All.FirstOrDefault(known => string.Equals(known.Id, draft.Label, StringComparison.Ordinal)),
                 Presence = draft.Finding?.Presence,
             };
@@ -221,7 +229,7 @@ public static class McpClientCards
 
         internal int Connections { get; set; }
 
-        internal List<string> Folders { get; } = [];
+        internal List<McpClientSession> Sessions { get; } = [];
 
         internal McpToolFinding? Finding { get; set; }
 

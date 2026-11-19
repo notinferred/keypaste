@@ -16,6 +16,7 @@ internal sealed class EnvVariableRow : ObservableObject, IRevealSource
 {
     private readonly EnvProjectViewModel _owner;
     private int _maskedLength;
+    private bool _isConfirmingRemove;
 
     internal EnvVariableRow(EnvProjectViewModel owner, EnvSource source, int length)
     {
@@ -52,6 +53,16 @@ internal sealed class EnvVariableRow : ObservableObject, IRevealSource
     /// <summary>Opens the form that writes a new value over this one.</summary>
     internal RelayCommand ReplaceCommand { get; }
 
+    /// <summary>Whether the row asks, in place, to remove this variable.</summary>
+    internal bool IsConfirmingRemove => _isConfirmingRemove;
+
+    /// <summary>What the row asks before removing.</summary>
+    internal string RemovePrompt => _owner.RemovePrompt;
+
+    internal RelayCommand ConfirmRemoveCommand => _owner.ConfirmRemoveCommand;
+
+    internal RelayCommand CancelRemoveCommand => _owner.CancelRemoveCommand;
+
     /// <inheritdoc/>
     public event EventHandler? Changed;
 
@@ -60,6 +71,12 @@ internal sealed class EnvVariableRow : ObservableObject, IRevealSource
 
     /// <inheritdoc/>
     public void Conceal() => _owner.Conceal(this);
+
+    internal void ConfirmRemove(bool asking)
+    {
+        SetProperty(ref _isConfirmingRemove, asking, nameof(IsConfirmingRemove));
+        OnPropertyChanged(nameof(RemovePrompt));
+    }
 
     /// <summary>Picks up a new length after the value changed.</summary>
     internal void Resize(int length)

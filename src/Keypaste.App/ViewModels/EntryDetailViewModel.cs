@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Keypaste.App.Clipboard;
+using Keypaste.App.Resources;
 using Keypaste.App.Session;
 using Keypaste.Core;
 using Keypaste.Core.Activity;
@@ -156,14 +157,6 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         History = new EntryHistoryViewModel(session, clipboard, this, Restored);
         Attachments = new EntryAttachmentsViewModel(session, Name, picker, report, History.Refresh);
 
-        History.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(EntryHistoryViewModel.IsOpen))
-            {
-                OnPropertyChanged(nameof(TakesWholeView));
-            }
-        };
-
         ReadTimes();
         ReadFieldsAndTags();
     }
@@ -270,10 +263,13 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     /// <summary>The entry's own tags, never its group's.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasTags), nameof(TagsSummary), nameof(IsFavorite), nameof(FavoriteLabel), nameof(Mark))]
+    [NotifyPropertyChangedFor(nameof(HasTags), nameof(TagsSummary), nameof(IsFavorite), nameof(FavoriteLabel), nameof(Mark), nameof(ChipTags))]
     internal partial IReadOnlyList<EntryTagChip> Tags { get; private set; } = [];
 
     internal bool HasTags => Tags.Count > 0;
+
+    /// <summary>The tags the Tags row draws: all but a project's, which its Environments line names once.</summary>
+    internal IReadOnlyList<EntryTagChip> ChipTags => [.. Tags.Where(chip => !Environments.Any(row => ReferenceEquals(row.Tag, chip)))];
 
     /// <summary>A new field's value, while its form is open.</summary>
     internal SecretField NewFieldValue { get; }
@@ -339,8 +335,12 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         get => _replacingField;
         private set
         {
+            var before = _replacingField;
+
             if (SetProperty(ref _replacingField, value))
             {
+                before?.ShowForm();
+                value?.ShowForm();
                 OnPropertyChanged(nameof(IsReplacingField));
                 OnPropertyChanged(nameof(ReplaceFieldPrompt));
                 OnPropertyChanged(nameof(ReplacingFieldName));
@@ -357,9 +357,6 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     /// <summary>Whether a form in the pane shows its own primary button: an edit, a rotate, or adding, replacing or renaming a field.</summary>
     internal bool HasOwnPrimary => IsEditing || IsConfirmingRotate || IsAddingField || IsReplacingField || IsRenamingField || IsSettingTotp;
-
-    /// <summary>Whether the item takes the whole of Items rather than sharing it with the list: while two revisions are compared.</summary>
-    internal bool TakesWholeView => History.IsOpen;
 
     internal string ReplaceFieldPrompt => $"New value for {_replacingField?.DisplayName}";
 
@@ -381,8 +378,12 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         get => _renamingField;
         private set
         {
+            var before = _renamingField;
+
             if (SetProperty(ref _renamingField, value))
             {
+                before?.ShowForm();
+                value?.ShowForm();
                 OnPropertyChanged(nameof(IsRenamingField));
                 OnPropertyChanged(nameof(RenameFieldPrompt));
                 OnPropertyChanged(nameof(RenamingFieldName));
@@ -441,7 +442,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     /// <summary>The project environments the item's own tags put it in, for the Environments card.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsEnvironments))]
+    [NotifyPropertyChangedFor(nameof(ShowsEnvironments), nameof(ChipTags))]
     internal partial IReadOnlyList<EnvironmentRow> Environments { get; private set; } = [];
 
     /// <summary>Whether the Environments card shows: the item's own tags put it in a project.</summary>
@@ -613,18 +614,6 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     /// <summary>Generate, on the saved password: Edit fields with the generator open, whose Apply fills the new password that Save writes and history keeps the old one of.</summary>
     internal RelayCommand GeneratePasswordCommand { get; }
 
-    /// <summary>Adds a generated value as a new protected field, as Generate password's Add as a field asks, through Add a field's own write.</summary>
-    internal void AddGeneratedField(string name, SecretField value)
-    {
-        ArgumentNullException.ThrowIfNull(value);
-
-        BeginAddField();
-        DraftFieldName = name;
-        NewFieldValue.TakeFrom(value);
-        NewFieldProtected = true;
-        ConfirmAddFieldCommand.Press();
-    }
-
     /// <summary>Generate, on a protected field: its replace form with the generator open, whose Apply fills the value Replace writes and history keeps the old one of.</summary>
     internal void GenerateField(EntryFieldRow row) =>
         LeavingFieldForm(() =>
@@ -658,9 +647,6 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         _generatorPanel is { } panel && ReferenceEquals(panel.Target, field) ? panel : null;
 
     internal RelayCommand CloseGeneratorCommand { get; }
-
-    /// <summary>Starts a new item with a generated value, set by the screen that holds this pane; the second argument closes the panel.</summary>
-    internal Action<SecretField, Action>? StartNewItemWith { get; set; }
 
     /// <summary>The generator open for one of the pane's fields, or null while it is closed.</summary>
     internal GeneratePasswordViewModel? GeneratorPanel
@@ -698,16 +684,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         }
 
         CloseGenerator();
-        var forPassword = ReferenceEquals(field, NewPassword);
-        GeneratorPanel = new GeneratePasswordViewModel(
-            _clipboard,
-            Generator,
-            field,
-            value => ApplyGenerated(field, value),
-            forPassword ? value => StartNewItemWith?.Invoke(value, CloseGenerator) : null,
-            forPassword ? (value, name) => AddGeneratedField(name, value) : null,
-            Name.Title,
-            CloseGenerator);
+        GeneratorPanel = new GeneratePasswordViewModel(_clipboard, Generator, field, value => ApplyGenerated(field, value), CloseGenerator);
     }
 
     private void ApplyGenerated(SecretField field, SecretField value)
@@ -891,11 +868,8 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     [NotifyCanExecuteChangedFor(nameof(RotateCommand), nameof(ConfirmRotateCommand), nameof(CancelRotateCommand))]
     internal partial bool IsConfirmingRotate { get; private set; }
 
-    /// <summary>What the confirm row asks; an instance property because a binding needs one.</summary>
-#pragma warning disable CA1822
-    internal string RotatePrompt =>
-        $"Replace the saved password with a new {PasswordGenerator.DefaultLength}-character one? keypaste only changes its copy: set the new password on the site or service too, or you will need the old one from history to sign in.";
-#pragma warning restore CA1822
+    /// <summary>What the confirm row asks: whose password, and where else it must change.</summary>
+    internal string RotatePrompt => UseText.RotatePassword(DisplayTitle, WebAddress.TryOpenable(Url, out var address) ? address.Host : null);
 
     /// <summary>When the entry was created, as the metadata row shows it.</summary>
     [ObservableProperty]
@@ -908,6 +882,13 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     /// <summary>When its current password was set, as the metadata row shows it.</summary>
     [ObservableProperty]
     internal partial string Rotated { get; private set; } = string.Empty;
+
+    /// <summary>The footer's one line: how long since the item changed.</summary>
+    [ObservableProperty]
+    internal partial string ModifiedLine { get; private set; } = string.Empty;
+
+    /// <summary>The footer line's tooltip: when the item was created, changed and its password set.</summary>
+    internal string TimesTip => string.Join(Environment.NewLine, new[] { (Strings.Created, Created), (Strings.Modified, Modified), (Strings.Rotated, Rotated) }.Where(time => time.Item2.Length > 0).Select(time => $"{time.Item1} {time.Item2}"));
 
     /// <summary>When the item expires or expired, its local date and time as the metadata row shows it; empty when it never expires.</summary>
     [ObservableProperty]
@@ -943,14 +924,6 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     internal bool ShowsAgentAccessSummary => AgentLines.Count == 0;
 
-    /// <summary>When an agent last received it: "in use", "4m ago" or "never".</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasBeenUsed))]
-    internal partial string LastUsedText { get; private set; } = "never";
-
-    /// <summary>Whether an agent ever received it, which is when the card says when.</summary>
-    internal bool HasBeenUsed => LastUsedText != "never";
-
     /// <summary>Takes the latest picture of what agents did, never a value.</summary>
     /// <param name="activity">The picture.</param>
     internal void Apply(EntryActivity activity)
@@ -971,9 +944,11 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         ShowsAgentAccess = activity.AgentsCanSee(Name, tags, byItem: SharesItsName);
         AgentAccess = access;
         AgentAccessSummary = UseText.Summary(access, activity.Seeing(Name, tags));
-        LastUsedText = UseText.LastUsed(access.Use, now);
         AgentLines = UseText.Lines(access, now);
     }
+
+    /// <summary>The attached agents that see this item by its title, which a rename can hide it from.</summary>
+    internal IReadOnlyList<string> SeeingByName => _activity?.SeeingByName(Name) ?? [];
 
     /// <summary>The Agent access card's detail: each client that received this entry.</summary>
     [ObservableProperty]
@@ -993,25 +968,18 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     /// <summary>Each group down to this entry.</summary>
     internal string Location => string.Join(" › ", _groupPath.Split('/', StringSplitOptions.RemoveEmptyEntries).Select(group => EntryNameSanitizer.Sanitize(group).Text));
 
-    /// <summary>Back to the preview from an edit or a comparison.</summary>
-    internal void LeaveWholeView()
-    {
-        if (IsEditing)
-        {
-            CancelEdit();
-        }
+    /// <summary>Whether the item's KeePass UUID is known, which Copy KeePass ID copies.</summary>
+    internal bool HasKeePassId => _uuid is { Length: > 0 };
 
-        if (History.IsOpen)
+    /// <summary>Copies the item's KeePass UUID, which names it in KeePassXC and holds no value.</summary>
+    [RelayCommand]
+    private async Task CopyKeePassIdAsync()
+    {
+        if (_uuid is { Length: > 0 } uuid)
         {
-            History.ToggleCommand.Press();
+            await _clipboard.CopyPlainAsync(uuid.ToLowerInvariant(), Strings.KeePassItemID).ConfigureAwait(true);
         }
     }
-
-    /// <summary>Where the value lives in the KDBX file: the entry's UUID, abbreviated, and its field.</summary>
-    /// <remarks>The list's row says where it is; the UUID is what KeePassXC shows nowhere else.</remarks>
-    internal string KdbxEntry => _uuid is { Length: > 8 } uuid
-        ? $"uuid {uuid[..4].ToLowerInvariant()}…{uuid[^4..].ToLowerInvariant()} · field Password"
-        : $"{DisplayPath} · field Password";
 
     /// <summary>Whether the URL is a link that opens in the browser: http or https, or a bare address as https.</summary>
     internal bool OpensUrl => WebAddress.TryOpenable(Url, out _);
@@ -1061,7 +1029,11 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
 
     /// <summary>Whether another item has this name now, so the card reads only what is recorded of this item by its UUID.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AgentAccessTip))]
     internal partial bool SharesItsName { get; private set; }
+
+    /// <summary>The Agent access row's tooltip: why it shows only this item's use while another has its title.</summary>
+    internal string? AgentAccessTip => SharesItsName ? Strings.SharedNameActivity : null;
 
     /// <summary>Whether another item has this name and neither its username nor its URL tells them apart, which only a rename can then do.</summary>
     [ObservableProperty]
@@ -1137,7 +1109,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     internal partial string Username { get; private set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(OpensUrl), nameof(ShowsUrlNote), nameof(DisplayUrl), nameof(HasUrl), nameof(HasStandardRows), nameof(Mark))]
+    [NotifyPropertyChangedFor(nameof(OpensUrl), nameof(ShowsUrlNote), nameof(DisplayUrl), nameof(HasUrl), nameof(HasStandardRows), nameof(Mark), nameof(RotatePrompt))]
     [NotifyCanExecuteChangedFor(nameof(CopyUrlCommand), nameof(OpenUrlCommand))]
     internal partial string Url { get; private set; }
 
@@ -1192,7 +1164,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     internal EntryAttachmentsViewModel Attachments { get; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsTotp), nameof(ShowsTotpProblem), nameof(CanAddTotp), nameof(CanRemoveTotp), nameof(HasOwnPrimary), nameof(TakesWholeView), nameof(ShowsEnvironments))]
+    [NotifyPropertyChangedFor(nameof(ShowsTotp), nameof(ShowsTotpProblem), nameof(CanAddTotp), nameof(CanRemoveTotp), nameof(HasOwnPrimary), nameof(ShowsEnvironments))]
     [NotifyCanExecuteChangedFor(nameof(EditCommand), nameof(CancelCommand), nameof(SaveCommand), nameof(RotateCommand), nameof(GeneratePasswordCommand), nameof(OpenGeneratorCommand), nameof(BeginSetTotpCommand), nameof(BeginRemoveTotpCommand))]
     internal partial bool IsEditing { get; private set; }
 
@@ -1349,7 +1321,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         Attachments.Dispose();
 
         OnPropertyChanged(nameof(Reference));
-        OnPropertyChanged(nameof(KdbxEntry));
+        OnPropertyChanged(nameof(HasKeePassId));
         OnPropertyChanged(nameof(Title));
         OnPropertyChanged(nameof(GroupPath));
         OnPropertyChanged(nameof(Path));
@@ -1464,11 +1436,13 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
             var times = vault.ReadTimes(Name);
             Created = UseText.Dated(times?.Created, now);
             Modified = UseText.Dated(times?.Modified, now);
+            ModifiedLine = times?.Modified is { } modified ? UseText.Modified(UseText.DaysAgo(modified, now)) : string.Empty;
             Expiry = UseText.LocalMinute(times?.Expires);
             IsExpired = times?.Expires <= now;
             Rotated = UseText.Dated(EntryRotation.LastRotated(vault, Name), now);
+            OnPropertyChanged(nameof(TimesTip));
             _uuid = vault.EntryUuid(Name);
-            OnPropertyChanged(nameof(KdbxEntry));
+            OnPropertyChanged(nameof(HasKeePassId));
         }
         catch (VaultException e)
         {
@@ -1510,7 +1484,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
             Tags = [.. (vault.Tags(Name) ?? []).Select(tag => new EntryTagChip(tag, RemoveTag))];
             Kind = EntryKinds.Tagged(_iconKind, Tags.Select(chip => chip.Tag));
             TagSuggestions = [.. ProjectCatalog.MemberTags(vault).Except(Tags.Select(chip => chip.Tag), StringComparer.Ordinal)];
-            Environments = [.. (_session.ReadEnvironments(vault, Name) ?? []).Select(environment => new EnvironmentRow(environment))];
+            Environments = [.. (_session.ReadEnvironments(vault, Name) ?? []).Select(environment => new EnvironmentRow(environment, Tags))];
             ReadTotp(vault);
         }
         catch (VaultException e)

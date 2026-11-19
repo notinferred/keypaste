@@ -1,7 +1,4 @@
-using Avalonia.Automation;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
-using Avalonia.VisualTree;
 using Keypaste.App.Navigation;
 using Keypaste.App.Resources;
 using Keypaste.App.Tests.Rendering;
@@ -10,28 +7,26 @@ using Xunit;
 
 namespace Keypaste.App.Tests.Views;
 
-/// <summary>The "+" beside the list's title makes an item where the list is: its place's kind at once, or a choice where the place holds every kind.</summary>
+/// <summary>The sidebar's New is the one add control: a menu naming the vault, the common templates and the way to every template; ⌘N opens the place's kind.</summary>
 public sealed class ItemAddMenuTests
 {
     [Fact]
-    public Task Where_every_kind_is_listed_the_plus_names_the_vault_and_lists_the_common_templates_then_more() => HeadlessSession.On(() =>
+    public Task New_names_the_vault_and_lists_the_common_templates_then_more() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-item-add-");
         var items = shell.Show<EntriesViewModel>(DestinationKind.Entries);
 
-        Assert.False(shell.Named<Button>("AddInPlace").IsEffectivelyVisible);
-        var panel = Open(shell);
+        var (menu, _) = shell.OpenMenu("SidebarNew");
+        var rows = menu.Items.OfType<MenuItem>().ToList();
 
-        Assert.Equal($"New in {items.VaultTitle}", panel.GetVisualDescendants().OfType<TextBlock>().First().Text);
-        Assert.Equal(
-            TemplateChoice.Common.Select(kind => kind.MenuLabel).Append(Strings.MoreTemplatesLabel),
-            panel.GetVisualDescendants().OfType<Button>().Where(button => button.IsEffectivelyVisible).Select(button => button.GetVisualDescendants().OfType<TextBlock>().Single().Text));
+        Assert.Equal($"New in {items.VaultTitle}", rows[0].Header);
+        Assert.False(rows[0].IsEnabled);
+        Assert.Equal(TemplateChoice.Common.Select(kind => kind.MenuLabel).Append(Strings.MoreTemplatesLabel), rows.Skip(1).Select(row => row.Header));
 
-        shell.Tap(shell.Named<Button>("MoreTemplates"));
-        RenderedShell.Drain();
+        Menus.Choose(menu, Menus.Item(menu, "MoreTemplates"));
 
         Assert.True(shell.Named<Border>("TemplateSheet").IsEffectivelyVisible);
-        Assert.False(shell.Named<ToggleButton>("AddEntry").IsChecked);
+        Assert.False(menu.IsOpen);
     });
 
     [Fact]
@@ -42,13 +37,13 @@ public sealed class ItemAddMenuTests
 
         foreach (var kind in TemplateChoice.Common)
         {
-            shell.Tap(Open(shell).GetVisualDescendants().OfType<Button>().Single(entry => Equals(entry.CommandParameter, kind.Template)));
-            RenderedShell.Drain();
+            var (menu, _) = shell.OpenMenu("SidebarNew");
+            Menus.Choose(menu, menu.Items.OfType<MenuItem>().Single(entry => Equals(entry.CommandParameter, kind.Template)));
 
             Assert.True(items.IsAdding);
             Assert.Equal(kind.Template, items.NewItem!.Template);
             Assert.True(shell.Named<Border>("NewItemDialog").IsEffectivelyVisible);
-            Assert.False(shell.Named<ToggleButton>("AddEntry").IsChecked);
+            Assert.False(menu.IsOpen);
 
             items.CancelAddCommand.Execute(null);
             RenderedShell.Drain();
@@ -56,28 +51,17 @@ public sealed class ItemAddMenuTests
     });
 
     [Fact]
-    public Task In_a_place_of_one_kind_the_plus_and_the_chord_open_its_form_in_the_vault_in_view() => HeadlessSession.On(() =>
+    public Task In_a_place_of_one_kind_the_chord_opens_its_form_in_the_vault_in_view() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-item-add-place-");
         var items = shell.Show<EntriesViewModel>(DestinationKind.Entries);
         items.Place = ItemPlace.ApiKeys;
         RenderedShell.Drain();
 
-        var plus = shell.Named<Button>("AddInPlace");
-        Assert.True(plus.IsEffectivelyVisible);
-        Assert.False(shell.Named<ToggleButton>("AddEntry").IsEffectivelyVisible);
-        Assert.Equal($"New API key in {items.VaultTitle}", ToolTip.GetTip(plus));
-        Assert.Equal($"New API key in {items.VaultTitle}", AutomationProperties.GetName(plus));
-
-        shell.Tap(plus);
-        RenderedShell.Drain();
-        Assert.Equal(ItemTemplate.ApiKey, items.NewItem!.Template);
-        Assert.Same(items.NewItem.Places[0], items.NewItem.SaveIn);
-        items.CancelAddCommand.Execute(null);
-
         var newItem = shell.Commands.Menus.Single(group => group.Header == Strings.FileMenu).Entries.OfType<AppCommand>().Single(command => command.Header == Strings.NewItemLabel);
         shell.Commands.ForChord(newItem.Keys[0].Key, newItem.Keys[0].KeyModifiers)!.Run();
         Assert.Equal(ItemTemplate.ApiKey, items.NewItem!.Template);
+        Assert.Same(items.NewItem.Places[0], items.NewItem.SaveIn);
     });
 
     [Fact]
@@ -99,13 +83,4 @@ public sealed class ItemAddMenuTests
             items.CancelAddCommand.Execute(null);
         }
     });
-
-    private static Border Open(RenderedShell shell)
-    {
-        shell.Named<ToggleButton>("AddEntry").IsChecked = true;
-        RenderedShell.Drain();
-        var panel = shell.Named<Border>("AddMenuPanel");
-        Assert.True(panel.IsEffectivelyVisible);
-        return panel;
-    }
 }

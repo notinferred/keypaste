@@ -15,25 +15,7 @@
       <!-- A vault with no Trash deletes for good, which is a limit the person should see rather than find out. -->
       <TextBlock IsVisible="{Binding !RecyclesDeletedEntries}" Text="{Binding Note}" TextWrapping="Wrap" Classes="subtitle" />
 
-      <!-- KpDanger marks the two ways to erase. A restore is ordinary; erasing a value is not. -->
-      <Border IsVisible="{Binding IsConfirmingPurge}"
-              ctl:ShowInView.OnShow="True"
-              ctl:FormKeys.Cancel="{Binding CancelPurgeCommand}"
-              Classes="card"
-              Background="{DynamicResource KpDangerTint}"
-              BorderBrush="{DynamicResource KpDanger}">
-        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-          <ctl:KpIcon Grid.Column="0" Icon="alert-triangle" Size="16" Foreground="{DynamicResource KpDanger}" />
-          <TextBlock Grid.Column="1" Text="{Binding PurgePrompt}" TextWrapping="Wrap" Classes="size-13"
-                     VerticalAlignment="Center" Foreground="{DynamicResource KpTextPrimary}" />
-          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
-            <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelPurgeCommand}" />
-            <Button Classes="danger" Content="{x:Static res:Strings.DeleteForGood}" Command="{Binding ConfirmPurgeCommand}" />
-          </StackPanel>
-        </Grid>
-      </Border>
-
-      <!-- Emptying the bin asks in the same place, naming how many items go. -->
+      <!-- KpDanger marks the two ways to erase. Emptying the bin asks here, naming how many items go; one item asks under its own buttons. -->
       <Border IsVisible="{Binding IsConfirmingEmpty}"
               ctl:ShowInView.OnShow="True"
               ctl:FormKeys.Cancel="{Binding CancelEmptyCommand}"
@@ -76,7 +58,7 @@
 
     </StackPanel>
 
-    <ctl:ListDetail x:Name="Split" ShowsDetail="{Binding HasSelection}">
+    <ctl:ListDetail x:Name="Split" ListWidth="280" ShowsDetail="{Binding HasSelection}">
 
       <!-- The list: its header with the title and the sort, then the two-line rows. A row carries no field value, because RecycledEntry has none. -->
       <Border x:Name="ListColumn" ZIndex="1" BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,1,0">
@@ -87,7 +69,6 @@
                 <TextBlock x:Name="ListTitle"
                            Classes="list-title"
                            Text="{Binding ListTitle}"
-                           ToolTip.Tip="{Binding Note}"
                            VerticalAlignment="Center" />
                 <TextBlock Classes="size-11 muted"
                            Text="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).VaultInView.Title, FallbackValue={x:Null}}"
@@ -95,41 +76,32 @@
                            MaxWidth="120"
                            VerticalAlignment="Center" />
               </StackPanel>
-              <ToggleButton x:Name="SortMenu"
-                            Grid.Column="2"
-                            Classes="more"
-                            IsVisible="{Binding !IsEmpty}"
-                            ToolTip.Tip="{x:Static res:Strings.SortThisList}"
-                            AutomationProperties.Name="{x:Static res:Strings.SortThisList}">
+              <Button x:Name="SortMenu"
+                      Grid.Column="2"
+                      Classes="more"
+                      IsVisible="{Binding !IsEmpty}"
+                      ToolTip.Tip="{x:Static res:Strings.SortThisList}"
+                      AutomationProperties.Name="{x:Static res:Strings.SortThisList}">
                 <ctl:KpIcon Icon="list-filter" Size="16" />
-              </ToggleButton>
+                <Button.Flyout>
+                  <ctl:ButtonMenu Placement="BottomEdgeAlignedRight" ItemsSource="{Binding SortChoices}">
+                    <ctl:ButtonMenu.ItemContainerTheme>
+                      <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:SortChoice">
+                        <Setter Property="Header" Value="{Binding Name}" />
+                        <Setter Property="AutomationProperties.Name" Value="{Binding Spoken}" />
+                        <Setter Property="Command" Value="{Binding $parent[views:TrashView].((vm:TrashViewModel)DataContext).SortByCommand}" />
+                        <Setter Property="CommandParameter" Value="{Binding Column}" />
+                        <Setter Property="Icon">
+                          <Template>
+                            <ctl:KpIcon Icon="{Binding Arrow}" Size="14" />
+                          </Template>
+                        </Setter>
+                      </ControlTheme>
+                    </ctl:ButtonMenu.ItemContainerTheme>
+                  </ctl:ButtonMenu>
+                </Button.Flyout>
+              </Button>
             </Grid>
-
-            <!-- The menu takes no room, so an open one lies over the rows rather than pushing them down. -->
-            <Canvas Height="0">
-              <Border x:Name="SortMenuPanel"
-                      Classes="menu"
-                      Canvas.Right="0"
-                      Canvas.Top="-6"
-                      MinWidth="180"
-                      IsVisible="{Binding #SortMenu.IsChecked}">
-                <ItemsControl ItemsSource="{Binding SortChoices}">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:SortChoice">
-                      <Button Classes="ghost menu-item"
-                              Command="{Binding $parent[views:TrashView].((vm:TrashViewModel)DataContext).SortByCommand}"
-                              CommandParameter="{Binding Column}"
-                              AutomationProperties.Name="{Binding Spoken}">
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                          <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
-                          <ctl:KpIcon Grid.Column="1" Icon="{Binding Arrow}" Size="14" IsVisible="{Binding Arrow, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                        </Grid>
-                      </Button>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-              </Border>
-            </Canvas>
           </StackPanel>
 
           <!-- Every row at once, so it is offered only while there is something to empty. -->
@@ -143,12 +115,7 @@
           </Border>
 
           <Panel>
-            <StackPanel Spacing="8" Margin="24,40" HorizontalAlignment="Center" VerticalAlignment="Top"
-                        IsVisible="{Binding IsEmpty}">
-              <ctl:KpIcon Icon="trash-2" Size="20" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextDisabled}" />
-              <TextBlock Text="{Binding EmptyNote}" TextWrapping="Wrap" TextAlignment="Center"
-                         Classes="size-13" Foreground="{DynamicResource KpTextMuted}" />
-            </StackPanel>
+            <ctl:EmptyState x:Name="TrashEmpty" Icon="trash-2" Text="{Binding EmptyNote}" IsVisible="{Binding IsEmpty}" />
 
             <ListBox Name="TrashRows" AutomationProperties.Name="{x:Static res:Strings.DeletedItems}"
                      Classes="rows two-line monograms"
@@ -201,40 +168,59 @@
                      IsVisible="{Binding OffersChoice}" />
 
           <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Margin="32,24" Spacing="16" MaxWidth="756" HorizontalAlignment="Stretch" IsVisible="{Binding HasSelection}">
-              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
-                <TextBlock Classes="list-title"
+            <StackPanel Margin="24,20" Spacing="16" MaxWidth="640" HorizontalAlignment="Left" IsVisible="{Binding HasSelection}">
+              <!-- The item's tile and title, as Items heads it, with Restore and Delete for good under them. -->
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                <ctl:Monogram Title="{Binding Selected.DisplayTitle, FallbackValue={x:Null}}" Id="{Binding Selected.Hue}" Size="52" VerticalAlignment="Center" IsVisible="{Binding !HasSeveralSelected}" />
+                <TextBlock Grid.Column="1"
+                           x:Name="DetailTitle"
+                           Classes="title"
                            Text="{Binding DetailTitle}"
                            TextTrimming="CharacterEllipsis"
                            ToolTip.Tip="{Binding DetailTitle}"
                            VerticalAlignment="Center" />
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                  <Button Name="PurgeButton" Classes="danger" Command="{Binding PurgeCommand}" IsVisible="{Binding !HasSeveralSelected}" AutomationProperties.Name="{x:Static res:Strings.DeleteForGood}">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                      <ctl:KpIcon Icon="trash-2" Size="14" />
-                      <TextBlock Text="{x:Static res:Strings.DeleteForGood}" />
-                    </StackPanel>
-                  </Button>
-                  <Button Name="RestoreButton" Classes="primary" Command="{Binding RestoreCommand}" AutomationProperties.Name="{x:Static res:Strings.Restore}">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                      <ctl:KpIcon Icon="history" Size="14" />
-                      <TextBlock Text="{x:Static res:Strings.Restore}" />
-                    </StackPanel>
-                  </Button>
-                </StackPanel>
               </Grid>
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Name="RestoreButton" Classes="primary" Command="{Binding RestoreCommand}" AutomationProperties.Name="{x:Static res:Strings.Restore}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ctl:KpIcon Icon="history" Size="14" />
+                    <TextBlock Text="{x:Static res:Strings.Restore}" />
+                  </StackPanel>
+                </Button>
+                <Button Name="PurgeButton" Classes="danger" Command="{Binding PurgeCommand}" IsVisible="{Binding !HasSeveralSelected}" AutomationProperties.Name="{x:Static res:Strings.DeleteForGood}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <ctl:KpIcon Icon="trash-2" Size="14" />
+                    <TextBlock Text="{x:Static res:Strings.DeleteForGood}" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+
+              <!-- Deleting one item for good asks here, under the button that asked. -->
+              <Border Classes="group padded"
+                      Background="{DynamicResource KpDangerTint}"
+                      IsVisible="{Binding IsConfirmingPurge}"
+                      ctl:ShowInView.OnShow="True"
+                      ctl:FormKeys.Cancel="{Binding CancelPurgeCommand}">
+                <StackPanel Spacing="8">
+                  <TextBlock x:Name="PurgePrompt" Text="{Binding PurgePrompt}" TextWrapping="Wrap" Classes="primary size-13" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelPurgeCommand}" />
+                    <Button Classes="danger" Content="{x:Static res:Strings.DeleteForGood}" Command="{Binding ConfirmPurgeCommand}" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
 
               <Border Classes="group" IsVisible="{Binding !HasSeveralSelected}">
                 <ctl:GroupedRows>
                   <ctl:FieldRow Label="{x:Static res:Strings.DeletedFrom}">
                     <StackPanel Spacing="2" VerticalAlignment="Center">
-                      <TextBlock Classes="mono size-13" Text="{Binding Selected.Where}" TextWrapping="Wrap" />
+                      <TextBlock Classes="size-13" Text="{Binding Selected.Where}" TextWrapping="Wrap" />
                       <TextBlock Classes="secondary size-13" Text="{x:Static res:Strings.ComesBackAtTheTopLevel}" TextWrapping="Wrap"
                                  IsVisible="{Binding !Selected.CameFromALiveGroup}" />
                     </StackPanel>
                   </ctl:FieldRow>
                   <ctl:FieldRow Label="{x:Static res:Strings.Deleted}">
-                    <TextBlock Classes="mono size-13" Text="{Binding Selected.When}" VerticalAlignment="Center" />
+                    <TextBlock Classes="size-13" Text="{Binding Selected.When}" VerticalAlignment="Center" />
                   </ctl:FieldRow>
                 </ctl:GroupedRows>
               </Border>

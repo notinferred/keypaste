@@ -20,29 +20,26 @@
     <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
   </Window.Styles>
 
-  <!-- A claim card for a terminal's edit to the held vault, asked every time: no Always allow. The changes sit in a box of
-       fixed height that scrolls, so no edit moves the buttons (THREATS.md T-2). Return presses Allow once it is armed, never
+  <!-- A claim card for a terminal's edit to the held vault, asked every time: no Always allow. The question names the item on
+       one line, cut where it is long, and the changes sit in a box of fixed height that scrolls, so no edit moves the buttons
+       (THREATS.md T-2). Return presses Allow once it is armed, never
        Delete for good; Escape denies. -->
 
-  <Border Classes="claim">
+  <Border Classes="claim" Classes.arming="{Binding IsArming}">
     <StackPanel>
       <StackPanel Classes="claim-body">
         <TextBlock Classes="live" ctl:Announcer.Says="{Binding Opening}" />
         <views:PromptHead />
 
         <StackPanel Spacing="4">
-          <TextBlock Name="TitleText" Classes="claim-title size-16" Text="{Binding Question}" />
-          <StackPanel Orientation="Horizontal" Spacing="6" Height="20">
-            <ctl:KpIcon Classes="claim-muted" Icon="key" Size="14" VerticalAlignment="Center" />
-            <TextBlock Name="ItemText" Classes="claim-muted size-12-5" Text="{Binding Item}" MaxWidth="380" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-          </StackPanel>
+          <TextBlock Name="TitleText" Classes="claim-title size-15" Text="{Binding Question}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
           <StackPanel Orientation="Horizontal" Spacing="6" Height="20">
             <ctl:KpIcon Classes="claim-muted" Icon="terminal" Size="14" VerticalAlignment="Center" />
             <TextBlock Name="CommandText" Classes="mono" Text="{Binding Command}" VerticalAlignment="Center" />
           </StackPanel>
         </StackPanel>
 
-        <Border Classes="claim-block" Height="96">
+        <Border Classes="claim-block" Height="64">
           <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
             <ItemsControl Name="ChangesList" ItemsSource="{Binding Changes}">
               <ItemsControl.ItemsPanel>
@@ -59,27 +56,22 @@
           </ScrollViewer>
         </Border>
 
-        <StackPanel Orientation="Horizontal" Spacing="6">
-          <ctl:KpIcon Classes="claim-muted" Icon="alert-triangle" Size="14" VerticalAlignment="Center" />
-          <TextBlock Name="OriginText" Classes="claim-line size-12-5" Text="{Binding Origin}" />
-        </StackPanel>
-
-        <TextBlock Name="ExplainerText" Classes="claim-line size-12-5" Text="{Binding Explainer}" />
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+          <ctl:KpIcon Classes="claim-warn" Icon="alert-triangle" Size="14" />
+          <TextBlock Grid.Column="1" Name="WarningText" Classes="claim-line size-13" Text="{Binding Warning}" />
+        </Grid>
       </StackPanel>
 
       <Border Classes="claim-rule" />
 
-      <ctl:HeaderRow Classes="claim-foot" Spacing="8">
-        <ctl:SteadyDigits Name="CountdownText" Classes="claim-muted size-12-5" Text="{Binding DeniesIn}" VerticalAlignment="Center"
-                          TextWrapping="NoWrap" IsVisible="{Binding IsChoosing}" />
-        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <Button Name="Deny" Classes="claim keyed" Content="Deny" Tag="esc"
-                  IsVisible="{Binding IsChoosing}" Command="{Binding DenyCommand}" />
-          <Button Name="Allow" Classes="claim keyed" Classes.primary="{Binding !DeletesForGood}" Classes.danger="{Binding DeletesForGood}"
-                  Content="{Binding AllowLabel}" Tag="{Binding AllowKey}"
-                  IsVisible="{Binding IsChoosing}" Command="{Binding AllowOnceCommand}" />
-        </StackPanel>
-      </ctl:HeaderRow>
+      <StackPanel Classes="claim-foot">
+        <Button Name="Deny" Classes="claim keyed" Content="Deny" Tag="esc"
+                IsVisible="{Binding IsChoosing}" Command="{Binding DenyCommand}" />
+        <Button Name="Allow" Classes="claim keyed" Classes.primary="{Binding !DeletesForGood}" Classes.danger="{Binding DeletesForGood}"
+                Content="{Binding AllowLabel}" Tag="{Binding AllowKey}"
+                IsVisible="{Binding IsChoosing}" Command="{Binding AllowOnceCommand}" />
+      </StackPanel>
+      <ProgressBar Name="TimeBar" Classes="claim-time" Value="{Binding TimeLeft}" AutomationProperties.Name="{Binding DeniesIn}" />
     </StackPanel>
   </Border>
 

@@ -1,0 +1,349 @@
+<UserControl xmlns:res="using:Keypaste.App.Resources"
+             xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Keypaste.App.ViewModels"
+             xmlns:ctl="using:Keypaste.App.Controls"
+             xmlns:views="using:Keypaste.App.Views"
+             x:Class="Keypaste.App.Views.UnlockForm"
+             x:DataType="vm:UnlockViewModel">
+
+  <UserControl.Styles>
+    <Style Selector="TextBlock.form-message">
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+    </Style>
+    <Style Selector="TextBlock.form-message.error">
+      <Setter Property="Foreground" Value="{DynamicResource KpDanger}" />
+    </Style>
+    <Style Selector="TextBlock.form-heading">
+      <Setter Property="AutomationProperties.HeadingLevel" Value="1" />
+      <Setter Property="TextAlignment" Value="Center" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <Style Selector="TextBlock.form-file">
+      <Setter Property="TextAlignment" Value="Center" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <Style Selector="StackPanel.factors">
+      <Setter Property="Orientation" Value="Horizontal" />
+      <Setter Property="Spacing" Value="8" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="WrapPanel.form-actions">
+      <Setter Property="ItemSpacing" Value="8" />
+      <Setter Property="LineSpacing" Value="8" />
+      <Setter Property="ItemsAlignment" Value="End" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+    </Style>
+  </UserControl.Styles>
+
+  <!-- The one unlock form, for the whole-window lock and a vault locked in the sidebar alike: open, create or restore one vault, Unlock or Create vault its one accent. -->
+  <StackPanel Width="300" Spacing="14">
+
+    <Border Classes="tile" Width="56" Height="56" CornerRadius="14" HorizontalAlignment="Center" Background="{DynamicResource KpBgCard}">
+      <ctl:KpIcon Icon="lock" Size="20" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource KpTextSecondary}" />
+    </Border>
+
+    <!-- Opening the selected vault. -->
+    <StackPanel Spacing="14" IsVisible="{Binding IsOpening}">
+      <StackPanel Spacing="2">
+        <TextBlock Name="UnlockHeading" Classes="dialog-title form-heading" Text="{Binding Heading}" />
+        <TextBlock Name="UnlockFile" Classes="caption form-file" Text="{Binding SelectedName}" ToolTip.Tip="{Binding SelectedLocation}" />
+        <TextBlock ctl:MachineRuns.InText="True" Name="LockNote" Classes="caption" TextAlignment="Center" TextWrapping="Wrap" Text="{Binding LockNote}" IsVisible="{Binding HasLockNote}" />
+      </StackPanel>
+
+      <StackPanel Spacing="2" IsVisible="{Binding HasNewFileLocation}" ctl:Announcer.Says="{Binding NewFileNotice}">
+        <TextBlock Classes="caption" TextAlignment="Center" TextWrapping="Wrap" Text="{x:Static res:Strings.KeypasteHasntOpenedThisFileBefore}" />
+        <TextBlock Name="NewFileLocation" Classes="mono muted size-12" TextAlignment="Center" TextWrapping="Wrap" Text="{Binding NewFileLocation}" />
+      </StackPanel>
+
+      <!-- Where Windows Hello can open the vault, it stands alone until the person asks for the password. -->
+      <StackPanel Spacing="8" IsVisible="{Binding ShowsQuickUnlockAlone}">
+        <Button Name="QuickUnlock"
+                Classes="lg"
+                Classes.primary="{Binding QuickUnlockIsPrimary}"
+                HorizontalAlignment="Stretch"
+                HorizontalContentAlignment="Center"
+                Command="{Binding ResumeCommand}"
+                AutomationProperties.Name="{x:Static res:Strings.UnlockWithWindowsHello}">
+          <DockPanel HorizontalSpacing="8">
+            <ctl:KpIcon DockPanel.Dock="Left" Icon="fingerprint" Size="16" />
+            <TextBlock Text="{x:Static res:Strings.UnlockWithWindowsHello}" TextWrapping="Wrap" VerticalAlignment="Center" />
+          </DockPanel>
+        </Button>
+        <Button Name="UsePassword" Classes="ghost sm" HorizontalAlignment="Center" Content="{x:Static res:Strings.UseMasterPassword}" Command="{Binding UsePasswordCommand}" />
+      </StackPanel>
+
+      <StackPanel Spacing="14" IsVisible="{Binding ShowsPasswordForm}">
+        <StackPanel Spacing="6">
+          <TextBlock Name="PasswordLabel" Classes="label" Text="{x:Static res:Strings.MasterPassword}" />
+          <ctl:MaskedInput Name="Password"
+                           Classes="size-14"
+                           AllowsPaste="True"
+                           MaskedLength="{Binding MaskedLength}"
+                           IsEnabled="{Binding CanTypePassword}"
+                           AutomationProperties.Name="{x:Static res:Strings.MasterPassword}" />
+          <TextBlock Classes="form-message size-13" Classes.error="{Binding IsError}" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding HasMessage}" />
+          <Button Name="RestoreBackup" Classes="link" HorizontalAlignment="Left" IsVisible="{Binding OffersRestoreLink}" Content="{x:Static res:Strings.RestoreABackupLabel}" Command="{Binding StartRestoreCommand}" />
+        </StackPanel>
+
+        <!-- A YubiKey's touch is asked in Unlock's own place, so the form never grows a second prompt. -->
+        <Button Name="Unlock"
+                Classes="lg"
+                Classes.primary="{Binding UnlockIsPrimary}"
+                Classes.busy="{Binding Busy}"
+                HorizontalAlignment="Stretch"
+                HorizontalContentAlignment="Center"
+                IsDefault="True"
+                Command="{Binding UnlockCommand}"
+                AutomationProperties.Name="{x:Static res:Strings.Unlock}">
+          <Panel>
+            <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding !IsWaitingForTouch}">
+              <ctl:KpIcon Icon="refresh-cw" Size="14" IsVisible="{Binding IsUnlocking}" Classes.spinning="{Binding IsUnlocking}" />
+              <TextBlock Text="{x:Static res:Strings.Unlock}" IsVisible="{Binding !Busy}" />
+              <TextBlock Text="{x:Static res:Strings.Unlocking}" IsVisible="{Binding Busy}" />
+            </StackPanel>
+            <StackPanel Name="TouchPrompt" Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsWaitingForTouch}">
+              <Border Classes="dot waiting" VerticalAlignment="Center" />
+              <TextBlock Text="{x:Static res:Strings.TouchYourYubiKey}" VerticalAlignment="Center" />
+            </StackPanel>
+          </Panel>
+        </Button>
+        <Button Name="CancelTouch" Classes="ghost sm" HorizontalAlignment="Center" IsVisible="{Binding IsWaitingForTouch}" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelTouchCommand}" />
+
+        <StackPanel Classes="factors" IsEnabled="{Binding CanTypePassword}">
+          <Button Name="ChooseKeyfile"
+                  Classes="ghost sm"
+                  IsVisible="{Binding !HasKeyfile}"
+                  Content="{x:Static res:Strings.KeyFileLabel}"
+                  Command="{Binding ChooseKeyfileCommand}"
+                  ToolTip.Tip="{x:Static res:Strings.UnlockWithAKeyFileToo}"
+                  AutomationProperties.Name="{x:Static res:Strings.UnlockWithAKeyFileToo}" />
+          <Border Classes="chip" IsVisible="{Binding HasKeyfile}" ToolTip.Tip="{Binding KeyfilePath}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="{Binding KeyfileName}" MaxWidth="160" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+              <Button Classes="chip-remove" Command="{Binding ClearKeyfileCommand}" ToolTip.Tip="{x:Static res:Strings.UnlockWithoutAKeyFile}" AutomationProperties.Name="{x:Static res:Strings.UnlockWithoutAKeyFile}">
+                <ctl:KpIcon Icon="x" Size="14" />
+              </Button>
+            </StackPanel>
+          </Border>
+          <Button Name="UseHardwareKey"
+                  Classes="ghost sm"
+                  Content="{x:Static res:Strings.YubiKeyLabel}"
+                  Command="{Binding UseHardwareKeyCommand}"
+                  ToolTip.Tip="{x:Static res:Strings.UnlockWithAYubiKeyToo}"
+                  AutomationProperties.Name="{x:Static res:Strings.UnlockWithAYubiKeyToo}">
+            <Button.IsVisible>
+              <MultiBinding Converter="{x:Static BoolConverters.And}">
+                <Binding Path="OffersHardwareKey" />
+                <Binding Path="!UsesHardwareKey" />
+              </MultiBinding>
+            </Button.IsVisible>
+          </Button>
+          <Border Classes="chip" IsVisible="{Binding UsesHardwareKey}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Button Name="HardwareKeySlot" Classes="link" Content="{Binding HardwareKeyLabel}">
+                <Button.Flyout>
+                  <ctl:ButtonMenu>
+                    <MenuItem Name="SwitchSlot" Header="{Binding OtherSlotLabel}" Command="{Binding SwitchSlotCommand}" />
+                  </ctl:ButtonMenu>
+                </Button.Flyout>
+              </Button>
+              <Button Classes="chip-remove" Command="{Binding ClearHardwareKeyCommand}" ToolTip.Tip="{x:Static res:Strings.UnlockWithoutAYubiKey}" AutomationProperties.Name="{x:Static res:Strings.UnlockWithoutAYubiKey}">
+                <ctl:KpIcon Icon="x" Size="14" />
+              </Button>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <TextBlock Classes="caption" TextAlignment="Center" TextWrapping="Wrap" Text="{Binding KeepingNote}" IsVisible="{Binding IsKeepingQuickUnlock}" />
+      </StackPanel>
+    </StackPanel>
+
+    <!-- Making a vault at the path already chosen. -->
+    <StackPanel Spacing="14" IsVisible="{Binding IsCreating}">
+      <StackPanel Spacing="2">
+        <TextBlock Name="CreateHeading" Classes="dialog-title form-heading" Text="{x:Static res:Strings.NewVault}" />
+        <TextBlock Classes="caption form-file" Text="{Binding NewVaultName}" />
+      </StackPanel>
+      <StackPanel Spacing="6">
+        <TextBlock Classes="label" Text="{x:Static res:Strings.NewMasterPassword}" />
+        <ctl:MaskedInput Name="NewPassword"
+                         Classes="size-14"
+                         AllowsPaste="True"
+                         MaskedLength="{Binding NewMaskedLength}"
+                         AutomationProperties.Name="{x:Static res:Strings.NewMasterPassword}" />
+      </StackPanel>
+      <StackPanel Spacing="6">
+        <TextBlock Classes="label" Text="{x:Static res:Strings.ConfirmMasterPassword}" />
+        <ctl:MaskedInput Name="ConfirmPassword"
+                         Classes="size-14"
+                         AllowsPaste="True"
+                         MaskedLength="{Binding ConfirmMaskedLength}"
+                         AutomationProperties.Name="{x:Static res:Strings.ConfirmMasterPassword}" />
+        <TextBlock Classes="form-message size-13" Classes.error="{Binding IsError}" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding HasMessage}" />
+      </StackPanel>
+
+      <StackPanel Classes="factors">
+        <Button Name="AddKeyfile"
+                Classes="ghost sm"
+                IsVisible="{Binding !HasKeyfile}"
+                ToolTip.Tip="{x:Static res:Strings.OptionalOneYouHaveOrANewX7bc1a7}"
+                AutomationProperties.Name="{x:Static res:Strings.KeyFile}">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <TextBlock Text="{x:Static res:Strings.KeyFileLabel}" VerticalAlignment="Center" />
+            <ctl:KpIcon Icon="chevron-down" Size="14" />
+          </StackPanel>
+          <Button.Flyout>
+            <ctl:ButtonMenu>
+              <MenuItem Name="ChooseNewKeyfile" Header="{x:Static res:Strings.Choose}" Command="{Binding ChooseKeyfileCommand}" />
+              <MenuItem Name="CreateNewKeyfile" Header="{x:Static res:Strings.CreateLabel}" Command="{Binding CreateKeyfileCommand}" />
+            </ctl:ButtonMenu>
+          </Button.Flyout>
+        </Button>
+        <Border Classes="chip" IsVisible="{Binding HasKeyfile}" ToolTip.Tip="{Binding KeyfilePath}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="{Binding KeyfileName}" MaxWidth="160" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+            <Button Classes="chip-remove" Command="{Binding ClearKeyfileCommand}" ToolTip.Tip="{x:Static res:Strings.NoKeyFile}" AutomationProperties.Name="{x:Static res:Strings.NoKeyFile}">
+              <ctl:KpIcon Icon="x" Size="14" />
+            </Button>
+          </StackPanel>
+        </Border>
+        <Button Classes="ghost sm"
+                Content="{x:Static res:Strings.YubiKeyLabel}"
+                Command="{Binding UseHardwareKeyCommand}"
+                ToolTip.Tip="{x:Static res:Strings.PlugInAYubiKeyWhoseSlotIsX7a5557}"
+                AutomationProperties.Name="{x:Static res:Strings.AddAYubiKey}">
+          <Button.IsVisible>
+            <MultiBinding Converter="{x:Static BoolConverters.And}">
+              <Binding Path="OffersHardwareKey" />
+              <Binding Path="!UsesHardwareKey" />
+            </MultiBinding>
+          </Button.IsVisible>
+        </Button>
+        <Border Classes="chip" IsVisible="{Binding UsesHardwareKey}" ToolTip.Tip="{x:Static res:Strings.PlugInAYubiKeyWhoseSlotIsX7a5557}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <Button Classes="link" Content="{Binding HardwareKeyLabel}">
+              <Button.Flyout>
+                <ctl:ButtonMenu>
+                  <MenuItem Header="{Binding OtherSlotLabel}" Command="{Binding SwitchSlotCommand}" />
+                </ctl:ButtonMenu>
+              </Button.Flyout>
+            </Button>
+            <Button Classes="chip-remove" Command="{Binding ClearHardwareKeyCommand}" ToolTip.Tip="{x:Static res:Strings.NoYubiKey}" AutomationProperties.Name="{x:Static res:Strings.NoYubiKey}">
+              <ctl:KpIcon Icon="x" Size="14" />
+            </Button>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+      <TextBlock Classes="caption" TextAlignment="Center" TextWrapping="Wrap" IsVisible="{Binding HasKeyfileNote}" Text="{Binding KeyfileNote}" />
+
+      <WrapPanel Classes="form-actions">
+        <Button Name="CancelCreate" Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelCreateCommand}" />
+        <Button Name="Create"
+                Classes="primary"
+                Classes.busy="{Binding Busy}"
+                IsDefault="True"
+                Command="{Binding CreateCommand}"
+                AutomationProperties.Name="{x:Static res:Strings.CreateVault}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <ctl:KpIcon Icon="refresh-cw" Size="14" IsVisible="{Binding Busy}" Classes.spinning="{Binding Busy}" />
+            <TextBlock Text="{x:Static res:Strings.CreateVault}" IsVisible="{Binding !Busy}" />
+            <TextBlock Text="{x:Static res:Strings.CreatingVault}" IsVisible="{Binding Busy}" ctl:Announcer.Says="{x:Static res:Strings.CreatingVault}" />
+          </StackPanel>
+        </Button>
+      </WrapPanel>
+    </StackPanel>
+
+    <!-- Putting a backup in the vault's place. Locked throughout: the check shows counts and a time, never a name or a value. -->
+    <StackPanel IsVisible="{Binding IsRestoring}">
+      <StackPanel Spacing="14" DataContext="{Binding Restore}" x:DataType="vm:RestoreBackupViewModel">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="dialog-title form-heading" Text="{x:Static res:Strings.RestoreABackup}" />
+          <TextBlock Classes="caption form-file" Text="{Binding $parent[views:UnlockForm].((vm:UnlockViewModel)DataContext).SelectedName, FallbackValue={x:Null}}" />
+        </StackPanel>
+
+        <StackPanel Spacing="14" IsVisible="{Binding IsChoosing}">
+          <StackPanel Spacing="6">
+            <TextBlock Classes="label" Text="{x:Static res:Strings.Backups}" />
+            <ComboBox Name="BackupList"
+                      HorizontalAlignment="Stretch"
+                      ItemsSource="{Binding Rows}"
+                      SelectedItem="{Binding Selected}"
+                      AutomationProperties.Name="{x:Static res:Strings.Backups}">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:BackupRow">
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Label}" VerticalAlignment="Center" />
+                    <Border Grid.Column="1" Classes="chip" IsVisible="{Binding IsDamaged}">
+                      <TextBlock Text="{x:Static res:Strings.Damaged}" />
+                    </Border>
+                  </Grid>
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+          </StackPanel>
+
+          <StackPanel Spacing="6">
+            <TextBlock Classes="label" Text="{x:Static res:Strings.MasterPassword}" ToolTip.Tip="{Binding Note}" />
+            <ctl:MaskedInput Name="BackupPassword"
+                             Classes="size-14"
+                             AllowsPaste="True"
+                             MaskedLength="{Binding MaskedLength}"
+                             ToolTip.Tip="{Binding Note}"
+                             AutomationProperties.Name="{x:Static res:Strings.MasterPassword}" />
+            <TextBlock Classes="form-message size-13" Classes.error="{Binding IsError}" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding HasMessage}" />
+          </StackPanel>
+
+          <StackPanel Classes="factors">
+            <Button Classes="ghost sm"
+                    IsVisible="{Binding !HasKeyfile}"
+                    Content="{x:Static res:Strings.KeyFileLabel}"
+                    Command="{Binding ChooseKeyfileCommand}"
+                    AutomationProperties.Name="{x:Static res:Strings.KeyFile}" />
+            <Border Classes="chip" IsVisible="{Binding HasKeyfile}" ToolTip.Tip="{Binding KeyfilePath}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBlock Text="{Binding KeyfileName}" MaxWidth="160" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                <Button Classes="chip-remove" Command="{Binding ClearKeyfileCommand}" ToolTip.Tip="{x:Static res:Strings.NoKeyFile}" AutomationProperties.Name="{x:Static res:Strings.NoKeyFile}">
+                  <ctl:KpIcon Icon="x" Size="14" />
+                </Button>
+              </StackPanel>
+            </Border>
+            <Border Classes="chip" IsVisible="{Binding UsesHardwareKey}" ToolTip.Tip="{x:Static res:Strings.TheCheckAsksTheYubiKeyTheUnlockX4a39c1}">
+              <TextBlock Text="{x:Static res:Strings.YubiKey}" VerticalAlignment="Center" />
+            </Border>
+          </StackPanel>
+
+          <WrapPanel Classes="form-actions">
+            <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding $parent[views:UnlockForm].((vm:UnlockViewModel)DataContext).CloseRestoreCommand, FallbackValue={x:Null}}" />
+            <Button Classes="primary"
+                    Classes.busy="{Binding Busy}"
+                    Command="{Binding CheckCommand}"
+                    AutomationProperties.Name="{x:Static res:Strings.CheckThisBackup}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <ctl:KpIcon Icon="refresh-cw" Size="14" IsVisible="{Binding Busy}" Classes.spinning="{Binding Busy}" />
+                <TextBlock Text="{x:Static res:Strings.CheckThisBackup}" IsVisible="{Binding !Busy}" />
+                <TextBlock Text="{x:Static res:Strings.CheckingThisBackup}" IsVisible="{Binding Busy}" />
+              </StackPanel>
+            </Button>
+          </WrapPanel>
+        </StackPanel>
+
+        <!-- The confirmation takes the form's place; restoring keeps the replaced file as a backup, so it is an ordinary action. -->
+        <StackPanel Spacing="8" IsVisible="{Binding IsConfirming}">
+          <TextBlock Classes="body primary" TextWrapping="Wrap" Text="{Binding Taken}" />
+          <TextBlock Classes="body primary" TextWrapping="Wrap" Text="{Binding Holds}" />
+          <TextBlock Classes="body primary" TextWrapping="Wrap" Text="{Binding Replaces}" />
+          <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding Warning}" />
+          <WrapPanel Classes="form-actions" Margin="0,6,0,0">
+            <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelCommand}" />
+            <Button Name="ConfirmRestore" Content="{x:Static res:Strings.Restore}" Command="{Binding ConfirmCommand}" />
+          </WrapPanel>
+        </StackPanel>
+      </StackPanel>
+    </StackPanel>
+
+    <TextBlock ctl:MachineRuns.InText="True" Name="Owner" Classes="caption" TextAlignment="Center" TextWrapping="Wrap" Text="{Binding Owner}" IsVisible="{Binding HasOwner}" />
+  </StackPanel>
+
+</UserControl>

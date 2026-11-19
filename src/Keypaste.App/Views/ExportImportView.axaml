@@ -11,15 +11,6 @@
        it did and that the file is to be deleted. -->
 
   <UserControl.Styles>
-    <Style Selector="Button.dialog-action">
-      <Setter Property="Height" Value="34" />
-      <Setter Property="MinHeight" Value="34" />
-      <Setter Property="Padding" Value="12,0" />
-    </Style>
-    <Style Selector="Button.dialog-action.primary">
-      <Setter Property="Padding" Value="16,0" />
-    </Style>
-
     <Style Selector="Border.map-row">
       <Setter Property="Padding" Value="12,8" />
       <Setter Property="BorderBrush" Value="{DynamicResource KpBorderDefault}" />
@@ -91,9 +82,32 @@
           </Grid>
         </Panel>
 
-        <!-- The preview: the group it lands under, the choice for names the vault already has, and every item's row. -->
+        <!-- The preview: how many items it imports and how many the vault has a name for, with what to do about those; then, folded, the group
+             it lands under and every item's row. -->
         <StackPanel Spacing="16" IsVisible="{Binding IsPreviewing}">
           <StackPanel Spacing="8">
+            <TextBlock x:Name="ExportSummary" Classes="size-13 primary" Text="{Binding Summary}" TextWrapping="Wrap" />
+            <Border Classes="segmented inset" HorizontalAlignment="Left" IsVisible="{Binding HasHeld}"
+                    ToolTip.Tip="{x:Static res:Strings.KeepBothLandsEachBesideYoursUnderX77358f}">
+              <StackPanel Orientation="Horizontal">
+                <RadioButton Classes="segment" GroupName="ExportHeldNames" Content="{x:Static res:Strings.KeepBoth}" IsChecked="{Binding KeepHeld}" />
+                <RadioButton Classes="segment" GroupName="ExportHeldNames" Content="{x:Static res:Strings.SkipThem}" IsChecked="{Binding SkipHeld}" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+
+          <ToggleButton x:Name="ShowWhereItemsLand"
+                        Classes="ghost sm"
+                        HorizontalAlignment="Left"
+                        AutomationProperties.Name="{x:Static res:Strings.WhereEachItemLands}">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <ctl:KpIcon Icon="chevron-right" Size="14" IsVisible="{Binding !#ShowWhereItemsLand.IsChecked}" />
+              <ctl:KpIcon Icon="chevron-down" Size="14" IsVisible="{Binding #ShowWhereItemsLand.IsChecked}" />
+              <TextBlock Text="{x:Static res:Strings.WhereEachItemLands}" VerticalAlignment="Center" />
+            </StackPanel>
+          </ToggleButton>
+
+          <StackPanel Spacing="8" IsVisible="{Binding #ShowWhereItemsLand.IsChecked}">
             <TextBlock Classes="label" Text="{x:Static res:Strings.CopyIntoThisGroup}" />
             <TextBox x:Name="ExportInto"
                      Classes="mono size-12"
@@ -101,21 +115,7 @@
                      AutomationProperties.Name="{x:Static res:Strings.GroupToCopyInto}" />
           </StackPanel>
 
-          <StackPanel Spacing="8" IsVisible="{Binding HasHeld}">
-            <TextBlock Classes="label" Text="{Binding HeldLabel}" />
-            <Border Classes="segmented inset">
-              <StackPanel Orientation="Horizontal">
-                <RadioButton Classes="segment" GroupName="ExportHeldNames" Content="{x:Static res:Strings.KeepBoth}" IsChecked="{Binding KeepHeld}" />
-                <RadioButton Classes="segment" GroupName="ExportHeldNames" Content="{x:Static res:Strings.SkipThem}" IsChecked="{Binding SkipHeld}" />
-              </StackPanel>
-            </Border>
-            <TextBlock Classes="caption"
-                       TextWrapping="Wrap"
-                       Text="{x:Static res:Strings.KeepBothLandsEachBesideYoursUnderX77358f}" />
-          </StackPanel>
-
-          <StackPanel Spacing="8">
-            <TextBlock Classes="label" Text="{x:Static res:Strings.WhereEachItemLands}" />
+          <StackPanel Spacing="8" IsVisible="{Binding #ShowWhereItemsLand.IsChecked}">
             <Border BorderBrush="{DynamicResource KpBorderDefault}"
                     BorderThickness="1"
                     CornerRadius="{DynamicResource KpRadiusButton}"
@@ -170,7 +170,7 @@
         <!-- After the import: what it did. -->
         <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsImported}">
           <ctl:KpIcon Icon="circle-check" Size="16" Foreground="{DynamicResource KpOk}" />
-          <TextBlock Classes="size-13-5"
+          <TextBlock Classes="size-13"
                      FontWeight="Medium"
                      TextWrapping="Wrap"
                      Foreground="{DynamicResource KpTextPrimary}"
@@ -180,8 +180,18 @@
 
         <!-- Everything that does not land, before and after the import, each with why. -->
         <StackPanel Spacing="8" IsVisible="{Binding HasNotImported}">
-          <TextBlock Classes="label" Text="{Binding NotImportedLabel}" />
+          <ToggleButton x:Name="ShowNotImported"
+                        Classes="ghost sm"
+                        HorizontalAlignment="Left"
+                        AutomationProperties.Name="{Binding NotImportedLabel}">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <ctl:KpIcon Icon="chevron-right" Size="14" IsVisible="{Binding !#ShowNotImported.IsChecked}" />
+              <ctl:KpIcon Icon="chevron-down" Size="14" IsVisible="{Binding #ShowNotImported.IsChecked}" />
+              <TextBlock Text="{Binding NotImportedLabel}" VerticalAlignment="Center" />
+            </StackPanel>
+          </ToggleButton>
           <Border BorderBrush="{DynamicResource KpBorderDefault}"
+                  IsVisible="{Binding #ShowNotImported.IsChecked}"
                   BorderThickness="1"
                   CornerRadius="{DynamicResource KpRadiusButton}"
                   ClipToBounds="True">
@@ -237,22 +247,22 @@
 
         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
           <Button x:Name="ExportCancel"
-                  Classes="ghost dialog-action"
+                  Classes="ghost lg"
                   Content="{x:Static res:Strings.Cancel}"
                   IsVisible="{Binding !IsImported}"
                   Command="{Binding CancelCommand}" />
           <Button x:Name="ExportChooseAnother"
-                  Classes="dialog-action"
+                  Classes="lg"
                   IsVisible="{Binding CanChooseAnother}"
                   Content="{x:Static res:Strings.ChooseAnotherFile}"
                   Command="{Binding ChooseAnotherCommand}" />
           <Button x:Name="ExportConfirm"
-                  Classes="primary dialog-action"
+                  Classes="primary lg"
                   IsVisible="{Binding IsPreviewing}"
                   Content="{Binding ConfirmText}"
                   Command="{Binding ConfirmCommand}" />
           <Button x:Name="ExportDone"
-                  Classes="primary dialog-action"
+                  Classes="primary lg"
                   IsVisible="{Binding IsImported}"
                   Content="{x:Static res:Strings.Done}"
                   Command="{Binding CancelCommand}" />

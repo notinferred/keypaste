@@ -26,7 +26,7 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
-    public void Use_this_vault_chooses_it_for_agents_and_the_CLI_and_a_later_preference_keeps_it()
+    public void Choosing_the_vault_for_agents_and_the_CLI_writes_it_and_a_later_preference_keeps_it()
     {
         using var fixture = new TempVault();
         using var session = new AppVaultSession(new ManualClock(), home: fixture.Home);
@@ -37,14 +37,15 @@ public sealed class SettingsViewModelTests
 
         using var model = Screen(session, fixture);
         Assert.False(model.IsThisVaultChosen);
-        Assert.Contains("each needs --vault", model.ChosenVaultText, StringComparison.Ordinal);
+        Assert.Equal("None", model.AgentVault?.Label);
 
-        model.UseThisVaultCommand.Press();
+        model.AgentVault = model.AgentVaultChoices.Single(choice => choice.Path == fixture.Path_);
         model.Theme = AppTheme.Dark;
 
         Assert.True(model.IsThisVaultChosen);
         Assert.False(model.UseThisVaultCommand.CanExecute(null));
-        Assert.Contains(fixture.Path_, model.ChosenVaultText, StringComparison.Ordinal);
+        Assert.Equal(fixture.Path_, model.AgentVault?.Path);
+        Assert.DoesNotContain(model.AgentVaultChoices, choice => choice.Path is null);
         Assert.Equal(fixture.Path_, ChosenVault.Read(fixture.Home));
         Assert.Equal(AppTheme.Dark, AppSettings.Load(KeypasteHome.SettingsPath(fixture.Home)).Theme);
     }
@@ -184,6 +185,7 @@ public sealed class SettingsViewModelTests
 
         using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var model = Screen(session, fixture);
+        Assert.Equal("1 vault", model.RecentVaultsCount);
 
         model.AskForgetAllCommand.Press();
 
@@ -201,6 +203,7 @@ public sealed class SettingsViewModelTests
         Assert.False(model.IsConfirmingForgetAll);
         Assert.Empty(RecentVaults.Load(KeypasteHome.RecentPath(fixture.Home)));
         Assert.True(model.HasMessage);
+        Assert.Equal(("None", false), (model.RecentVaultsCount, model.HasRecentVaults));
     }
 
     [Fact]

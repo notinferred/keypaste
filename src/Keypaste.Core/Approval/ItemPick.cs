@@ -26,6 +26,9 @@ public sealed record ItemCandidate
 
     /// <summary>Its URL, sanitized, or empty.</summary>
     public required string Url { get; init; }
+
+    /// <summary>Whether it belongs to a protected environment, asked about every time, so the picker offers no always answer.</summary>
+    public bool Protected { get; init; }
 }
 
 /// <summary>The person's answer to a picker prompt.</summary>

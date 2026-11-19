@@ -11,8 +11,8 @@ using Xunit;
 namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
-/// Settings' Send crash reports switch shows whether reports are sent and changes it, and Diagnostics lists each report
-/// waiting as the exact JSON a request would carry, with Delete (D-0594).
+/// Diagnostics' Send crash reports switch shows whether reports are sent and changes it, and Diagnostics lists each report
+/// waiting as a row whose View shows the exact JSON a request would carry, with Delete.
 /// </summary>
 public sealed class CrashReportScreensTests : IDisposable
 {
@@ -43,7 +43,7 @@ public sealed class CrashReportScreensTests : IDisposable
     {
         _crashes.Agree(send: true);
         _crashes.Crash(Thrown());
-        using var settings = Settings();
+        var settings = Diagnostics();
 
         Assert.True(settings.HasCrashReports);
         Assert.True(settings.SendCrashReports);
@@ -68,9 +68,9 @@ public sealed class CrashReportScreensTests : IDisposable
     {
         _crashes.Agree(send: true);
         _crashes.SetSending(false);
-        using var settings = Settings();
+        Diagnostics().SendCrashReports = true;
+        using var settings = new SettingsViewModel(_session, _fixture.Home, _preferences, _ => { });
 
-        settings.SendCrashReports = true;
         settings.Theme = AppTheme.Dark;
         settings.LockWhenMinimized = true;
 
@@ -80,12 +80,12 @@ public sealed class CrashReportScreensTests : IDisposable
     }
 
     [Fact]
-    public void Turned_on_under_terms_not_agreed_to_the_switch_asks_and_only_Continue_starts_reports()
+    public void Turned_on_under_terms_not_agreed_to_the_switch_asks_and_only_Agree_starts_reports()
     {
         File.WriteAllText(SettingsFile, "[[settings]]\nsend_crash_reports = 0\nterms = \"2020-01-01\"\n");
         var preferences = new DesktopPreferences(_fixture.Home);
         using var crashes = new CrashReporting(_fixture.Home, preferences, endpoint: null, _clock);
-        using var settings = new SettingsViewModel(_session, _fixture.Home, preferences, _ => { }) { Crashes = crashes };
+        var settings = new DiagnosticsViewModel(_session, _fixture.Home, crashes);
         FirstLaunchViewModel? asked = null;
         settings.AskTerms = terms => asked = terms;
 
@@ -95,7 +95,7 @@ public sealed class CrashReportScreensTests : IDisposable
         Assert.False(settings.SendCrashReports);
         Assert.Equal((false, "2020-01-01"), (AppSettings.Load(SettingsFile).SendCrashReports, AppSettings.Load(SettingsFile).TermsAgreed));
 
-        asked.ContinueCommand.Press();
+        asked.AgreeCommand.Press();
 
         Assert.True(settings.SendCrashReports);
         Assert.Equal((true, TermsOfUse.Carried.Version), (AppSettings.Load(SettingsFile).SendCrashReports, AppSettings.Load(SettingsFile).TermsAgreed));
@@ -109,8 +109,8 @@ public sealed class CrashReportScreensTests : IDisposable
         File.WriteAllText(SettingsFile, handEdit);
         var preferences = new DesktopPreferences(_fixture.Home);
         using var crashes = new CrashReporting(_fixture.Home, preferences, endpoint: null, _clock);
-        using var settings = new SettingsViewModel(_session, _fixture.Home, preferences, _ => { }) { Crashes = crashes };
-        settings.AskTerms = terms => terms.ContinueCommand.Press();
+        var settings = new DiagnosticsViewModel(_session, _fixture.Home, crashes);
+        settings.AskTerms = terms => terms.AgreeCommand.Press();
 
         settings.SendCrashReports = true;
 
@@ -122,7 +122,7 @@ public sealed class CrashReportScreensTests : IDisposable
     [Fact]
     public void Without_crash_reports_composed_the_switch_is_not_offered()
     {
-        using var settings = new SettingsViewModel(_session, _fixture.Home, _preferences, _ => { });
+        var settings = new DiagnosticsViewModel(_session, _fixture.Home);
 
         Assert.False(settings.HasCrashReports);
         Assert.False(settings.SendCrashReports);
@@ -145,7 +145,7 @@ public sealed class CrashReportScreensTests : IDisposable
         Assert.True(diagnostics.HasCrashReports);
         Assert.Equal(waiting.Select(report => report.Text), diagnostics.Reports.Select(row => row.Json));
         Assert.Equal(
-            "2 crash reports are waiting to be sent. Each is shown as it would be sent. This copy of keypaste was not built as one of its packages, so it sends none of them.",
+            "2 crash reports are waiting to be sent. This copy of keypaste was not built as one of its packages, so it sends none of them.",
             diagnostics.ReportsSummary);
 
         diagnostics.Reports[0].AskDeleteCommand.Press();
@@ -168,12 +168,30 @@ public sealed class CrashReportScreensTests : IDisposable
     }
 
     [Fact]
+    public void A_waiting_report_reads_as_its_day_and_exception_and_View_opens_and_closes_its_json()
+    {
+        _crashes.Agree(send: true);
+        _crashes.Crash(Thrown());
+
+        var row = Assert.Single(Diagnostics().Reports);
+
+        Assert.Equal($"Crash on {_clock.GetUtcNow():yyyy-MM-dd} · InvalidOperationException", row.Title);
+        Assert.False(row.IsViewing);
+        row.ViewCommand.Press();
+        Assert.True(row.IsViewing);
+        row.CloseViewCommand.Press();
+        Assert.False(row.IsViewing);
+        row.AskDeleteCommand.Press();
+        Assert.Equal("Delete this report? It won't be sent.", row.Shown);
+    }
+
+    [Fact]
     public void Diagnostics_says_when_the_switch_is_off_and_where_nothing_is_composed_shows_no_list()
     {
         _crashes.Agree(send: true);
         _crashes.SetSending(false);
 
-        Assert.Equal("Send crash reports is off in Settings, so none are kept.", new DiagnosticsViewModel(_session, _fixture.Home, _crashes).ReportsSummary);
+        Assert.Equal("Send crash reports is off, so none are kept.", new DiagnosticsViewModel(_session, _fixture.Home, _crashes).ReportsSummary);
 
         var none = new DiagnosticsViewModel(_session, _fixture.Home);
         Assert.False(none.HasCrashReports);
@@ -188,7 +206,7 @@ public sealed class CrashReportScreensTests : IDisposable
         sending.Crash(Thrown());
 
         Assert.Equal(
-            "1 crash report is waiting to be sent. Each is shown as it would be sent.",
+            "1 crash report is waiting to be sent.",
             new DiagnosticsViewModel(_session, _fixture.Home, sending).ReportsSummary);
     }
 
@@ -206,15 +224,13 @@ public sealed class CrashReportScreensTests : IDisposable
 
         shell.Current = Destinations.Of(DestinationKind.Settings);
         Assert.Equal("settings", _crashes.Screen);
-        Assert.True(Assert.IsType<SettingsViewModel>(shell.Content).HasCrashReports);
 
         shell.Current = Destinations.Of(DestinationKind.Diagnostics);
         Assert.Equal("diagnostics", _crashes.Screen);
         Assert.True(Assert.IsType<DiagnosticsViewModel>(shell.Content).HasCrashReports);
     }
 
-    private SettingsViewModel Settings() =>
-        new(_session, _fixture.Home, _preferences, _ => { }) { Crashes = _crashes };
+    private DiagnosticsViewModel Diagnostics() => new(_session, _fixture.Home, _crashes);
 
     private static InvalidOperationException Thrown()
     {

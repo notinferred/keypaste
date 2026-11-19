@@ -27,8 +27,30 @@ internal sealed class ApprovalViewModel : PromptViewModel
         Truncation = TruncationText(prompt);
     }
 
-    /// <summary>Whose words a reason is, said above it whatever it says.</summary>
-    internal static string Says(string agent) => $"{agent} says";
+    /// <summary>Whose words a reason is, said above it whatever it says, and that keypaste altered or cut what it shows.</summary>
+    internal static string Says(string agent, string scrubbed, string truncation) =>
+        $"{agent} says{(scrubbed.Length > 0 ? " \u00b7 altered by keypaste" : string.Empty)}{(truncation.Length > 0 ? " \u00b7 cut short" : string.Empty)}";
+
+    /// <summary>What pointing at a quote's label says when keypaste altered or cut it, or null when it did neither.</summary>
+    internal static string? NoteOn(string scrubbed, string truncation) =>
+        string.Join(" ", new[] { scrubbed, truncation }.Where(note => note.Length > 0)) is { Length: > 0 } note ? note : null;
+
+    /// <summary>A field a question names in words, such as "the password for", or null for a key named as it is.</summary>
+    internal static string? FieldWords(string field) => field switch
+    {
+        "password" => "the password for",
+        "username" => "the username for",
+        "url" => "the URL for",
+        "notes" => "the notes for",
+        CredentialFields.Totp => "the one-time code for",
+        _ => null,
+    };
+
+    /// <summary>An item's title as a question names it, cut so it never wraps the question past two lines.</summary>
+    internal static string Titled(string title) => title.Length > TitleLength ? string.Concat(title.AsSpan(0, TitleLength - 1), "\u2026") : title;
+
+    /// <summary>The longest item title a question holds.</summary>
+    internal const int TitleLength = 32;
 
     /// <summary>The agent's words as the card quotes them.</summary>
     internal static string Quote(string reason) => $"“{reason}”";
@@ -37,7 +59,7 @@ internal sealed class ApprovalViewModel : PromptViewModel
     internal override bool OffersAlways => _offersAlways;
 
     /// <inheritdoc/>
-    internal override string AlwaysTip => $"Don't ask again for {Agent} and this key. Change in Settings › Agents.";
+    internal override string AlwaysTip => $"Don't ask again for {Agent} and this key. Change it in Agents \u203a {Agent}.";
 
     /// <inheritdoc/>
     internal override string NoAlways => Protected ? string.Empty : NoAlwaysText(_offersAlways, _label);
@@ -73,13 +95,16 @@ internal sealed class ApprovalViewModel : PromptViewModel
     internal bool Protected { get; }
 
     /// <summary>Whose words the quote is.</summary>
-    internal string SaysLabel => Says(Agent);
+    internal string SaysLabel => Says(Agent, Scrubbed, Truncation);
+
+    /// <summary>What keypaste altered or cut in the quote, or null.</summary>
+    internal string? QuoteNote => NoteOn(Scrubbed, Truncation);
 
     /// <summary>The agent's words, quoted.</summary>
     internal string Quoted => Quote(Reason);
 
     /// <summary>What allowing does, in one plain line.</summary>
-    internal string Consequence => $"{Agent} will receive the value and can pass it on.";
+    internal string Consequence => $"{Agent} gets it and can pass it on.";
 
     /// <summary>What the requesting client calls itself. Never proof of anything.</summary>
     internal string Client { get; }
@@ -89,8 +114,14 @@ internal sealed class ApprovalViewModel : PromptViewModel
         ? "keypaste.request_attachment"
         : "keypaste.request_credential";
 
+    /// <summary>The question after the agent: a standard field in words with the item's title, which has no mono name then.</summary>
+    internal string Asked => FieldWords(Field) is { } words ? $" {words} {Titled(_itemTitle)}" : " ";
+
+    /// <summary>A key the question names as it is, in the mono, or nothing for a standard field.</summary>
+    internal string Key => FieldWords(Field) is null ? Field : string.Empty;
+
     /// <inheritdoc/>
-    protected override string Asks => $"Give {Agent} {Field} from {_itemTitle}?";
+    protected override string Asks => FieldWords(Field) is { } words ? $"Give {Agent} {words} {_itemTitle}?" : $"Give {Agent} {Field} from {_itemTitle}?";
 
     /// <summary>The label the client's configuration gave its bridge.</summary>
     internal string Label { get; }

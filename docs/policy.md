@@ -16,7 +16,7 @@ The 1.0.0 build does not read `policy.toml` and carries none of its rules over; 
 
 ## What an agent sees
 
-An agent sees each item that its bridge's `--expose` reaches ([what it can see](mcp-setup.md#what-the-agent-can-see)): the item's title, group, tags and URL, and its username unless Agents see usernames is turned off under Every other agent in Agents. That switch hides the username alone, so the agent then asks for it. Listing works either way. Hosts and references, beside it and off until you turn it on, lets a search also show the host in an item's Host field and which items reference another's fields; those then reach the agent's AI provider too.
+An agent sees each item that its bridge's `--expose` reaches ([what it can see](mcp-setup.md#what-the-agent-can-see)): the item's title, group, tags and URL, and its username unless Agents see usernames is turned off in Settings › Agents. That switch hides the username alone, so the agent then asks for it. Listing works either way. Hosts and references, beside it and off until you turn it on, lets a search also show the host in an item's Host field and which items reference another's fields; those then reach the agent's AI provider too.
 
 ## How each value is answered
 
@@ -29,7 +29,7 @@ Every value an agent asks for falls in one kind, and each kind is Ask, Allow or 
 | Project variables | A custom field of an item tagged into a project, `env:<project>` or `env:<project>:<stage>` |
 | Card values | A protected custom field of an item tagged `Credit Card`, such as its number or security code |
 | Identity values | A protected custom field of an item tagged `Identity`, such as a passport number |
-| TOTP codes | An item's current code, never its seed |
+| One-time codes | An item's current code, never its seed |
 | Notes | An item's notes |
 | Attachments | One attachment of an item, asked for by name, at most 5 MiB |
 

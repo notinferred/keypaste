@@ -140,9 +140,6 @@ internal sealed class VaultSection
     /// <summary>The vault's full path, for the tooltip, as last seen unlocked or as the open vaults hold it, since a locked session forgets it.</summary>
     internal string VaultPath => _knownPath = Session.VaultPath ?? _heldPath() ?? _knownPath ?? string.Empty;
 
-    /// <summary>The vault's file name with its extension, which the locked vault's form names under its title.</summary>
-    internal string FileName => VaultPath.Length > 0 ? EntryNameSanitizer.Sanitize(Path.GetFileName(VaultPath)).Text : string.Empty;
-
     internal bool IsLocked => !Session.IsUnlocked;
 
     /// <summary>Whether its places show under it.</summary>

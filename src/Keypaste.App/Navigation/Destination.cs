@@ -22,17 +22,14 @@ internal enum DestinationKind
     /// <summary>The recycle bin, and the way back out of it.</summary>
     Trash = 5,
 
-    /// <summary>The share links made from this vault, under Settings › Advanced.</summary>
+    /// <summary>The share links made from this vault, a section of Settings.</summary>
     Sharing = 6,
 
-    /// <summary>The vault's scoped tokens, minting and revoking one, under Settings › Advanced.</summary>
+    /// <summary>The vault's scoped tokens, minting and revoking one, a section of Settings.</summary>
     Tokens = 8,
 
-    /// <summary>The paths and version this app uses, under Settings › Advanced.</summary>
+    /// <summary>The paths and version this app uses, a section of Settings.</summary>
     Diagnostics = 9,
-
-    /// <summary>The way to the screens the everyday ones leave out, under Settings.</summary>
-    Advanced = 10,
 
     /// <summary>Security: keys left in notes, dropped project tags, weak passwords and reminders to review.</summary>
     Recommendations = 11,
@@ -52,7 +49,7 @@ internal enum DestinationKind
 /// h1 with its title above it; a restyled screen that lays out edge to edge sets this.
 /// </param>
 /// <param name="Parent">The screen a screen sits under, or null for one of the four places the rail lists.</param>
-/// <param name="InSidebar">Whether the screen is one of a vault's places in the sidebar, reached from there rather than by Back.</param>
+/// <param name="InSidebar">Whether the screen is reached from its place's own list, a vault's sidebar or Settings' sections, rather than by Back.</param>
 internal sealed record Destination(
     DestinationKind Kind,
     Func<string> Says,
@@ -85,11 +82,10 @@ internal static class Destinations
         new(DestinationKind.Settings, () => Strings.Settings, "settings", OwnsHeader: true),
         new(DestinationKind.EnvSets, () => Strings.Environments, "braces", OwnsHeader: true, Parent: DestinationKind.Entries, InSidebar: true),
         new(DestinationKind.Trash, () => Strings.Trash, "trash", OwnsHeader: true, Parent: DestinationKind.Entries, InSidebar: true),
-        new(DestinationKind.Advanced, () => Strings.Advanced, "layers", OwnsHeader: true, Parent: DestinationKind.Settings),
         new(DestinationKind.Log, () => Strings.Activity, "activity", OwnsHeader: true, Parent: DestinationKind.AgentActivity),
-        new(DestinationKind.Sharing, () => Strings.ShareLinks, "link", OwnsHeader: true, Parent: DestinationKind.Advanced),
-        new(DestinationKind.Tokens, () => Strings.ScopedTokens, "ticket", OwnsHeader: true, Parent: DestinationKind.Advanced),
-        new(DestinationKind.Diagnostics, () => Strings.Diagnostics, "bug", OwnsHeader: true, Parent: DestinationKind.Advanced),
+        new(DestinationKind.Sharing, () => Strings.ShareLinks, "link", OwnsHeader: true, Parent: DestinationKind.Settings, InSidebar: true),
+        new(DestinationKind.Tokens, () => Strings.ScopedTokens, "ticket", OwnsHeader: true, Parent: DestinationKind.Settings, InSidebar: true),
+        new(DestinationKind.Diagnostics, () => Strings.Diagnostics, "bug", OwnsHeader: true, Parent: DestinationKind.Settings, InSidebar: true),
     ];
 
     /// <summary>The four places, in the order the rail reads and the digits count.</summary>

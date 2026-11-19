@@ -6,7 +6,7 @@ using Keypaste.App.Terms;
 
 namespace Keypaste.App.Views;
 
-/// <summary>"Terms of use": opens the terms in its <see cref="TermsOfUse"/> data context in a small window over this one, and has the keyboard back when it closes.</summary>
+/// <summary>"Read the terms · Source code": opens the terms in its <see cref="TermsOfUse"/> data context in a small window over this one, having the keyboard back when it closes, or the app's source in the browser.</summary>
 internal sealed partial class TermsLink : UserControl
 {
     private TermsWindow? _open;
@@ -16,6 +16,15 @@ internal sealed partial class TermsLink : UserControl
         AvaloniaXamlLoader.Load(this);
         var link = this.FindControl<Button>("OpenTerms")!;
         link.Click += (_, _) => Open(link);
+        this.FindControl<Button>("OpenSourceCode")!.Click += (_, _) => OpenSource();
+    }
+
+    private void OpenSource()
+    {
+        if (TopLevel.GetTopLevel(this) is { } top)
+        {
+            _ = new PlatformWebLauncher(top).OpenAsync(new Uri(AppCommands.SourceAddress));
+        }
     }
 
     private void Open(Button link)

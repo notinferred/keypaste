@@ -44,14 +44,39 @@ internal sealed class EntryFieldRow : ObservableObject, IRevealSource
         RemoveCommand = new RelayCommand(() => _owner.BeginRemoveField(this), () => !IsReadOnly);
     }
 
+    /// <summary>The pane the row is in, whose replace and rename forms the row turns into.</summary>
+    internal EntryDetailViewModel Owner => _owner;
+
+    /// <summary>Whether the row is the input for a new value.</summary>
+    internal bool IsBeingReplaced => ReferenceEquals(_owner.ReplacingField, this);
+
+    /// <summary>Whether the row is the input for a new name.</summary>
+    internal bool IsBeingRenamed => ReferenceEquals(_owner.RenamingField, this);
+
+    /// <summary>Whether the row shows its value, as it does unless it is an input.</summary>
+    internal bool ShowsValue => !IsBeingReplaced && !IsBeingRenamed;
+
+    /// <summary>This row while it is the input for a new value, so only that row builds the input; otherwise null.</summary>
+    internal EntryFieldRow? ReplaceForm => IsBeingReplaced ? this : null;
+
+    /// <summary>This row while it is the input for a new name; otherwise null.</summary>
+    internal EntryFieldRow? RenameForm => IsBeingRenamed ? this : null;
+
+    /// <summary>Says the row became an input or stopped being one.</summary>
+    internal void ShowForm()
+    {
+        OnPropertyChanged(nameof(IsBeingReplaced));
+        OnPropertyChanged(nameof(IsBeingRenamed));
+        OnPropertyChanged(nameof(ShowsValue));
+        OnPropertyChanged(nameof(ReplaceForm));
+        OnPropertyChanged(nameof(RenameForm));
+    }
+
     /// <summary>The field's name, as the vault holds it. Addresses the field on every act.</summary>
     internal string Name { get; }
 
     /// <summary>The name as the pane draws it.</summary>
     internal string DisplayName => EntryNameSanitizer.Sanitize(Name).Text;
-
-    /// <summary>Whether the name reads as a variable, GITHUB_TOKEN, which the row sets in the monospace; Region stays words.</summary>
-    internal bool IsVariableName => Name.Length > 0 && char.IsAsciiLetterUpper(Name[0]) && Name.All(c => char.IsAsciiLetterUpper(c) || char.IsAsciiDigit(c) || c == '_') && Name.Any(c => c == '_' || char.IsAsciiDigit(c));
 
     internal bool IsProtected { get; }
 

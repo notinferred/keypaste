@@ -235,6 +235,11 @@ public sealed class EntryActivity
             .Order(StringComparer.Ordinal)];
     }
 
+    /// <summary>The attached agents that can name an entry by its group and title alone, so a rename can take it out of their view.</summary>
+    /// <param name="entry">The entry.</param>
+    /// <returns>Each such agent's name once, in ordinal order; empty when none can.</returns>
+    public IReadOnlyList<string> SeeingByName(EntryName entry) => Seeing(entry, []);
+
     /// <summary>What the Agent access card shows for an entry.</summary>
     /// <param name="entry">The entry.</param>
     /// <param name="byItem">Whether to read only what names the entry's own UUID, as <see cref="Use"/> does.</param>

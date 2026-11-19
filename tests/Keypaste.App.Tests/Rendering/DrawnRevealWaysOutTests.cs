@@ -220,7 +220,7 @@ public sealed class DrawnRevealWaysOutTests
                 Assert.True(shell.IsLocked);
                 break;
             case "cancel":
-                shell.Tap(shell.Named<Button>("CloseGenerator"));
+                shell.Tap(shell.Named<Button>(shell.Shell.HasGeneratorDialog ? "CloseStandaloneGenerator" : "CloseGenerator"));
                 break;
             case "escape":
                 shell.Window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
@@ -252,7 +252,7 @@ public sealed class DrawnRevealWaysOutTests
                 shell.Tap(shell.ToggleOf(shell.Named<RevealedValue>("CurrentPassword")));
                 break;
             case "menu" when shell.Shell.Content is EntriesViewModel:
-                shell.Tap(shell.Named<ToggleButton>("AddEntry"));
+                shell.Tap(shell.Named<Button>("SidebarNew"));
                 break;
             case "menu" when shell.Shell.Content is ScopedTokensViewModel tokens:
                 // A right-click chooses the row, which an uncopied token would hold off.

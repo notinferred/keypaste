@@ -62,11 +62,13 @@ public sealed class ItemReminderRecommendationsTests : IDisposable
             shell.Recommendations.ReminderGroups.Select(group => (group.Heading, group.Reason)));
 
         var expiring = Assert.Single(shell.Recommendations.ReminderGroups[0].Rows);
-        Assert.StartsWith("keys/GitHub, expires ", expiring.Line, StringComparison.Ordinal);
+        Assert.Equal("GitHub", expiring.Entry);
+        Assert.StartsWith("Expires ", expiring.Detail, StringComparison.Ordinal);
         Assert.Equal(("Open key page", "https://github.com/settings/tokens"), (expiring.PageLabel, expiring.PageAddress));
 
         var marked = Assert.Single(shell.Recommendations.ReminderGroups[1].Rows);
-        Assert.StartsWith("keys/Stripe, marked ", marked.Line, StringComparison.Ordinal);
+        Assert.Equal("Stripe", marked.Entry);
+        Assert.StartsWith("Marked ", marked.Detail, StringComparison.Ordinal);
         Assert.False(marked.HasPage);
         Assert.False(marked.OpenPageCommand.CanExecute(null));
 

@@ -39,7 +39,8 @@ public sealed class DesktopRunApprovalTests
             Assert.Equal("keypaste.run", Text(window, "ToolText"));
             Assert.Equal("deploy --to staging", Text(window, "CommandText"));
             Assert.False(string.IsNullOrEmpty(Text(window, "ProgramText")));
-            Assert.Contains("The command can read these values", Text(window, "ConsequenceText"), StringComparison.Ordinal);
+            Assert.Equal("deploy --to staging gets 1 value in its environment; keypaste removes it from its output.", Text(window, "ConsequenceText"));
+            Assert.Equal("Allow only a command you would run yourself.", Text(window, "WarningText"));
             Assert.Equal(TextWrapping.Wrap, window.FindControl<TextBlock>("CommandText")!.TextWrapping);
             Assert.Equal(TextTrimming.None, window.FindControl<TextBlock>("CommandText")!.TextTrimming);
             Assert.Equal("Run once", window.FindControl<Button>("AllowOnce")!.Content);

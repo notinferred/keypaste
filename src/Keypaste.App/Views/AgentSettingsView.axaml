@@ -3,44 +3,29 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Keypaste.App.ViewModels"
              xmlns:ctl="using:Keypaste.App.Controls"
+             xmlns:views="using:Keypaste.App.Views"
              x:Class="Keypaste.App.Views.AgentSettingsView"
              x:DataType="vm:AgentSettingsViewModel">
 
-  <!-- One agent's settings: whether it may ask to run commands, each run still asked, its own rule for each kind of
-       value and the answers remembered for it. The panel holds no primary action, so the screen keeps its one amber element. -->
+  <!-- One agent's rules, as the Change… its summary row opened: what it gets of each kind of value, whether it may ask to
+       run commands, and the answers remembered for it. No primary action, so the screen keeps its one amber element. -->
 
   <UserControl.Styles>
-    <Style Selector="Button.choice">
-      <Setter Property="Height" Value="28" />
-      <Setter Property="MinHeight" Value="28" />
-      <Setter Property="Padding" Value="12,0" />
-    </Style>
-    <Style Selector="Button.choice.chosen /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
-      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
-    </Style>
-    <!-- Tighter than the log's filter, so three modes stay on one line beside the sidebar in the narrowest column the panel gets. -->
     <Style Selector="ContentPresenter:nth-child(n+2) > Border.remembered">
       <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
       <Setter Property="BorderThickness" Value="0,1,0,0" />
     </Style>
-    <Style Selector="ToggleButton.segment">
-      <Setter Property="Padding" Value="6,2" />
-    </Style>
   </UserControl.Styles>
 
   <UserControl.Resources>
-    <!-- One of several, as the log's filter draws it. Its check says which holds without relying on colour. -->
+    <!-- One of several; the raised segment says which holds. -->
     <DataTemplate x:Key="Segment" x:DataType="vm:SettingChoice">
       <ctl:ChoiceSegment Name="RunChoice" Classes="segment"
                          IsChecked="{Binding IsChosen, Mode=OneWay}"
                          Command="{Binding $parent[UserControl].((vm:AgentSettingsViewModel)DataContext).ChooseCommand}"
                          CommandParameter="{Binding}"
                          AutomationProperties.Name="{Binding Words}">
-        <StackPanel Orientation="Horizontal" Spacing="6">
-          <ctl:KpIcon Icon="check" Size="14" IsVisible="{Binding IsChosen}" Foreground="{DynamicResource KpTextPrimary}" />
-          <TextBlock Text="{Binding Words}" VerticalAlignment="Center" />
-        </StackPanel>
+        <TextBlock Text="{Binding Words}" VerticalAlignment="Center" />
       </ctl:ChoiceSegment>
     </DataTemplate>
     <ItemsPanelTemplate x:Key="Segments">
@@ -50,22 +35,18 @@
 
   <StackPanel Spacing="12">
 
-    <TextBlock Name="IdentityText" Classes="caption" Text="{Binding Identity}" TextWrapping="Wrap" MaxWidth="720" HorizontalAlignment="Left" />
-
     <TextBlock Name="SettingsProblem" Classes="body danger" ctl:Announcer.Says="{Binding Problem}" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" TextWrapping="Wrap" />
 
-    <Border Classes="group">
-      <ctl:GroupedRows>
-        <ctl:FieldRow Label="{x:Static res:Strings.MayRunCommands}">
-          <Border Classes="segmented" HorizontalAlignment="Left">
-            <ItemsControl Name="RunChoices" ItemsSource="{Binding RunChoices}" ItemsPanel="{StaticResource Segments}" ItemTemplate="{StaticResource Segment}" />
-          </Border>
-        </ctl:FieldRow>
-      </ctl:GroupedRows>
-    </Border>
-
-    <StackPanel Spacing="6">
-      <TextBlock Classes="label" Text="{x:Static res:Strings.WhenItAsks}" />
+    <StackPanel Classes="section" IsVisible="{Binding ChangesAsks}" ctl:ShowInView.OnShow="True">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+        <WrapPanel ItemSpacing="6" VerticalAlignment="Center">
+          <TextBlock Classes="section-heading" Text="{Binding Shown, StringFormat={x:Static res:Strings.WhenValueAsks}}" />
+          <TextBlock Classes="caption" Text="{x:Static res:Strings.DefaultFollowsSettingsAgents}" />
+          <Button Name="ShowDefaults" Classes="link" Content="{x:Static res:Strings.ChangeDefaults}"
+                  Command="{Binding $parent[views:AgentActivityView].((vm:AgentActivityViewModel)DataContext).ShowDefaultsCommand, FallbackValue={x:Null}}" />
+        </WrapPanel>
+        <Button Grid.Column="1" Name="AsksDone" Classes="sm" Content="{x:Static res:Strings.Done}" Command="{Binding DoneCommand}" />
+      </Grid>
       <Border Classes="group">
         <ItemsControl Name="CategoryRules" ItemsSource="{Binding Rows}">
           <ItemsControl.ItemsPanel>
@@ -75,7 +56,7 @@
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:AgentCategoryRow">
-              <ctl:FieldRow Classes="stacked" Label="{Binding Name}">
+              <ctl:FieldRow Label="{Binding Name}">
                 <Border Classes="segmented" HorizontalAlignment="Left">
                   <ItemsControl ItemsSource="{Binding Choices}" ItemsPanel="{StaticResource Segments}">
                     <ItemsControl.ItemTemplate>
@@ -85,10 +66,7 @@
                                            Command="{Binding $parent[UserControl].((vm:AgentSettingsViewModel)DataContext).ChooseCategoryCommand}"
                                            CommandParameter="{Binding}"
                                            AutomationProperties.Name="{Binding Words}">
-                          <StackPanel Orientation="Horizontal" Spacing="6">
-                            <ctl:KpIcon Icon="check" Size="14" IsVisible="{Binding IsChosen}" Foreground="{DynamicResource KpTextPrimary}" />
-                            <TextBlock Text="{Binding Words}" VerticalAlignment="Center" />
-                          </StackPanel>
+                          <TextBlock Text="{Binding Words}" VerticalAlignment="Center" />
                         </ctl:ChoiceSegment>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
@@ -112,11 +90,27 @@
       </Border>
     </StackPanel>
 
-    <StackPanel Spacing="6">
-      <TextBlock Classes="label" Text="{x:Static res:Strings.AlwaysAnswers}" />
-      <TextBlock Classes="caption" TextWrapping="Wrap" IsVisible="{Binding !HasRemembered}"
-                 Text="{x:Static res:Strings.NoAlwaysAnswersYet}" />
-      <Border Classes="group" IsVisible="{Binding HasRemembered}">
+    <StackPanel Classes="section" IsVisible="{Binding ChangesRun}" ctl:ShowInView.OnShow="True">
+      <Border Classes="group">
+        <ctl:GroupedRows>
+          <ctl:FieldRow Label="{x:Static res:Strings.MayRunCommands}">
+            <Border Classes="segmented" HorizontalAlignment="Left">
+              <ItemsControl Name="RunChoices" ItemsSource="{Binding RunChoices}" ItemsPanel="{StaticResource Segments}" ItemTemplate="{StaticResource Segment}" />
+            </Border>
+            <ctl:FieldRow.Actions>
+              <Button Name="RunDone" Classes="sm" Content="{x:Static res:Strings.Done}" Command="{Binding DoneCommand}" />
+            </ctl:FieldRow.Actions>
+          </ctl:FieldRow>
+        </ctl:GroupedRows>
+      </Border>
+    </StackPanel>
+
+    <StackPanel Classes="section" IsVisible="{Binding ChangesAnswers}" ctl:ShowInView.OnShow="True">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+        <TextBlock Classes="section-heading" Text="{x:Static res:Strings.AlwaysAnswers}" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Name="AnswersDone" Classes="sm" Content="{x:Static res:Strings.Done}" Command="{Binding DoneCommand}" />
+      </Grid>
+      <Border Classes="group">
         <ItemsControl Name="RememberedAnswers" ItemsSource="{Binding Remembered}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:RememberedRow">

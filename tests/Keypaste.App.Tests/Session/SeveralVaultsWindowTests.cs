@@ -65,7 +65,7 @@ public sealed class SeveralVaultsWindowTests
             var rebuilt = await Until(() => Shell(main) is { } shell && shell != first ? shell : null);
             Assert.Same(acme.Session, rebuilt.Anchor);
             Assert.True(acme.Session.IsUnlocked);
-            Assert.Equal("test is locked", Assert.IsType<LockedVaultViewModel>(rebuilt.Content).Heading);
+            Assert.Equal("test", Assert.IsType<LockedVaultViewModel>(rebuilt.Content).Unlock.Heading);
 
             vaults.Pairings.Show!(BrowserShow.NewLogin, "acme", "https://github.com");
             await Until(() => rebuilt.Content is EntriesViewModel { NewItem: not null } items ? items : null);

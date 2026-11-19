@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
@@ -75,19 +74,12 @@ public sealed class NewItemSheetTests
         [
             (() =>
             {
-                shell.Named<ToggleButton>("AddEntry").IsChecked = true;
-                RenderedShell.Drain();
-                shell.Tap(shell.Named<Border>("AddMenuPanel").GetVisualDescendants().OfType<Button>().Single(button => Equals(button.CommandParameter, ItemTemplate.Card)));
+                var (menu, _) = shell.OpenMenu("SidebarNew");
+                Menus.Choose(menu, menu.Items.OfType<MenuItem>().Single(item => Equals(item.CommandParameter, ItemTemplate.Card)));
             }, ItemTemplate.Card),
             (newItem.Run, ItemTemplate.Login),
             (() => shell.Commands.ForChord(newItem.Keys[0].Key, newItem.Keys[0].KeyModifiers)!.Run(), ItemTemplate.Login),
             (byKind[^1].Run, TemplateChoice.All[^1].Template),
-            (() =>
-            {
-                shell.Shell.OpenGeneratorCommand.Execute(null);
-                RenderedShell.Drain();
-                shell.Tap(shell.Named<Button>("GeneratedNewItem"));
-            }, ItemTemplate.Login),
         ];
 
         foreach (var (open, kind) in ways)
@@ -127,19 +119,14 @@ public sealed class NewItemSheetTests
         Assert.Same(shell.Named<TextBox>("NewItemTitle"), shell.Window.FocusManager?.GetFocusedElement());
         Assert.Equal(Strings.Save, shell.Named<Button>("CreateItem").Content);
         Assert.True(shell.Named<StackPanel>("FillsInBrowserNote").IsEffectivelyVisible);
-        Assert.True(shell.Named<ComboBox>("NewItemSaveIn").IsEffectivelyVisible);
+        Assert.False(shell.Named<ComboBox>("NewItemSaveIn").IsEffectivelyVisible, "Save in shows with one vault open");
 
-        var addField = shell.Named<ToggleButton>("AddFieldMenu");
+        var addField = shell.Named<Button>("AddFieldMenu");
         Assert.Equal(Strings.AddAField, Avalonia.Automation.AutomationProperties.GetName(addField));
-        addField.IsChecked = true;
-        RenderedShell.Drain();
-        var menu = shell.Named<Border>("AddFieldMenuPanel");
-        Assert.True(menu.IsEffectivelyVisible);
-        Assert.True(Within(menu, shell.Named<Border>("NewItemDialog")), "Add field…'s menu lies inside the sheet");
-        shell.Tap(menu.GetVisualDescendants().OfType<Button>().Single(button => Equals(button.CommandParameter, NewItemField.CustomField)));
-        RenderedShell.Drain();
+        var (menu, _) = shell.OpenMenu("AddFieldMenu");
+        Menus.Choose(menu, Menus.Rows(menu).Single(item => Equals(item.CommandParameter, NewItemField.CustomField)));
 
-        Assert.False(addField.IsChecked);
+        Assert.False(menu.IsOpen);
         Assert.Single(items.NewItem!.CustomFields);
         Assert.True(shell.Named<ItemsControl>("NewItemCustomFields").IsEffectivelyVisible);
 
@@ -175,9 +162,18 @@ public sealed class NewItemSheetTests
 
     private static double Top(Visual control, RenderedShell shell) => control.TranslatePoint(default, shell.Window)!.Value.Y;
 
-    private static bool Within(Visual inner, Visual outer)
+    [Fact]
+    public Task Save_in_shows_at_the_foot_only_while_another_vault_is_open() => HeadlessSession.On(() =>
     {
-        var topLeft = inner.TranslatePoint(default, outer)!.Value;
-        return topLeft.X >= 0 && topLeft.Y >= 0 && topLeft.X + inner.Bounds.Width <= outer.Bounds.Width && topLeft.Y + inner.Bounds.Height <= outer.Bounds.Height;
-    }
+        using var shell = new RenderedShell("keypaste-new-item-save-in-", secondVault: "acme");
+        var items = shell.Show<EntriesViewModel>(DestinationKind.Entries);
+        items.BeginAddCommand.Execute(null);
+        RenderedShell.Drain();
+
+        var saveIn = shell.Named<ComboBox>("NewItemSaveIn");
+        Assert.True(saveIn.IsEffectivelyVisible);
+        Assert.True(
+            saveIn.TranslatePoint(default, shell.Window)!.Value.Y > shell.Named<ScrollViewer>("NewItemRows").TranslatePoint(default, shell.Window)!.Value.Y,
+            "Save in is not under the rows");
+    });
 }

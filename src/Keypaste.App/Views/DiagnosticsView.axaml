@@ -1,77 +1,114 @@
 <UserControl xmlns:res="using:Keypaste.App.Resources"
-  xmlns="https://github.com/avaloniaui"
+             xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Keypaste.App.ViewModels"
              xmlns:ctl="using:Keypaste.App.Controls"
+             xmlns:views="using:Keypaste.App.Views"
              x:Class="Keypaste.App.Views.DiagnosticsView"
              x:DataType="vm:DiagnosticsViewModel">
 
-  <UserControl.Styles>
-    <Style Selector="SelectableTextBlock.fact-value">
-      <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
-      <Setter Property="TextWrapping" Value="Wrap" />
-      <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
-    </Style>
-  </UserControl.Styles>
+  <Panel>
+    <views:SettingsFrame Section="{x:Static vm:SettingsSectionChoice.Diagnostics}">
+      <views:SettingsFrame.Page>
+        <StackPanel Classes="sections">
 
-  <ScrollViewer>
-    <StackPanel Margin="32,12,32,24" Spacing="16" MaxWidth="640" HorizontalAlignment="Left">
-      <TextBlock Classes="h1"
-                 Text="{x:Static res:Strings.Diagnostics}"
-                 ToolTip.Tip="{x:Static res:Strings.TheVaultTheFolderAndTheVersionXa37320}" />
-
-      <Border Classes="group">
-        <ctl:GroupedRows>
-          <ctl:FieldRow Classes="stacked" Label="{x:Static res:Strings.Vault}">
-            <SelectableTextBlock Classes="fact-value size-12" Text="{Binding VaultPath}" />
-          </ctl:FieldRow>
-          <ctl:FieldRow Classes="stacked" Label="{x:Static res:Strings.KeypasteHome}">
-            <SelectableTextBlock Classes="fact-value size-12" Text="{Binding HomePath}" />
-          </ctl:FieldRow>
-          <ctl:FieldRow Classes="stacked mono-label" Label="{x:Static res:Strings.KEYPASTEHOMECapitals}">
-            <SelectableTextBlock Classes="fact-value size-12" Text="{Binding HomeOverride}" />
-          </ctl:FieldRow>
-          <ctl:FieldRow Label="{x:Static res:Strings.Version}">
-            <SelectableTextBlock Classes="fact-value size-12" Text="{Binding Version}" />
-          </ctl:FieldRow>
-          <ctl:FieldRow Classes="stacked" Label="{x:Static res:Strings.AnsweringAgents}">
-            <SelectableTextBlock Name="AnsweringAgents" Classes="fact-value size-12" Text="{Binding AnsweringAgents}" />
-          </ctl:FieldRow>
-        </ctl:GroupedRows>
-      </Border>
-
-      <!-- The crash reports waiting, each as the exact JSON a request would carry, with Delete (D-0594). -->
-      <Border Name="CrashReportsCard" Classes="group" Padding="16,12" IsVisible="{Binding HasCrashReports}">
-        <StackPanel Spacing="12">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <ctl:KpIcon Icon="bug" Size="16" Foreground="{DynamicResource KpTextMuted}" />
-            <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.CrashReports}" />
-          </StackPanel>
-          <TextBlock Name="CrashReportsSummary" Classes="caption" TextWrapping="Wrap" Text="{Binding ReportsSummary}" />
-          <ItemsControl Name="CrashReportRows" ItemsSource="{Binding Reports}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:CrashReportRow">
-                <Border BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,0,0,12">
-                  <StackPanel Spacing="8">
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
-                      <SelectableTextBlock Grid.Column="0" Classes="fact-value size-12" Text="{Binding Json}" />
-                      <Button Grid.Column="1" Classes="sm ghost" Content="{x:Static res:Strings.Delete}" VerticalAlignment="Top"
-                              IsVisible="{Binding !IsConfirming}"
-                              Command="{Binding AskDeleteCommand}" />
-                    </Grid>
-                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelDeleteCommand}">
-                      <TextBlock Text="{x:Static res:Strings.DeleteThisReportItWontBeSent}" Classes="size-13" TextWrapping="Wrap" VerticalAlignment="Center" />
-                      <Button Grid.Column="1" Classes="ghost sm size-12" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelDeleteCommand}" />
-                      <Button Grid.Column="2" Name="ConfirmDeleteReport" Classes="danger sm size-12" Content="{x:Static res:Strings.DeleteReport}" Command="{Binding DeleteCommand}" />
-                    </Grid>
+          <StackPanel Classes="section">
+            <Border Classes="group">
+              <ctl:GroupedRows>
+                <ctl:FieldRow Label="{x:Static res:Strings.Version}">
+                  <SelectableTextBlock Name="Version" Classes="size-13" Text="{Binding Version}" />
+                </ctl:FieldRow>
+                <ctl:FieldRow Label="{x:Static res:Strings.Vault}">
+                  <SelectableTextBlock Classes="mono secondary size-12" TextWrapping="Wrap" Text="{Binding VaultPath}" />
+                </ctl:FieldRow>
+                <ctl:FieldRow Label="{x:Static res:Strings.KeypasteHome}">
+                  <StackPanel Spacing="2">
+                    <SelectableTextBlock Name="HomePath" Classes="mono secondary size-12" TextWrapping="Wrap" Text="{Binding HomePath}" />
+                    <TextBlock Name="HomeOverride" Classes="caption" Text="{x:Static res:Strings.SetByKeypasteHome}" IsVisible="{Binding HomeIsOverridden}" />
                   </StackPanel>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
+                </ctl:FieldRow>
+                <ctl:FieldRow Label="{x:Static res:Strings.AnsweringAgents}">
+                  <TextBlock Name="AnsweringAgents" Classes="size-13" Text="{Binding AnsweringAgents}" ToolTip.Tip="{Binding AnsweringAgentsDetail}" />
+                </ctl:FieldRow>
+              </ctl:GroupedRows>
+            </Border>
+            <Button Name="CopyDiagnostics" Classes="sm" HorizontalAlignment="Left" Margin="0,6,0,0"
+                    Content="{x:Static res:Strings.CopyDiagnostics}" Command="{Binding CopyCommand}" />
+          </StackPanel>
+
+          <!-- Whether crash reports are sent, and those waiting, each a row whose View shows the exact JSON a request would carry. -->
+          <StackPanel Name="CrashReportsCard" Classes="section" IsVisible="{Binding HasCrashReports}">
+            <TextBlock Classes="section-heading" Text="{x:Static res:Strings.CrashReports}" />
+            <Border Classes="group">
+              <ctl:GroupedRows>
+                <ctl:FieldRow Label="{x:Static res:Strings.SendCrashReports}">
+                  <ctl:FieldRow.Actions>
+                    <ToggleSwitch Name="SendCrashReports"
+                                  AutomationProperties.Name="{x:Static res:Strings.SendCrashReports}"
+                                  AutomationProperties.HelpText="{x:Static res:Strings.SendsWhatFailedNeverAnythingFromYourVault}"
+                                  ToolTip.Tip="{x:Static res:Strings.SendsWhatFailedNeverAnythingFromYourVault}"
+                                  IsChecked="{Binding SendCrashReports}" />
+                  </ctl:FieldRow.Actions>
+                </ctl:FieldRow>
+              </ctl:GroupedRows>
+            </Border>
+            <TextBlock Name="CrashReportsSummary" Classes="caption" Margin="14,0" TextWrapping="Wrap" Text="{Binding ReportsSummary}" />
+            <Border Classes="group" IsVisible="{Binding HasReports}">
+              <ItemsControl Name="CrashReportRows" ItemsSource="{Binding Reports}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><ctl:GroupedRows /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:CrashReportRow">
+                    <ctl:FieldRow Classes="adaptive" Label="{Binding Shown}" ctl:FormKeys.Cancel="{Binding CancelDeleteCommand}">
+                      <ctl:FieldRow.Actions>
+                        <Panel>
+                          <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsConfirming}">
+                            <Button Classes="sm" Content="{x:Static res:Strings.View}" Command="{Binding ViewCommand}"
+                                    AutomationProperties.Name="{Binding Title, StringFormat={x:Static res:Strings.ViewTheReportValue}}" />
+                            <Button Classes="ghost sm" Content="{x:Static res:Strings.Delete}" Command="{Binding AskDeleteCommand}" />
+                          </StackPanel>
+                          <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True">
+                            <Button Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelDeleteCommand}" />
+                            <Button Name="ConfirmDeleteReport" Classes="danger sm" Content="{x:Static res:Strings.DeleteReport}" Command="{Binding DeleteCommand}" />
+                          </StackPanel>
+                        </Panel>
+                      </ctl:FieldRow.Actions>
+                    </ctl:FieldRow>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </Border>
+            <TextBlock ctl:MachineRuns.InText="True" Classes="caption" Margin="14,0" TextWrapping="Wrap"
+                       ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" IsVisible="{Binding HasMessage}" />
+          </StackPanel>
         </StackPanel>
-      </Border>
-    </StackPanel>
-  </ScrollViewer>
+      </views:SettingsFrame.Page>
+    </views:SettingsFrame>
+
+    <!-- A waiting report's JSON, as a sheet over the screen. -->
+    <ItemsControl ItemsSource="{Binding Reports}">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate><Panel /></ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:CrashReportRow">
+          <Border Classes="backdrop" Padding="24" IsVisible="{Binding IsViewing}">
+            <Border Classes="dialog" Width="560" MaxWidth="560" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,24,0,0"
+                    ctl:FormKeys.Cancel="{Binding CloseViewCommand}" ctl:ShowInView.OnShow="True">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Classes="dialog-title" Margin="0,0,0,12" Text="{Binding Title}" />
+                <Button DockPanel.Dock="Bottom" Classes="primary lg" HorizontalAlignment="Right" Margin="0,16,0,0"
+                        Content="{x:Static res:Strings.Done}" Command="{Binding CloseViewCommand}" />
+                <ScrollViewer MaxHeight="420">
+                  <SelectableTextBlock Name="CrashReportJson" Classes="mono secondary size-12" TextWrapping="Wrap" Text="{Binding Json}" />
+                </ScrollViewer>
+              </DockPanel>
+            </Border>
+          </Border>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+  </Panel>
 
 </UserControl>

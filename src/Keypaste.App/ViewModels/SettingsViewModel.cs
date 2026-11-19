@@ -1,9 +1,7 @@
 using System.Globalization;
 using Keypaste.App.Globalization;
-using Keypaste.App.Navigation;
 using Keypaste.App.Resources;
 using Keypaste.App.Session;
-using Keypaste.App.Terms;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Linking;
@@ -28,8 +26,16 @@ internal sealed record LogKeepChoice(int Days, string Label);
 /// <param name="Label">How it reads in the list.</param>
 internal sealed record ExpiryReminderChoice(int Days, string Label);
 
+/// <summary>One vault General offers agents and the CLI, or None.</summary>
+/// <param name="Path">The vault's file, or null for None.</param>
+/// <param name="Label">Its name in the pop-up.</param>
+internal sealed record AgentVaultChoice(string? Path, string Label)
+{
+    public override string ToString() => Label;
+}
+
 /// <summary>
-/// Settings, with the way to Advanced, which leads to the screens the everyday ones leave out.
+/// Settings' sections that are not screens of their own: General, This vault, Browser and Agents.
 /// </summary>
 /// <remarks>
 /// Every change is written immediately and applied immediately — there is no Save button and no way
@@ -57,6 +63,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     private bool? _openAtLogin;
     private bool _exporting;
     private CliLinkStatus? _cliStatus;
+    private IReadOnlyList<AgentVaultChoice>? _agentVaultChoices;
 
     internal SettingsViewModel(
         AppVaultSession session,
@@ -64,7 +71,6 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
         DesktopPreferences preferences,
         Action<AppTheme> applyTheme,
         IVaultFilePicker? picker = null,
-        Action<DestinationKind>? open = null,
         Func<SecretBuffer, Task<PasteOutcome>>? paste = null)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -91,10 +97,9 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
         ExpiryReminderChoices = ReminderChoicesFor(_settings.ExpiryReminderDays);
         _expiryReminder = ExpiryReminderChoices.Single(choice => choice.Days == _settings.ExpiryReminderDays);
 
-        UseThisVaultCommand = new RelayCommand(UseThisVault, () => !IsThisVaultChosen && _session.VaultPath is not null);
+        UseThisVaultCommand = new RelayCommand(() => ChooseAgentVault(_session.VaultPath!), () => !IsThisVaultChosen && _session.VaultPath is not null);
         ExportCommand = new AsyncRelayCommand(ExportAsync, () => !_exporting && _picker is not null);
         Access = new VaultAccessViewModel(session, home, picker, paste);
-        OpenAdvancedCommand = new RelayCommand(() => open?.Invoke(DestinationKind.Advanced), () => open is not null);
         LinkCliCommand = new AsyncRelayCommand(LinkCliAsync, () => OffersCliLink && !IsCliLinking);
         BeginReplaceCliCommand = new RelayCommand(
             () => IsConfirmingCliReplace = true,
@@ -104,9 +109,6 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
             () => IsConfirmingCliReplace = false,
             () => IsConfirmingCliReplace && !IsCliLinking);
     }
-
-    /// <summary>Settings › Advanced, the screen that leads to the activity log, share links, scoped tokens and diagnostics.</summary>
-    internal RelayCommand OpenAdvancedCommand { get; }
 
     /// <summary>The unlocked vaults This vault's picker offers, or none where one vault is open.</summary>
     internal IReadOnlyList<VaultChoice> VaultChoices { get; init; } = [];
@@ -168,38 +170,24 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     /// </remarks>
     internal IReadOnlyList<IdleChoice> IdleChoices { get; }
 
-    /// <summary>The parts of this screen, Browser only where a browser can reach this vault.</summary>
-    internal IReadOnlyList<SettingsSectionChoice> Sections =>
-        HasBrowserFill
-            ? [SettingsSectionChoice.General, SettingsSectionChoice.ThisVault, SettingsSectionChoice.Browser]
-            : [SettingsSectionChoice.General, SettingsSectionChoice.ThisVault];
-
     /// <summary>The part of this screen in view.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SectionNote), nameof(ShowsGeneral), nameof(ShowsThisVault), nameof(ShowsBrowser))]
+    [NotifyPropertyChangedFor(nameof(ShowsGeneral), nameof(ShowsThisVault), nameof(ShowsBrowser), nameof(ShowsAgents))]
     internal partial SettingsSectionChoice Section { get; set; } = SettingsSectionChoice.General;
 
     partial void OnSectionChanged(SettingsSectionChoice value) => SectionIsOpen = true;
 
-#pragma warning disable CA1822
-    internal string ListTitle => Strings.Settings;
-#pragma warning restore CA1822
-
     /// <summary>Whether the part in view stands where a narrow window would otherwise show the list of parts.</summary>
     [ObservableProperty]
     internal partial bool SectionIsOpen { get; set; } = true;
-
-    /// <summary>The way back from a part to the list of parts, where the window shows one at a time.</summary>
-    [RelayCommand]
-    private void CloseSection() => SectionIsOpen = false;
-
-    internal string SectionNote => Section.Note;
 
     internal bool ShowsGeneral => Section == SettingsSectionChoice.General;
 
     internal bool ShowsThisVault => Section == SettingsSectionChoice.ThisVault;
 
     internal bool ShowsBrowser => Section == SettingsSectionChoice.Browser;
+
+    internal bool ShowsAgents => Section == SettingsSectionChoice.Agents;
 
     /// <summary>Whether Appearance shows, only where the system reports no light or dark of its own.</summary>
     internal bool OffersTheme { get; init; }
@@ -357,9 +345,6 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
         }
     }
 
-    /// <summary>The app's crash reports, whose switch this screen shows; null where the app composed none.</summary>
-    internal CrashReporting? Crashes { get; init; }
-
     /// <summary>Browser fill: pairing a browser and the pairings the vault holds; null where nothing answers browsers.</summary>
     internal BrowserFillViewModel? BrowserFill { get; init; }
 
@@ -368,49 +353,10 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     /// <summary>Browser fill's browsers, each turned on and off as keypaste's host; null where the shell lists none.</summary>
     internal BrowserHostsViewModel? BrowserHosts { get; init; }
 
+    /// <summary>What every agent can see and gets when it asks, for Settings › Agents; null where the vault serves no agents.</summary>
+    internal AgentRulesViewModel? AgentDefaults { get; init; }
+
     internal bool HasBrowserHosts => BrowserHosts is not null;
-
-    internal bool HasCrashReports => Crashes is not null;
-
-    /// <summary>Shows the one terms screen over this one; the view sets it.</summary>
-    internal Action<FirstLaunchViewModel>? AskTerms { get; set; }
-
-    /// <summary>Whether crash reports are sent; turning it off deletes the reports waiting, and turning it on under terms not agreed to asks first.</summary>
-    internal bool SendCrashReports
-    {
-        get => Crashes?.IsOn == true;
-        set
-        {
-            if (Crashes is not { } crashes || value == crashes.IsOn)
-            {
-                return;
-            }
-
-            if (value && !crashes.HasAgreed)
-            {
-                AskTerms?.Invoke(FirstLaunchViewModel.ForSwitch(TermsOfUse.Carried, () => TookAgreement(crashes)));
-                return;
-            }
-
-            var saved = crashes.SetSending(value);
-            CrashSwitchMoved();
-            Message = saved ? string.Empty : "That preference could not be saved, so it will not survive a restart. Check that keypaste's folder can be written, then change it again.";
-        }
-    }
-
-    private void TookAgreement(CrashReporting crashes)
-    {
-        var saved = crashes.Agree(send: true);
-        CrashSwitchMoved();
-        Message = saved ? string.Empty : "Crash reports are on until you quit, because keypaste could not keep this in its settings file, app.toml.";
-    }
-
-    private void CrashSwitchMoved()
-    {
-        // The next preference this screen writes starts from the switch, not from what it read when it opened.
-        _settings = _preferences.Current;
-        OnPropertyChanged(nameof(SendCrashReports));
-    }
 
     /// <summary>The entry that opens the app at login, or null where Settings offers none.</summary>
     internal ILoginItem? Login { get; init; }
@@ -441,23 +387,55 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
         }
     }
 
+    /// <summary>The vaults General's pop-up offers agents and the CLI: this computer's recent and open vaults, and None while none is chosen.</summary>
+    internal IReadOnlyList<AgentVaultChoice> AgentVaultChoices => _agentVaultChoices ??= ReadAgentVaultChoices();
+
+    /// <summary>The vault agents and the CLI use without <c>--vault</c>; choosing one writes it at once.</summary>
+    internal AgentVaultChoice? AgentVault
+    {
+        get => AgentVaultChoices.FirstOrDefault(choice => ChosenVault.Same(choice.Path, ChosenVault.Read(_home)))
+            ?? AgentVaultChoices.FirstOrDefault(choice => choice.Path is null);
+        set
+        {
+            if (value?.Path is { } path && !ChosenVault.Same(path, ChosenVault.Read(_home)))
+            {
+                ChooseAgentVault(path);
+            }
+        }
+    }
+
     /// <summary>Makes the unlocked vault the one agents and the CLI use without <c>--vault</c>.</summary>
     internal RelayCommand UseThisVaultCommand { get; }
 
-    /// <summary>The vault agents and the CLI use without <c>--vault</c>, read each time.</summary>
-    internal string ChosenVaultText => ChosenVault.Read(_home) is { } chosen
-        ? IsThisVaultChosen
-            ? $"Agents and the keypaste CLI use this vault, {chosen}, when no --vault is given."
-            : $"Agents and the keypaste CLI use {chosen} when no --vault is given, not this vault."
-        : "No vault is chosen for agents and the keypaste CLI, so each needs --vault.";
-
     internal bool IsThisVaultChosen => ChosenVault.Same(ChosenVault.Read(_home), _session.VaultPath);
 
-#pragma warning disable CA1822
-    internal string ChosenVaultRule =>
-        "An AI tool that is already running keeps the vault it started with until it restarts keypaste mcp. " +
-        "An AI tool connected with --vault keeps that vault.";
-#pragma warning restore CA1822
+    private List<AgentVaultChoice> ReadAgentVaultChoices()
+    {
+        var chosen = ChosenVault.Read(_home);
+        List<string> paths = [.. new[] { chosen, _session.VaultPath }.OfType<string>()];
+        paths.AddRange(VaultChoices.Select(choice => choice.Vault?.VaultPath).OfType<string>());
+        paths.AddRange(RecentVaults.Load(KeypasteHome.RecentPath(_home)).Select(recent => recent.Path));
+
+        List<AgentVaultChoice> choices = chosen is null ? [new(null, Strings.NoneWord)] : [];
+        foreach (var path in paths.Where(path => !choicesHave(path)))
+        {
+            choices.Add(new(path, Path.GetFileNameWithoutExtension(path)));
+        }
+
+        return choices;
+
+        bool choicesHave(string path) => choices.Exists(choice => ChosenVault.Same(choice.Path, path));
+    }
+
+    /// <summary>How many vaults keypaste remembers having opened on this computer.</summary>
+    internal string RecentVaultsCount => RecentVaults.Load(KeypasteHome.RecentPath(_home)).Count switch
+    {
+        0 => Strings.NoneWord,
+        1 => "1 vault",
+        var count => string.Create(CultureInfo.InvariantCulture, $"{count} vaults"),
+    };
+
+    internal bool HasRecentVaults => RecentVaults.Load(KeypasteHome.RecentPath(_home)).Count > 0;
 
     /// <summary>Links the <c>keypaste</c> a terminal runs to this app's own, or null where Settings offers no link (Windows, and an app with no <c>keypaste</c> beside it).</summary>
     internal ICliLink? CliLink { get; init; }
@@ -567,9 +545,9 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     internal string BackupsSummary => _session.VaultPath is { } path
         ? VaultBackups.List(path) switch
         {
-            [] => "No copies yet. The first save after an unlock makes one.",
-            [var only] => $"1 copy, from {When(only)}.",
-            [var newest, ..] all => $"{all.Count} copies, the newest from {When(newest)}.",
+            [] => Strings.NoCopiesYet,
+            [var only] => $"1 copy · latest {When(only)}",
+            [var newest, ..] all => string.Create(CultureInfo.InvariantCulture, $"{all.Count} copies · latest {When(newest)}"),
         }
         : string.Empty;
 
@@ -577,13 +555,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     internal bool HasBackupCopies => _session.VaultPath is { } path && VaultBackups.List(path).Count > 0;
 
 #pragma warning disable CA1822
-    internal string CloseHelp => OperatingSystem.IsLinux()
-        ? $"{Strings.ClosingTheWindowStillLocksTheVaultX283e06} {Strings.SomeLinuxDesktopsShowNoTrayIcon}"
-        : Strings.ClosingTheWindowStillLocksTheVaultX283e06;
-
-    internal string MinimizeHelp => OperatingSystem.IsMacOS()
-        ? $"{Strings.TakesEffectAtOnceAndAtEveryX7e38a2} {Strings.HidingTheAppIsNotMinimizing}"
-        : Strings.TakesEffectAtOnceAndAtEveryX7e38a2;
+    internal string CloseHelp => Strings.ClosingTheWindowKeepsKeypasteRunningLocked;
 
     internal string BackupsRule =>
         $"A save keeps the file it replaces: the first save after each unlock, no more often than every " +
@@ -593,9 +565,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     internal string RestoreHint =>
         "To put one back, lock keypaste and choose Restore a backup on the unlock screen.";
 
-    internal string ElsewhereAdvice =>
-        "Copies beside the vault do not survive losing the disk or the folder. Export an encrypted copy " +
-        "and keep it on another disk. It opens with this vault's master password.";
+    internal string ElsewhereAdvice => Strings.KeepACopyOnAnotherDisk;
 #pragma warning restore CA1822
 
     /// <summary>Confirmation of the last thing that happened, or nothing.</summary>
@@ -665,28 +635,26 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     {
         Access.Dispose();
         BrowserFill?.Dispose();
+        AgentDefaults?.Dispose();
     }
 
     private static string When(VaultBackup backup) =>
         PersonTime.Moment(backup.TakenAt.ToLocalTime());
 
-    private void UseThisVault()
+    private void ChooseAgentVault(string path)
     {
-        if (_session.VaultPath is not { } path)
-        {
-            return;
-        }
-
         Message = ChosenVault.Choose(_home, path, onlyIfNone: false) switch
         {
-            ChooseOutcome.Chosen => "Agents and the keypaste CLI now use this vault when no --vault is given.",
+            ChooseOutcome.Chosen => $"Agents and the keypaste CLI now use {Path.GetFileNameWithoutExtension(path)} when no --vault is given.",
             ChooseOutcome.Unreadable => $"{KeypasteHome.SettingsPath(_home)} could not be read, so it was left as it is. Fix or delete it, then choose again.",
             ChooseOutcome.Unrecordable => "This vault's path holds a quote, a control character or a backslash, which app.toml cannot record. Move or rename the vault.",
             _ => $"{KeypasteHome.SettingsPath(_home)} could not be written, so nothing changed. Check that you can write to it, then choose again.",
         };
 
+        _agentVaultChoices = null;
+        OnPropertyChanged(nameof(AgentVaultChoices));
+        OnPropertyChanged(nameof(AgentVault));
         OnPropertyChanged(nameof(IsThisVaultChosen));
-        OnPropertyChanged(nameof(ChosenVaultText));
         UseThisVaultCommand.NotifyCanExecuteChanged();
     }
 
@@ -767,6 +735,8 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
         IsConfirmingForgetAll = false;
         RecentVaults.Save(KeypasteHome.RecentPath(_home), []);
         Message = "The recent vaults list is empty.";
+        OnPropertyChanged(nameof(RecentVaultsCount));
+        OnPropertyChanged(nameof(HasRecentVaults));
     }
 
     /// <summary>

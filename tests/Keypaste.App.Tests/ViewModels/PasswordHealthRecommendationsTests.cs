@@ -69,15 +69,18 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
         var rows = shell.Recommendations.Passwords;
 
         Assert.Equal(
-            [("services/Cloud", "Expired item"), ("services/Forum", "Reused password"), ("services/Mail", "Weak password"), ("services/Shop", "Reused password")],
+            [("Cloud", "Expired item"), ("Forum", "Reused password"), ("Mail", "Weak password"), ("Shop", "Reused password")],
             rows.Select(row => (row.Entry, row.Problem)));
         Assert.All(rows, row => Assert.Equal("Needs review", row.StateLabel));
-        Assert.StartsWith("on services/Cloud, whose expiry date ", rows[0].Where, StringComparison.Ordinal);
+        Assert.StartsWith("on Cloud, whose expiry date ", rows[0].Where, StringComparison.Ordinal);
         Assert.EndsWith(" has passed", rows[0].Where, StringComparison.Ordinal);
-        Assert.Equal("on services/Forum, also on services/Shop", rows[1].Where);
-        Assert.Equal("on services/Mail, short or predictable enough to be guessed", rows[2].Where);
-        Assert.Equal("on services/Shop, also on services/Forum", rows[3].Where);
-        Assert.Equal("Weak password on services/Mail, short or predictable enough to be guessed, needs review", rows[2].Description);
+        Assert.Equal("on Forum, also on Shop", rows[1].Where);
+        Assert.Equal("Also on Shop", rows[1].Detail);
+        Assert.StartsWith("Expired ", rows[0].Detail, StringComparison.Ordinal);
+        Assert.Equal("services/Cloud", rows[0].EntryPath);
+        Assert.Equal("on Mail, short or predictable enough to be guessed", rows[2].Where);
+        Assert.Equal("on Shop, also on Forum", rows[3].Where);
+        Assert.Equal("Weak password on Mail, short or predictable enough to be guessed, needs review", rows[2].Description);
 
         Assert.Equal("4", Settings(shell).Count);
         Assert.Null(shell.Notice);
@@ -174,7 +177,7 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
         shell.Recommendations.Check();
         await shell.Recommendations.Checking;
 
-        Assert.Equal([("services/Cloud", "Expired item")], shell.Recommendations.Passwords.Select(row => (row.Entry, row.Problem)));
+        Assert.Equal([("Cloud", "Expired item")], shell.Recommendations.Passwords.Select(row => (row.Entry, row.Problem)));
         Assert.Equal("1", Settings(shell).Count);
     }
 
@@ -186,7 +189,6 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
         shell.Current = Destinations.Of(DestinationKind.Settings);
         var weak = shell.Recommendations.Passwords.Single(row => row.Finding.Entry == _mail);
 
-        Assert.Equal("Open services/Mail in Items", weak.OpenLabel);
         Assert.Equal(OrganizeOutcome.Renamed, _session.Unlocked!.RenameEntry(_mail, "Mailbox", out var renamed));
 
         weak.OpenCommand.Press();
@@ -209,7 +211,7 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
         weak.OpenCommand.Press();
 
         Assert.Equal(DestinationKind.Settings, shell.Current.Kind);
-        Assert.Equal("services/Mail is no longer in this vault. Check the list, then try again.", shell.Recommendations.Message);
+        Assert.Equal("Mail is no longer in this vault. Check the list, then try again.", shell.Recommendations.Message);
     }
 
     private static void Add(Vault vault, EntryName name, string password) =>

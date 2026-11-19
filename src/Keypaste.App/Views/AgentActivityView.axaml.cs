@@ -26,6 +26,16 @@ internal sealed partial class AgentActivityView : UserControl
         _rows = this.FindControl<ListBox>("AgentRows")!;
         _rows.AddHandler(TappedEvent, OnRowTapped, RoutingStrategies.Bubble);
         _rows.AddHandler(KeyDownEvent, OnRowKeyDown, RoutingStrategies.Bubble);
+        _rows.ContainerPrepared += OnRowPrepared;
+    }
+
+    /// <summary>A section's heading and the look in progress name the rows near them and cannot be chosen.</summary>
+    private static void OnRowPrepared(object? sender, ContainerPreparedEventArgs e)
+    {
+        var heading = e.Container.DataContext is AgentListHeading;
+        e.Container.Focusable = !heading;
+        e.Container.IsEnabled = !heading;
+        e.Container.Classes.Set("heading", heading);
     }
 
     /// <summary>Where the detail takes the list's place, the keyboard goes with it, and back to the list when it returns.</summary>

@@ -1,29 +1,29 @@
 using System.Globalization;
 using Keypaste.App.Clipboard;
+using Keypaste.App.Resources;
 using Keypaste.App.Session;
 using Keypaste.Core;
 using Keypaste.Core.Tokens;
 
 namespace Keypaste.App.ViewModels;
 
-/// <summary>One scoped token as Settings › Advanced › Scoped tokens lists it: never its secret or its verifier.</summary>
+/// <summary>One scoped token as Settings › Scoped tokens lists it: never its secret or its verifier.</summary>
 /// <param name="Id">The token's id, which a revoke names.</param>
 /// <param name="Name">The name, scrubbed.</param>
 /// <param name="Prefix">The token's id as it is shown, <c>kpt_7d2e91c0…</c>.</param>
 /// <param name="Scope">Its scopes, joined.</param>
-/// <param name="Mode">What it can do with what it reads.</param>
 /// <param name="Expires">How long it has left, such as <c>29 days</c>, or <c>expired</c>.</param>
 /// <param name="IsExpired">Whether it has stopped working.</param>
-internal sealed record ScopedTokenRow(string Id, string Name, string Prefix, string Scope, string Mode, string Expires, bool IsExpired)
+internal sealed record ScopedTokenRow(string Id, string Name, string Prefix, string Scope, string Expires, bool IsExpired)
 {
     /// <summary>Whether the row is asking to confirm its revoke, which cannot be undone.</summary>
     internal bool IsConfirming { get; init; }
 
-    internal string ConfirmText => $"Revoke {Name}? Anything using it stops working.";
+    internal string ConfirmText => $"Revoke {Name}? It stops working for good.";
 }
 
 /// <summary>
-/// Settings › Advanced › Scoped tokens: the tokens the session's vault holds, minting one and revoking one.
+/// Settings › Scoped tokens: the tokens the session's vault holds, minting one and revoking one.
 /// </summary>
 /// <remarks>
 /// The desktop owns the vault while it is unlocked, so this is where tokens are made and revoked
@@ -115,7 +115,7 @@ internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposa
     /// <summary>Why the name typed cannot be used, or null; an empty one only once Create is pressed on it.</summary>
     internal string? NameProblem =>
         _name.Trim().Length == 0
-            ? (_pressedCreate ? "A token needs a name. Type one, such as ci-staging." : null)
+            ? (_pressedCreate ? Strings.EnterAName : null)
             : !TokenStore.IsValidName(_name.Trim(), out var error) ? Sentence(error) : null;
 
     internal bool HasNameProblem => NameProblem is not null;
@@ -137,7 +137,7 @@ internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposa
     /// <summary>Why the scope typed cannot be used, or null; an empty one only once Create is pressed on it.</summary>
     internal string? ScopeProblem =>
         _scope.Trim().Length == 0
-            ? (_pressedCreate ? "A token needs a scope. Type one, such as read:acme-api/staging/*." : null)
+            ? (_pressedCreate ? Strings.EnterAScope : null)
             : !TokenScope.TryParseList(_scope, out _, out var error) ? Sentence(error) : null;
 
     internal bool HasScopeProblem => ScopeProblem is not null;
@@ -224,7 +224,6 @@ internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposa
             EntryNameSanitizer.Sanitize(info.Name).Text,
             info.Prefix,
             string.Join(", ", info.Scopes),
-            TokenInfo.Mode,
             Remaining(info, now),
             info.IsExpired(now)))];
     }
@@ -351,8 +350,7 @@ internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposa
         }
 
         CloseForm();
-        var prefix = Rows.FirstOrDefault(row => row.Name == name)?.Prefix ?? TokenSecret.Prefix;
-        SetMinted(new MintedToken(token, name, $"keypaste keeps only a verifier of {prefix}, so nobody can show you this token later."));
+        SetMinted(new MintedToken(token, name));
         _toast($"Created {name}");
     }
 
@@ -423,14 +421,11 @@ internal sealed partial class ScopedTokensViewModel : ObservableObject, IDisposa
 /// <summary>A token just minted: drawn only while revealed and copied on request, then forgotten.</summary>
 /// <param name="token">The whole token, which no property returns.</param>
 /// <param name="name">What it is called.</param>
-/// <param name="note">What to do with it, naming its prefix and never its secret.</param>
-internal sealed class MintedToken(string token, string name, string note) : IRevealSource
+internal sealed class MintedToken(string token, string name) : IRevealSource
 {
     private string? _token = token;
 
     internal string Name { get; } = name;
-
-    internal string Note { get; } = note;
 
     /// <summary>Whether a copy reached the clipboard; until one does the token is an unsaved draft.</summary>
     internal bool IsCopied { get; set; }

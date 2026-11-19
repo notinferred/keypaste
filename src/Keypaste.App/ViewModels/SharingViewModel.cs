@@ -1,5 +1,7 @@
 using Avalonia.Data.Converters;
 using Keypaste.App.Clipboard;
+using Keypaste.App.Globalization;
+using Keypaste.App.Resources;
 using Keypaste.App.Session;
 using Keypaste.Core;
 using Keypaste.Core.Sharing;
@@ -23,22 +25,25 @@ internal enum ShareStatusTone
 /// One share link in the Sharing screen's list: names and limits, never a key or a value.
 /// <c>Opens</c> is whether the link may still open, so revoking it means something.
 /// </summary>
-internal sealed record SharingRow(string Id, string What, string Recipient, string Rule, string Status, ShareStatusTone StatusTone, bool Opens, bool Checked = true)
+/// <param name="Id">The link's id, which a revoke names.</param>
+/// <param name="What">The item shared, by path.</param>
+/// <param name="Detail">The second line, who it went to and its limits in words: For sam@acme.dev · 1 view · 1 hour · needs a passphrase.</param>
+/// <param name="Status">What the share server last said of it, or empty before anything was asked.</param>
+/// <param name="StatusTone">How its status dot is drawn.</param>
+/// <param name="Opens">Whether it may still open.</param>
+internal sealed record SharingRow(string Id, string What, string Detail, string Status, ShareStatusTone StatusTone, bool Opens)
 {
-    /// <summary>The second line: who it went to and its limits.</summary>
-    internal string Detail => $"{Recipient} · {Rule}";
-
     internal bool IsOk => StatusTone == ShareStatusTone.Ok;
 
     internal bool IsInfo => StatusTone == ShareStatusTone.Info;
 
     /// <summary>A link that may still open is revoked; one that cannot is only forgotten.</summary>
-    internal string RevokeLabel => Opens ? "Revoke" : "Remove";
+    internal string RevokeLabel => Opens ? Strings.RevokeEllipsis : Strings.Remove;
 
     /// <summary>Whether the row is asking to confirm its revoke, which cannot be undone.</summary>
     internal bool IsConfirming { get; init; }
 
-    internal string ConfirmText => $"Revoke the link to {What}? It stops opening for good.";
+    internal string ConfirmText => $"Revoke the link to {What}? It stops working for good.";
 }
 
 /// <summary>
@@ -63,6 +68,17 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
         "24h" => "24 hours",
         "7d" => "7 days",
         _ => ttl ?? string.Empty,
+    });
+
+    /// <summary>A field the link can carry, as the dialog names it.</summary>
+    public static readonly FuncValueConverter<string, string> FieldInWords = new(field => field switch
+    {
+        "password" => Resources.Strings.Password,
+        "username" => Resources.Strings.Username,
+        "url" => Resources.Strings.URL,
+        "notes" => Resources.Strings.Notes,
+        "login" => Resources.Strings.Login,
+        _ => field ?? string.Empty,
     });
 
     /// <summary>What <see cref="Views"/> offers.</summary>
@@ -145,14 +161,15 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
 
     /// <summary>The links made from this vault, soonest to expire first.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsEmpty), nameof(HasUnchecked))]
+    [NotifyPropertyChangedFor(nameof(IsEmpty))]
     internal partial IReadOnlyList<SharingRow> Rows { get; private set; } = [];
 
     /// <summary>Whether the vault remembers no link.</summary>
     internal bool IsEmpty => Rows.Count == 0;
 
-    /// <summary>Whether a link's status has not been asked for yet, since opening the screen asks nothing.</summary>
-    internal bool HasUnchecked => Rows.Any(row => !row.Checked);
+    /// <summary>When the share server was last asked, said once beside Check status; opening the screen asks nothing.</summary>
+    [ObservableProperty]
+    internal partial string CheckedText { get; private set; } = Strings.NotCheckedYet;
 
     /// <summary>The entries that can be shared, by path; keypaste's own records are not among them.</summary>
     [ObservableProperty]
@@ -167,6 +184,12 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CreateCommand))]
     internal partial string? SelectedWhat { get; set; }
+
+    /// <summary>The title of the item an item's Share… opened this for, as its pane draws it.</summary>
+    internal string ItemTitle => _item is { } item ? EntryNameSanitizer.Sanitize(item.Title).Text : SelectedWhat ?? string.Empty;
+
+    /// <summary>The item's UUID as a <see cref="Guid"/>, which picks its tile's hue as everywhere else.</summary>
+    internal Guid ItemHue => Guid.TryParseExact(_item?.Uuid, "N", out var id) ? id : Guid.Empty;
 
     /// <summary>One of <see cref="FieldOptions"/>.</summary>
     internal string Field
@@ -409,6 +432,11 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
         var listed = await _service.ListAsync(vault, online, CancellationToken.None).ConfigureAwait(true);
         Rows = [.. listed.Select(share => Row(share, online, tells))];
         Selected = wanted is null ? null : Rows.FirstOrDefault(row => row.Id == wanted);
+
+        if (online)
+        {
+            CheckedText = $"Status checked {PersonTime.Moment(_session.Clock.GetLocalNow())}";
+        }
     }
 
     private static SharingRow Row((ShareInfo Info, string Status, int? ViewsLeft) listed, bool online, SameNameTells tells)
@@ -422,18 +450,40 @@ internal sealed partial class SharingViewModel : ObservableObject, IDisposable
             ("expired", _) => ("Expired", ShareStatusTone.Muted, false),
             (_, { } views) when views >= info.Views => ("Not opened yet", ShareStatusTone.Ok, true),
             (_, { } views) => (Invariant($"{info.Views - views} of {info.Views} views used"), ShareStatusTone.Info, true),
-            _ => (online ? "Status unknown" : "Not checked", ShareStatusTone.Muted, true),
+            _ => (online ? "Status unknown" : string.Empty, ShareStatusTone.Muted, true),
         };
 
-        return new SharingRow(
-            info.Id,
-            Named(info, tells),
-            info.Recipient is { } to ? EntryNameSanitizer.SanitizeProse(to).Text : "Anyone with the link",
-            info.Rule,
-            text,
-            tone,
-            opens,
-            Checked: online || !opens);
+        return new SharingRow(info.Id, Named(info, tells), Detail(info), text, tone, opens);
+    }
+
+    /// <summary>Who a link went to and its limits, in words.</summary>
+    private static string Detail(ShareInfo info)
+    {
+        List<string> parts =
+        [
+            info.Recipient is { } to ? $"For {EntryNameSanitizer.SanitizeProse(to).Text}" : "Anyone with the link",
+            info.Views == 1 ? "1 view" : Invariant($"{info.Views} views"),
+            InWords(info.Expires - info.Created),
+        ];
+
+        if (info.Passphrase)
+        {
+            parts.Add("needs a passphrase");
+        }
+
+        return string.Join(" · ", parts);
+    }
+
+    /// <summary>A link's lifetime as a person says it: 1 hour, 24 hours, 7 days.</summary>
+    private static string InWords(TimeSpan ttl)
+    {
+        var minutes = (long)Math.Round(ttl.TotalMinutes);
+
+        return minutes > 1440 && minutes % 1440 == 0 ? Counted(minutes / 1440, "day")
+            : minutes > 0 && minutes % 60 == 0 ? Counted(minutes / 60, "hour")
+            : Counted(minutes, "minute");
+
+        static string Counted(long count, string unit) => Invariant($"{count} {unit}{(count == 1 ? string.Empty : "s")}");
     }
 
     /// <summary>What was shared: its path, and which item it is where another has that path, read from the UUID the link recorded.</summary>

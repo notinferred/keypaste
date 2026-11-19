@@ -59,6 +59,10 @@ internal sealed class MaskedInput : TemplatedControl
     internal static readonly StyledProperty<ISecretSink?> SinkProperty =
         AvaloniaProperty.Register<MaskedInput, ISecretSink?>(nameof(Sink));
 
+    /// <summary>What the empty field says, in words, never a value.</summary>
+    internal static readonly StyledProperty<string?> PlaceholderTextProperty =
+        AvaloniaProperty.Register<MaskedInput, string?>(nameof(PlaceholderText));
+
     /// <summary>Whether this field answers the platform's paste gesture.</summary>
     /// <remarks>
     /// Default false, so a field pastes only where its view says so. A field bound to a
@@ -92,6 +96,12 @@ internal sealed class MaskedInput : TemplatedControl
     {
         get => GetValue(DisplayProperty);
         private set => SetValue(DisplayProperty, value);
+    }
+
+    internal string? PlaceholderText
+    {
+        get => GetValue(PlaceholderTextProperty);
+        set => SetValue(PlaceholderTextProperty, value);
     }
 
     internal ISecretSink? Sink

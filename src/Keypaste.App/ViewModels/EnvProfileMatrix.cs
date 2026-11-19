@@ -12,25 +12,31 @@ internal sealed record EnvProfileColumn(string Name, bool IsProtected, bool IsSe
     /// <summary>The name as the segment draws it.</summary>
     internal string DisplayName => EntryNameSanitizer.Sanitize(Name).Text;
 
-    /// <summary>Whether a variable another stage holds has no value here, which the segment marks with a dot.</summary>
-    internal bool HasMissing { get; init; }
+    /// <summary>How many variables another stage holds have no value here, which the segment shows as a count.</summary>
+    internal int MissingCount { get; init; }
 
-    /// <summary>What a screen reader hears for the segment, since the dot and protection are drawn, not written.</summary>
+    internal bool HasMissing => MissingCount > 0;
+
+    internal string MissingCountText => MissingCount.ToString(System.Globalization.CultureInfo.CurrentCulture);
+
+    /// <summary>What a screen reader hears for the segment, since the count and protection are drawn, not written.</summary>
     internal string Spoken => string.Join(", ", new[]
     {
         DisplayName,
         IsProtected ? "protected" : string.Empty,
-        HasMissing ? "missing values" : string.Empty,
+        MissingCount switch { 0 => string.Empty, 1 => "1 missing value", var count => Invariant($"{count} missing values") },
     }.Where(part => part.Length > 0));
 
     /// <summary>What hovering the segment explains.</summary>
     internal string Tip => (IsProtected, HasMissing) switch
     {
-        (true, true) => $"{DisplayName} asks before every release, and lacks a value another stage has.",
+        (true, true) => $"{DisplayName} asks before every release, and lacks {Missing} another stage has.",
         (true, false) => $"{DisplayName} asks before every release.",
-        (false, true) => $"{DisplayName} lacks a value another stage has.",
+        (false, true) => $"{DisplayName} lacks {Missing} another stage has.",
         _ => $"Show {DisplayName}'s variables",
     };
+
+    private string Missing => MissingCount == 1 ? "a value" : Invariant($"{MissingCount} values");
 }
 
 /// <summary>One variable of the selected stage, with how every stage holds it. Holds no value.</summary>
@@ -78,12 +84,16 @@ internal sealed record EnvKeyRow(string Key, IReadOnlyList<EnvProfileCell> Cells
 
     internal bool HasProblem => Problem.Length > 0;
 
-    /// <summary>The item the value comes from, by title, or how many items hold it.</summary>
-    internal string From => Selected.SourceTitles switch
+    /// <summary>The item holding most of the stage's variables, which the column's heading names in place of each row.</summary>
+    internal string? CommonSource { get; init; }
+
+    /// <summary>The item the value comes from, by title, where it is not the one the heading names, or how many items hold it.</summary>
+    internal string From => (Selected.Sources, Selected.SourceTitles) switch
     {
-        [] => string.Empty,
-        [var only] => only,
-        var several => Invariant($"{several.Count} items"),
+        (_, []) => string.Empty,
+        ([var path], _) when path == CommonSource => string.Empty,
+        (_, [var only]) => only,
+        (_, var several) => Invariant($"{several.Count} items"),
     };
 
     /// <summary>The items by path, and the other stages one item serves, for the tooltip and the screen reader.</summary>

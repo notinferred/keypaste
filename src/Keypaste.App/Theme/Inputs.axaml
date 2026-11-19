@@ -3,9 +3,10 @@
         xmlns:ctl="using:Keypaste.App.Controls">
 
   <!--
-    Fields and choices. A field sits on the surface with the control edge round it; focused, its border is the accent's
-    ring with a 3px glow of it outside. Classes:
-      TextBox.search       28px titlebar/list search field
+    Fields and choices. A field, a masked field and a pop-up button are 32px tall on the surface with the control edge
+    round them; focused, the border is the accent's ring with a 3px glow of it outside. A checkbox is square, a radio
+    round, and a checked box, a chosen radio and a switch that is on all take the accent. Classes:
+      TextBox.search       28px titlebar/list search field, the one field not 32px
       TextBox.mono         the system's monospace for keys, values and paths
       AutoCompleteBox.mono the same for a field that suggests, its suggestions included
       Border.segmented     the track around a segmented control; put RadioButton.segment (or
@@ -25,15 +26,15 @@
   <Style Selector="TextBox.mono">
     <Setter Property="FlowDirection" Value="LeftToRight" />
     <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
-    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="FontSize" Value="13" />
   </Style>
   <Style Selector="AutoCompleteBox.mono">
     <Setter Property="FlowDirection" Value="LeftToRight" />
     <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
-    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="FontSize" Value="13" />
   </Style>
   <Style Selector="AutoCompleteBox.mono /template/ TextBox">
-    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="FontSize" Value="13" />
   </Style>
 
   <Style Selector="TextBox.search">
@@ -50,21 +51,38 @@
   </Style>
   <Style Selector="ComboBox:focus-visible /template/ Border#Background">
     <Setter Property="BorderBrush" Value="{DynamicResource KpFocusRing}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource KpFieldGlow}" />
   </Style>
 
   <Style Selector="CalendarDatePicker">
     <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusField}" />
     <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
-    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="FontSize" Value="13" />
     <Setter Property="MinHeight" Value="32" />
+  </Style>
+  <Style Selector="CalendarDatePicker:focus-within /template/ TextBox#PART_TextBox /template/ Border#PART_BorderElement">
+    <Setter Property="BorderBrush" Value="{DynamicResource KpFocusRing}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource KpFieldGlow}" />
+  </Style>
+
+  <!-- A stepper's arrows lie flat on the field until pointed at or pressed. -->
+  <Style Selector="ButtonSpinner /template/ RepeatButton /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="ButtonSpinner /template/ RepeatButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
+  </Style>
+  <Style Selector="ButtonSpinner /template/ RepeatButton:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
   </Style>
 
   <Style Selector="CheckBox">
-    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusChip}" />
+    <Setter Property="CornerRadius" Value="4" />
     <Setter Property="FontSize" Value="13" />
   </Style>
 
-  <!-- The design's switch: a 32x18 track in the text colour when on, with a 14px knob and the label to its
+  <!-- The design's switch: a 32x18 track in the accent when on, with a 14px knob and the label to its
        right. PART_SwitchKnob is the knob's travel, which ToggleSwitch moves PART_MovingKnobs across. -->
   <Style Selector="ToggleSwitch">
     <Setter Property="FontSize" Value="13" />
@@ -170,7 +188,7 @@
     <Setter Property="Opacity" Value="0.5" />
   </Style>
 
-  <!-- A choice between options: a 16px ring around a 6px dot, both in the text colour when picked. -->
+  <!-- A choice between options: a 16px ring around a 6px dot, both in the accent when picked. -->
   <Style Selector="RadioButton:not(.segment)">
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
     <Setter Property="Background" Value="Transparent" />
@@ -204,10 +222,10 @@
     <Setter Property="Stroke" Value="{DynamicResource RadioButtonOuterEllipseStrokePointerOver}" />
   </Style>
   <Style Selector="RadioButton:not(.segment):checked /template/ Ellipse#Ring">
-    <Setter Property="Stroke" Value="{DynamicResource KpTextPrimary}" />
+    <Setter Property="Stroke" Value="{DynamicResource KpAccent}" />
   </Style>
   <Style Selector="RadioButton:not(.segment):checked /template/ Ellipse#Dot">
-    <Setter Property="Fill" Value="{DynamicResource KpTextPrimary}" />
+    <Setter Property="Fill" Value="{DynamicResource KpAccent}" />
   </Style>
   <Style Selector="RadioButton:not(.segment):focus-visible /template/ Ellipse#Ring">
     <Setter Property="Stroke" Value="{DynamicResource KpFocusRing}" />

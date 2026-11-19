@@ -114,7 +114,8 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.Equal(before + 1, _session.Unlocked.ReadHistory(stripe)!.Count);
 
         project.BeginRemove(project.Variables.Single(row => row.Key == "STRIPE_KEY"));
-        Assert.Equal("Remove STRIPE_KEY from services/Stripe? Its value stays in the item's history.", project.RemovePrompt);
+        Assert.Equal("Remove STRIPE_KEY from Stripe?", project.RemovePrompt);
+        Assert.True(project.Variables.Single(row => row.Key == "STRIPE_KEY").IsConfirmingRemove);
         project.ConfirmRemoveCommand.Press();
 
         Assert.Null(screen.Error);
@@ -394,7 +395,8 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.True(database.IsSameAs);
         Assert.Equal("Same as dev", database.SameAsNote);
         Assert.Equal(0, database.MaskedLength);
-        Assert.Equal("acme-api .env.staging", database.From);
+        Assert.Empty(database.From);
+        Assert.Equal("From .env.staging", project.FromHeading);
         Assert.Equal("Missing in dev and staging", project.Rows.Single(row => row.Key == "SENTRY_DSN").MissingNote);
     }
 
@@ -406,8 +408,8 @@ public sealed class EnvProfilesTests : IDisposable
 
         Assert.Equal(["dev", "prod"], project.Columns.Select(column => column.Name));
         Assert.Equal([true, false], project.Columns.Select(column => column.IsSelected));
-        Assert.Equal([true, false], project.Columns.Select(column => column.HasMissing));
-        Assert.Equal("dev, missing values", project.Columns[0].Spoken);
+        Assert.Equal([1, 0], project.Columns.Select(column => column.MissingCount));
+        Assert.Equal("dev, 1 missing value", project.Columns[0].Spoken);
         Assert.Equal("prod, protected", project.Columns[1].Spoken);
 
         var sentry = project.Rows.Single(row => row.Key == "SENTRY_DSN");
@@ -418,7 +420,8 @@ public sealed class EnvProfilesTests : IDisposable
         var database = project.Rows.Single(row => row.Key == "DATABASE_URL");
         Assert.Equal("DATABASE_URL", database.Variable?.Key);
         Assert.False(database.IsFlagged);
-        Assert.Equal("acme-api .env", database.From);
+        Assert.Empty(database.From);
+        Assert.Equal("From .env", project.FromHeading);
 
         sentry.Selected.Act.Press();
         Assert.Equal("dev", project.SelectedProfile);
@@ -479,7 +482,8 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.Equal(["DATABASE_URL", "MAIL_KEY", "STRIPE_KEY"], dev.Members.Select(member => member.KeysText));
         Assert.Equal(["", "", "also staging, billing/dev"], dev.Members.Select(member => member.AlsoText));
         Assert.Equal("also dev, billing/dev", Assert.Single(project.Environments[1].Members).AlsoText);
-        Assert.Equal("env/acme-api/.env.prod", Assert.Single(project.Environments[2].Members).Display);
+        var prod = Assert.Single(project.Environments[2].Members);
+        Assert.Equal((".env.prod", "env/acme-api/.env.prod"), (prod.Display, prod.DisplayPath));
 
         var cells = project.Rows.Single(row => row.Key == "STRIPE_KEY").Cells;
         Assert.Equal(["services/Stripe · also staging, billing/dev", "services/Stripe · also dev, billing/dev", ""], cells.Select(cell => cell.FullSourceNote));
@@ -489,7 +493,8 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.Equal("Missing in prod", stripeRow.MissingNote);
 
         var named = project.Rows.Single(row => row.Key == "DATABASE_URL");
-        Assert.Equal("acme-api .env", named.From);
+        Assert.Empty(named.From);
+        Assert.Equal("From .env", project.FromHeading);
         Assert.Equal("env/acme-api/.env", named.FromTip);
         Assert.Equal("••••••, from env/acme-api/.env", named.Spoken);
         Assert.Contains("env/acme-api/.env", named.Selected.Tip, StringComparison.Ordinal);
@@ -501,7 +506,7 @@ public sealed class EnvProfilesTests : IDisposable
             project.ReplacePrompt);
         project.BeginRemove(project.Variables.Single(row => row.Key == "STRIPE_KEY"));
         Assert.Equal(
-            "Remove STRIPE_KEY from services/Stripe, which acme-api/dev, acme-api/staging and billing/dev read? Its value stays in the item's history.",
+            "Remove STRIPE_KEY from Stripe, which acme-api/dev, acme-api/staging and billing/dev read?",
             project.RemovePrompt);
         project.BeginReplace(project.Variables.Single(row => row.Key == "MAIL_KEY"));
         Assert.Equal("New value for MAIL_KEY on services/Mail. The old one stays in the item's history.", project.ReplacePrompt);
@@ -553,7 +558,8 @@ public sealed class EnvProfilesTests : IDisposable
 
         project.EntryFilter = "QUEUE";
         project.ChosenEntry = Assert.Single(project.EntryCandidates);
-        Assert.Equal(["env:acme-api puts services/Queue in acme-api/dev.", "Joining acme-api/dev: QUEUE_KEY."], project.TagChangeLines);
+        Assert.Equal("Queue", project.ChosenEntry!.Display);
+        Assert.Equal(["Queue adds QUEUE_KEY to dev."], project.TagChangeLines);
         Assert.Equal("Add to dev", project.TagChangeAction);
 
         var before = File.ReadAllBytes(_fixture.Path_);
@@ -607,13 +613,73 @@ public sealed class EnvProfilesTests : IDisposable
     [Fact]
     public void The_screen_names_every_tag_that_puts_its_entry_in_no_project()
     {
-        Tagged("services", "Odd", "ODD_KEY", "env:acme-api:Prod");
+        Tagged("services", "Odd", "ODD_KEY", "env:acme-api:Prod", "env:acme-api:Bad_Stage");
         using var screen = new EnvSetsViewModel(_session, _countdown);
 
-        var problem = Assert.Single(screen.MalformedTags);
-        Assert.StartsWith("services/Odd has the tag env:acme-api:Prod, which puts it in no project: ", problem.Sentence, StringComparison.Ordinal);
-        Assert.EndsWith(" Every agent request for the item is still asked live.", problem.Sentence, StringComparison.Ordinal);
-        Assert.DoesNotContain("services/Odd", Open(screen).Environments.SelectMany(environment => environment.Members).Select(member => member.Display));
+        Assert.Equal(2, screen.MalformedTags.Count);
+        var cased = screen.MalformedTags.Single(problem => problem.HasFix);
+        Assert.Equal("Odd's tag Prod isn't a stage name.", cased.Sentence);
+        Assert.Equal("Change to prod", cased.FixLabel);
+        var broken = screen.MalformedTags.Single(problem => !problem.HasFix);
+        Assert.StartsWith("Odd has the tag env:acme-api:Bad_Stage, which puts it in no project: ", broken.Sentence, StringComparison.Ordinal);
+        Assert.DoesNotContain("Odd", Open(screen).Environments.SelectMany(environment => environment.Members).Select(member => member.Display));
+    }
+
+    [Fact]
+    public void A_tag_cased_wrong_changes_to_its_stage_only_once_what_it_reaches_is_confirmed()
+    {
+        var odd = Tagged("services", "Odd", "ODD_KEY", "env:acme-api:Prod");
+        using var screen = new EnvSetsViewModel(_session, _countdown);
+        var before = File.ReadAllBytes(_fixture.Path_);
+
+        screen.MalformedTags[0].Change.Press();
+        Assert.True(screen.IsConfirmingFix);
+        Assert.Contains(screen.FixLines, line => line.Contains("acme-api/prod", StringComparison.Ordinal));
+        screen.CancelFixCommand.Press();
+        Assert.Equal(before, File.ReadAllBytes(_fixture.Path_));
+
+        screen.MalformedTags[0].Change.Press();
+        screen.ConfirmFixCommand.Press();
+
+        Assert.Null(screen.Error);
+        Assert.Empty(screen.MalformedTags);
+        using var saved = Vault.Open(_fixture.Path_, TempVault.Password);
+        Assert.Equal(["env:acme-api:prod"], saved.Tags(odd));
+    }
+
+    [Fact]
+    public async Task Run_where_no_terminal_opens_copies_the_run_command_and_says_so()
+    {
+        var clipboard = new FakeClipboard();
+        using var countdown = new ClipboardCountdown(clipboard, new ManualClock(AppClock.Start));
+        List<string> toasts = [];
+        using var screen = new EnvSetsViewModel(_session, countdown, launching: new ProjectLaunching(new Core.Launch.TerminalLaunch(launcher: null), new Core.Launch.DetachedProcessLauncher(), Core.Launch.EnvironmentMerge.Inherited), toast: (message, _) => toasts.Add(message));
+        var project = Open(screen);
+
+        Assert.False(project.Launch.IsSupported);
+        Assert.True(project.StartRunCommand.CanExecute(null));
+        await project.StartRunCommand.ExecuteAsync(null);
+
+        Assert.Equal(project.RunCommand, clipboard.Content);
+        Assert.Contains(toasts, toast => toast.Contains("copied the run command", StringComparison.Ordinal));
+        Assert.False(project.Launch.IsSettingUp);
+    }
+
+    [Fact]
+    public void An_open_form_takes_the_accent_from_Run()
+    {
+        TaggedStripe();
+        using var screen = new EnvSetsViewModel(_session, _countdown);
+        var project = Open(screen);
+
+        Assert.False(project.IsFormOpen);
+        project.BeginAddCommand.Press();
+        Assert.True(project.IsFormOpen);
+        project.CancelAddCommand.Press();
+        project.Launch.SetUpCommand.Press();
+        Assert.True(project.IsFormOpen);
+        project.Launch.CancelSetUpCommand.Press();
+        Assert.False(project.IsFormOpen);
     }
 
     /// <summary>Once a file is imported the screen offers to delete it, as <c>keypaste env pull</c> does, and keeps it byte for byte unless Delete is pressed.</summary>

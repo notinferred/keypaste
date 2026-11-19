@@ -10,14 +10,8 @@
   <Style Selector=":is(Control).size-12">
     <Setter Property="TextElement.FontSize" Value="12" />
   </Style>
-  <Style Selector=":is(Control).size-12-5">
-    <Setter Property="TextElement.FontSize" Value="12.5" />
-  </Style>
   <Style Selector=":is(Control).size-13">
     <Setter Property="TextElement.FontSize" Value="13" />
-  </Style>
-  <Style Selector=":is(Control).size-13-5">
-    <Setter Property="TextElement.FontSize" Value="13.5" />
   </Style>
   <Style Selector=":is(Control).size-14">
     <Setter Property="TextElement.FontSize" Value="14" />
@@ -25,18 +19,12 @@
   <Style Selector=":is(Control).size-15">
     <Setter Property="TextElement.FontSize" Value="15" />
   </Style>
-  <Style Selector=":is(Control).size-16">
-    <Setter Property="TextElement.FontSize" Value="16" />
-  </Style>
   <!-- A name in a sentence a step below its heading, as a prompt's question names its field. -->
   <Style Selector="Run.size-15">
     <Setter Property="FontSize" Value="15" />
   </Style>
   <Style Selector=":is(Control).size-20">
     <Setter Property="TextElement.FontSize" Value="20" />
-  </Style>
-  <Style Selector=":is(Control).size-24">
-    <Setter Property="TextElement.FontSize" Value="24" />
   </Style>
 
 </Styles>

@@ -13,13 +13,14 @@ internal sealed class FirstLaunchViewModel
 
     /// <summary>The first-launch screen, whose crash-report choice is off until the person turns it on.</summary>
     /// <param name="terms">The terms the link opens.</param>
-    /// <param name="agree">Takes Continue with the person's answer on crash reports.</param>
-    internal FirstLaunchViewModel(TermsOfUse terms, Action<bool> agree)
-        : this(terms, agree, Strings.ContinuingAgreesToTheTermsOfUse)
+    /// <param name="agree">Takes Agree with the person's answer on crash reports.</param>
+    /// <param name="quit">Takes Quit, which agrees to nothing.</param>
+    internal FirstLaunchViewModel(TermsOfUse terms, Action<bool> agree, Action? quit = null)
+        : this(terms, agree, Strings.OnlineServicesHaveTerms, quit)
     {
     }
 
-    private FirstLaunchViewModel(TermsOfUse terms, Action<bool> agree, string agreement)
+    private FirstLaunchViewModel(TermsOfUse terms, Action<bool> agree, string agreement, Action? quit = null)
     {
         ArgumentNullException.ThrowIfNull(terms);
         ArgumentNullException.ThrowIfNull(agree);
@@ -27,32 +28,36 @@ internal sealed class FirstLaunchViewModel
         Terms = terms;
         _agree = agree;
         Agreement = agreement;
-        Opening = $"{agreement} {Strings.AReportHoldsTheVersionSystemScreenX3de709}";
-        ContinueCommand = new RelayCommand(() => _agree(SendCrashReports));
+        Opening = $"{Strings.TermsOfUse}. {agreement}";
+        AgreeCommand = new RelayCommand(() => _agree(SendCrashReports));
+        QuitCommand = new RelayCommand(() => quit?.Invoke());
     }
 
     /// <summary>The terms Settings' switch asks for before it turns crash reports on.</summary>
     /// <param name="terms">The terms the link opens.</param>
-    /// <param name="agree">Takes Continue.</param>
+    /// <param name="agree">Takes Agree.</param>
     internal static FirstLaunchViewModel ForSwitch(TermsOfUse terms, Action agree)
     {
         ArgumentNullException.ThrowIfNull(agree);
 
-        return new(terms, _ => agree(), Strings.ContinuingAgreesToTheTermsAndTurnsCrashReportsOn) { SendCrashReports = true };
+        return new(terms, _ => agree(), Strings.AgreeingTurnsCrashReportsOn) { SendCrashReports = true };
     }
 
     /// <summary>The terms of use.</summary>
     internal TermsOfUse Terms { get; }
 
-    /// <summary>What continuing agrees to.</summary>
+    /// <summary>The one line under the heading: what agreeing is to.</summary>
     internal string Agreement { get; }
 
-    /// <summary>What a screen reader hears as the screen opens, since Continue takes the keyboard and Return agrees.</summary>
+    /// <summary>What a screen reader hears as the screen opens, since Agree takes the keyboard and Return agrees.</summary>
     internal string Opening { get; }
 
     /// <summary>Whether the person said yes to sending crash reports.</summary>
     internal bool SendCrashReports { get; set; }
 
     /// <summary>Agrees and goes on.</summary>
-    internal RelayCommand ContinueCommand { get; }
+    internal RelayCommand AgreeCommand { get; }
+
+    /// <summary>Leaves the app without agreeing; the first-launch screen's alone.</summary>
+    internal RelayCommand QuitCommand { get; }
 }

@@ -1,5 +1,6 @@
 using System.Globalization;
 using Keypaste.App.Globalization;
+using Keypaste.App.Resources;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Sharing;
@@ -27,8 +28,10 @@ internal sealed record LogRow
 {
     internal const string You = "you";
 
-    /// <summary>What a row the hash chain does not vouch for is told, on its tooltip and in the legend.</summary>
-    internal const string UnverifiedWords = "The hash chain does not vouch for this row.";
+    /// <summary>What a row the hash chain does not vouch for is told, on its tooltip and in the detail.</summary>
+    internal static string UnverifiedWords => Strings.KeypasteCantVouchForThisRecord;
+
+    private const string _namesOnly = "names only";
 
     private const string _none = "—";
 
@@ -50,7 +53,7 @@ internal sealed record LogRow
     internal string? Day { get; init; }
 
     /// <summary>What a screen reader says for the row: its columns, none of which holds a value.</summary>
-    internal string RowName => $"{When}, {Actor}, {Action}, {Secrets}, {Where}, {Result}{(Unverified ? $", {UnverifiedWords}" : string.Empty)}";
+    internal string RowName => $"{When}, {Actor}, {Action}, {Secrets}, {WhereInFull}, {Result}{(Edited ? $", {Strings.Edited}: {EditedWords}" : Unverified ? $", {UnverifiedWords}" : string.Empty)}{(ReasonUnread ? $", {Strings.ServedFromAnEarlierApprovalUnderAXde6ddd}" : string.Empty)}";
 
     internal bool StartsDay => Day is not null;
 
@@ -63,13 +66,20 @@ internal sealed record LogRow
 
     internal string Secrets { get; private init; } = string.Empty;
 
+    /// <summary>Where the values live as the cell shows it: a group's last part, a set, a recipient.</summary>
     internal string Where { get; private init; } = string.Empty;
 
-    /// <summary>The Secrets cell's tooltip where the table has no Where column.</summary>
-    internal string SecretsAndWhere => string.Join(" · ", new[] { Secrets, Where }.Where(part => part.Length > 0));
+    /// <summary>Where the values live in full, the cell's tooltip.</summary>
+    internal string WhereInFull { get; private init; } = string.Empty;
 
-    /// <summary>What the line was about: the secrets and where they live, or empty when it names neither.</summary>
-    internal string Subject => string.Join(" · ", new[] { UnlessNone(Secrets), UnlessNone(Where) }.OfType<string>());
+    /// <summary>Whether the Values cell holds a note about the values, drawn in the interface face, rather than their names.</summary>
+    internal bool NamesOnly => Secrets == _namesOnly;
+
+    /// <summary>The Values cell's tooltip where the table has no Where column.</summary>
+    internal string SecretsAndWhere => string.Join(" · ", new[] { Secrets, WhereInFull }.Where(part => part.Length > 0));
+
+    /// <summary>What the line was about: the values and where they live, or empty when it names neither.</summary>
+    internal string Subject => string.Join(" · ", new[] { UnlessNone(Secrets), UnlessNone(WhereInFull) }.OfType<string>());
 
     internal bool HasSubject => Subject.Length > 0;
 
@@ -96,6 +106,15 @@ internal sealed record LogRow
 
     internal bool Unverified => !Verified;
 
+    /// <summary>Whether the chain breaks at this record: changed, inserted or written by something else since keypaste wrote it.</summary>
+    internal bool Edited { get; private init; }
+
+    /// <summary>A record the chain cannot check without its breaking there, such as one a newer keypaste wrote.</summary>
+    internal bool Unchecked => Unverified && !Edited;
+
+    /// <summary>What the Edited mark says, with the result the record states.</summary>
+    internal string EditedWords => $"This record was changed or added after keypaste wrote it. It says: {Result}.";
+
     /// <summary>Whether this release was served under a reason no person read (THREATS.md T-12).</summary>
     internal bool ReasonUnread => Source.ReasonUnread;
 
@@ -107,7 +126,7 @@ internal sealed record LogRow
     /// <summary>What a screen reader says for the row in the list.</summary>
     public override string ToString() => RowName;
 
-    internal static LogRow From(AuditEntry entry, bool verified, TimeProvider clock)
+    internal static LogRow From(AuditEntry entry, bool verified, TimeProvider clock, bool edited = false)
     {
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(clock);
@@ -121,7 +140,7 @@ internal sealed record LogRow
         if (Is(entry.Method, "share-created") && ShareAuditReason.TryRead(entry.Reason, out var recipient, out var expires))
         {
             where = recipient;
-            result = entry.At is { } created && Lifetime(expires - created) is { } lifetime ? $"Link · {lifetime}" : "Link";
+            result = entry.At is { } created && Lifetime(expires - created) is { } lifetime ? $"{Strings.Shared} · {lifetime}" : Strings.Shared;
         }
 
         return new LogRow(entry)
@@ -132,11 +151,13 @@ internal sealed record LogRow
             Actor = byYou ? You : ActorOf(entry),
             Action = ActionOf(entry),
             Secrets = secrets,
-            Where = where,
+            Where = Last(where),
+            WhereInFull = where,
             Result = result,
             Tone = tone,
             Detail = DetailOf(entry, verified, clock.LocalTimeZone),
             Verified = verified,
+            Edited = edited,
             ByYou = byYou,
         };
     }
@@ -229,7 +250,7 @@ internal sealed record LogRow
 
         if (Is(entry.Tool, "list_entry_names"))
         {
-            return ("names only", _none);
+            return (_namesOnly, _none);
         }
 
         if (set is not null)
@@ -267,26 +288,20 @@ internal sealed record LogRow
             };
         }
 
+        // The prompt's words: a person allowed it once or for a while, an Always allow row allowed it, or a rule did.
         return entry.Method switch
         {
-            "prompt" => (entry.GrantedSeconds switch
-            {
-                null => "Approved",
-                0 => "Approved once",
-                var seconds => $"Approved {Span(seconds.Value)}",
-            }, LogTone.Ok),
-            "automatic" => ("Automatic", LogTone.Ok),
-            "automatic-commands" => ("Automatic with commands", LogTone.Ok),
-            "always-allowed" => ("Always", LogTone.Ok),
-            // Released by a policy.toml rule, in a line written before agents had modes.
-            "policy" => ("By rule", LogTone.Ok),
+            "prompt" => (entry.GrantedSeconds is > 0 and var seconds ? $"Allowed for {Lifetime(TimeSpan.FromSeconds(seconds))}" : Strings.AllowedOnce, LogTone.Ok),
+            "always-allowed" => (Strings.AlwaysAllowed, LogTone.Ok),
+            // policy: released by a policy.toml rule, in a line written before agents had modes.
+            "automatic" or "automatic-commands" or "policy" or "exposure" or "allowed" => (Strings.AllowedByRule, LogTone.Ok),
             "narrowing" => ("Narrowed", LogTone.Muted),
             "merged" => ("Merged", LogTone.Muted),
-            "token" => ("Token", LogTone.Info),
-            "share-created" => ("Link", LogTone.Muted),
+            "token" => (Strings.TokenResult, LogTone.Info),
+            "share-created" => (Strings.Shared, LogTone.Muted),
             "share-revoked" => ("Revoked", LogTone.Muted),
             "removed" => ("Removed", LogTone.Muted),
-            _ => ("Allowed", LogTone.Ok),
+            _ => (Strings.Allowed, LogTone.Ok),
         };
     }
 
@@ -322,27 +337,21 @@ internal sealed record LogRow
         return lines.Count == 0 ? null : string.Join(Environment.NewLine, lines);
     }
 
-    /// <summary>A link's lifetime from the moment it was recorded, to the minute: <c>24h</c>, <c>7d</c>, <c>45m</c>.</summary>
+    /// <summary>A lifetime to the minute, in words: <c>24 hours</c>, <c>7 days</c>, <c>45 minutes</c>.</summary>
     private static string? Lifetime(TimeSpan span)
     {
         var minutes = (int)Math.Round(span.TotalMinutes);
 
         return minutes switch
         {
-            <= 0 => null,
-            < 60 => Invariant($"{minutes}m"),
-            _ when minutes % 1_440 == 0 && minutes >= 2_880 => Invariant($"{minutes / 1_440}d"),
-            _ => Invariant($"{(int)Math.Round(minutes / 60.0)}h"),
+            <= 0 => span.TotalSeconds >= 1 ? Count((int)Math.Round(span.TotalSeconds), "second") : null,
+            < 60 => Count(minutes, "minute"),
+            _ when minutes % 1_440 == 0 && minutes >= 2_880 => Count(minutes / 1_440, "day"),
+            _ => Count((int)Math.Round(minutes / 60.0), "hour"),
         };
     }
 
-    private static string Span(int seconds) => seconds switch
-    {
-        >= 86_400 when seconds % 86_400 == 0 => Invariant($"{seconds / 86_400}d"),
-        >= 3_600 when seconds % 3_600 == 0 => Invariant($"{seconds / 3_600}h"),
-        >= 60 when seconds % 60 == 0 => Invariant($"{seconds / 60}m"),
-        _ => Invariant($"{seconds}s"),
-    };
+    private static string Count(int n, string unit) => Invariant($"{n} {unit}{(n == 1 ? string.Empty : "s")}");
 
     private static string Title(string path)
     {
@@ -358,6 +367,9 @@ internal sealed record LogRow
 
     /// <summary>A group as a place: itself, or a dash at the root.</summary>
     private static string Readable(string group) => group.Length == 0 ? _none : group;
+
+    /// <summary>A group path's last part, as the cell shows it; anything else as it is.</summary>
+    private static string Last(string where) => where.Contains('/', StringComparison.Ordinal) ? Title(where) : where;
 
     /// <summary>A set as a place: <c>env/acme-api/dev</c> reads <c>acme-api · dev</c>.</summary>
     private static string SetLabel(string set)

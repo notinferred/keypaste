@@ -37,7 +37,8 @@ public sealed class GeneratorViewModelTests
         Assert.True(generator.Digits);
         Assert.True(generator.Symbols);
         Assert.False(generator.LeaveOutLookalikes);
-        Assert.Equal("20 characters — about 128 bits", generator.Strength);
+        Assert.Equal("Strong", generator.Strength);
+        Assert.Equal("About 128 bits", generator.StrengthTip);
     }
 
     [Fact]
@@ -46,7 +47,7 @@ public sealed class GeneratorViewModelTests
         var generator = new GeneratorViewModel { Length = 32, Symbols = false, LeaveOutLookalikes = true };
 
         Assert.Equal("32-character password", generator.Recipe?.Describe("password"));
-        Assert.Equal("32 characters — about 187 bits", generator.Strength);
+        Assert.Equal("About 187 bits", generator.StrengthTip);
         Assert.Null(generator.Error);
     }
 
@@ -132,17 +133,22 @@ public sealed class GeneratorViewModelTests
     }
 
     [Fact]
-    public void The_strength_line_names_the_count_and_the_bits_and_follows_the_count()
+    public void The_strength_is_one_word_with_the_bits_and_the_list_in_its_tooltip()
     {
         var generator = new GeneratorViewModel { UseWords = true };
 
-        Assert.Contains("6 words", generator.Strength, StringComparison.Ordinal);
-        Assert.Contains("78 bits", generator.Strength, StringComparison.Ordinal);
+        Assert.Equal("Strong", generator.Strength);
+        Assert.StartsWith("About 78 bits, from ", generator.StrengthTip, StringComparison.Ordinal);
+        Assert.EndsWith("of 7,776 words", generator.StrengthTip, StringComparison.Ordinal);
 
-        generator.WordCount = 12;
+        generator.UseCharacters = true;
+        generator.Length = 9;
+        Assert.Equal("Fair", generator.Strength);
 
-        Assert.Contains("12 words", generator.Strength, StringComparison.Ordinal);
-        Assert.Contains("155 bits", generator.Strength, StringComparison.Ordinal);
+        generator.Length = 8;
+        generator.Digits = false;
+        generator.Symbols = false;
+        Assert.Equal("Weak", generator.Strength);
     }
 
     /// <summary>
@@ -178,6 +184,7 @@ public sealed class GeneratorViewModelTests
                 nameof(GeneratorViewModel.UseWords),
                 nameof(GeneratorViewModel.UseCharacters),
                 nameof(GeneratorViewModel.Strength),
+                nameof(GeneratorViewModel.StrengthTip),
                 nameof(GeneratorViewModel.Error),
             ],
             raised);
@@ -185,20 +192,12 @@ public sealed class GeneratorViewModelTests
         raised.Clear();
         generator.WordCount = 8;
         Assert.Equal(
-            [nameof(GeneratorViewModel.WordCount), nameof(GeneratorViewModel.Strength), nameof(GeneratorViewModel.Error)],
+            [nameof(GeneratorViewModel.WordCount), nameof(GeneratorViewModel.Strength), nameof(GeneratorViewModel.StrengthTip), nameof(GeneratorViewModel.Error)],
             raised);
 
         raised.Clear();
         generator.Separator = "ab";
         Assert.Equal([nameof(GeneratorViewModel.Separator), nameof(GeneratorViewModel.Error)], raised);
-    }
-
-    [Fact]
-    public void The_provenance_line_names_the_list_and_its_size_and_its_bits_per_word()
-    {
-        Assert.Contains(WordList.Provenance, GeneratorViewModel.Provenance, StringComparison.Ordinal);
-        Assert.Contains("7,776", GeneratorViewModel.Provenance, StringComparison.Ordinal);
-        Assert.Contains("12.9 bits", GeneratorViewModel.Provenance, StringComparison.Ordinal);
     }
 
     [Fact]

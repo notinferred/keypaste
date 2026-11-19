@@ -27,9 +27,9 @@ public sealed class LogRowTests
     };
 
     [Theory]
-    [InlineData(3600, "Approved 1h")]
-    [InlineData(900, "Approved 15m")]
-    [InlineData(0, "Approved once")]
+    [InlineData(3600, "Allowed for 1 hour")]
+    [InlineData(900, "Allowed for 15 minutes")]
+    [InlineData(0, "Allowed once")]
     public void A_person_s_approval_says_for_how_long(int seconds, string result)
     {
         var row = Row(Entry("request_credential", "granted", "prompt") with { Entry = "env/acme-api/dev/DATABASE_URL", Field = "password", GrantedSeconds = seconds });
@@ -38,16 +38,18 @@ public sealed class LogRowTests
         Assert.Equal(LogTone.Ok, row.Tone);
         Assert.Equal("Requested", row.Action);
         Assert.Equal("DATABASE_URL", row.Secrets);
-        Assert.Equal("env/acme-api/dev", row.Where);
+        Assert.Equal("dev", row.Where);
+        Assert.Equal("env/acme-api/dev", row.WhereInFull);
         Assert.Equal("claude-code", row.Actor);
         Assert.False(row.ByYou);
     }
 
-    /// <summary>A release nobody was asked about says which kind it was: an agent's Automatic mode, or a rule in a line written before agents had modes.</summary>
+    /// <summary>A release nobody was asked about says, in the prompt's words, whether an Always allow row or a rule gave it.</summary>
     [Theory]
-    [InlineData("automatic", "Automatic")]
-    [InlineData("always-allowed", "Always")]
-    [InlineData("policy", "By rule")]
+    [InlineData("automatic", "Allowed by rule")]
+    [InlineData("automatic-commands", "Allowed by rule")]
+    [InlineData("always-allowed", "Always allowed")]
+    [InlineData("policy", "Allowed by rule")]
     public void A_release_nobody_was_asked_about_says_so(string method, string result)
     {
         var row = Row(Entry("request_credential", "granted", method) with { Entry = "env/acme-api/.env", Field = "DATABASE_URL" });
@@ -85,7 +87,7 @@ public sealed class LogRowTests
         Assert.Equal(LogTone.Muted, row.Tone);
         Assert.Equal("keypaste app", row.Actor);
         Assert.Equal("STRIPE_KEY", row.Secrets);
-        Assert.Equal("env/billing", row.Where);
+        Assert.Equal("billing", row.Where);
         Assert.False(row.Denied);
     }
 
@@ -128,7 +130,7 @@ public sealed class LogRowTests
         Assert.Equal(LogRow.You, row.Actor);
         Assert.Equal("Shared", row.Action);
         Assert.Equal("STRIPE_SECRET_KEY", row.Secrets);
-        Assert.Equal("Link", row.Result);
+        Assert.Equal("Shared", row.Result);
         Assert.Equal(LogTone.Muted, row.Tone);
         Assert.True(row.ByYou);
     }
@@ -142,7 +144,7 @@ public sealed class LogRowTests
         var row = Row(Entry("share", "granted", "share-created") with { Entry = info.What, Field = "password", Reason = ShareAuditReason.Created(info) });
 
         Assert.Equal("maya@acme.dev", row.Where);
-        Assert.Equal("Link · 24h", row.Result);
+        Assert.Equal("Shared · 24 hours", row.Result);
     }
 
     /// <summary>A change to an agent's settings reads as made only when it was; one refused or unanswered was only asked for, as a run reads.</summary>
@@ -166,7 +168,8 @@ public sealed class LogRowTests
 
         Assert.Equal("Listed names", row.Action);
         Assert.Equal("names only", row.Secrets);
-        Assert.Equal("Allowed", row.Result);
+        Assert.True(row.NamesOnly);
+        Assert.Equal("Allowed by rule", row.Result);
     }
 
     /// <summary>The clock keeps its seconds on every day, so two records a minute apart still read in order.</summary>

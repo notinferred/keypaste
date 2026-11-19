@@ -81,6 +81,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
         _dismissals = [.. dismissals];
 
         MoveSelectedCommand = new RelayCommand(() => Move([.. Rows.Where(row => row.IsSelected && !row.IsDismissed)]));
+        SelectAllCommand = new RelayCommand(SelectAll);
 
         if (_preferences is not null)
         {
@@ -136,9 +137,9 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     [NotifyPropertyChangedFor(nameof(ShownVault))]
     internal partial IReadOnlyList<RecommendationsViewModel> AlsoShown { get; set; } = [];
 
-    /// <summary>Every finding: those needing review first, then those dismissed.</summary>
+    /// <summary>The keys left in notes, one row for each item's: those needing review first, then those dismissed.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(NeedsReview), nameof(IsEmpty), nameof(HasNoteKeys), nameof(Line))]
+    [NotifyPropertyChangedFor(nameof(NeedsReview), nameof(IsEmpty), nameof(HasNoteKeys), nameof(OffersBulkMove), nameof(Line))]
     internal partial IReadOnlyList<RecommendationRow> Rows { get; private set; } = [];
 
     /// <summary>Every project tag an entry lost in another app: those needing review first, then those dismissed.</summary>
@@ -287,6 +288,9 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
 
     internal bool HasNoteKeys => Rows.Count > 0;
 
+    /// <summary>Whether Select all and Move selected are offered: only while two or more items' keys need review.</summary>
+    internal bool OffersBulkMove => Rows.Count(row => row.NeedsReview) > 1;
+
     /// <summary>Whether Move selected has anything to move.</summary>
     internal bool HasSelectedKeys => Rows.Any(row => row.IsSelected && !row.IsDismissed);
 
@@ -302,6 +306,8 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     internal bool HasMessage => Message.Length > 0;
 
     internal RelayCommand MoveSelectedCommand { get; }
+
+    internal RelayCommand SelectAllCommand { get; }
 
     /// <summary>The latest check, complete once its findings are shown, or handed to the UI thread, or dropped.</summary>
     internal Task Checking { get; private set; } = Task.CompletedTask;
@@ -412,14 +418,11 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
         FragileKeyFile = keyfile is not null && VaultKeyfile.Inspect(keyfile).IsFragile ? Path.GetFileName(keyfile) : null;
         FragileKeyFileDismissed = FragileKeyFile is not null && _dismissals.Contains(FragileKeyFileDismissal(vaultKey));
         LookForConflictedCopies();
-        var rows = _noteKeys
-            .Select(finding => new RecommendationRow(this, finding, IsDismissed(vaultKey, finding)))
+        Rows = [.. _noteKeys
+            .GroupBy(finding => (finding.EntryUuid, finding.Entry, Dismissed: IsDismissed(vaultKey, finding)))
+            .Select(item => new RecommendationRow(this, [.. item.OrderBy(finding => finding.Line)], item.Key.Dismissed))
             .OrderBy(row => row.IsDismissed)
-            .ThenBy(row => row.Entry, StringComparer.Ordinal)
-            .ThenBy(row => row.Finding.Line)
-            .ToList();
-
-        Rows = rows;
+            .ThenBy(row => row.Entry, StringComparer.Ordinal)];
         LostTags = [.. _lost
             .Select(finding => new LostTagRow(this, finding, IsDismissed(vaultKey, finding)))
             .OrderBy(row => row.IsDismissed)
@@ -437,7 +440,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
             .ThenBy(row => row.Entry, StringComparer.Ordinal)];
     }
 
-    /// <summary>Shows what putting a lost tag back does, before it is written (D-0415).</summary>
+    /// <summary>Shows what putting a lost tag back does, before it is written.</summary>
     internal void AskRestore(LostTagRow row)
     {
         if (_session.Unlocked is not { } vault)
@@ -476,16 +479,89 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
         Check();
     }
 
-    /// <summary>Moves the given findings into protected fields and saves.</summary>
+    /// <summary>Moves the keys ticked on the given items into protected fields on each item, and saves.</summary>
     internal void Move(IReadOnlyList<RecommendationRow> rows)
     {
-        if (rows.Count == 0)
+        List<NoteKeyFinding> findings = [.. rows.SelectMany(row => row.Included)];
+
+        if (findings.Count == 0)
         {
             Message = "Choose a key to move first.";
             return;
         }
 
-        var write = _session.Write(vault => vault.MoveNoteKeys(_check, [.. rows.Select(row => row.Finding)]), result => result.Moved);
+        Write(vault => vault.MoveNoteKeys(_check, findings), findings.Count, stage: null);
+    }
+
+    /// <summary>Opens the choice of a project stage for an item's ticked keys, every stage of every project listed.</summary>
+    internal void AskMoveToStage(RecommendationRow row)
+    {
+        if (_session.Unlocked is not { } vault)
+        {
+            Message = "The vault is locked. Unlock it, then try again.";
+            return;
+        }
+
+        List<ProjectMembership> stages = [.. ProjectCatalog.Read(vault).Projects
+            .SelectMany(project => project.Environments.Select(stage => new ProjectMembership(project.Name, stage.Name)))];
+
+        if (stages.Count == 0)
+        {
+            Message = Resources.Strings.NoProjectYetCreateOneInEnvironments;
+            return;
+        }
+
+        Message = string.Empty;
+        row.Stages = stages;
+        row.ChosenStage = stages[0];
+    }
+
+    /// <summary>What moving an item's ticked keys into its chosen stage does: the stage it joins and every variable it brings, the item's own included.</summary>
+    internal string StagePreview(RecommendationRow row)
+    {
+        if (row.ChosenStage is not { } stage || _session.Unlocked is not { } vault || !row.HasIncludedKeys)
+        {
+            return string.Empty;
+        }
+
+        var listing = ProjectCatalog.Read(vault).Projects.FirstOrDefault(project => project.Name == stage.Project)?.Environments.FirstOrDefault(environment => environment.Name == stage.Environment);
+        var variables = (vault.Fields(row.Keys[0].Finding.Entry) ?? [])
+            .Select(field => field.Name)
+            .Where(EnvConvention.IsEnvNamedField)
+            .Concat(row.Included.Select(finding => finding.Field))
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .Select(name => EntryNameSanitizer.Sanitize(name).Text);
+        var joins = UseText.JoinsStage(row.Entry, Shown(stage), string.Join(", ", variables));
+
+        return listing?.IsProtected == true ? joins + " " + Resources.Strings.AgentsAreAskedEveryTimeForAProtectedStage : joins;
+    }
+
+    /// <summary>Moves an item's ticked keys into fields on it and puts it in the chosen stage, in one revision, and saves.</summary>
+    internal void MoveToStage(RecommendationRow row)
+    {
+        if (row.ChosenStage is not { } stage || row.Included is not { Count: > 0 } findings)
+        {
+            return;
+        }
+
+        row.Stages = [];
+
+        try
+        {
+            Write(vault => vault.MoveNoteKeysInto(_check, findings, stage.Project, stage.Environment), findings.Count, stage);
+        }
+        catch (VaultException e)
+        {
+            Message = e.Message;
+        }
+    }
+
+    private static string Shown(ProjectMembership stage) => EntryNameSanitizer.SanitizePath(stage.ToString()).Text;
+
+    private void Write(Func<Vault, NoteKeyMove> act, int keys, ProjectMembership? stage)
+    {
+        var write = _session.Write(act, result => result.Moved);
 
         if (write.Problem("move the keys again") is { } problem)
         {
@@ -507,7 +583,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
             return;
         }
 
-        Message = Moved(rows.Count, move.Entries);
+        Message = Moved(keys, move.Entries, stage);
         Check();
     }
 
@@ -562,11 +638,17 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     private Dismissal FragileKeyFileDismissal(string vaultKey) =>
         new(vaultKey, RecommendationDismissals.FragileKeyFile, RecommendationDismissals.FragileKeyFile, FragileKeyFile ?? string.Empty);
 
+    /// <summary>Shows the item whose notes hold the keys in Items, found again by its UUID.</summary>
+    internal void Open(RecommendationRow row) => Open(row.EntryUuid, row.Entry);
+
+    /// <summary>Shows the item that lost the tag in Items, found again by its UUID.</summary>
+    internal void Open(LostTagRow row) => Open(row.Finding.EntryUuid, row.Entry);
+
     internal void Dismiss(RecommendationRow row) =>
-        Dismiss(new Dismissal(VaultKey(), row.Finding.EntryUuid, RecommendationDismissals.NoteKey, row.Key));
+        Dismiss([.. row.Keys.Select(key => new Dismissal(VaultKey(), row.EntryUuid, RecommendationDismissals.NoteKey, key.Key))]);
 
     internal void ReviewAgain(RecommendationRow row) =>
-        ReviewAgain(new Dismissal(VaultKey(), row.Finding.EntryUuid, RecommendationDismissals.NoteKey, row.Key));
+        ReviewAgain([.. row.Keys.Select(key => new Dismissal(VaultKey(), row.EntryUuid, RecommendationDismissals.NoteKey, key.Key))]);
 
     internal void Dismiss(LostTagRow row) =>
         Dismiss(new Dismissal(VaultKey(), row.Finding.EntryUuid, RecommendationDismissals.LostProjectTag, row.Finding.Key));
@@ -608,25 +690,20 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
         _check.Dispose();
     }
 
-    private void Dismiss(Dismissal dismissal)
+    private void Dismiss(params IReadOnlyList<Dismissal> dismissals)
     {
-        if (!_dismissals.Contains(dismissal))
-        {
-            _dismissals.Add(dismissal);
-        }
-
+        _dismissals.AddRange(dismissals.Where(dismissal => !_dismissals.Contains(dismissal)).Distinct());
         Message = Remember();
         Show();
     }
 
-    private void ReviewAgain(Dismissal dismissal)
+    private void ReviewAgain(params IReadOnlyList<Dismissal> dismissals)
     {
-        _dismissals.Remove(dismissal);
+        _dismissals.RemoveAll(dismissals.Contains);
         Message = Remember();
         Show();
     }
 
-    [RelayCommand]
     private void SelectAll()
     {
         var select = Rows.Any(row => !row.IsDismissed && !row.IsSelected);
@@ -674,9 +751,14 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
 
     private string VaultKey() => _session.Identity?.Key ?? string.Empty;
 
-    private string Moved(int keys, IReadOnlyList<EntryName> entries)
+    private string Moved(int keys, IReadOnlyList<EntryName> entries, ProjectMembership? stage)
     {
         var what = keys == 1 ? "1 key" : keys.ToString(CultureInfo.InvariantCulture) + " keys";
+
+        if (stage is not null)
+        {
+            return UseText.MovedIntoStage(what, Named(entries[0]), Shown(stage));
+        }
 
         return entries.Count == 1
             ? $"Moved {what} from the notes of {Named(entries[0])} into protected fields. The notes as they were stay in its history."
@@ -698,8 +780,8 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
         };
     }
 
-    /// <summary>A finding's item as a sentence names it, which two of one name need to read apart.</summary>
-    internal string Named(EntryName entry) => _tells?.Named(entry) ?? Shown(entry);
+    /// <summary>A finding's item by its title, as a sentence names it, with the tell two items of one name need to read apart.</summary>
+    internal string Named(EntryName entry) => SameNameTells.WithTell(EntryNameSanitizer.Sanitize(entry.Title).Text, _tells?.Of(entry));
 
     internal static string Shown(EntryName entry) =>
         EntryNameSanitizer.SanitizePath(entry.GroupPath.Length == 0 ? entry.Title : entry.GroupPath + "/" + entry.Title).Text;

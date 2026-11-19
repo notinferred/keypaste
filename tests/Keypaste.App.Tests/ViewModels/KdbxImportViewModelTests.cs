@@ -248,6 +248,26 @@ public sealed class KdbxImportViewModelTests : IDisposable
     private KdbxImportViewModel NewImport() =>
         new(_session, _source, (path, keyfile, _) => _opened.Add((path, keyfile)), _announced.Add);
 
+    [Fact]
+    public void A_readable_file_asks_first_whether_to_copy_it_in_or_open_it_as_its_own_vault()
+    {
+        using var copy = NewImport();
+
+        Assert.True(copy.ShowsChoice);
+        Assert.False(copy.ShowsUnlockForm);
+        Assert.False(copy.ShowsConfirm);
+
+        copy.ChooseCopyCommand.Execute(null);
+        Assert.False(copy.ShowsChoice);
+        Assert.True(copy.ShowsUnlockForm);
+
+        using var open = NewImport();
+        open.ChooseOpenCommand.Execute(null);
+        Assert.False(open.ShowsChoice);
+        Assert.True(open.KeepEditingInPlace);
+        Assert.True(open.ShowsConfirm);
+    }
+
     private static async Task Unlock(KdbxImportViewModel import)
     {
         foreach (var c in _sourcePassword)

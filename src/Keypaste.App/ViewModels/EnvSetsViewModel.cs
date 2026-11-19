@@ -10,7 +10,7 @@ namespace Keypaste.App.ViewModels;
 /// <remarks>
 /// <para>
 /// A project is the entries whose own tags name it, and a variable is an env-named field of one of
-/// them (D-0416), read through <see cref="ProjectCatalog"/> and <see cref="EnvResolution"/> and
+/// them, read through <see cref="ProjectCatalog"/> and <see cref="EnvResolution"/> and
 /// written through <see cref="EnvStore"/>. Nothing about where a variable lives is decided here,
 /// which is what lets <c>keypaste env ls</c> and <c>keypaste run</c> see what this screen writes the
 /// moment it is written.
@@ -29,15 +29,18 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
     private readonly IVaultFilePicker? _picker;
     private readonly ProjectLaunching _launching;
     private readonly Action<string, ToastTone>? _toast;
+    private readonly Action<EntryName>? _openItem;
 
     private EnvProjectViewModel? _open;
+    private bool _importsOnceCreated;
 
     internal EnvSetsViewModel(
         AppVaultSession session,
         ClipboardCountdown clipboard,
         IVaultFilePicker? picker = null,
         ProjectLaunching? launching = null,
-        Action<string, ToastTone>? toast = null)
+        Action<string, ToastTone>? toast = null,
+        Action<EntryName>? openItem = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(clipboard);
@@ -47,6 +50,7 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
         _picker = picker;
         _launching = launching ?? ProjectLaunching.ForThisMachine(authority: null);
         _toast = toast;
+        _openItem = openItem;
 
         CopyRunCommandCommand = new RelayCommand<string>(
             project => _ = CopyRunCommandAsync(project ?? string.Empty));
@@ -54,6 +58,9 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
         BeginAddCommand = new RelayCommand(BeginAdd, () => !IsAdding);
         CancelAddCommand = new RelayCommand(CancelAdd, () => IsAdding);
         ConfirmAddCommand = new RelayCommand(ConfirmAdd, () => IsAdding);
+        BeginImportCommand = new RelayCommand(BeginImport, () => !IsAdding);
+        ConfirmFixCommand = new RelayCommand(ConfirmFix, () => PendingFix is not null);
+        CancelFixCommand = new RelayCommand(() => PendingFix = null, () => PendingFix is not null);
 
         Reload();
     }
@@ -76,6 +83,25 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
     internal partial IReadOnlyList<EnvTagProblemRow> MalformedTags { get; private set; } = [];
 
     internal bool HasMalformedTags => MalformedTags.Count > 0;
+
+    /// <summary>The tag whose change to lower case is being asked about, or null.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsConfirmingFix))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmFixCommand), nameof(CancelFixCommand))]
+    internal partial EnvTagProblemRow? PendingFix { get; private set; }
+
+    internal bool IsConfirmingFix => PendingFix is not null;
+
+    /// <summary>What changing the tag reaches, shown before it is written.</summary>
+    [ObservableProperty]
+    internal partial IReadOnlyList<string> FixLines { get; private set; } = [];
+
+    internal RelayCommand ConfirmFixCommand { get; }
+
+    internal RelayCommand CancelFixCommand { get; }
+
+    /// <summary>Import .env… with no project yet: names the new project first, then chooses the file.</summary>
+    internal RelayCommand BeginImportCommand { get; }
 
     /// <summary>The project whose table is showing, or null.</summary>
     internal EnvProjectViewModel? OpenProject
@@ -120,7 +146,7 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
     internal bool HasNotice => Notice is not null;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(BeginAddCommand), nameof(CancelAddCommand), nameof(ConfirmAddCommand))]
+    [NotifyCanExecuteChangedFor(nameof(BeginAddCommand), nameof(CancelAddCommand), nameof(ConfirmAddCommand), nameof(BeginImportCommand))]
     internal partial bool IsAdding { get; private set; }
 
     /// <summary>The name of the project being created.</summary>
@@ -202,7 +228,15 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
     {
         var catalog = ProjectCatalog.Read(vault);
         Projects = [.. catalog.Projects.Select(listing => listing.Name)];
-        MalformedTags = [.. catalog.Problems.Select(problem => new EnvTagProblemRow(problem))];
+        PendingFix = null;
+        MalformedTags = [.. catalog.Problems.Select(Row)];
+
+        EnvTagProblemRow Row(ProjectTagProblem problem)
+        {
+            EnvTagProblemRow? row = null;
+            row = new EnvTagProblemRow(problem, new RelayCommand(() => _openItem?.Invoke(problem.Entry)), new RelayCommand(() => AskFix(row!)));
+            return row;
+        }
     }
 
     /// <summary>How many variables a project holds, without opening it.</summary>
@@ -227,7 +261,7 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
         }
     }
 
-    /// <summary>The command that injects a project, for the card's copy helper, for the person to finish, or null when the name gets none (D-0453).</summary>
+    /// <summary>The command that injects a project, for the card's copy helper, for the person to finish, or null when the name gets none.</summary>
     internal static string? RunCommandFor(string project) => CopiedRunCommand.For(project, environment: null, command: string.Empty);
 
     /// <summary>Copies a project's run command, plainly and with no countdown, when it has one.</summary>
@@ -279,6 +313,53 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
         }
     }
 
+    private void AskFix(EnvTagProblemRow row)
+    {
+        if (_session.Unlocked is not { } vault || row.Fixed is not { } tag)
+        {
+            return;
+        }
+
+        try
+        {
+            FixLines = ProjectTagChange.Preview(vault, row.Problem.Entry, [tag], adding: true)?.Describe() ?? [];
+            PendingFix = row;
+            Error = null;
+        }
+        catch (VaultException e)
+        {
+            Error = e.Message;
+        }
+    }
+
+    /// <summary>Takes the cased-wrong tag off its item and puts the lower-case one on, and saves.</summary>
+    private void ConfirmFix()
+    {
+        if (PendingFix is not { Fixed: { } tag } row)
+        {
+            return;
+        }
+
+        PendingFix = null;
+        var entry = row.Problem.Entry;
+        var write = _session.Write(vault => vault.RemoveTags(entry, [row.Problem.Tag]) | vault.AddTag(entry, tag), changed => changed);
+
+        if (write.Problem("change the tag again") is { } problem)
+        {
+            Error = problem;
+            return;
+        }
+
+        Error = null;
+        Reload();
+    }
+
+    private void BeginImport()
+    {
+        BeginAdd();
+        _importsOnceCreated = true;
+    }
+
     private void BeginAdd()
     {
         NewProject = string.Empty;
@@ -289,6 +370,7 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
 
     private void CancelAdd()
     {
+        _importsOnceCreated = false;
         IsAdding = false;
         NewProject = string.Empty;
         RefuseNewProject(null);
@@ -324,5 +406,11 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
         IsAdding = false;
         Error = null;
         Open(project);
+
+        if (_importsOnceCreated)
+        {
+            _importsOnceCreated = false;
+            OpenProject?.Import.ChooseCommand.Press();
+        }
     }
 }

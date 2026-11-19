@@ -85,8 +85,8 @@ public sealed class SecretsScreenTests : IDisposable
 
         Assert.Equal(EntryKind.Login, detail.Kind);
         Assert.Equal("Work", detail.Location);
-        Assert.Matches("^uuid [0-9a-f]{4}…[0-9a-f]{4} · field Password$", detail.KdbxEntry);
-        Assert.Contains("20-character one? keypaste only changes its copy", detail.RotatePrompt, StringComparison.Ordinal);
+        Assert.True(detail.HasKeePassId);
+        Assert.Equal("Rotate github's password? Change it on github.com too.", detail.RotatePrompt);
     }
 
     [Fact]
@@ -110,7 +110,7 @@ public sealed class SecretsScreenTests : IDisposable
         context.Entries.Selected = context.Entries.Rows.Single(row => row.GroupPath == "env/acme-api/prod");
         var detail = context.Entries.Detail!;
 
-        Assert.Contains("20-character one? keypaste only changes its copy", detail.RotatePrompt, StringComparison.Ordinal);
+        Assert.EndsWith("password? Change it where you use it too.", detail.RotatePrompt, StringComparison.Ordinal);
         Assert.DoesNotContain(_value, detail.RotatePrompt, StringComparison.Ordinal);
     }
 

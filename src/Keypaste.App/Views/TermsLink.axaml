@@ -1,14 +1,12 @@
 <UserControl xmlns:res="using:Keypaste.App.Resources"
-  xmlns="https://github.com/avaloniaui"
+             xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Keypaste.App.Views.TermsLink">
 
-  <Button Name="OpenTerms"
-          Classes="link"
-          MinHeight="20"
-          VerticalContentAlignment="Center"
-          AutomationProperties.Name="{x:Static res:Strings.TermsOfUse}">
-    <TextBlock Text="{x:Static res:Strings.TermsOfUse}" TextDecorations="Underline" />
-  </Button>
+  <StackPanel Orientation="Horizontal" Spacing="6">
+    <Button Name="OpenTerms" Classes="link" Content="{x:Static res:Strings.ReadTheTerms}" />
+    <TextBlock Classes="muted" Text="·" VerticalAlignment="Center" />
+    <Button Name="OpenSourceCode" Classes="link" Content="{x:Static res:Strings.SourceCode}" />
+  </StackPanel>
 
 </UserControl>

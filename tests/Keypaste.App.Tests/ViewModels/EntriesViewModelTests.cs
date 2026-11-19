@@ -165,7 +165,8 @@ public sealed class EntriesViewModelTests : IDisposable
         context.Entries.DeleteCommand.Press();
 
         Assert.True(context.Entries.IsConfirmingDelete);
-        Assert.Contains("servers/staging", context.Entries.DeletePrompt, StringComparison.Ordinal);
+        Assert.Contains("staging", context.Entries.DeletePrompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("servers/", context.Entries.DeletePrompt, StringComparison.Ordinal);
 
         // Still there: asking is not doing.
         using (var untouched = Vault.Open(_vaultPath, Master))

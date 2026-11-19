@@ -56,7 +56,7 @@ public sealed class ShellViewModelTests : IDisposable
         Assert.Equal([1, 2, 3, 4], Destinations.Places.Select(d => d.Shortcut));
         Assert.All(Destinations.All.Where(d => !d.IsPlace), d => Assert.Equal(0, d.Shortcut));
         Assert.False(shell.ShowsAccounts);
-        Assert.Equal(["Favorites", "All items 4", "Logins 4", "Environments 1", "Trash"], Titles(shell));
+        Assert.Equal(["Favorites", "All items 4", "Logins 2", "Environments 1", "Trash"], Titles(shell));
     }
 
     [Fact]
@@ -68,7 +68,8 @@ public sealed class ShellViewModelTests : IDisposable
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
         Assert.Equal("Logins", entries.ListTitle);
         Assert.Equal("test", entries.ListSubtitle);
-        Assert.Equal(4, entries.Rows.Count);
+        Assert.Equal(2, entries.Rows.Count);
+        Assert.DoesNotContain(entries.Rows, row => row.Kind == EntryKind.Environment);
         Assert.Equal(shell.Place(ItemPlace.Logins), shell.SelectedSidebarRow);
 
         shell.SelectedSidebarRow = shell.Place(ItemPlace.Trash);
@@ -164,17 +165,9 @@ public sealed class ShellViewModelTests : IDisposable
     {
         using var shell = Shell();
 
-        shell.Current = Destinations.Of(DestinationKind.Advanced);
-        Assert.Equal("Settings", shell.SelectedRailPlace?.Title);
-        Assert.True(shell.HasBack);
-        Assert.Equal("Settings", shell.BackTitle);
-
-        shell.BackCommand.Press();
-        Assert.IsType<SettingsViewModel>(shell.Content);
-        Assert.False(shell.HasBack);
-
         shell.Current = Destinations.Of(DestinationKind.Log);
         Assert.Equal("Agents", shell.SelectedRailPlace?.Title);
+        Assert.True(shell.HasBack);
         Assert.Equal("Agents", shell.BackTitle);
         Assert.Equal("Activity", shell.CurrentTitle);
         Assert.IsType<LogViewModel>(shell.Content);
@@ -185,52 +178,31 @@ public sealed class ShellViewModelTests : IDisposable
     }
 
     [Fact]
-    public void Settings_opens_advanced_as_a_screen_under_it_and_back_returns_to_settings()
+    public void Settings_opens_each_section_from_its_list_and_keeps_settings_selected()
     {
         using var shell = Shell();
         shell.GoTo(4);
+        var settings = Assert.IsType<SettingsViewModel>(shell.Content);
 
-        Assert.IsType<SettingsViewModel>(shell.Content).OpenAdvancedCommand.Press();
+        shell.OpenSettings(SettingsSectionChoice.Browser);
+        Assert.Same(settings, shell.Content);
+        Assert.Equal(SettingsSectionChoice.Browser, settings.Section);
 
-        Assert.IsType<AdvancedViewModel>(shell.Content);
-        Assert.Equal("Advanced", shell.CurrentTitle);
-        Assert.Equal("Settings", shell.SelectedRailPlace?.Title);
-        Assert.Equal("Back to Settings", $"Back to {shell.BackTitle}");
-        Assert.Equal(0, shell.Current.Shortcut);
-
-        shell.BackCommand.Press();
-        Assert.IsType<SettingsViewModel>(shell.Content);
-        Assert.False(shell.HasBack);
-    }
-
-    [Fact]
-    public void Settings_advanced_opens_the_share_links()
-    {
-        using var shell = Shell();
-        shell.GoTo(4);
-        Assert.IsType<SettingsViewModel>(shell.Content).OpenAdvancedCommand.Press();
-
-        Assert.IsType<AdvancedViewModel>(shell.Content).OpenShareLinksCommand.Press();
+        shell.OpenSettings(SettingsSectionChoice.ShareLinks);
         Assert.IsType<SharingViewModel>(shell.Content);
         Assert.Equal("Share links", shell.CurrentTitle);
-    }
 
-    [Fact]
-    public void Settings_advanced_opens_the_scoped_tokens_and_diagnostics()
-    {
-        using var shell = Shell();
-        shell.GoTo(4);
-        Assert.IsType<SettingsViewModel>(shell.Content).OpenAdvancedCommand.Press();
-
-        Assert.IsType<AdvancedViewModel>(shell.Content).OpenScopedTokensCommand.Press();
+        shell.OpenSettings(SettingsSectionChoice.ScopedTokens);
         Assert.IsType<ScopedTokensViewModel>(shell.Content);
-        Assert.Equal("Back to Advanced", $"Back to {shell.BackTitle}");
         Assert.Equal("Settings", shell.SelectedRailPlace?.Title);
+        Assert.False(shell.HasBack);
+        Assert.Equal(0, shell.Current.Shortcut);
 
-        shell.BackCommand.Press();
-        Assert.IsType<AdvancedViewModel>(shell.Content).OpenDiagnosticsCommand.Press();
+        shell.OpenSettings(SettingsSectionChoice.Diagnostics);
         Assert.IsType<DiagnosticsViewModel>(shell.Content);
-        Assert.Equal("Diagnostics", shell.CurrentTitle);
+
+        shell.OpenSettings(SettingsSectionChoice.ThisVault);
+        Assert.Equal(SettingsSectionChoice.ThisVault, Assert.IsType<SettingsViewModel>(shell.Content).Section);
     }
 
     [Fact]
@@ -394,7 +366,7 @@ public sealed class ShellViewModelTests : IDisposable
         Assert.False(shell.AgentsServing);
         Assert.True(agents.HasDot);
         Assert.False(agents.DotLive);
-        Assert.Equal("not serving agents", agents.Detail);
+        Assert.Equal("Agents · Not answering agents", agents.RailTip);
         Assert.False(shell.RailPlaces.Single(item => item.Destination.Kind == DestinationKind.Entries).HasDot);
     }
 

@@ -1378,7 +1378,31 @@ public sealed class Vault : IDisposable
     /// </remarks>
     /// <exception cref="ArgumentException">A finding came from another check.</exception>
     /// <exception cref="VaultException">More than one entry answers to an entry's name. Nothing is changed.</exception>
-    public NoteKeyMove MoveNoteKeys(NoteKeyCheck check, IReadOnlyList<NoteKeyFinding> findings)
+    public NoteKeyMove MoveNoteKeys(NoteKeyCheck check, IReadOnlyList<NoteKeyFinding> findings) => MoveNoteKeysTagging(check, findings, tag: null);
+
+    /// <summary>Moves keys found in notes into protected fields, as <see cref="MoveNoteKeys"/> does, and puts each item they leave into one stage of a project in the same revision. Call <see cref="Save"/> to persist it.</summary>
+    /// <param name="check">The check that found them, while it is still undisposed.</param>
+    /// <param name="findings">The findings to move, from <paramref name="check"/>.</param>
+    /// <param name="project">The project.</param>
+    /// <param name="environment">The stage.</param>
+    /// <returns>What was moved, or why nothing was.</returns>
+    /// <remarks>The item gains the stage's project tag (<see cref="ProjectTag.TryFor"/>), so its fields become the stage's variables; one already carrying it keeps it once.</remarks>
+    /// <exception cref="ArgumentException">A finding came from another check.</exception>
+    /// <exception cref="VaultException">The project or stage name is refused, or more than one entry answers to an entry's name. Nothing is changed.</exception>
+    public NoteKeyMove MoveNoteKeysInto(NoteKeyCheck check, IReadOnlyList<NoteKeyFinding> findings, string project, string environment)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+        ArgumentNullException.ThrowIfNull(environment);
+
+        if (!ProjectTag.TryFor(project, environment, out var tag, out var error))
+        {
+            throw Refused(error);
+        }
+
+        return MoveNoteKeysTagging(check, findings, tag);
+    }
+
+    private NoteKeyMove MoveNoteKeysTagging(NoteKeyCheck check, IReadOnlyList<NoteKeyFinding> findings, string? tag)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(check);
@@ -1412,7 +1436,7 @@ public sealed class Vault : IDisposable
 
                 foreach (var (entry, writes, notes) in planned)
                 {
-                    _interop.MoveToFields(entry, writes, notes);
+                    _interop.MoveToFields(entry, writes, notes, tag);
                 }
 
                 return new NoteKeyMove(true, [.. planned.Select(plan => plan.Entry)], []);

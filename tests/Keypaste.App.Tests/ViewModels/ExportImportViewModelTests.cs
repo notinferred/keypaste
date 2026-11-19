@@ -111,7 +111,7 @@ public sealed class ExportImportViewModelTests : IDisposable
         Assert.Equal("imported/Work/GitHub (2)", import.Rows[0].Lands);
         Assert.Equal("'GitHub' is already an item there", import.Rows[0].Note);
         Assert.True(import.HasHeld);
-        Assert.Equal("1 name your vault already has", import.HeldLabel);
+        Assert.Equal("3 items to import, 1 duplicate", import.Summary);
         Assert.True(import.KeepHeld);
         Assert.Equal("Import 3 items", import.ConfirmText);
 

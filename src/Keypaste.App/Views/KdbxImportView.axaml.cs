@@ -37,7 +37,7 @@ internal sealed partial class KdbxImportView : UserControl
             if (_watched is not null)
             {
                 _watched.PropertyChanged += OnModelChanged;
-                FocusLater(_watched.IsReadable ? _password : First("ChooseAnother", "ImportConfirm"));
+                FocusLater(_watched.ShowsUnlockForm ? _password : First("ChooseCopy", "ChooseAnother", "ImportConfirm"));
             }
         };
     }
@@ -88,10 +88,16 @@ internal sealed partial class KdbxImportView : UserControl
         }
     }
 
-    /// <summary>Once the password field goes, the keyboard moves to the confirm button rather than out of the dialog.</summary>
+    /// <summary>A choice to copy takes the keyboard to the password; once the password field goes, it moves to the confirm button rather than out of the dialog.</summary>
     private void OnModelChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName != nameof(KdbxImportViewModel.NeedsUnlock) || Model is not { NeedsUnlock: false })
+        if (e.PropertyName == nameof(KdbxImportViewModel.ShowsUnlockForm) && Model is { ShowsUnlockForm: true })
+        {
+            FocusLater(_password);
+            return;
+        }
+
+        if (e.PropertyName is not (nameof(KdbxImportViewModel.NeedsUnlock) or nameof(KdbxImportViewModel.ShowsChoice)) || Model is not { NeedsUnlock: false, ShowsChoice: false })
         {
             return;
         }

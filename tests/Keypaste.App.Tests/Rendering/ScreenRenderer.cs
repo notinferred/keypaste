@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -23,7 +22,6 @@ using Keypaste.Core;
 using Keypaste.Core.Activity;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
-using Keypaste.Core.Clients;
 using Keypaste.Core.Launch;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Tests;
@@ -208,6 +206,7 @@ public sealed class ScreenRenderer
         DrawEnv(demo, output);
         DrawApproval(output);
         DrawComponents(output);
+        DrawComponentStates(output);
         DrawSecrets(demo, output);
         DrawLockAndImport(demo, output);
         DrawPrompts(output);
@@ -282,8 +281,16 @@ public sealed class ScreenRenderer
         vaults.LockAlone(acme);
         clock.Advance(TimeSpan.FromSeconds(1));
         shell.SelectedSidebarRow = shell.SidebarRows.OfType<VaultRow>().Single(row => row.Title == "acme");
-        Assert.IsType<LockedVaultViewModel>(shell.Content);
+        var locked = Assert.IsType<LockedVaultViewModel>(shell.Content).Unlock;
         Save(window, output, "95-vaults-one-locked");
+
+        foreach (var c in "not the password")
+        {
+            locked.Type(c);
+        }
+
+        Wait(locked.UnlockAsync());
+        Save(window, output, "95b-vaults-one-locked-wrong-password");
 
         window.Close();
     }
@@ -869,7 +876,7 @@ public sealed class ScreenRenderer
         await agents.Opening;
         Save(window, output, "24-agents-connect");
         var connecting = agents.Connection!;
-        DrawCheckWorking(window, output, connecting);
+        DrawCheckResults(window, output, connecting);
 
         // With nothing waiting, the open pane's Connect action is the frame's one amber.
         await zed.DisposeAsync();
@@ -904,7 +911,7 @@ public sealed class ScreenRenderer
         var settingsScreen = Assert.IsType<SettingsViewModel>(shell.Content);
         settingsScreen.Section = SettingsSectionChoice.Browser;
         var browserFill = settingsScreen.BrowserFill!;
-        var pairing = new PairingItem("work laptop", "chrome-extension://fipabobollckgdobkjfkkchimlphcicg", "Last used 2 days ago");
+        var pairing = new PairingItem("work laptop", "Chrome", "keypaste's extension from the Chrome Web Store (fipabobollckgdobkjfkkchimlphcicg)", "last used 2 days ago");
         SetDrawnState(browserFill, nameof(browserFill.Rows), new[] { pairing });
         WindowInput.Drain();
         foreach (var toast in shell.Toasts.Shown.ToList())
@@ -952,30 +959,23 @@ public sealed class ScreenRenderer
         Save(window, output, "04-settings-this-vault-change");
         settingsScreen.Access.CloseFormCommand.Execute(null);
 
-        // Agents › What agents get: the username switch and each category's rule, an Allow waiting on its confirmation, and the
-        // notice that the rules on file are ignored.
+        // Agents: the Connect sheet, then an agent's rules with When it asks open on its Change….
         shell.Current = Destinations.Of(DestinationKind.AgentActivity);
         WindowInput.Drain();
         var agentsScreen = Assert.IsType<AgentActivityViewModel>(shell.Content);
-        agentsScreen.AddMcpManuallyCommand.Execute(null);
+        agentsScreen.StartConnectCommand.Execute(null);
         WindowInput.Drain();
         Save(window, output, "02-agents-connections-manual");
-        agentsScreen.Choose(agentsScreen.Rows.Single(row => row.IsEveryOther));
-        WindowInput.Drain();
-        Save(window, output, "02-agents-tab");
-        var rules = agentsScreen.RulesForEveryAgent!;
-        var card = window.GetVisualDescendants().OfType<StackPanel>().First(panel => panel.Name == "AgentRulesCard");
-        scroller = card.GetVisualAncestors().OfType<ScrollViewer>().First();
-        scroller.Offset = new Vector(0, scroller.Offset.Y + card.TranslatePoint(default, scroller)!.Value.Y - 24);
-        WindowInput.Drain();
-        Save(window, output, "04-settings-agent-rules");
-        rules.ChooseCommand.Press(rules.Rows.Single(row => row.Category == Core.Agents.FieldCategory.Password).Choices.Single(choice => choice.Rule == Core.Agents.CategoryRule.Allow));
-        WindowInput.Drain();
-        Save(window, output, "04-settings-agent-rules-allow");
-        rules.CancelGrantCommand.Press();
-        SetDrawnState(rules, nameof(rules.Ignored), "Agent rules and browser fill allowances were changed outside keypaste and are ignored until you set them again. Until then every value is asked about and no agent may run commands.");
-        WindowInput.Drain();
-        Save(window, output, "04-settings-agent-rules-ignored");
+        agentsScreen.CloseSheetCommand.Execute(null);
+
+        if (agentsScreen.Rows.FirstOrDefault(row => row.HasSettings) is { } named)
+        {
+            agentsScreen.Choose(named);
+            WindowInput.Drain();
+            named.Settings?.ExpandCommand.Execute("asks");
+            WindowInput.Drain();
+            Save(window, output, "02-agents-tab");
+        }
 
         window.Close();
     }
@@ -1086,13 +1086,8 @@ public sealed class ScreenRenderer
         WindowInput.Drain();
 
         WindowInput.Drain();
-        window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "EntryMenu").IsChecked = true;
-        Save(window, output, "12-secrets-menu");
-        window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "EntryMenu").IsChecked = false;
-
-        window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "AddEntry").IsChecked = true;
-        Save(window, output, "13i-items-add-menu");
-        window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "AddEntry").IsChecked = false;
+        SaveMenu(window, "EntryMenu", output, "12-secrets-menu");
+        SaveMenu(window, "SidebarNew", output, "13i-items-add-menu");
 
         // On Logins the "+" opens a login's form at once; its tooltip, "New login in acme", is ItemAddMenuTests', since a headless tooltip draws at the window's corner.
         entries.Place = ItemPlace.Logins;
@@ -1112,9 +1107,7 @@ public sealed class ScreenRenderer
         Save(window, output, "13d-secrets-new-720");
         window.Width = newItemWidth;
 
-        window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "AddFieldMenu").IsChecked = true;
-        Save(window, output, "13e-secrets-new-field-options");
-        window.GetVisualDescendants().OfType<ToggleButton>().Single(toggle => toggle.Name == "AddFieldMenu").IsChecked = false;
+        SaveMenu(window, "AddFieldMenu", output, "13e-secrets-new-field-options");
 
         // The username box completes the best username the vault already uses in grey, and Down lists the others.
         var usernameBox = window.GetVisualDescendants().OfType<UsernameBox>().Single(box => box.Name == "NewEntryUsername");
@@ -1223,7 +1216,7 @@ public sealed class ScreenRenderer
         Save(window, output, "18-secrets-delete");
         entries.UndoCommand.Press();
 
-        SetDrawnState(entries, nameof(EntriesViewModel.Error), "That item could not be saved. Unlock the vault, then try again.");
+        SetDrawnState(entries, nameof(EntriesViewModel.Error), "acme.kdbx could not be written: the disk is full.");
         Save(window, output, "18b-items-problem-note");
         SetDrawnState(entries, nameof(EntriesViewModel.Error), null);
 
@@ -1979,19 +1972,15 @@ public sealed class ScreenRenderer
 
         DrawTerms(output);
 
-        // Settings' plain switch, and a waiting report's Delete asking first.
+        // Diagnostics' crash reports switch beside a waiting report, and its Delete asking first.
         var preferences = new DesktopPreferences(empty.Path);
         using var crashes = new CrashReporting(empty.Path, preferences, endpoint: null);
         crashes.Agree(send: true);
         crashes.Crash(new InvalidOperationException("demo"));
-        using var settings = new SettingsViewModel(session, empty.Path, preferences, _ => { }) { Crashes = crashes };
-        var settingsWindow = new MainWindow { Width = _width, Height = 2600 };
-        settingsWindow.FindControl<ContentControl>("Root")!.Content = new SettingsView { DataContext = settings };
-        settingsWindow.Show();
-        Save(settingsWindow, output, "00d-settings-crash-switch-whole");
+        var settingsWindow = new MainWindow { Width = _width, Height = _height };
         var diagnostics = new DiagnosticsViewModel(session, empty.Path, crashes);
         settingsWindow.FindControl<ContentControl>("Root")!.Content = new DiagnosticsView { DataContext = diagnostics };
-        settingsWindow.Height = _height;
+        settingsWindow.Show();
         Save(settingsWindow, output, "95c-diagnostics-report");
         diagnostics.Reports[0].AskDeleteCommand.Press();
         Save(settingsWindow, output, "95c-diagnostics-report-delete");
@@ -2210,7 +2199,7 @@ public sealed class ScreenRenderer
         screen.Reload();
         Save(window, output, "48-env-ignored-tag");
 
-        // A copy of keypaste that does not run as keypaste.app on macOS, whose caption says why Run is off.
+        // A copy of keypaste that does not run as keypaste.app on macOS, whose Run… copies the run command instead.
         using (var copyOnly = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(AppClock.Start), picker: new FakeVaultFilePicker())
         {
             Launching = new ProjectLaunching(new TerminalLaunch(launcher: null), new DetachedProcessLauncher(), EnvironmentMerge.Inherited),
@@ -2220,7 +2209,6 @@ public sealed class ScreenRenderer
             copyOnly.Current = Destinations.Of(DestinationKind.EnvSets);
             ((EnvSetsViewModel)copyOnly.Content!).OpenCommand.Press("acme-api");
             WindowInput.Drain();
-            window.GetVisualDescendants().OfType<TextBlock>().First(text => text.Classes.Contains("caption") && text.IsEffectivelyVisible && text.Text?.Contains("Terminal", StringComparison.OrdinalIgnoreCase) == true).BringIntoView();
             Save(window, output, "49-env-terminal-unavailable");
         }
 
@@ -2453,6 +2441,122 @@ public sealed class ScreenRenderer
         window.Close();
     }
 
+    /// <summary>
+    /// Each shared control in every state it draws, a row a class: rest, pointed, pressed, focused from the keyboard, disabled and busy, so hover and press
+    /// contrast are read from a frame rather than from tokens. A state is set as its pseudo-class; the one control the keyboard holds draws the window's ring.
+    /// </summary>
+    private static void DrawComponentStates(string output)
+    {
+        string[] states = ["", ":pointerover", ":pressed", ":focus-visible", ":disabled", "busy"];
+
+        static Control InState(Control control, string state)
+        {
+            if (state == ":disabled")
+            {
+                control.IsEnabled = false;
+            }
+            else if (state == "busy")
+            {
+                control.Classes.Add("busy");
+                control.IsEnabled = false;
+            }
+            else if (state.Length > 0)
+            {
+                ((IPseudoClasses)control.Classes).Add(state);
+            }
+
+            return control;
+        }
+
+        static Button Button(string classes, object content)
+        {
+            var button = new Button { Content = content };
+            button.Classes.AddRange(classes.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+            return button;
+        }
+
+        static Control Busy(string text) => new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 6,
+            Children = { new KpIcon { Icon = "refresh-cw", Size = 14, Classes = { "spinning" } }, new TextBlock { Text = text } },
+        };
+
+        (string Name, Func<string, Control> Make)[] rows =
+        [
+            ("(base)", state => Button(string.Empty, state == "busy" ? Busy("Checking…") : "Edit")),
+            ("primary", state => Button("primary", state == "busy" ? Busy("Creating link…") : "Copy")),
+            ("ghost", state => Button("ghost", "Cancel")),
+            ("danger", state => Button("danger", "Delete for good")),
+            ("danger sm", state => Button("danger sm", "Revoke")),
+            ("link", state => Button("link", "Learn more")),
+            ("icon", state => Button("icon ghost", new KpIcon { Icon = "star", Size = 16 })),
+            ("icon sm", state => Button("icon ghost sm", new KpIcon { Icon = "eye", Size = 14 })),
+            ("more", state => Button("more", new KpIcon { Icon = "ellipsis", Size = 16 })),
+            ("sm / lg", state => new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { InState(Button("sm", "Small"), state), InState(Button("lg primary", "Large"), state) } }),
+            ("segment", state => new Border { Classes = { "segmented" }, Child = new StackPanel { Orientation = Orientation.Horizontal, Children = { new RadioButton { Content = "All", IsChecked = true, Classes = { "segment" } }, InState(new RadioButton { Content = "You", Classes = { "segment" } }, state) } } }),
+            ("switch", state => new ToggleSwitch { IsChecked = true }),
+            ("checkbox", state => new CheckBox { IsChecked = true, Content = "Digits" }),
+            ("radio", state => new RadioButton { IsChecked = true, Content = "Keep it" }),
+            ("list row", state => new ListBox { Classes = { "nav" }, Width = 140, ItemsSource = new[] { "All items" } }),
+            ("menu item", state => new MenuItem { Header = "Rename…", Width = 140 }),
+        ];
+
+        var grid = new Grid { Margin = new Thickness(32, 28), ColumnSpacing = 16, RowSpacing = 12 };
+        grid.ColumnDefinitions.Add(new ColumnDefinition(96, GridUnitType.Pixel));
+
+        foreach (var state in states)
+        {
+            grid.ColumnDefinitions.Add(new ColumnDefinition(150, GridUnitType.Pixel));
+        }
+
+        grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+
+        foreach (var (state, column) in states.Select((state, index) => (state, index + 1)))
+        {
+            var head = new TextBlock { Text = state.Length == 0 ? "rest" : state.TrimStart(':'), Classes = { "th" } };
+            Grid.SetColumn(head, column);
+            grid.Children.Add(head);
+        }
+
+        foreach (var ((name, make), row) in rows.Select((entry, index) => (entry, index + 1)))
+        {
+            grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            var label = new TextBlock { Text = name, Classes = { "mono", "muted" }, VerticalAlignment = VerticalAlignment.Center };
+            Grid.SetRow(label, row);
+            grid.Children.Add(label);
+
+            foreach (var (state, column) in states.Select((state, index) => (state, index + 1)))
+            {
+                var control = make(state);
+
+                if (state == "busy" && control is not Avalonia.Controls.Button)
+                {
+                    continue;
+                }
+
+                var cell = control is StackPanel or Border || (control is ListBox && state != ":disabled") ? control : InState(control, state);
+                cell.HorizontalAlignment = HorizontalAlignment.Left;
+                cell.VerticalAlignment = VerticalAlignment.Center;
+                Grid.SetRow(cell, row);
+                Grid.SetColumn(cell, column);
+                grid.Children.Add(cell);
+            }
+        }
+
+        var window = new Window { Width = _width * InterfaceZoom.Factor, Height = 900 * InterfaceZoom.Factor, Content = new ZoomFrame(new ScrollViewer { Content = grid }) };
+        window.Show();
+        WindowInput.Drain();
+
+        foreach (var list in grid.Children.OfType<ListBox>().Where(list => states[Grid.GetColumn(list) - 1] is ":pointerover" or ":pressed" or ":focus-visible"))
+        {
+            ((IPseudoClasses)list.ContainerFromIndex(0)!.Classes).Add(states[Grid.GetColumn(list) - 1]);
+        }
+
+        Save(window, output, "92b-component-states", sheet: true);
+        window.Close();
+    }
+
     /// <summary>A table sorted by its second head with its first edge moved, narrow and then wide, then with the head and the edge in focus, then by its last head, then with every edge at its least.</summary>
     private static void SaveSorted(Window window, ShellViewModel shell, string screen, string output)
     {
@@ -2506,6 +2610,16 @@ public sealed class ScreenRenderer
         table.Reset();
     }
 
+    /// <summary>A button's menu open, as the window draws it and as the menu's own window does.</summary>
+    private static void SaveMenu(Window window, string button, string output, string name)
+    {
+        var (menu, drawn) = Menus.Open(window.GetVisualDescendants().OfType<Button>().Single(control => control.Name == button));
+        Save(window, output, name);
+        Save(drawn, output, $"{name}-popup");
+        menu.Hide();
+        WindowInput.Drain();
+    }
+
     /// <param name="window">The window to draw.</param>
     /// <param name="output">The folder.</param>
     /// <param name="name">The file's name.</param>
@@ -2534,24 +2648,16 @@ public sealed class ScreenRenderer
     private static void SetDrawnState(object model, string property, object? value) =>
         model.GetType().GetProperty(property, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(model, value);
 
-    private static void DrawCheckWorking(Window window, string output, ConnectClientViewModel pane)
+    // The check runs silently after connecting, so a frame draws the one line it ends with.
+    private static void DrawCheckResults(Window window, string output, ConnectClientViewModel pane)
     {
-        const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
-        var starting = typeof(ConnectClientViewModel).GetMethod("SetStartingCheck", Private)!;
-        var setCheck = typeof(ConnectClientViewModel).GetMethod("SetCheck", Private)!;
+        SetDrawnState(pane, nameof(pane.Reaches), true);
+        SetDrawnState(pane, nameof(pane.CheckMessage), "Cursor can reach keypaste.");
+        Save(window, output, "24b-agents-connect-reaches");
 
-        SetDrawnState(pane, nameof(pane.CheckMessage), "Starting keypaste mcp as Cursor would…");
-        starting.Invoke(pane, [true]);
-        Save(window, output, "24b-agents-connect-checking");
-        starting.Invoke(pane, [false]);
-
-        // Not a bridge that could run: the view reads only that a check is held, and it is let go below without being disposed.
-        typeof(ConnectClientViewModel).GetField("_checkEntries", Private)!.SetValue(pane, new McpListedEntry[] { new("1", "env/ci/DEPLOY_KEY", "value"), new("2", "env/ci/OTHER", "value") });
-        setCheck.Invoke(pane, [RuntimeHelpers.GetUninitializedObject(typeof(McpConnectionCheck))]);
-        SetDrawnState(pane, nameof(pane.CheckMessage), "keypaste mcp lists 2 items. Pick the one to ask for.");
-        Save(window, output, "24c-agents-connect-picking");
-        typeof(ConnectClientViewModel).GetField("_checkEntries", Private)!.SetValue(pane, Array.Empty<McpListedEntry>());
-        setCheck.Invoke(pane, [null]);
+        SetDrawnState(pane, nameof(pane.Reaches), false);
+        SetDrawnState(pane, nameof(pane.CheckMessage), "Cursor can't reach keypaste: the vault is locked. Add it again, then restart Cursor.");
+        Save(window, output, "24c-agents-connect-unreachable");
         SetDrawnState(pane, nameof(pane.CheckMessage), string.Empty);
     }
 

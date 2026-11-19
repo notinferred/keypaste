@@ -270,7 +270,7 @@ public sealed class SameNameItemsTests : IDisposable
         context.Entries.DeleteCommand.Press();
 
         Assert.Null(context.Entries.Error);
-        Assert.Contains($"services/Mail ({username})", context.Entries.Notice, StringComparison.Ordinal);
+        Assert.Equal($"Moved Mail ({username}) to Trash", context.Entries.Notice);
         Assert.Equal(other, context.Entries.Rows.Single(row => row.GroupPath == "services" && row.Title == "Mail").Username);
         Assert.Equal(other + "-password", Saved(other).Password);
 
@@ -334,7 +334,7 @@ public sealed class SameNameItemsTests : IDisposable
             context.Open(username);
             context.Entries.DeleteCommand.Press();
 
-            Assert.Equal($"Delete services/Mail ({username})? There is no undo.", context.Entries.DeletePrompt);
+            Assert.Equal($"Delete Mail ({username}) for good?", context.Entries.DeletePrompt);
 
             context.Entries.ConfirmDeleteCommand.Press();
 
@@ -374,7 +374,7 @@ public sealed class SameNameItemsTests : IDisposable
 
         var row = Assert.Single(context.Entries.Rows);
         Assert.Equal("alice", row.Username);
-        Assert.Equal("username", row.Why);
+        Assert.Equal("alice", row.SecondLine);
     }
 
     [Fact]
@@ -605,7 +605,7 @@ public sealed class SameNameItemsTests : IDisposable
         Assert.True(context.Entries.OrganizeCommand.CanExecute(null));
 
         context.Entries.DeleteCommand.Press();
-        Assert.Equal("Delete the open item, services/Pair? Another item has this name. There is no undo.", context.Entries.DeletePrompt);
+        Assert.Equal("Delete Pair for good?", context.Entries.DeletePrompt);
         context.Entries.CancelDeleteCommand.Press();
 
         Assert.Equal("services/Pair", context.Entries.Selected!.DisplayPath);
@@ -690,7 +690,7 @@ public sealed class SameNameItemsTests : IDisposable
         using var shell = new ShellViewModel(session, home, authority: null, clock: new ManualClock(AppClock.Start), post: null);
         await shell.Recommendations.Checking;
 
-        RecommendationRow Row(string who) => shell.Recommendations.Rows.Single(row => row.Entry == $"services/Mail ({who})");
+        RecommendationRow Row(string who) => shell.Recommendations.Rows.Single(row => row.Entry == $"Mail ({who})");
 
         Row(username).DismissCommand.Press();
 
@@ -699,7 +699,7 @@ public sealed class SameNameItemsTests : IDisposable
 
         Row(other).MoveCommand.Press();
 
-        Assert.Contains($"services/Mail ({other})", shell.Recommendations.Message, StringComparison.Ordinal);
+        Assert.Contains($"Mail ({other})", shell.Recommendations.Message, StringComparison.Ordinal);
         Assert.Empty(session.Unlocked!.Fields(Named(session.Unlocked, username))!);
         Assert.Single(session.Unlocked.Fields(Named(session.Unlocked, other))!);
     }

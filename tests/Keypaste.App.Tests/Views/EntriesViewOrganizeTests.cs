@@ -3,6 +3,7 @@ using Avalonia.VisualTree;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
+using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
@@ -103,11 +104,9 @@ public sealed class EntriesViewOrganizeTests : IDisposable
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "production");
         window.UpdateLayout();
 
-        var button = Named<Button>(window, "OrganizeFromPane");
-        Assert.NotNull(button);
         Assert.False(context.Entries.IsOrganizing);
 
-        button!.Command!.Press(button.CommandParameter);
+        PressInPaneMenu(window, "OrganizeFromPane");
 
         Assert.True(context.Entries.IsOrganizing);
     });
@@ -122,12 +121,19 @@ public sealed class EntriesViewOrganizeTests : IDisposable
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "production");
         window.UpdateLayout();
 
-        var button = Named<Button>(window, "DuplicateEntry")!;
-        button.Command!.Press(button.CommandParameter);
+        PressInPaneMenu(window, "DuplicateEntry");
 
         Assert.Null(context.Entries.Error);
         Assert.Equal(new EntryName("servers", "production (copy)"), context.Entries.Selected?.Name);
     });
+
+    private static void PressInPaneMenu(Window window, string name)
+    {
+        var (menu, _) = Menus.Open(Named<Button>(window, "EntryMenu")!);
+        var item = Menus.Item(menu, name);
+        item.Command!.Press(item.CommandParameter);
+        menu.Hide();
+    }
 
     private static T? Named<T>(Window window, string name)
         where T : Control =>

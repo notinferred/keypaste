@@ -9,9 +9,5 @@ internal static class ShortcutText
     public static string IdleLock =>
         $"Counted from the last key or click. A machine that sleeps for longer than this wakes locked. {Chord("L")} locks now.";
 
-    public static string PastePassword => $"Type it or press {Chord("V")} to paste. Leave it empty for an item with no password.";
-
-    public static string PasteProtected => $"A protected field is masked in KeePassXC too. Type the value or press {Chord("V")} to paste.";
-
     public static string Paste => $"Type it or press {Chord("V")} to paste.";
 }

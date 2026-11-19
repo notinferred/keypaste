@@ -128,7 +128,7 @@ public static class FieldCategories
         FieldCategory.ProjectVariable => "project variables",
         FieldCategory.Card => "card values",
         FieldCategory.Identity => "identity values",
-        FieldCategory.Totp => "TOTP codes",
+        FieldCategory.Totp => "one-time codes",
         FieldCategory.Notes => "notes",
         FieldCategory.Attachment => "attachments",
         _ => "passkeys",
@@ -136,7 +136,7 @@ public static class FieldCategories
 
     /// <summary>One value of the category, as a sentence about each of them names it.</summary>
     /// <param name="category">The category.</param>
-    /// <returns>Its name in the singular, lower-case but for TOTP.</returns>
+    /// <returns>Its name in the singular, lower-case but for URL.</returns>
     public static string One(FieldCategory category) => category switch
     {
         FieldCategory.Url => "URL",
@@ -146,7 +146,7 @@ public static class FieldCategories
         FieldCategory.ProjectVariable => "project variable",
         FieldCategory.Card => "card value",
         FieldCategory.Identity => "identity value",
-        FieldCategory.Totp => "TOTP code",
+        FieldCategory.Totp => "one-time code",
         FieldCategory.Notes => "notes",
         FieldCategory.Attachment => "attachment",
         _ => "passkey",

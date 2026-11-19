@@ -1,27 +1,41 @@
+using Keypaste.App.Resources;
 using Keypaste.Core;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 
 namespace Keypaste.App.ViewModels;
 
-/// <summary>One choice a setting offers on an agent's settings panel; the one that holds is checked.</summary>
+/// <summary>Which kinds of value a rule's words speak for.</summary>
+internal enum RuleScope
+{
+    /// <summary>Every kind of value.</summary>
+    EveryKind,
+
+    /// <summary>Every kind not named before it.</summary>
+    TheRest,
+
+    /// <summary>What the default gives.</summary>
+    Default,
+}
+
+/// <summary>One choice a setting offers on an agent's settings; the one that holds is raised.</summary>
 /// <param name="Setting">What it sets: <c>run</c>.</param>
 /// <param name="Word">Its word as <c>keypaste clients</c> spells it.</param>
-/// <param name="Words">What the panel says.</param>
+/// <param name="Words">What the segment says.</param>
 /// <param name="IsChosen">Whether it holds now.</param>
 internal sealed record SettingChoice(string Setting, string Word, string Words, bool IsChosen);
 
-/// <summary>One of a category's choices for one agent; the one that holds is checked.</summary>
+/// <summary>One of a category's choices for one agent; the one that holds is raised.</summary>
 /// <param name="Category">The category it sets.</param>
-/// <param name="Rule">The agent's own rule, or null for what Settings sets.</param>
+/// <param name="Rule">The agent's own rule, or null for the default.</param>
 /// <param name="Words">What the segment says.</param>
 /// <param name="IsChosen">Whether it holds now.</param>
 internal sealed record AgentCategoryChoice(FieldCategory Category, CategoryRule? Rule, string Words, bool IsChosen);
 
-/// <summary>One category's row for one agent: its name, what Settings gives every agent, and the agent's choices.</summary>
+/// <summary>One category's row for one agent: its name and the agent's choices.</summary>
 /// <param name="Category">The category.</param>
 /// <param name="Name">Its name as the row shows it.</param>
-/// <param name="Choices">As in Settings, Ask, Allow and Block.</param>
+/// <param name="Choices">Default, Ask, Allow and Block.</param>
 internal sealed record AgentCategoryRow(FieldCategory Category, string Name, IReadOnlyList<AgentCategoryChoice> Choices);
 
 /// <summary>An answer keypaste remembers for this agent, as its row says it, with what Remove forgets.</summary>
@@ -30,12 +44,12 @@ internal sealed record AgentCategoryRow(FieldCategory Category, string Name, IRe
 internal sealed record RememberedRow(string Text, Func<AgentRules, AgentRules> Forget);
 
 /// <summary>
-/// One agent's settings, on the panel the Agents screen opens from its card: whether it may ask to run commands, its own
-/// rule for any category in place of Settings', and the answers a person told keypaste to remember for it, each with Remove.
+/// One agent's rules in its detail on Agents, as summary rows each opening its own Change…: what it gets when it asks,
+/// whether it may ask to run commands, and the answers a person told keypaste to remember for it, each with Remove.
 /// </summary>
 /// <remarks>
 /// Kept in this computer's <c>agents.toml</c>, sealed with the vault's key by the authority that answers agents. Turning run
-/// on releases nothing unasked, since every run is asked, so the change is made at once; so do Ask, Block, As in Settings
+/// on releases nothing unasked, since every run is asked, so the change is made at once; so do Ask, Block, Default
 /// and Remove. Allow takes the person's confirmation first, since it releases values nobody is asked about.
 /// </remarks>
 internal sealed partial class AgentSettingsViewModel : ObservableObject, IDisposable
@@ -51,8 +65,9 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
 
     /// <param name="authority">The authority that answers agents, which reads and seals the rules.</param>
     /// <param name="agent">The agent's name.</param>
+    /// <param name="title">What its sentences call it: its tool's name, else its own.</param>
     /// <param name="changed">Called after each change, so the screen around the panel reads again.</param>
-    internal AgentSettingsViewModel(Session.AppAuthority authority, string agent, Action? changed = null)
+    internal AgentSettingsViewModel(Session.AppAuthority authority, string agent, string? title = null, Action? changed = null)
     {
         ArgumentNullException.ThrowIfNull(authority);
         ArgumentNullException.ThrowIfNull(agent);
@@ -60,6 +75,7 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         _authority = authority;
         _changed = changed;
         Agent = agent;
+        Shown = EntryNameSanitizer.Sanitize(title ?? agent, AgentNames.MaximumLength).Text;
         ChooseCommand = new RelayCommand<SettingChoice>(choice => Choose(choice!), choice => choice is not null && HasRules);
         ChooseCategoryCommand = new RelayCommand<AgentCategoryChoice>(choice => Choose(choice!), choice => choice is not null && HasRules);
         ConfirmAllowCommand = new RelayCommand(ConfirmAllow);
@@ -72,10 +88,8 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
     /// <summary>The agent's name.</summary>
     internal string Agent { get; }
 
-    private string Shown => EntryNameSanitizer.Sanitize(Agent, AgentNames.MaximumLength).Text;
-
-    /// <summary>The agent's name as the panel shows it.</summary>
-    internal string Identity => $"{Shown} gets each kind of value as Settings sets for every agent, unless a row here sets its own. An answer you told keypaste to remember for one item decides before either.";
+    /// <summary>What the sentences call it.</summary>
+    internal string Shown { get; }
 
     /// <summary>Run's two choices.</summary>
     internal IReadOnlyList<SettingChoice> RunChoices
@@ -100,11 +114,50 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
             if (SetProperty(ref _remembered, value))
             {
                 OnPropertyChanged(nameof(HasRemembered));
+                OnPropertyChanged(nameof(RememberedCount));
             }
         }
     }
 
     internal bool HasRemembered => Remembered.Count > 0;
+
+    /// <summary>How many answers are remembered, as the Always answers row says it.</summary>
+    internal string RememberedCount => Remembered.Count.ToString(System.Globalization.CultureInfo.CurrentCulture);
+
+    /// <summary>What it gets when it asks, in a line: the rule most kinds follow, each kind that differs, and whether all of it is the default.</summary>
+    [ObservableProperty]
+    internal partial string AsksSummary { get; private set; } = "—";
+
+    /// <summary>Whether it may ask to run commands, in a word.</summary>
+    [ObservableProperty]
+    internal partial string RunSummary { get; private set; } = "—";
+
+    /// <summary>Which summary row's Change… is open: <c>asks</c>, <c>run</c>, <c>answers</c>, or null.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ChangesAsks), nameof(ChangesRun), nameof(ChangesAnswers))]
+    internal partial string? Changing { get; private set; }
+
+    internal bool ChangesAsks => Changing == "asks";
+
+    internal bool ChangesRun => Changing == _run;
+
+    internal bool ChangesAnswers => Changing == "answers";
+
+    /// <summary>Opens one summary row's choices, or closes them when they are open.</summary>
+    [RelayCommand]
+    private void Expand(string what)
+    {
+        Confirming = null;
+        Changing = Changing == what ? null : what;
+    }
+
+    /// <summary>Closes the open choices.</summary>
+    [RelayCommand]
+    private void Done()
+    {
+        Confirming = null;
+        Changing = null;
+    }
 
     /// <summary>Why the rules cannot be read, or empty.</summary>
     [ObservableProperty]
@@ -171,13 +224,17 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
             RunChoices = [];
             Rows = [];
             Remembered = [];
+            AsksSummary = "—";
+            RunSummary = "—";
+            Changing = null;
             Notify();
             return;
         }
 
         Problem = string.Empty;
         var runs = rules.Runs(Agent);
-        List<SettingChoice> choices = [new SettingChoice(_run, "off", "Off", !runs), new SettingChoice(_run, "on", "On", runs)];
+        List<SettingChoice> choices = [new SettingChoice(_run, "off", Strings.Off, !runs), new SettingChoice(_run, "on", Strings.On, runs)];
+        RunSummary = runs ? Strings.On : Strings.Off;
 
         // Each kept when unchanged, so a refresh rebuilds no segment and the keyboard stays where it was.
         if (!choices.SequenceEqual(RunChoices))
@@ -192,6 +249,8 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
             Rows = rows;
         }
 
+        AsksSummary = Summarize(rules);
+
         Remembered =
         [
             .. rules.Answers.Where(answer => answer.Agent == Agent).Select(answer => new RememberedRow(
@@ -202,7 +261,26 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
                 held => held.Forgetting(pick))),
         ];
 
+        if (ChangesAnswers && !HasRemembered)
+        {
+            Changing = null;
+        }
+
         Notify();
+    }
+
+    /// <summary>The rule most kinds follow, each kind that differs by name, and "(default)" while none is the agent's own.</summary>
+    private string Summarize(AgentRules rules)
+    {
+        var held = FieldCategories.Ruled.Select(category => (Category: category, Rule: rules.RuleFor(Agent, category) ?? rules.RuleFor(category))).ToList();
+        var most = held.GroupBy(pair => pair.Rule).OrderByDescending(group => group.Count()).First().Key;
+        var others = held.Where(pair => pair.Rule != most).Select(pair => $"{Capitalized(FieldCategories.Shown(pair.Category))}: {Word(pair.Rule)}").ToList();
+        var said = others.Count == 0
+            ? UseText.RuleFor(RuleScope.EveryKind, Word(most))
+            : string.Join(" · ", others.Append(UseText.RuleFor(RuleScope.TheRest, Word(most))));
+        var own = FieldCategories.Ruled.Any(category => rules.RuleFor(Agent, category) is not null);
+
+        return own ? said : $"{said} {Strings.DefaultMark}";
     }
 
     private void Notify()
@@ -218,26 +296,23 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
         ? $"attachment {EntryNameSanitizer.Sanitize(field[(CredentialFields.Attachment.Length + 1)..]).Text}"
         : EntryNameSanitizer.Sanitize(field).Text;
 
-    private static AgentCategoryRow Row(FieldCategory category, CategoryRule every, CategoryRule? own)
-    {
-        var shown = FieldCategories.Shown(category);
+    private static string Capitalized(string shown) => char.ToUpperInvariant(shown[0]) + shown[1..];
 
-        return new AgentCategoryRow(
-            category,
-            char.ToUpperInvariant(shown[0]) + shown[1..],
-            [
-                new AgentCategoryChoice(category, null, $"As in Settings ({Word(every)})", own is null),
-                new AgentCategoryChoice(category, CategoryRule.Ask, "Ask", own == CategoryRule.Ask),
-                new AgentCategoryChoice(category, CategoryRule.Allow, "Allow", own == CategoryRule.Allow),
-                new AgentCategoryChoice(category, CategoryRule.Block, "Block", own == CategoryRule.Block),
-            ]);
-    }
+    private static AgentCategoryRow Row(FieldCategory category, CategoryRule every, CategoryRule? own) => new(
+        category,
+        Capitalized(FieldCategories.Shown(category)),
+        [
+            new AgentCategoryChoice(category, null, UseText.RuleFor(RuleScope.Default, Word(every)), own is null),
+            new AgentCategoryChoice(category, CategoryRule.Ask, Strings.Ask, own == CategoryRule.Ask),
+            new AgentCategoryChoice(category, CategoryRule.Allow, Strings.Allow, own == CategoryRule.Allow),
+            new AgentCategoryChoice(category, CategoryRule.Block, Strings.Block, own == CategoryRule.Block),
+        ]);
 
     private static string Word(CategoryRule rule) => rule switch
     {
-        CategoryRule.Allow => "allow",
-        CategoryRule.Block => "block",
-        _ => "ask",
+        CategoryRule.Allow => Strings.Allow,
+        CategoryRule.Block => Strings.Block,
+        _ => Strings.Ask,
     };
 
     private void Choose(SettingChoice choice)
@@ -276,7 +351,7 @@ internal sealed partial class AgentSettingsViewModel : ObservableObject, IDispos
             {
                 CategoryRule.Block => $"{Shown} is refused {shown} without you being asked.",
                 CategoryRule.Ask => $"You're asked before {Shown} gets {shown}.",
-                _ => $"{Shown} gets {shown} as Settings sets for every agent.",
+                _ => $"{Shown} gets {shown} as the default says.",
             });
     }
 

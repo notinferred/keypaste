@@ -6,7 +6,11 @@ namespace Keypaste.App.ViewModels;
 /// <param name="Name">The variable's name.</param>
 /// <param name="Source">The item and field its value comes from.</param>
 /// <param name="ChangesHowProgramsStart">Whether setting it changes how programs start, such as <c>NODE_OPTIONS</c>.</param>
-internal sealed record RunVariableRow(string Name, string Source, bool ChangesHowProgramsStart);
+internal sealed record RunVariableRow(string Name, string Source, bool ChangesHowProgramsStart)
+{
+    /// <summary>What pointing at its chip says: the whole name and where its value comes from.</summary>
+    internal string Tip => $"{Name} from {Source}";
+}
 
 /// <summary>An agent's request to run a command with secrets in its environment, asked every time with Allow once only (THREATS.md T-35).</summary>
 internal sealed class RunApprovalViewModel : PromptViewModel
@@ -37,6 +41,8 @@ internal sealed class RunApprovalViewModel : PromptViewModel
             [var one] => $"{one} changes how programs start.",
             var several => $"{string.Join(", ", several)} change how programs start.",
         };
+        Named = ShortCommand(prompt.Command);
+        Values = CountOfValues(Variables.Count);
         Reason = prompt.Reason;
         Scrubbed = prompt.ReasonWasAltered ? "The reason is not what the agent sent: it was scrubbed." : string.Empty;
         Truncation = prompt.ReasonWasTruncated ? "Cut short: the full text is hashed in the audit log." : string.Empty;
@@ -76,7 +82,10 @@ internal sealed class RunApprovalViewModel : PromptViewModel
     internal string Reason { get; }
 
     /// <summary>Whose words the quote is.</summary>
-    internal string SaysLabel => ApprovalViewModel.Says(Agent);
+    internal string SaysLabel => ApprovalViewModel.Says(Agent, Scrubbed, Truncation);
+
+    /// <summary>What keypaste altered or cut in the quote, or null.</summary>
+    internal string? QuoteNote => ApprovalViewModel.NoteOn(Scrubbed, Truncation);
 
     /// <summary>The agent's words, quoted.</summary>
     internal string Quoted => ApprovalViewModel.Quote(Reason);
@@ -85,7 +94,30 @@ internal sealed class RunApprovalViewModel : PromptViewModel
 
     internal string Truncation { get; }
 
+    /// <summary>The command as the consequence names it, cut so it never wraps a line; the block holds all of it.</summary>
+    internal string Named { get; }
+
+    /// <summary>How many values the command gets, in words.</summary>
+    internal string Values { get; }
+
     /// <summary>What allowing does, in one plain line.</summary>
-    internal string Consequence { get; } =
-        "The command can read these values; keypaste removes them from its output. Allow only a command you would run yourself.";
+    internal string Consequence => $"{Named} gets {Values} in its environment; keypaste removes {(Variables.Count == 1 ? "it" : "them")} from its output.";
+
+    /// <summary>What the person checks before allowing, on its own line.</summary>
+    internal string Warning { get; } = "Allow only a command you would run yourself.";
+
+    /// <summary>The longest command a question or consequence names.</summary>
+    internal const int CommandLength = 24;
+
+    /// <summary>A command as a sentence names it, cut to <see cref="CommandLength"/> characters: whatever sent it chose its length.</summary>
+    internal static string ShortCommand(string command) =>
+        command.Length > CommandLength ? string.Concat(command.AsSpan(0, CommandLength - 1), "\u2026") : command;
+
+    /// <summary>A count of values in words: <c>no values</c>, <c>1 value</c>, <c>3 values</c>.</summary>
+    internal static string CountOfValues(int count) => count switch
+    {
+        0 => "no values",
+        1 => "1 value",
+        _ => string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{count} values"),
+    };
 }

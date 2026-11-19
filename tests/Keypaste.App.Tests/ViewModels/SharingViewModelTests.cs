@@ -137,11 +137,11 @@ public sealed class SharingViewModelTests : IDisposable
         var row = Assert.Single(screen.Rows);
         Assert.Equal(id, row.Id);
         Assert.Equal("env/acme-api/STRIPE_KEY", row.What);
-        Assert.Equal("sam@acme.dev · 3 views · 24h", row.Detail);
+        Assert.Equal("For sam@acme.dev · 3 views · 24 hours", row.Detail);
         Assert.Equal("Not opened yet", row.Status);
         Assert.Equal(ShareStatusTone.Ok, row.StatusTone);
-        Assert.False(screen.HasUnchecked);
-        Assert.Equal("Revoke", row.RevokeLabel);
+        Assert.StartsWith("Status checked ", screen.CheckedText, StringComparison.Ordinal);
+        Assert.Equal("Revoke…", row.RevokeLabel);
         Assert.DoesNotContain(key, row.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain(_toasts, toast => toast.Contains(key, StringComparison.Ordinal));
     }
@@ -167,7 +167,7 @@ public sealed class SharingViewModelTests : IDisposable
         Assert.Null(screen.Error);
         Assert.True(ShareLink.TryParse(_clipboard.Content!, out var id, out var key));
         Assert.True(ShareCrypto.TryOpen(_server.Shares[id].Envelope, key, "a long enough passphrase", out _, out _));
-        Assert.Contains("passphrase", Assert.Single(screen.Rows).Rule, StringComparison.Ordinal);
+        Assert.EndsWith(" · needs a passphrase", Assert.Single(screen.Rows).Detail, StringComparison.Ordinal);
         Assert.False(screen.Passphrase.HasValue);
     }
 
@@ -379,7 +379,7 @@ public sealed class SharingViewModelTests : IDisposable
         var row = Assert.Single(screen.Rows);
         Assert.Equal("1 of 3 views used", row.Status);
         Assert.Equal(ShareStatusTone.Info, row.StatusTone);
-        Assert.Equal("Revoke", row.RevokeLabel);
+        Assert.Equal("Revoke…", row.RevokeLabel);
     }
 
     [Fact]
@@ -396,9 +396,8 @@ public sealed class SharingViewModelTests : IDisposable
         await Until(() => screen.Rows.Count == 1);
 
         Assert.Equal(asked, _server.Requests.Count);
-        Assert.Equal("Not checked", screen.Rows[0].Status);
-        Assert.Equal(ShareStatusTone.Muted, screen.Rows[0].StatusTone);
-        Assert.True(screen.HasUnchecked);
+        Assert.Empty(screen.Rows[0].Status);
+        Assert.Equal("Not checked yet", screen.CheckedText);
     }
 
     [Fact]
@@ -431,7 +430,7 @@ public sealed class SharingViewModelTests : IDisposable
         var secondRow = screen.Rows.Single(row => row.Id == secondId);
         Assert.Equal("services/Mail (alice)", firstRow.What);
         Assert.Equal("services/Mail (bob)", secondRow.What);
-        Assert.Equal("Revoke the link to services/Mail (bob)? It stops opening for good.", secondRow.ConfirmText);
+        Assert.Equal("Revoke the link to services/Mail (bob)? It stops working for good.", secondRow.ConfirmText);
 
         screen.Selected = secondRow;
         await screen.RevokeCommand.PressAsync();

@@ -24,15 +24,15 @@
        in a block of fixed height that wraps and scrolls, and the agent's words in a box of fixed height, so nothing an agent
        sends moves the question or the buttons (THREATS.md T-2, T-35). Return presses the primary only once it is armed; Escape denies. -->
 
-  <Border Classes="claim">
+  <Border Classes="claim" Classes.arming="{Binding IsArming}">
     <StackPanel>
       <StackPanel Classes="claim-body">
         <TextBlock Classes="live" ctl:Announcer.Says="{Binding Opening}" />
         <views:PromptHead />
 
-        <TextBlock Name="TitleText" Classes="claim-title size-16" Text="{Binding Title}" />
+        <TextBlock Name="TitleText" Classes="claim-title size-15" Text="{Binding Title}" />
 
-        <Border Classes="claim-block" Height="148">
+        <Border Classes="claim-block" Height="128">
           <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="8">
               <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
@@ -40,7 +40,7 @@
                 <TextBlock Grid.Column="1" Name="CommandText" Classes="mono" Text="{Binding Command}" TextWrapping="Wrap" />
               </Grid>
               <StackPanel Spacing="6">
-                <TextBlock Classes="claim-line size-12-5" Text="It can read:" />
+                <TextBlock Classes="claim-line size-13" Text="It can read:" />
                 <ItemsControl Name="VariablesList" ItemsSource="{Binding Variables}">
                   <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -49,56 +49,54 @@
                   </ItemsControl.ItemsPanel>
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:RunVariableRow">
-                      <Border Classes="claim-chip" ToolTip.Tip="{Binding Source}">
-                        <TextBlock Classes="mono size-12" Text="{Binding Name}" TextWrapping="Wrap" />
+                      <Border Classes="claim-chip" ToolTip.Tip="{Binding Tip}" AutomationProperties.Name="{Binding Name}">
+                        <TextBlock Classes="mono size-12" Text="{Binding Name}" />
                       </Border>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
                 <StackPanel Orientation="Horizontal" Spacing="6"
                             IsVisible="{Binding StartWarning, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                  <ctl:KpIcon Icon="alert-triangle" Size="14" Foreground="{DynamicResource KpWarn}" VerticalAlignment="Center" />
-                  <TextBlock Name="StartWarningText" Classes="claim-line size-12-5" Text="{Binding StartWarning}" />
+                  <ctl:KpIcon Classes="claim-warn" Icon="alert-triangle" Size="14" />
+                  <TextBlock Name="StartWarningText" Classes="claim-line size-13" Text="{Binding StartWarning}" />
                 </StackPanel>
               </StackPanel>
               <Grid ColumnDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="6">
                 <ctl:KpIcon Classes="claim-muted" Icon="folder" Size="14" VerticalAlignment="Top" />
                 <TextBlock Grid.Column="1" Name="DirectoryText" Classes="mono" Text="{Binding Directory}" MaxWidth="240" TextWrapping="Wrap" Foreground="{DynamicResource KpTextMuted}" />
-                <TextBlock Grid.Column="2" Classes="claim-muted size-12-5" Text="&#x00B7;" VerticalAlignment="Top" />
-                <TextBlock Grid.Column="3" Name="ProfileText" Classes="claim-agent size-12-5" Text="{Binding Profile}" VerticalAlignment="Top" />
+                <TextBlock Grid.Column="2" Classes="claim-muted size-13" Text="&#x00B7;" VerticalAlignment="Top" />
+                <TextBlock Grid.Column="3" Name="ProfileText" Classes="claim-agent size-13" Text="{Binding Profile}" VerticalAlignment="Top" />
               </Grid>
             </StackPanel>
           </ScrollViewer>
         </Border>
 
           <StackPanel Spacing="4">
-            <TextBlock Classes="claim-label size-11" Text="{Binding SaysLabel}" />
+            <TextBlock Name="SaysText" Classes="claim-label size-11" Text="{Binding SaysLabel}" Background="Transparent" ToolTip.Tip="{Binding QuoteNote}" />
             <Border Classes="claim-quote">
               <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                 <DockPanel Classes="claim-quote-text">
                   <Border Classes="claim-quote-bar" />
-                  <StackPanel Spacing="4">
-                    <TextBlock Name="ScrubbedText" Classes="claim-muted size-12-5" Text="{Binding Scrubbed}"
-                               IsVisible="{Binding Scrubbed, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                    <TextBlock Classes="claim-muted size-12-5" Text="{Binding Truncation}"
-                               IsVisible="{Binding Truncation, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                    <TextBlock Name="ReasonText" Classes="size-13" Text="{Binding Quoted}" />
-                  </StackPanel>
+                  <TextBlock Name="ReasonText" Classes="size-13" Text="{Binding Quoted}" />
                 </DockPanel>
               </ScrollViewer>
             </Border>
           </StackPanel>
 
-        <TextBlock Name="ConsequenceText" Classes="claim-line size-12-5" Text="{Binding Consequence}" />
+        <TextBlock Name="ConsequenceText" Classes="claim-line size-13" Text="{Binding Consequence}" />
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+          <ctl:KpIcon Classes="claim-warn" Icon="alert-triangle" Size="14" />
+          <TextBlock Grid.Column="1" Name="WarningText" Classes="claim-line size-13" Text="{Binding Warning}" />
+        </Grid>
 
           <StackPanel Spacing="8">
             <ToggleButton Name="DetailsToggle" Classes="claim-details" AutomationProperties.Name="Details">
               <StackPanel Orientation="Horizontal" Spacing="4">
                 <ctl:KpIcon Icon="chevron-right" Size="14" VerticalAlignment="Center" RenderTransformOrigin="50%,50%" />
-                <TextBlock Classes="size-12-5" Text="Details" VerticalAlignment="Center" />
+                <TextBlock Classes="size-13" Text="Details" VerticalAlignment="Center" />
               </StackPanel>
             </ToggleButton>
-            <Grid Classes="claim-facts size-12-5" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
+            <Grid Classes="claim-facts size-13" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
                   ColumnSpacing="12" RowSpacing="4" Margin="20,0,0,0" IsVisible="{Binding #DetailsToggle.IsChecked}">
               <TextBlock Grid.Row="0" Classes="fact" Text="Tool" />
               <TextBlock Grid.Row="0" Grid.Column="1" Name="ToolText" Classes="mono" Text="{Binding Tool}" />
@@ -118,16 +116,13 @@
 
       <Border Classes="claim-rule" />
 
-      <ctl:HeaderRow Classes="claim-foot" Spacing="8">
-        <ctl:SteadyDigits Name="CountdownText" Classes="claim-muted size-12-5" Text="{Binding DeniesIn}" VerticalAlignment="Center"
-                          TextWrapping="NoWrap" IsVisible="{Binding IsChoosing}" />
-        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <Button Name="Deny" Classes="claim keyed" Content="Deny" Tag="esc"
-                  IsVisible="{Binding IsChoosing}" Command="{Binding DenyCommand}" />
-          <Button Name="AllowOnce" Classes="claim keyed primary" Content="Run once" Tag="&#x21A9;"
-                  IsVisible="{Binding IsChoosing}" Command="{Binding AllowOnceCommand}" />
-        </StackPanel>
-      </ctl:HeaderRow>
+      <StackPanel Classes="claim-foot">
+        <Button Name="Deny" Classes="claim keyed" Content="Deny" Tag="esc"
+                IsVisible="{Binding IsChoosing}" Command="{Binding DenyCommand}" />
+        <Button Name="AllowOnce" Classes="claim keyed primary" Content="Run once" Tag="&#x21A9;"
+                IsVisible="{Binding IsChoosing}" Command="{Binding AllowOnceCommand}" />
+      </StackPanel>
+      <ProgressBar Name="TimeBar" Classes="claim-time" Value="{Binding TimeLeft}" AutomationProperties.Name="{Binding DeniesIn}" />
     </StackPanel>
   </Border>
 

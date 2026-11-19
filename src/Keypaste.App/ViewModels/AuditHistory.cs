@@ -43,6 +43,9 @@ internal sealed record AuditHistory(AuditReadKind Kind, IReadOnlyList<string> Li
     /// <summary>The physical line numbers the hash chain does not vouch for.</summary>
     internal IReadOnlySet<int> Unverified { get; init; } = new HashSet<int>();
 
+    /// <summary>The physical line numbers where the chain breaks: changed, inserted or written by something else.</summary>
+    internal IReadOnlySet<int> Edited { get; init; } = new HashSet<int>();
+
     /// <summary>What the chain check found, for a screen that states the verdict in its own layout.</summary>
     internal AuditChainReport? Report { get; init; }
 
@@ -98,6 +101,7 @@ internal sealed record AuditHistory(AuditReadKind Kind, IReadOnlyList<string> Li
             Total = entries.Count,
             Unreadable = unreadable,
             Unverified = unverified,
+            Edited = report.Findings.Where(finding => finding.IsBreak).Select(finding => finding.Line).ToHashSet(),
             Report = report,
         };
     }

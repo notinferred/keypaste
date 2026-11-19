@@ -46,10 +46,10 @@ public sealed class UnlockHardwareKeyTests : IDisposable
         Type(model, _master);
         await model.UnlockAsync();
         Assert.Equal(0, _unlockedCalls);
-        Assert.Equal("That password didn't open this vault. It may also need a key file or a YubiKey: add one below, or type the password again.", model.Message);
+        Assert.Equal("Wrong password or key file.", model.Message);
 
         model.UseHardwareKeyCommand.Press();
-        Assert.Equal("YubiKey, slot 2", model.HardwareKeyLabel);
+        Assert.Equal("YubiKey · slot 2", model.HardwareKeyLabel);
         Type(model, _master);
         await model.UnlockAsync();
 
@@ -77,8 +77,7 @@ public sealed class UnlockHardwareKeyTests : IDisposable
         await model.UnlockAsync();
 
         Assert.Equal(0, _unlockedCalls);
-        Assert.Equal(
-            "That password and YubiKey didn't open this vault. If the vault uses the other slot, switch to it.", model.Message);
+        Assert.Equal("Wrong password, key file or YubiKey slot.", model.Message);
         Assert.Equal(0, model.MaskedLength);
     }
 
@@ -147,7 +146,7 @@ public sealed class UnlockHardwareKeyTests : IDisposable
         await model.StartCreateAsync();
         Assert.False(model.UsesHardwareKey);
         model.UseHardwareKeyCommand.Press();
-        Assert.Equal("YubiKey, slot 2", model.HardwareKeyLabel);
+        Assert.Equal("YubiKey · slot 2", model.HardwareKeyLabel);
         TypeNew(model, _master);
         await model.CreateAsync();
 

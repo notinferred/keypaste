@@ -1,5 +1,4 @@
 using System.Globalization;
-using Keypaste.App.Globalization;
 using Keypaste.Core;
 using Keypaste.Core.Recommendations;
 
@@ -31,13 +30,18 @@ internal sealed class ReminderRow : IRecommendationRow
 
     internal ItemReminder Finding { get; }
 
-    /// <summary>The item's path, sanitized for display.</summary>
+    /// <summary>The item's title as a sentence names it.</summary>
     internal string Entry { get; }
 
-    /// <summary>What the row says under its group's heading: the item, and when.</summary>
-    internal string Line => Finding.When is { } when
-        ? $"{Entry}, {(Finding.Reason == ReminderReason.ExpiresSoon ? "expires" : "marked")} {PersonTime.Moment(when.ToLocalTime())}"
-        : Entry;
+    /// <summary>The row's muted second line: when it expires or was marked, or empty.</summary>
+    internal string Detail => Finding.When is { } when
+        ? Finding.Reason == ReminderReason.ExpiresSoon ? UseText.Expires(when) : UseText.Marked(when)
+        : string.Empty;
+
+    internal bool HasDetail => Detail.Length > 0;
+
+    /// <summary>The item's group path and title, for its tooltip.</summary>
+    internal string EntryPath => RecommendationsViewModel.Shown(Finding.Entry);
 
     /// <summary>A group's heading.</summary>
     internal static string Heading(ReminderReason reason) => reason switch
@@ -75,16 +79,13 @@ internal sealed class ReminderRow : IRecommendationRow
     internal string StateLabel => IsDismissed ? "Dismissed" : "Needs review";
 
     /// <summary>What a screen reader hears for the row.</summary>
-    internal string Description => $"{Heading(Finding.Reason)}: {Line}, {StateLabel.ToLowerInvariant()}";
-
-    /// <summary>What a screen reader hears for Open item.</summary>
-    internal string OpenLabel => $"Open {Entry} in Items";
+    internal string Description => $"{Heading(Finding.Reason)}: {Entry}, {Detail}, {StateLabel.ToLowerInvariant()}";
 
     /// <summary>What a screen reader hears for the page button.</summary>
     internal string PageDescription => $"{PageLabel} for {Entry}: {PageAddress}";
 
     /// <summary>Shows the item in Items, selected.</summary>
-    internal RelayCommand OpenCommand { get; }
+    public RelayCommand OpenCommand { get; }
 
     /// <summary>Opens <see cref="ItemReminder.Page"/> in the browser; keypaste itself makes no request.</summary>
     internal AsyncRelayCommand OpenPageCommand { get; }

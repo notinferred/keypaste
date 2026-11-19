@@ -4,7 +4,7 @@
 
   <!--
     Lists. Every ListBoxItem is a row: radius 8, hover raises one step, selected takes the accent's
-    tint with no bar, and a KpIcon in a selected row takes the text's colour.
+    tint with no bar, focused from the keyboard draws a 2px accent ring inside its edge, and a KpIcon in a selected row takes the text's colour.
     Classes:
       ListBox.nav   the sidebar: 28px rows, selected takes the same tint
       ListBox.rows  a tall list such as Secrets (52px rows); the default look, named for intent
@@ -99,11 +99,9 @@
   <Style Selector="ListBox.nav > ListBoxItem:selected TextBlock.count">
     <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
   </Style>
-  <!-- A vault's heading: its title in the row title's weight, with room above it, as Outlook heads an account. -->
+  <!-- A vault's heading: its title in the row title's weight, with room above it outside the row, so a chosen vault's tint is a row's height. -->
   <Style Selector="ListBox.nav > ListBoxItem.vault">
-    <Setter Property="Height" Value="34" />
-    <Setter Property="MinHeight" Value="34" />
-    <Setter Property="Padding" Value="8,8,8,0" />
+    <Setter Property="Margin" Value="0,6,0,0" />
   </Style>
   <Style Selector="ListBox.nav > ListBoxItem TextBlock.vault">
     <Setter Property="FontWeight" Value="SemiBold" />
@@ -164,5 +162,10 @@
     <Setter Property="Background" Value="{DynamicResource KpBgRaised}" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
     <Setter Property="BoxShadow" Value="{StaticResource KpShadowControl}" />
+  </Style>
+
+  <!-- Inside the row, since the list scrolls and clips what is drawn outside it. -->
+  <Style Selector="ListBoxItem:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BoxShadow" Value="{DynamicResource KpFocusRingInset}" />
   </Style>
 </Styles>

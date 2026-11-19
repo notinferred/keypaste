@@ -74,7 +74,7 @@ internal sealed partial class App : Application, IDisposable
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
-        Theme.FontWeights.Pin(this);
+        _ = Theme.FontWeights.Pin(this, FontManager.Current);
 
         if (ReadingDirection.Of(CultureInfo.CurrentUICulture) == FlowDirection.RightToLeft)
         {
@@ -917,7 +917,7 @@ internal sealed partial class App : Application, IDisposable
         }
 
         _window.FindControl<ContentControl>("Root")!.Content = Crashes is { AsksTerms: true } asking
-            ? new FirstLaunchView { DataContext = new FirstLaunchViewModel(TermsOfUse.Carried, send => AgreeToTerms(asking, send)) }
+            ? new FirstLaunchView { DataContext = new FirstLaunchViewModel(TermsOfUse.Carried, send => AgreeToTerms(asking, send), Quit) }
             : new UnlockView { DataContext = _unlock };
     }
 

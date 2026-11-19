@@ -3,8 +3,7 @@ using Keypaste.App.Clipboard;
 namespace Keypaste.App.ViewModels;
 
 /// <summary>
-/// Generate password…, on its own (V.12): a generated password to copy, to start a new item with, or to add to the
-/// chosen item as a protected field.
+/// Generate password…, on its own (V.12): a generated password to copy; a field takes one from its own generator.
 /// </summary>
 /// <remarks>
 /// The value lives in a <see cref="SecretField"/>, drawn from the generator straight into its buffer, and leaves it
@@ -14,34 +13,20 @@ namespace Keypaste.App.ViewModels;
 internal sealed partial class GeneratePasswordViewModel : ObservableObject, IRevealSource, IDisposable
 {
     private readonly ClipboardCountdown _clipboard;
-    private readonly Action<SecretField>? _newItem;
-    private readonly Action<SecretField, string>? _addField;
     private readonly Action _close;
     private readonly GeneratorViewModel? _choices;
     private readonly Action<SecretField>? _apply;
     private bool _disposed;
 
     /// <param name="clipboard">The clipboard that clears itself.</param>
-    /// <param name="newItem">Opens New item with the value as its password.</param>
-    /// <param name="addField">Adds the value to the chosen item as a protected field of the name given, or null with no item chosen.</param>
-    /// <param name="item">The chosen item's title, or null.</param>
     /// <param name="close">Closes the dialog.</param>
-    internal GeneratePasswordViewModel(
-        ClipboardCountdown clipboard,
-        Action<SecretField> newItem,
-        Action<SecretField, string>? addField,
-        string? item,
-        Action close)
+    internal GeneratePasswordViewModel(ClipboardCountdown clipboard, Action close)
     {
         ArgumentNullException.ThrowIfNull(clipboard);
-        ArgumentNullException.ThrowIfNull(newItem);
         ArgumentNullException.ThrowIfNull(close);
 
         _clipboard = clipboard;
-        _newItem = newItem;
-        _addField = addField;
         _close = close;
-        Item = item;
         Generator = new GeneratorViewModel();
         Value = new SecretField(clipboard);
         Generator.PropertyChanged += (_, _) => Regenerate();
@@ -53,18 +38,12 @@ internal sealed partial class GeneratePasswordViewModel : ObservableObject, IRev
     /// <param name="choices">The form's choices, which the panel starts from and Apply sets to its own.</param>
     /// <param name="target">The form's field, which stays the form's: a generated value it holds is the one the panel starts with.</param>
     /// <param name="apply">Puts the value in the form's field.</param>
-    /// <param name="newItem">Opens New item with the value as its password, or null where the form offers none.</param>
-    /// <param name="addField">Adds the value as a protected field of the name given, or null where the form offers none.</param>
-    /// <param name="item">The title of the item the value would be added to.</param>
     /// <param name="close">Closes the panel.</param>
     internal GeneratePasswordViewModel(
         ClipboardCountdown clipboard,
         GeneratorViewModel choices,
         SecretField target,
         Action<SecretField> apply,
-        Action<SecretField>? newItem,
-        Action<SecretField, string>? addField,
-        string? item,
         Action close)
     {
         ArgumentNullException.ThrowIfNull(clipboard);
@@ -74,13 +53,10 @@ internal sealed partial class GeneratePasswordViewModel : ObservableObject, IRev
         ArgumentNullException.ThrowIfNull(close);
 
         _clipboard = clipboard;
-        _newItem = newItem;
-        _addField = addField;
         _close = close;
         _choices = choices;
         _apply = apply;
         Target = target;
-        Item = item;
         Generator = new GeneratorViewModel();
         Generator.TakeChoicesFrom(choices);
         Value = new SecretField(clipboard);
@@ -110,23 +86,8 @@ internal sealed partial class GeneratePasswordViewModel : ObservableObject, IRev
     /// <summary>Whether Apply hands the value to a form's field; on its own, the panel copies it instead.</summary>
     internal bool Applies => _apply is not null;
 
-    internal bool OffersNewItem => _newItem is not null && !Applies;
-
-    /// <summary>Whether the sheet stands alone and so offers Copy and its other ways to keep the value; a form's sheet offers only Cancel and Apply.</summary>
+    /// <summary>Whether the sheet stands alone and so offers Copy and Close; a form's sheet offers only Cancel and Apply.</summary>
     internal bool KeepsElsewhere => !Applies;
-
-    /// <summary>Whether Add as a field shows: on the generator standing alone, never on a form's.</summary>
-    internal bool OffersAddField => CanAddField && !Applies;
-
-    /// <summary>The chosen item's title, which Add as a field adds to.</summary>
-    internal string? Item { get; }
-
-    internal bool CanAddField => _addField is not null;
-
-    /// <summary>What Add as a field calls the new field.</summary>
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AddFieldCommand))]
-    internal partial string FieldName { get; set; } = string.Empty;
 
     /// <inheritdoc/>
     public int MaskedLength => Value.MaskedLength;
@@ -179,18 +140,11 @@ internal sealed partial class GeneratePasswordViewModel : ObservableObject, IRev
     {
         RegenerateCommand.NotifyCanExecuteChanged();
         CopyCommand.NotifyCanExecuteChanged();
-        NewItemCommand.NotifyCanExecuteChanged();
-        AddFieldCommand.NotifyCanExecuteChanged();
         ApplyCommand.NotifyCanExecuteChanged();
     }
 
     [RelayCommand(CanExecute = nameof(CanGenerate))]
     private Task CopyAsync() => _disposed || !Value.HasValue ? Task.CompletedTask : _clipboard.CopyAsync(Value.Compose(), "Generated password");
-
-    private bool CanStartNewItem() => _newItem is not null && CanGenerate();
-
-    [RelayCommand(CanExecute = nameof(CanStartNewItem))]
-    private void NewItem() => _newItem?.Invoke(Value);
 
     private bool CanApply() => _apply is not null && CanGenerate();
 
@@ -205,15 +159,6 @@ internal sealed partial class GeneratePasswordViewModel : ObservableObject, IRev
 
         _choices?.TakeChoicesFrom(Generator);
         _apply(Value);
-        _close();
-    }
-
-    private bool CanAdd() => _addField is not null && FieldName.Trim().Length > 0 && CanGenerate();
-
-    [RelayCommand(CanExecute = nameof(CanAdd))]
-    private void AddField()
-    {
-        _addField?.Invoke(Value, FieldName.Trim());
         _close();
     }
 

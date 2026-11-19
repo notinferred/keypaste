@@ -203,7 +203,7 @@ public sealed class WindowLayoutTests
         var pane = shell.Named<ContentControl>("EntryPane");
         var widthBefore = pane.Bounds.Width;
 
-        shell.Tap(shell.Named<Button>("ShowSidebar"));
+        shell.Shell.ToggleSidebar();
         shell.Frame();
         Assert.True(sidebar.IsEffectivelyVisible);
         Assert.Equal(WindowChrome.SidebarWidth, sidebar.Bounds.Width);
@@ -271,16 +271,17 @@ public sealed class WindowLayoutTests
     });
 
     [Fact]
-    public Task Focus_inside_a_sidebar_that_hides_moves_to_its_button_and_focus_elsewhere_stays() => HeadlessSession.On(() =>
+    public Task Focus_inside_a_sidebar_that_hides_moves_to_the_rail_and_focus_elsewhere_stays() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-window-focus-");
         shell.Frame();
-        var button = shell.Named<Button>("ShowSidebar");
+        var rail = shell.Named<ListBox>("RailNav");
+        var button = rail.ContainerFromItem(rail.SelectedItem!)!;
 
         shell.Window.Width = 720;
         shell.Frame();
         WindowInput.Drain();
-        Assert.False(button.IsFocused, "narrowing the window moved the keyboard to the sidebar's button");
+        Assert.False(button.IsFocused, "narrowing the window moved the keyboard to the rail");
 
         shell.Window.Width = 1000;
         shell.Frame();

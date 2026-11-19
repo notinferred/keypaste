@@ -22,63 +22,64 @@
   </Window.Styles>
 
   <!-- A claim card that asks for a value. The agent never receives what is typed. The value, the agent's words and the
-       placement keep fixed heights, so nothing the agent writes moves the field or the buttons (THREATS.md T-2). Return presses the primary only once it is armed; Escape cancels. -->
+       placement keep fixed heights, so nothing the agent writes moves the field or the buttons (THREATS.md T-2). Return presses the primary only once it is armed; Escape denies. -->
 
-  <Border Classes="claim">
+  <Border Classes="claim" Classes.arming="{Binding IsArming}">
     <StackPanel>
       <StackPanel Classes="claim-body">
         <TextBlock Classes="live" ctl:Announcer.Says="{Binding Opening}" />
         <views:PromptHead />
 
         <StackPanel Spacing="4">
-          <TextBlock Name="TitleText" Classes="claim-title size-16">
+          <TextBlock Name="TitleText" Classes="claim-title size-15">
             <Run Text="Save a new value for " /><Run Classes="claim-name size-15" Text="{Binding Field}" /><Run Text="?" />
           </TextBlock>
           <StackPanel Orientation="Horizontal" Spacing="6" Height="20">
-            <ctl:KpIcon Classes="claim-muted" Icon="folder" Size="14" VerticalAlignment="Center" />
-            <TextBlock Name="ItemText" Classes="claim-muted size-12-5" Text="{Binding Item}" MaxWidth="380" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+            <ctl:KpIcon Classes="claim-muted" Icon="key" Size="14" VerticalAlignment="Center" />
+            <TextBlock Name="ItemText" Classes="claim-muted size-13" Text="{Binding Item}" MaxWidth="380" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
           </StackPanel>
         </StackPanel>
 
         <StackPanel Spacing="6">
           <TextBlock Classes="label" Text="New value" />
-          <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
             <ctl:MaskedInput x:Name="ValueInput" Grid.Column="0" AllowsPaste="True"
                              Sink="{Binding Value}" MaskedLength="{Binding Value.MaskedLength}"
                              AutomationProperties.Name="{x:Static res:Strings.TheValueToSave}" />
-            <Button Grid.Column="1" Name="Generate" Classes="claim" Content="Password" Command="{Binding GenerateCommand}"
-                    ToolTip.Tip="Generate a password" />
-            <Button Grid.Column="2" Name="GeneratePassphrase" Classes="claim" Content="Passphrase" Command="{Binding GeneratePassphraseCommand}"
-                    ToolTip.Tip="Generate a passphrase" />
+            <Button Grid.Column="1" Name="Generate" VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBlock Text="Generate" VerticalAlignment="Center" />
+                <ctl:KpIcon Icon="chevron-down" Size="14" VerticalAlignment="Center" />
+              </StackPanel>
+              <Button.Flyout>
+                <ctl:ButtonMenu Placement="BottomEdgeAlignedRight">
+                  <MenuItem Name="GeneratePassword" Header="Password" Command="{Binding GenerateCommand}" />
+                  <MenuItem Name="GeneratePassphrase" Header="Passphrase" Command="{Binding GeneratePassphraseCommand}" />
+                </ctl:ButtonMenu>
+              </Button.Flyout>
+            </Button>
           </Grid>
           <StackPanel Orientation="Horizontal" Spacing="6">
             <ctl:KpIcon Classes="claim-muted" Icon="lock" Size="14" VerticalAlignment="Center" />
-            <TextBlock Name="NeverText" Classes="claim-muted size-12-5" Text="{Binding NeverReceives}" VerticalAlignment="Center" />
+            <TextBlock Name="NeverText" Classes="claim-muted size-13" Text="{Binding NeverReceives}" VerticalAlignment="Center" />
           </StackPanel>
-          <TextBlock Name="ValueNote" Height="18" Classes="claim-line size-12-5" Text="{Binding Value.Note}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+          <TextBlock Name="ValueNote" Height="18" Classes="claim-line size-13" Text="{Binding Value.Note}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
         </StackPanel>
 
           <StackPanel Spacing="4">
-            <TextBlock Classes="claim-label size-11" Text="{Binding SaysLabel}" />
+            <TextBlock Name="SaysText" Classes="claim-label size-11" Text="{Binding SaysLabel}" Background="Transparent" ToolTip.Tip="{Binding QuoteNote}" />
             <Border Classes="claim-quote">
               <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                 <DockPanel Classes="claim-quote-text">
                   <Border Classes="claim-quote-bar" />
-                  <StackPanel Spacing="4">
-                    <TextBlock Name="ScrubbedText" Classes="claim-muted size-12-5" Text="{Binding Scrubbed}"
-                               IsVisible="{Binding Scrubbed, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                    <TextBlock Classes="claim-muted size-12-5" Text="{Binding Truncation}"
-                               IsVisible="{Binding Truncation, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                    <TextBlock Name="ReasonText" Classes="size-13" Text="{Binding Quoted}" />
-                  </StackPanel>
+                  <TextBlock Name="ReasonText" Classes="size-13" Text="{Binding Quoted}" />
                 </DockPanel>
               </ScrollViewer>
             </Border>
           </StackPanel>
 
-        <!-- The placement and the replace confirmation keep their place whether the prompt replaces a value or not. -->
-        <StackPanel Spacing="6" Height="48">
-          <TextBlock Name="PlacementText" Classes="claim-line size-12-5" Text="{Binding Placement}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+        <StackPanel Spacing="6">
+          <TextBlock Name="PlacementText" Classes="claim-line size-13" Text="{Binding Placement}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
           <CheckBox Name="ConfirmReplace" IsVisible="{Binding Replaces}" IsChecked="{Binding ConfirmsReplace}"
                     Content="Replace the value it holds" />
         </StackPanel>
@@ -87,10 +88,10 @@
             <ToggleButton Name="DetailsToggle" Classes="claim-details" AutomationProperties.Name="Details">
               <StackPanel Orientation="Horizontal" Spacing="4">
                 <ctl:KpIcon Icon="chevron-right" Size="14" VerticalAlignment="Center" RenderTransformOrigin="50%,50%" />
-                <TextBlock Classes="size-12-5" Text="Details" VerticalAlignment="Center" />
+                <TextBlock Classes="size-13" Text="Details" VerticalAlignment="Center" />
               </StackPanel>
             </ToggleButton>
-            <Grid Classes="claim-facts size-12-5" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
+            <Grid Classes="claim-facts size-13" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
                   ColumnSpacing="12" RowSpacing="4" Margin="20,0,0,0" IsVisible="{Binding #DetailsToggle.IsChecked}">
               <TextBlock Grid.Row="0" Classes="fact" Text="Tool" />
               <TextBlock Grid.Row="0" Grid.Column="1" Classes="mono" Text="{Binding Tool}" />
@@ -110,16 +111,13 @@
 
       <Border Classes="claim-rule" />
 
-      <ctl:HeaderRow Classes="claim-foot" Spacing="8">
-        <ctl:SteadyDigits Name="CountdownText" Classes="claim-muted size-12-5" Text="{Binding DeniesIn}" VerticalAlignment="Center"
-                          TextWrapping="NoWrap" IsVisible="{Binding IsChoosing}" />
-        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <Button Name="Deny" Classes="claim keyed" Content="Cancel" Tag="esc"
-                  IsVisible="{Binding IsChoosing}" Command="{Binding DenyCommand}" />
-          <Button Name="AllowOnce" Classes="claim keyed primary" Content="Save" Tag="&#x21A9;"
-                  IsVisible="{Binding IsChoosing}" Command="{Binding AllowOnceCommand}" />
-        </StackPanel>
-      </ctl:HeaderRow>
+      <StackPanel Classes="claim-foot">
+        <Button Name="Deny" Classes="claim keyed" Content="Deny" Tag="esc"
+                IsVisible="{Binding IsChoosing}" Command="{Binding DenyCommand}" />
+        <Button Name="AllowOnce" Classes="claim keyed primary" Content="Save" Tag="&#x21A9;"
+                IsVisible="{Binding IsChoosing}" Command="{Binding AllowOnceCommand}" />
+      </StackPanel>
+      <ProgressBar Name="TimeBar" Classes="claim-time" Value="{Binding TimeLeft}" AutomationProperties.Name="{Binding DeniesIn}" />
     </StackPanel>
   </Border>
 

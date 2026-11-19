@@ -27,12 +27,12 @@ internal sealed partial class NavItem : ObservableObject
 
     /// <summary>Whether the mark is a green dot: this app is answering agents for the vault.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(DotWords), nameof(RailName), nameof(DotStopped))]
+    [NotifyPropertyChangedFor(nameof(DotWords), nameof(RailName), nameof(RailTip), nameof(DotStopped))]
     internal partial bool DotLive { get; set; }
 
     /// <summary>Whether the mark is a red diamond: this app holds the vault and refuses every agent request.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(DotWords), nameof(RailName), nameof(DotStopped))]
+    [NotifyPropertyChangedFor(nameof(DotWords), nameof(RailName), nameof(RailTip), nameof(DotStopped))]
     internal partial bool DotDanger { get; set; }
 
     /// <summary>Whether the mark is a ring: this app is not answering agents for the vault.</summary>
@@ -44,10 +44,10 @@ internal sealed partial class NavItem : ObservableObject
     /// <summary>Whether the badge shows: Security's count of what needs review.</summary>
     internal bool HasBadge => Count.Length > 0;
 
-    /// <summary>The dot's state in words, beside its colour.</summary>
-    internal string DotWords => DotDanger ? "refusing" : DotLive ? "live" : string.Empty;
+    /// <summary>The dot's state in words, which the accessible name and the tooltip both say.</summary>
+    internal string DotWords => !HasDot ? string.Empty : DotDanger ? "Refusing agents" : DotLive ? "Answering agents" : "Not answering agents";
 
-    /// <summary>The row's tooltip and automation help text, or null.</summary>
+    /// <summary>What the row adds to its state, as its tooltip and automation help text, or null.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RailTip))]
     internal partial string? Detail { get; set; }
@@ -61,7 +61,7 @@ internal sealed partial class NavItem : ObservableObject
     internal string RailName => string.Join(", ", new[] { Title, DotWords, Waiting > 0 ? string.Create(CultureInfo.InvariantCulture, $"{Waiting} waiting") : string.Empty, HasDot ? string.Empty : Count }.Where(part => part.Length > 0));
 
     /// <summary>The rail's tooltip: the place, and what the row would say beside it if there were room.</summary>
-    internal string RailTip => string.IsNullOrEmpty(Detail) ? Title : $"{Title} · {Detail}";
+    internal string RailTip => string.Join(" · ", new[] { Title, DotWords, Detail ?? string.Empty }.Where(part => part.Length > 0));
 
     /// <summary>The row's name for a screen reader, which reads a list item by its content's text.</summary>
     public override string ToString() => string.Join(", ", new[] { Title, Count, DotWords }.Where(part => part.Length > 0));

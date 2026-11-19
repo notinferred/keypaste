@@ -106,8 +106,8 @@ public sealed class OneGeneratorTests
         AssertOneSheetOverTheWindow(shell);
         Assert.False(shell.Named<Button>("ApplyGenerated").IsEffectivelyVisible);
         Assert.True(shell.Named<Button>("CopyGenerated").IsEffectivelyVisible);
-        Assert.True(shell.Named<Button>("GeneratedNewItem").IsEffectivelyVisible);
-        Assert.True(shell.Named<Button>("AddGeneratedField").IsEffectivelyVisible);
+        Assert.True(shell.Named<Button>("CloseStandaloneGenerator").IsEffectivelyVisible);
+        Assert.False(shell.Named<Button>("CloseGenerator").IsEffectivelyVisible);
     });
 
     private static void AssertOneSheetOverTheWindow(RenderedShell shell)

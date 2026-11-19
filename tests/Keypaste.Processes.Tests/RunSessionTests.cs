@@ -91,8 +91,8 @@ public sealed class RunSessionTests
         using (var run = Run(workspace, "ci", "agent-yes"))
         {
             approve.WaitForError("is asking for a project's variables");
-            Assert.Contains(approve.Error, line => line.Contains("variables    DB_URL DEPLOY_KEY", StringComparison.Ordinal));
-            Assert.Contains(approve.Error, line => line.StartsWith("  command      ", StringComparison.Ordinal) && line.Contains("agent-yes", StringComparison.Ordinal));
+            approve.WaitForError("variables    DB_URL DEPLOY_KEY");
+            approve.WaitForError("^  command      .*agent-yes");
             approve.Send("o");
             AssertReleased(run);
         }

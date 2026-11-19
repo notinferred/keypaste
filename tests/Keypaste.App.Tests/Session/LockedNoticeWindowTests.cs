@@ -15,8 +15,8 @@ using static Keypaste.App.Tests.Session.DesktopApprovalTests;
 namespace Keypaste.App.Tests.Session;
 
 /// <summary>
-/// The notice an agent's request raises while the app is locked (D-0466) names the vault and holds no field; it does
-/// not take focus, Close is its default and is focused once it is brought forward, and Open keypaste works only after
+/// The notice an agent's request raises while the app is locked names the vault and holds no field; it does
+/// not take focus, Close is its default and is focused once it is brought forward, and Unlock… works only after
 /// it has been up a moment.
 /// </summary>
 public sealed class LockedNoticeWindowTests
@@ -33,16 +33,13 @@ public sealed class LockedNoticeWindowTests
 
             Assert.False(notice.ShowActivated);
             Assert.True(notice.Topmost);
-            Assert.Equal("An agent asked for vault.kdbx", Text(notice, "HeadText"));
-            Assert.Equal("It's locked, so the request was refused", Text(notice, "SubText"));
-            Assert.Equal(
-                "Agents can use this vault only while it's unlocked. Unlock it in keypaste, then ask the agent to try again. You won't see this again until you've unlocked keypaste.",
-                Text(notice, "NoticeText"));
+            Assert.Equal("vault is locked", Text(notice, "HeadText"));
+            Assert.Equal("An agent's request was refused. Unlock to let agents ask.", Text(notice, "NoticeText"));
             Assert.Empty(notice.GetVisualDescendants().OfType<TextBox>());
             Assert.Empty(notice.GetVisualDescendants().OfType<MaskedInput>());
-            Assert.Equal("Open keypaste", AutomationProperties.GetName(notice.FindControl<Button>("Open")!));
+            Assert.Equal("Unlock\u2026", AutomationProperties.GetName(notice.FindControl<Button>("Open")!));
             Assert.Equal(
-                ["Open keypaste", "Close"],
+                ["Close", "Unlock\u2026"],
                 notice.GetVisualDescendants().OfType<Button>().Where(button => button.IsEffectivelyVisible)
                     .Select(button => ControlAutomationPeer.CreatePeerForElement(button).GetName()));
 
@@ -82,9 +79,9 @@ public sealed class LockedNoticeWindowTests
             await Task.Delay(200, Token);
             WindowInput.Drain();
 
-            Assert.False(open.IsEffectivelyEnabled, "Open keypaste was armed before the notice had been up a moment");
+            Assert.False(open.IsEffectivelyEnabled, "Unlock… was armed before the notice had been up a moment");
             Assert.Equal(0, opened);
-            Assert.True(notice.IsVisible, "a press before Open keypaste was armed closed the notice");
+            Assert.True(notice.IsVisible, "a press before Unlock… was armed closed the notice");
 
             clock.Advance(TimeSpan.FromMilliseconds(1));
             await PromptedApp.UntilAsync(() => open.IsEffectivelyEnabled);

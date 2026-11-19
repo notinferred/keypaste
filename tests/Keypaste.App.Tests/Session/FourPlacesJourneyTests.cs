@@ -2,8 +2,8 @@ using System.Text;
 using Avalonia.Automation.Peers;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
 using Keypaste.App.Session;
@@ -104,7 +104,7 @@ public sealed class FourPlacesJourneyTests
             Assert.Equal("Trash", sidebar[^1]);
             Assert.DoesNotContain("Groups", sidebar);
             Assert.DoesNotContain(main.GetVisualDescendants().OfType<Control>(), control => control.Name is "Search" or "McpCard");
-            Assert.Equal(["ShellSearch"], main.GetVisualDescendants().OfType<TextBox>().Where(box => box.Classes.Contains("search")).Select(box => box.Name));
+            Assert.Equal(["ListSearch"], main.GetVisualDescendants().OfType<TextBox>().Where(box => box.Classes.Contains("search")).Select(box => box.Name));
 
             // An item found by the one search, in the vault's one flat list.
             Chord(main, PhysicalKey.Digit1);
@@ -120,7 +120,8 @@ public sealed class FourPlacesJourneyTests
             Press(main, Row(main, "Nav", row => row is ProjectRow { Name: "billing" }));
             var env = Assert.IsType<EnvSetsViewModel>(shell.Content);
             Assert.Equal(["STRIPE_KEY"], env.OpenProject!.Variables.Select(row => row.Key));
-            AccentElements.AssertOne(main, Named<Button>(main, "RunProject"), "a project's variables");
+            Assert.True(Named<Button>(main, "RunProject").IsEffectivelyEnabled);
+            AccentElements.AssertOne(main, Named<Button>(main, "RunProject"), "a project's variables, whose Run… copies the run command where no terminal opens");
             Assert.False(shell.HasBack);
             Press(main, Row(main, "Nav", row => row is PlaceRow { Place: ItemPlace.All, IsTop: false }));
             Assert.IsType<EntriesViewModel>(shell.Content);
@@ -129,6 +130,7 @@ public sealed class FourPlacesJourneyTests
             app.Menus!.All.Single(command => command.Header == AppCommands.ImportHeader).Run();
             WindowInput.Drain();
             await Until(() => shell.HasImport);
+            Press(main, Named<Button>(main, "ChooseCopy"));
             WindowInput.Click(main, Named<MaskedInput>(main, "ImportPassword"));
             WindowInput.Type(main, _sourcePassword);
             Press(main, main.GetVisualDescendants().OfType<Button>().Single(button => button.IsEffectivelyVisible && ReferenceEquals(button.Command, shell.Import!.UnlockCommand)));
@@ -142,8 +144,10 @@ public sealed class FourPlacesJourneyTests
             Chord(main, PhysicalKey.Digit1);
             items = Assert.IsType<EntriesViewModel>(shell.Content);
             Press(main, Row(main, "Rows", row => row is EntryRow { Title: "github" }));
-            Press(main, Named<ToggleButton>(main, "EntryMenu"));
-            Press(main, Named<Button>(main, "ShareEntry"));
+            var paneMenu = Named<Button>(main, "EntryMenu");
+            Press(main, paneMenu);
+            var menu = (MenuFlyout)paneMenu.Flyout!;
+            Menus.Choose(menu, Menus.Item(menu, "ShareEntry"));
             Assert.True(shell.HasShare);
             AccentElements.AssertOne(main, Named<Button>(main, "CreateLink"), "the share dialog");
             Press(main, Named<Button>(main, "CreateLink"));
@@ -167,14 +171,13 @@ public sealed class FourPlacesJourneyTests
             var log = Assert.IsType<LogViewModel>(shell.Content);
             AccentElements.AssertOne(main, null, "Activity");
             Assert.Contains(log.Rows, row => row.Actor == _label);
-            Press(main, Named<Button>(main, "VerifyChain"));
+            log.VerifyCommand.Press();
             Assert.True(log.VerdictShown);
             AccentElements.AssertOne(main, null, "Activity, its verdict shown");
 
-            // Settings › Advanced: the share links, revoked.
+            // Settings › Share links: the share links, revoked.
             Chord(main, PhysicalKey.Digit4);
             AccentElements.AssertOne(main, null, "Settings");
-            Press(main, Named<Button>(main, "OpenAdvanced"));
             // The toasts the share and the prompt left, the clipboard's countdown among them, lie over the content until closed.
             foreach (var toast in shell.Toasts.Shown.ToList())
             {
@@ -186,12 +189,13 @@ public sealed class FourPlacesJourneyTests
                 Press(main, main.GetVisualDescendants().OfType<Button>().First(button => button.IsEffectivelyVisible && ReferenceEquals(button.Command, shell.Clipboard.ClearNowCommand)));
             }
 
-            Press(main, Named<Button>(main, "OpenShareLinks"));
+            main.GetVisualDescendants().OfType<ListBox>().Single(list => list is { Name: "SettingsSections", IsEffectivelyVisible: true }).SelectedItem = SettingsSectionChoice.ShareLinks;
+            Dispatcher.UIThread.RunJobs();
             var links = Assert.IsType<SharingViewModel>(shell.Content);
             await Until(() => links.Rows.Count == 1);
             AccentElements.AssertOne(main, null, "share links");
             DrawnFrame.Capture(main);
-            Press(main, main.GetVisualDescendants().OfType<Button>().First(button => button.IsEffectivelyVisible && button.Classes.Contains("row-action")));
+            Press(main, main.GetVisualDescendants().OfType<Button>().First(button => button.IsEffectivelyVisible && ReferenceEquals(button.Command, links.RevokeRowCommand)));
             Assert.Single(server.Shares);
             Press(main, main.GetVisualDescendants().OfType<Button>().First(button => button is { Name: "ConfirmRevoke", IsEffectivelyVisible: true }));
             await Until(() => server.Shares.Count == 0);

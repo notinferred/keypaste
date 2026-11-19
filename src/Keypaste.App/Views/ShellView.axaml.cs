@@ -144,8 +144,15 @@ internal sealed partial class ShellView : UserControl
         }
         else
         {
-            GiveFocus(this.FindControl<Button>("ShowSidebar"), NavigationMethod.Tab);
+            FocusRail();
         }
+    }
+
+    // The sidebar has no button of its own, so the keyboard goes to the rail's chosen place, the way back to it.
+    private void FocusRail()
+    {
+        var rail = this.FindControl<ListBox>("RailNav")!;
+        GiveFocus(rail.ContainerFromItem(rail.SelectedItem ?? rail.Items[0]!) ?? rail, NavigationMethod.Tab);
     }
 
     // Focusing a control that already holds focus adds its focus adorner a second time and throws.
@@ -457,7 +464,7 @@ internal sealed partial class ShellView : UserControl
             {
                 var back = _focusBeforeImport is { IsEffectivelyVisible: true } before && TopLevel.GetTopLevel(before) is not null
                     ? before
-                    : this.GetVisualDescendants().OfType<Control>().FirstOrDefault(control => control.Name is "AddEntry" or "Nav" or "ShowSidebar" && control.IsEffectivelyVisible);
+                    : this.GetVisualDescendants().OfType<Control>().FirstOrDefault(control => control.Name is "SidebarNew" or "Nav" or "RailNav" && control.IsEffectivelyVisible);
                 _focusBeforeImport = null;
                 back?.Focus();
             },
@@ -472,7 +479,7 @@ internal sealed partial class ShellView : UserControl
         Dispatcher.UIThread.Post(
             () =>
             {
-                if (this.GetVisualDescendants().OfType<TextBox>().FirstOrDefault(box => box.Name == "ShellSearch" && box.IsEffectivelyVisible) is { } search)
+                if (this.GetVisualDescendants().OfType<TextBox>().FirstOrDefault(box => box.Name == "ListSearch" && box.IsEffectivelyVisible) is { } search)
                 {
                     search.Focus();
                     search.SelectAll();

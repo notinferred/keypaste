@@ -122,10 +122,31 @@ internal sealed partial class KdbxImportViewModel : ObservableObject, ISecretSin
 
     internal bool CanChooseAnother => IsUnreadable && _chooseAnother is not null;
 
-    /// <summary>The file card's second line: the header before unlock, and what unlocked it after.</summary>
-    internal string CardDetail => Source is null
-        ? $"{Version} · {Kdf} · {Cipher}"
-        : $"{Version} · {Kdf} · {Entries(EntryCount)} · {KeyFactors}";
+    /// <summary>The file card's second line: how many items it holds, once it is unlocked; its format is the card's tooltip.</summary>
+    internal string CardDetail => Source is null ? string.Empty : Entries(EntryCount);
+
+    /// <summary>The file card's tooltip: its format, and what unlocked it.</summary>
+    internal string CardFormat => Source is null ? $"{Version} · {Kdf} · {Cipher}" : $"{Version} · {Kdf} · {KeyFactors}";
+
+    /// <summary>Whether the person chose to copy the file's items into the open vault, so its unlock form shows.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsChoice), nameof(ShowsUnlockForm), nameof(ShowsConfirm))]
+    internal partial bool ChoseCopy { get; private set; }
+
+    /// <summary>Whether the dialog asks first: copy the file's items into the open vault, or open the file as its own vault.</summary>
+    internal bool ShowsChoice => IsReadable && !ChoseCopy && !KeepEditingInPlace;
+
+    /// <summary>Whether the password, key file and YubiKey show: the file is to be copied and is still locked.</summary>
+    internal bool ShowsUnlockForm => NeedsUnlock && ChoseCopy;
+
+    /// <summary>The choice that copies: "Copy into acme".</summary>
+    internal string CopyChoice => UseText.CopyInto(Show(System.IO.Path.GetFileNameWithoutExtension(_session.VaultPath)));
+
+    [RelayCommand]
+    private void ChooseCopy() => ChoseCopy = true;
+
+    [RelayCommand]
+    private void ChooseOpen() => KeepEditingInPlace = true;
 
     /// <summary>Whether a message shows below the dialog's body rather than under the password field or on the card.</summary>
     internal bool HasTrailingMessage => HasMessage && !NeedsUnlock && IsReadable;
@@ -136,11 +157,11 @@ internal sealed partial class KdbxImportViewModel : ObservableObject, ISecretSin
     /// <summary>Whether a paste may join the password: the field is showing and no unlock is reading it.</summary>
     private bool TakesPassword => NeedsUnlock && !Busy;
 
-    /// <summary>Whether the confirm button shows: the file was read and nothing more is needed to unlock it.</summary>
-    internal bool ShowsConfirm => IsReadable && !NeedsUnlock;
+    /// <summary>Whether the confirm button shows: the file was read, a choice was made and nothing more is needed to unlock it.</summary>
+    internal bool ShowsConfirm => IsReadable && !NeedsUnlock && !ShowsChoice;
 
-    /// <summary>Whether the group mapping shows: the file is unlocked and is being copied.</summary>
-    internal bool ShowsRows => Source is not null && !KeepEditingInPlace;
+    /// <summary>Whether the group mapping shows: only where a group the file is copied with cannot land where it would, so the person can move or untick it.</summary>
+    internal bool ShowsRows => Source is not null && !KeepEditingInPlace && _blocked;
 
     /// <summary>The unlock button's words, which say when Argon2 is running.</summary>
     internal string UnlockText => Busy ? "Unlocking…" : "Unlock";
@@ -236,7 +257,7 @@ internal sealed partial class KdbxImportViewModel : ObservableObject, ISecretSin
 
     /// <summary>The unlocked file, while there is one. A test seam for when its key goes.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CardDetail), nameof(NeedsUnlock), nameof(ShowsRows), nameof(SkippedText), nameof(InPlaceNote))]
+    [NotifyPropertyChangedFor(nameof(CardDetail), nameof(CardFormat), nameof(NeedsUnlock), nameof(ShowsUnlockForm), nameof(ShowsRows), nameof(SkippedText), nameof(InPlaceNote))]
     [NotifyPropertyChangedFor(nameof(KeyFactors), nameof(EntryCount), nameof(IsDecrypted), nameof(IsLocked), nameof(CardText), nameof(CanConfirm))]
     [NotifyPropertyChangedFor(nameof(HasTrailingMessage), nameof(ShowsConfirm), nameof(HasSkipped))]
     [NotifyCanExecuteChangedFor(nameof(UnlockCommand), nameof(ChooseKeyfileCommand), nameof(ClearKeyfileCommand), nameof(UseHardwareKeyCommand))]
@@ -287,7 +308,7 @@ internal sealed partial class KdbxImportViewModel : ObservableObject, ISecretSin
     /// <summary>Whether confirming opens the file as the vault instead of copying it in.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(NeedsUnlock), nameof(ShowsRows), nameof(ConfirmText), nameof(CanConfirm), nameof(HasTrailingMessage))]
-    [NotifyPropertyChangedFor(nameof(ShowsConfirm))]
+    [NotifyPropertyChangedFor(nameof(ShowsConfirm), nameof(ShowsChoice), nameof(ShowsUnlockForm))]
     [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
     internal partial bool KeepEditingInPlace { get; set; }
 
@@ -303,7 +324,7 @@ internal sealed partial class KdbxImportViewModel : ObservableObject, ISecretSin
     internal partial bool Busy { get; private set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(NeedsUnlock), nameof(PasswordLength), nameof(CanConfirm), nameof(HasTrailingMessage), nameof(ShowsConfirm))]
+    [NotifyPropertyChangedFor(nameof(NeedsUnlock), nameof(ShowsUnlockForm), nameof(PasswordLength), nameof(CanConfirm), nameof(HasTrailingMessage), nameof(ShowsConfirm))]
     [NotifyCanExecuteChangedFor(nameof(ChooseAnotherCommand), nameof(ConfirmCommand))]
     private partial bool Disposed { get; set; }
 
@@ -609,6 +630,7 @@ internal sealed partial class KdbxImportViewModel : ObservableObject, ISecretSin
 
         OnPropertyChanged(nameof(ConfirmText));
         OnPropertyChanged(nameof(CanConfirm));
+        OnPropertyChanged(nameof(ShowsRows));
         ConfirmCommand.NotifyCanExecuteChanged();
     }
 

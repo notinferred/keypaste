@@ -1,0 +1,44 @@
+<UserControl xmlns:res="using:Keypaste.App.Resources"
+             xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Keypaste.App.ViewModels"
+             xmlns:ctl="using:Keypaste.App.Controls"
+             xmlns:views="using:Keypaste.App.Views"
+             x:Class="Keypaste.App.Views.SettingsFrame">
+
+  <ctl:ListDetail x:Name="Split" ShowsDetail="{Binding $parent[views:SettingsFrame].SectionIsOpen}">
+
+    <Border BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,1,0">
+      <StackPanel Margin="12,16,12,8" Spacing="8">
+        <TextBlock Classes="list-title" Text="{x:Static res:Strings.Settings}" />
+        <ListBox Name="SettingsSections" Classes="nav"
+                 AutomationProperties.Name="{x:Static res:Strings.SettingsSections}"
+                 ItemsSource="{x:Static vm:SettingsSectionChoice.All}" />
+      </StackPanel>
+    </Border>
+
+    <DockPanel>
+      <Border DockPanel.Dock="Top" IsVisible="{Binding #Split.ShowsBack}">
+        <Button x:Name="BackToSections"
+                Classes="ghost sm"
+                HorizontalAlignment="Left"
+                Margin="24,12,0,0"
+                AutomationProperties.Name="{Binding Source={x:Static res:Strings.Settings}, StringFormat={x:Static res:Strings.BackToValue}}">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <ctl:KpIcon Icon="chevron-left" Size="14" />
+            <TextBlock Text="{x:Static res:Strings.Settings}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+      </Border>
+
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Classes="sections" Margin="32,24">
+          <TextBlock Classes="dialog-title" Text="{Binding $parent[views:SettingsFrame].Section}" />
+          <ContentPresenter Content="{Binding $parent[views:SettingsFrame].Page}" />
+        </StackPanel>
+      </ScrollViewer>
+    </DockPanel>
+
+  </ctl:ListDetail>
+
+</UserControl>

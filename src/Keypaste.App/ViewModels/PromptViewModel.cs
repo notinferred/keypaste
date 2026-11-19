@@ -13,8 +13,8 @@ namespace Keypaste.App.ViewModels;
 /// <para>
 /// Every allow is armed only after the prompt has been up for <see cref="ArmingDelay"/>: the window
 /// can appear under a pointer that was about to click something else, and that click is not an
-/// approval (D-0326). Bringing the prompt forward from Agents disarms it for another
-/// <see cref="ArmingDelay"/>, and a wait begun before that arms nothing (D-0456), and so does a click
+/// approval. Bringing the prompt forward from Agents disarms it for another
+/// <see cref="ArmingDelay"/>, and a wait begun before that arms nothing, and so does a click
 /// that brings it back from another window. Denying needs no delay.
 /// </para>
 /// <para>
@@ -79,7 +79,7 @@ internal abstract partial class PromptViewModel : ObservableObject
     internal bool IsNotVerified => Requester is { Verified: false };
 
     /// <summary>What pointing at Verified or Not verified says.</summary>
-    internal string VerificationExplained => Requester?.Explanation ?? string.Empty;
+    internal virtual string VerificationExplained => Requester?.Explanation ?? string.Empty;
 
     /// <summary>The program on the connection and its parent, for Details, or that it was not read.</summary>
     internal string Process => Requester?.Process ?? "not read";
@@ -154,7 +154,7 @@ internal abstract partial class PromptViewModel : ObservableObject
     internal string ConfirmText => Confirming is null ? string.Empty : AlwaysKept;
 
     /// <summary>What Always allow keeps, said under its confirmation.</summary>
-    internal const string AlwaysKept = "keypaste won't ask again for this key. Change it in Settings \u203a Agents.";
+    internal string AlwaysKept => $"keypaste won't ask again for this key. Change it in Agents \u203a {Agent}.";
 
     /// <summary>What pointing at Always allow says.</summary>
     internal virtual string AlwaysTip => string.Empty;
@@ -162,13 +162,18 @@ internal abstract partial class PromptViewModel : ObservableObject
     /// <summary>Why the card offers no Always allow, for Details, or nothing when it offers one.</summary>
     internal virtual string NoAlways => string.Empty;
 
-    /// <summary>How long is left to answer, as <c>m:ss</c>.</summary>
+    /// <summary>How long until the prompt denies by itself, in words, which the time bar is named by.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(DeniesIn))]
-    internal partial string Countdown { get; private set; } = string.Empty;
+    internal partial string DeniesIn { get; private set; } = string.Empty;
 
-    /// <summary>The card's quiet footer line: how long until the prompt denies by itself.</summary>
-    internal string DeniesIn => $"Denies in {Countdown}";
+    /// <summary>The share of the time to answer still left, from 1 as the prompt opens to 0 as it denies, which the time bar draws.</summary>
+    [ObservableProperty]
+    internal partial double TimeLeft { get; private set; } = 1;
+
+    private double _answerSeconds;
+
+    /// <summary>Whether an allow waits only for the prompt to arm, which the time bar shows rather than the buttons.</summary>
+    internal bool IsArming => !IsArmed && CanAllow && !IsAnswered;
 
     /// <summary>The person's answer, or a denial for every way the prompt went away without one.</summary>
     internal Task<ApprovalAnswer> Answer => _answer.Task;
@@ -243,7 +248,13 @@ internal abstract partial class PromptViewModel : ObservableObject
             };
         }
 
-        Countdown = string.Create(CultureInfo.InvariantCulture, $"{seconds / 60}:{seconds % 60:00}");
+        if (_answerSeconds == 0)
+        {
+            _answerSeconds = Math.Max(remaining.TotalSeconds, 1);
+        }
+
+        TimeLeft = Math.Clamp(remaining.TotalSeconds / _answerSeconds, 0, 1);
+        DeniesIn = string.Create(CultureInfo.InvariantCulture, $"Denies in {seconds / 60}:{seconds % 60:00}");
     }
 
     /// <summary>The window closed with no answer, which is a no. Called on the UI thread.</summary>
@@ -282,6 +293,7 @@ internal abstract partial class PromptViewModel : ObservableObject
         AlwaysAllowCommand.NotifyCanExecuteChanged();
         ConfirmAlwaysCommand.NotifyCanExecuteChanged();
         BackCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(IsArming));
         OnAllowsChanged();
     }
 

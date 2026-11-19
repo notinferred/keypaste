@@ -3,17 +3,17 @@
         xmlns:ctl="using:Keypaste.App.Controls">
 
   <!--
-    Buttons. With no class a button is the design's default button: the surface with a hairline round it. Classes:
+    Buttons. With no class a button is the design's default button, 30px tall: the surface with a hairline round it. Classes:
       primary (or Fluent's accent)  filled with the system's accent; the one primary action in a view
-      ghost                         plain: no fill or line until hovered: Deny, Cancel; on a ToggleButton, the same while its menu is open
-      danger                        danger tint: Revoke, Delete
-      icon                          a 30px square for an icon alone; add ghost for no fill
-      link                          text colour, no box: "Choose…"
-      more                          the 30px ⋯ toggle that opens a menu
+      ghost                         plain: no fill or line until hovered: Deny, Cancel; the same while its menu is open
+      danger                        danger tint: Revoke, Delete; at 13px like every button
+      icon                          a 30px square for an icon alone; add ghost for no fill, sm for a 28px row action
+      link                          text colour, no box, a 20px target: "Choose…"
+      more                          the 30px ⋯ button whose Flyout is a ctl:ButtonMenu
       disclosure                    an Expander's header toggle: ghost, whether open or not
-      menu-item                     a row in a menu (Border.menu); add danger for Delete
-      column-head                   a table's head: its text, nothing behind it until hovered
       sm / lg                       28px / 34px tall instead of 30px
+      busy                          while its work runs: keeps its fill, ignores presses; put a KpIcon.spinning in it
+    Every button draws the 2px gap and 2px accent ring outside its bounds while focused from the keyboard.
     Put a KpIcon and a TextBlock in a StackPanel (Orientation Horizontal, Spacing 6) for an icon
     button; the icon takes the button's foreground.
   -->
@@ -23,21 +23,27 @@
     <Setter Property="FontSize" Value="13" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
+    <!-- The focus ring is drawn 4px outside the button, which a button clips to its bounds by default. -->
+    <Setter Property="ClipToBounds" Value="False" />
+  </Style>
+  <Style Selector="Button, ToggleButton">
+    <Setter Property="MinHeight" Value="30" />
+    <Setter Property="Padding" Value="12,0" />
   </Style>
 
   <!-- What has no surface of its own has no line round it either. -->
   <Style Selector="Button.primary, ToggleButton.primary, Button.ghost, ToggleButton.ghost, Button.link, Button.danger, Button.fold,
-                   Button.menu-item, Button.column-head, ToggleButton.disclosure, ToggleButton.more">
+                   ToggleButton.disclosure, Button.more">
     <Setter Property="BorderThickness" Value="0" />
   </Style>
 
   <Style Selector="Button.sm, ToggleButton.sm">
     <Setter Property="MinHeight" Value="28" />
-    <Setter Property="Padding" Value="12,4" />
+    <Setter Property="Padding" Value="10,0" />
   </Style>
   <Style Selector="Button.lg">
     <Setter Property="MinHeight" Value="34" />
-    <Setter Property="Padding" Value="16,6" />
+    <Setter Property="Padding" Value="16,0" />
   </Style>
 
   <!-- primary / accent -->
@@ -56,11 +62,10 @@
     <Setter Property="Background" Value="{DynamicResource AccentButtonBackgroundPressed}" />
     <Setter Property="Foreground" Value="{DynamicResource AccentButtonForegroundPressed}" />
   </Style>
-  <!-- A disabled primary stays the accent, faded, so a form that is waiting for input keeps its one accent action. -->
+  <!-- A disabled primary is greyed as macOS greys a default button. -->
   <Style Selector="Button.primary:disabled /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource KpAccent}" />
-    <Setter Property="Foreground" Value="{DynamicResource KpOnAccent}" />
-    <Setter Property="Opacity" Value="0.45" />
+    <Setter Property="Background" Value="{DynamicResource AccentButtonBackgroundDisabled}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextDisabled}" />
   </Style>
   <Style Selector="Button.accent">
     <Setter Property="FontWeight" Value="SemiBold" />
@@ -91,7 +96,8 @@
   </Style>
   <Style Selector="Button.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter,
                    ToggleButton.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter,
-                   ToggleButton.ghost:checked /template/ ContentPresenter#PART_ContentPresenter">
+                   ToggleButton.ghost:checked /template/ ContentPresenter#PART_ContentPresenter,
+                   Button.ghost:flyout-open /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
@@ -115,11 +121,12 @@
     <Setter Property="Foreground" Value="{DynamicResource KpDanger}" />
   </Style>
   <Style Selector="Button.danger:pressed /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource KpDangerTint}" />
+    <Setter Property="Background" Value="{DynamicResource KpDangerTintPressed}" />
     <Setter Property="Foreground" Value="{DynamicResource KpDanger}" />
   </Style>
   <Style Selector="Button.danger:disabled /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Opacity" Value="0.5" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextDisabled}" />
   </Style>
 
   <!-- icon -->
@@ -148,8 +155,8 @@
 
   <!-- link -->
   <Style Selector="Button.link">
-    <Setter Property="Padding" Value="0" />
-    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Padding" Value="0,2" />
+    <Setter Property="MinHeight" Value="20" />
     <Setter Property="FontSize" Value="12" />
     <Setter Property="Cursor" Value="Hand" />
   </Style>
@@ -198,66 +205,38 @@
   </Style>
 
   <!-- The ⋯ button: plain until hovered, and raised while its menu is open. -->
-  <Style Selector="ToggleButton.more">
+  <Style Selector="Button.more">
     <Setter Property="Width" Value="30" />
     <Setter Property="Height" Value="30" />
     <Setter Property="MinHeight" Value="0" />
     <Setter Property="Padding" Value="0" />
     <Setter Property="HorizontalContentAlignment" Value="Center" />
   </Style>
-  <Style Selector="ToggleButton.more /template/ ContentPresenter#PART_ContentPresenter">
+  <Style Selector="Button.more /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
   </Style>
-  <Style Selector="ToggleButton.more:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+  <Style Selector="Button.more:pointerover /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
-  <Style Selector="ToggleButton.more:checked /template/ ContentPresenter#PART_ContentPresenter">
+  <Style Selector="Button.more:flyout-open /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
 
-  <Style Selector="Button.menu-item">
-    <Setter Property="HorizontalAlignment" Value="Stretch" />
-    <Setter Property="HorizontalContentAlignment" Value="Left" />
-    <Setter Property="Height" Value="30" />
-    <Setter Property="MinHeight" Value="0" />
-    <Setter Property="Padding" Value="12,0" />
-    <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusButton}" />
-    <Setter Property="FontSize" Value="13" />
-    <Setter Property="FontWeight" Value="Normal" />
+  <!-- A wait is not a refusal: a busy button keeps the look it had, though its command is disabled while it runs. -->
+  <Style Selector="Button.busy">
+    <Setter Property="IsHitTestVisible" Value="False" />
   </Style>
-  <Style Selector="Button.menu-item.danger /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="Transparent" />
+  <Style Selector="Button.busy:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource ButtonBackground}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ButtonBorderBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource ButtonForeground}" />
   </Style>
-  <Style Selector="Button.menu-item.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource KpDangerTint}" />
-  </Style>
-
-  <Style Selector="Button.column-head">
-    <Setter Property="Padding" Value="0" />
-    <Setter Property="BorderThickness" Value="0" />
-    <Setter Property="MinHeight" Value="20" />
-    <Setter Property="Height" Value="20" />
-    <Setter Property="CornerRadius" Value="4" />
-    <Setter Property="HorizontalAlignment" Value="Stretch" />
-    <Setter Property="HorizontalContentAlignment" Value="Left" />
-    <Setter Property="VerticalContentAlignment" Value="Center" />
-    <!-- A button clips what the adorner layer draws for it, which is its focus ring, to its own bounds. -->
-    <Setter Property="ClipToBounds" Value="False" />
-  </Style>
-  <Style Selector="Button.column-head /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="Transparent" />
-  </Style>
-  <Style Selector="Button.column-head:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.column-head:pressed /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="Transparent" />
-  </Style>
-  <Style Selector="Button.column-head:pointerover TextBlock.th, Button.column-head.sorted TextBlock.th">
-    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
-  </Style>
-  <Style Selector="Button.column-head ctl|KpIcon">
-    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  <Style Selector="Button.primary.busy:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentButtonBackground}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentButtonForeground}" />
   </Style>
 
 </Styles>

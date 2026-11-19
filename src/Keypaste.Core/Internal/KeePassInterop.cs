@@ -1905,11 +1905,11 @@ internal sealed class KeePassInterop : IDisposable
             : null;
     }
 
-    /// <summary>Writes protected fields and replaces the notes as one edit with one history revision.</summary>
+    /// <summary>Writes protected fields, replaces the notes and adds a tag, when given, as one edit with one history revision.</summary>
     /// <returns>0 when there is no such entry, otherwise 1.</returns>
-    /// <remarks>The caller has checked the names and the notes; the notes keep their protection flag.</remarks>
+    /// <remarks>The caller has checked the names, the notes and the tag; the notes keep their protection flag.</remarks>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
-    internal int MoveToFields(EntryName name, IReadOnlyList<FieldWrite> writes, string notes)
+    internal int MoveToFields(EntryName name, IReadOnlyList<FieldWrite> writes, string notes, string? tag)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -1927,6 +1927,12 @@ internal sealed class KeePassInterop : IDisposable
         }
 
         entry.Strings.Set(PwDefs.NotesField, new ProtectedString(entry.Strings.Get(PwDefs.NotesField)?.IsProtected ?? false, notes));
+
+        if (tag is not null)
+        {
+            AddTagTo(entry, tag);
+        }
+
         MarkEdited(entry);
         return 1;
     }

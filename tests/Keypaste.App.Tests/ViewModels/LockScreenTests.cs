@@ -16,10 +16,10 @@ public sealed class LockScreenTests : IDisposable
     public void Dispose() => _vault.Dispose();
 
     [Theory]
-    [InlineData(nameof(VaultLockReason.Idle), "Locked at 14:32 after 5 minutes without use")]
-    [InlineData(nameof(VaultLockReason.Manual), "You locked it at 14:32")]
-    [InlineData(nameof(VaultLockReason.Minimized), "Locked at 14:32 when the window was minimized")]
-    [InlineData(nameof(VaultLockReason.Requested), "Locked at 14:32 by keypaste lock")]
+    [InlineData(nameof(VaultLockReason.Idle), "Locked at 14:32 · idle 5 minutes")]
+    [InlineData(nameof(VaultLockReason.Manual), "Locked at 14:32 · by you")]
+    [InlineData(nameof(VaultLockReason.Minimized), "Locked at 14:32 · window minimized")]
+    [InlineData(nameof(VaultLockReason.Requested), "Locked at 14:32 · from the terminal")]
     [InlineData(nameof(VaultLockReason.AccessChanged), "")]
     [InlineData(nameof(VaultLockReason.Replaced), "")]
     public void The_note_says_why_it_locked(string reason, string expected) =>
@@ -31,7 +31,7 @@ public sealed class LockScreenTests : IDisposable
     [InlineData(90, "1 hour 30 minutes")]
     [InlineData(480, "8 hours")]
     public void The_idle_note_names_the_timeout_in_force(int minutes, string words) =>
-        Assert.EndsWith($"after {words} without use", UnlockViewModel.DescribeLock(VaultLockReason.Idle, DateTimeOffset.UnixEpoch, TimeSpan.FromMinutes(minutes)), StringComparison.Ordinal);
+        Assert.EndsWith($"· idle {words}", UnlockViewModel.DescribeLock(VaultLockReason.Idle, DateTimeOffset.UnixEpoch, TimeSpan.FromMinutes(minutes)), StringComparison.Ordinal);
 
     [Fact]
     public void A_lock_the_screen_follows_is_described_and_a_launch_is_not()
@@ -46,7 +46,7 @@ public sealed class LockScreenTests : IDisposable
 
         using var locked = new UnlockViewModel(session, _vault.Home, new FakeVaultFilePicker(), () => { }, lockedBy: VaultLockReason.Requested);
         Assert.True(locked.HasLockNote);
-        Assert.EndsWith("by keypaste lock", locked.LockNote, StringComparison.Ordinal);
+        Assert.EndsWith("· from the terminal", locked.LockNote, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -55,23 +55,23 @@ public sealed class LockScreenTests : IDisposable
         using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var model = new UnlockViewModel(session, _vault.Home, new FakeVaultFilePicker(), () => { });
 
-        Assert.Equal("Keep your keys in one place", model.Heading);
+        Assert.Empty(model.Heading);
         Assert.True(model.Offer(_vault.Path_));
-        Assert.Equal($"{Path.GetFileName(_vault.Path_)} is locked", model.Heading);
+        Assert.Equal(Path.GetFileNameWithoutExtension(_vault.Path_), model.Heading);
+        Assert.Equal(Path.GetFileName(_vault.Path_), model.SelectedName);
     }
 
     [Fact]
-    public void The_recent_list_shows_only_when_it_offers_another_vault()
+    public void The_vaults_this_computer_opened_are_listed_by_name_with_the_selected_one_chosen()
     {
         _vault.RememberSelf();
         using var session = new AppVaultSession(new ManualClock(AppClock.Start));
         using var model = new UnlockViewModel(session, _vault.Home, new FakeVaultFilePicker(), () => { });
 
-        Assert.True(model.HasSelection);
-        Assert.False(model.ShowsRecent);
-
-        model.SelectedPath = null;
-        Assert.True(model.ShowsRecent);
+        Assert.True(model.HasRecent);
+        var row = Assert.Single(model.Recent);
+        Assert.Equal(Path.GetFileNameWithoutExtension(_vault.Path_), row.Title);
+        Assert.Same(row, model.SelectedRecent);
     }
 
     [Fact]
@@ -93,7 +93,7 @@ public sealed class LockScreenTests : IDisposable
     }
 
     [Fact]
-    public void A_handed_over_file_is_opened_rather_than_called_locked()
+    public void A_handed_over_file_is_named_as_any_other_vault()
     {
         var foreign = Path.Combine(_vault.Home, "handed.kdbx");
         KeePassInterop.WriteForeignUnchecked(foreign, Encoding.UTF8.GetBytes("in-place"), null, "Argon2id", "ChaCha20");
@@ -102,12 +102,8 @@ public sealed class LockScreenTests : IDisposable
         using var model = new UnlockViewModel(session, _vault.Home, new FakeVaultFilePicker(), () => { });
 
         Assert.True(model.Offer(foreign, null));
-        Assert.Equal("Open handed.kdbx", model.Heading);
-        Assert.Contains("keep editing it in place", model.Subtitle, StringComparison.Ordinal);
+        Assert.Equal("handed", model.Heading);
         Assert.False(model.HasMessage);
-
-        Assert.True(model.Offer(_vault.Path_));
-        Assert.EndsWith("is locked", model.Heading, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -148,8 +144,7 @@ public sealed class LockScreenTests : IDisposable
         string[] chosen =
         [
             nameof(UnlockViewModel.SelectedName), nameof(UnlockViewModel.HasSelection), nameof(UnlockViewModel.Heading),
-            nameof(UnlockViewModel.Subtitle), nameof(UnlockViewModel.CanTypePassword), nameof(UnlockViewModel.OffersCreateFirst),
-            nameof(UnlockViewModel.WelcomeSubtitle), nameof(UnlockViewModel.HasLooseError),
+            nameof(UnlockViewModel.CanTypePassword), nameof(UnlockViewModel.ShowsWelcome), nameof(UnlockViewModel.HasLooseError),
         ];
         Assert.Empty(chosen.Except(raised));
         Assert.Contains("unlock", asked);
@@ -161,7 +156,7 @@ public sealed class LockScreenTests : IDisposable
         string[] creating =
         [
             nameof(UnlockViewModel.IsCreating), nameof(UnlockViewModel.IsOpening), nameof(UnlockViewModel.OffersRestore),
-            nameof(UnlockViewModel.NewVaultName), nameof(UnlockViewModel.CreateHeading),
+            nameof(UnlockViewModel.NewVaultName), nameof(UnlockViewModel.ShowsWelcome),
         ];
         Assert.Empty(creating.Except(raised));
         Assert.Equal(["browse", "create"], asked.Distinct().Order(StringComparer.Ordinal));

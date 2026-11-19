@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The desktop app is redrawn to one set of buttons, menus, focus rings and grouped rows: search sits at the top of the list, Lock on the rail, unlock and first launch drop the grid, prompts show their time as a bar, Agents connects a tool from one sheet with its setup prompt and config, Security moves a note's keys together, and Settings is one list of sections. (F.130)
+
 The desktop app shows each vault as one flat list; new items go to the top level, and groups already in a file are kept untouched. (J.1)
 
 The desktop app asks for crash reports on their own at first launch; they stay off unless you say yes, and accepting the terms no longer turns them on. (J.2)

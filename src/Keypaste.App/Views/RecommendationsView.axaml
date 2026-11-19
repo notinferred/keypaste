@@ -16,8 +16,12 @@
       <Setter Property="Grid.Column" Value="0" />
       <Setter Property="Grid.ColumnSpan" Value="2" />
     </Style>
-    <Style Selector=":is(Control).kind-head">
-      <Setter Property="Margin" Value="4,0" />
+    <!-- Dismiss shows while its row is pointed at or holds focus; it stays in the row's menu. -->
+    <Style Selector="ctl|FieldRow.wide Button.on-point">
+      <Setter Property="Opacity" Value="0" />
+    </Style>
+    <Style Selector="ctl|FieldRow.wide:pointerover Button.on-point, ctl|FieldRow.wide:focus-within Button.on-point">
+      <Setter Property="Opacity" Value="1" />
     </Style>
     <Style Selector="StackPanel.page">
       <Setter Property="Margin" Value="32,12,32,24" />
@@ -27,17 +31,21 @@
     </Style>
   </UserControl.Styles>
 
-  <!-- Keys left in notes, named by entry and key, never by value (C.2); project tags another app dropped (V.11); weak,
-       reused or expired passwords, named by item and problem, never by value (V.9). One list of grouped rows by kind; each issue carries its action and Dismiss. No amber here. -->
+  <!-- Each finding names its item and key or problem, never a value; pressing its row opens the item. No amber here. -->
   <ScrollViewer>
-    <StackPanel Classes="page" Classes.under="{Binding IsListedUnderAnother}" Spacing="12" MaxWidth="760" HorizontalAlignment="Left">
+    <StackPanel Classes="sections page" Classes.under="{Binding IsListedUnderAnother}">
       <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="12" IsVisible="{Binding ShowsPageHeader}">
         <TextBlock Classes="h1" Text="{x:Static res:Strings.Security}" />
         <Button Grid.Column="1" Name="LearnMoreRecommendations" Classes="link" VerticalAlignment="Bottom" Content="{x:Static res:Strings.LearnMore}"
                 AutomationProperties.Name="{x:Static res:Strings.LearnMoreAboutRecommendations}">
           <Button.Flyout>
             <Flyout Placement="Bottom">
-              <TextBlock MaxWidth="320" Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.KeysLeftInNotesPasswordsThatAreXc4a5b0}" />
+              <StackPanel MaxWidth="320" Spacing="8">
+                <TextBlock Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.KeysLeftInNotesPasswordsThatAreXc4a5b0}" />
+                <TextBlock Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.EachValueBecomesAProtectedFieldNamedX966a34}" />
+                <TextBlock Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.ReplaceAWeakOrReusedPasswordOnX22ee0c}" />
+                <TextBlock Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.ReplaceAnItemBeforeItExpires}" />
+              </StackPanel>
             </Flyout>
           </Button.Flyout>
         </Button>
@@ -54,10 +62,10 @@
 
       <TextBlock Classes="dialog-title" AutomationProperties.HeadingLevel="2" Text="{Binding VaultHeading}" IsVisible="{Binding ShowsVaultHeading}" />
 
-      <TextBlock Name="RecommendationsEmpty" Classes="caption" IsVisible="{Binding IsEmpty}" Text="{x:Static res:Strings.NoKeysFoundInNotesNoWeakX50d3ee}" />
+      <ctl:EmptyState Name="RecommendationsEmpty" IsVisible="{Binding IsEmpty}" Icon="shield-check" Text="{x:Static res:Strings.NoKeysFoundInNotesNoWeakX50d3ee}" />
 
-      <StackPanel Spacing="6" IsVisible="{Binding HasConflictedCopies}">
-        <TextBlock Classes="th kind-head" AutomationProperties.HeadingLevel="2" Text="{x:Static res:Strings.ChangesFromAnotherDevice}" />
+      <StackPanel Classes="section" IsVisible="{Binding HasConflictedCopies}">
+        <TextBlock Classes="section-heading" AutomationProperties.HeadingLevel="3" Text="{x:Static res:Strings.ChangesFromAnotherDevice}" />
         <Border Classes="group">
           <ItemsControl Name="ConflictedCopiesList" ItemsSource="{Binding ConflictedCopies}">
             <ItemsControl.ItemsPanel>
@@ -84,14 +92,14 @@
         </Border>
       </StackPanel>
 
-      <StackPanel Name="FragileKeyFileCard" Spacing="6" IsVisible="{Binding HasFragileKeyFile}">
-        <TextBlock Classes="th kind-head" AutomationProperties.HeadingLevel="2" Text="{x:Static res:Strings.KeyFile}" />
+      <StackPanel Name="FragileKeyFileCard" Classes="section" IsVisible="{Binding HasFragileKeyFile}">
+        <TextBlock Classes="section-heading" AutomationProperties.HeadingLevel="3" Text="{x:Static res:Strings.KeyFile}" />
         <Border Classes="group">
           <ctl:FieldRow Classes="wide">
             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
               <TextBlock ctl:MachineRuns.InText="True" Classes="size-13" TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{DynamicResource KpTextSecondary}" Text="{Binding FragileKeyFileWarning}" />
               <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                <Button Name="DismissFragileKeyFile" Classes="sm ghost" Content="{x:Static res:Strings.Dismiss}" IsVisible="{Binding FragileKeyFileNeedsReview}" Command="{Binding DismissFragileKeyFileCommand}" />
+                <Button Name="DismissFragileKeyFile" Classes="sm ghost on-point" Content="{x:Static res:Strings.Dismiss}" IsVisible="{Binding FragileKeyFileNeedsReview}" Command="{Binding DismissFragileKeyFileCommand}" />
                 <Button Name="ReviewFragileKeyFileAgain" Classes="sm ghost" Content="{x:Static res:Strings.ReviewAgain}" IsVisible="{Binding FragileKeyFileDismissed}" Command="{Binding ReviewFragileKeyFileAgainCommand}" />
               </StackPanel>
             </Grid>
@@ -106,20 +114,10 @@
                  ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}"
                  Foreground="{DynamicResource KpTextSecondary}" />
 
-      <StackPanel Name="NoteKeysCard" Spacing="6" IsVisible="{Binding HasNoteKeys}">
-        <Grid ColumnDefinitions="*,Auto" Classes="kind-head">
-          <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-            <TextBlock Classes="th" AutomationProperties.HeadingLevel="2" VerticalAlignment="Center" Text="{x:Static res:Strings.KeysLeftInNotes}" />
-            <Button Name="LearnMoreNoteKeys" Classes="link" Content="{x:Static res:Strings.LearnMore}"
-                    AutomationProperties.Name="{x:Static res:Strings.LearnMoreAboutKeysLeftInNotes}">
-              <Button.Flyout>
-                <Flyout Placement="Bottom">
-                  <TextBlock MaxWidth="320" Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.EachValueBecomesAProtectedFieldNamedX966a34}" />
-                </Flyout>
-              </Button.Flyout>
-            </Button>
-          </StackPanel>
-          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+      <StackPanel Name="NoteKeysCard" Classes="section" IsVisible="{Binding HasNoteKeys}">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Classes="section-heading" AutomationProperties.HeadingLevel="3" VerticalAlignment="Center" Text="{x:Static res:Strings.KeysLeftInNotes}" />
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding OffersBulkMove}">
             <Button Name="SelectAllRecommendations" Classes="sm ghost" Content="{x:Static res:Strings.SelectAll}" Command="{Binding SelectAllCommand}" />
             <Button Name="MoveSelected" Classes="sm" Content="{x:Static res:Strings.MoveSelected}" Command="{Binding MoveSelectedCommand}" />
           </StackPanel>
@@ -132,38 +130,64 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:RecommendationRow">
                 <ctl:FieldRow Classes="wide" AutomationProperties.Name="{Binding Description}">
-                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" Background="Transparent">
-                    <CheckBox Grid.Column="0"
-                              IsChecked="{Binding IsSelected}"
-                              IsEnabled="{Binding NeedsReview}"
-                              VerticalAlignment="Center"
-                              AutomationProperties.Name="{Binding Key, StringFormat={x:Static res:Strings.SelectValue}}" />
-                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Name="RecommendationTokenKind"
-                                   Text="{Binding TokenKind}"
-                                   IsVisible="{Binding IsToken}"
-                                   Classes="size-13-5"
-                                   FontWeight="Medium"
-                                   Foreground="{DynamicResource KpTextPrimary}"
-                                   VerticalAlignment="Center" />
-                        <TextBlock Name="RecommendationKey"
-                                   Classes="mono size-13"
-                                   Text="{Binding Key}"
-                                   Foreground="{DynamicResource KpTextPrimary}"
-                                   VerticalAlignment="Center" />
-                        <Border Classes="chip outline state" VerticalAlignment="Center" IsVisible="{Binding IsDismissed}">
-                          <TextBlock Text="{x:Static res:Strings.Dismissed}" />
-                        </Border>
+                  <StackPanel Spacing="8">
+                    <Grid Classes="opens-item" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8" Background="Transparent">
+                      <CheckBox IsChecked="{Binding IsSelected}"
+                                IsVisible="{Binding $parent[views:RecommendationsView].((vm:RecommendationsViewModel)DataContext).OffersBulkMove}"
+                                IsEnabled="{Binding NeedsReview}"
+                                VerticalAlignment="Center"
+                                AutomationProperties.Name="{Binding Entry, StringFormat={x:Static res:Strings.SelectValue}}" />
+                      <ToggleButton Grid.Column="1" Classes="disclosure" IsVisible="{Binding HasSeveralKeys}" IsChecked="{Binding IsExpanded}" VerticalAlignment="Center"
+                                    ToolTip.Tip="{x:Static res:Strings.ShowEachKey}" AutomationProperties.Name="{Binding Entry, StringFormat={x:Static res:Strings.ShowEachKeyInValue}}">
+                        <Panel>
+                          <ctl:KpIcon Icon="chevron-right" Size="14" IsVisible="{Binding !IsExpanded}" />
+                          <ctl:KpIcon Icon="chevron-down" Size="14" IsVisible="{Binding IsExpanded}" />
+                        </Panel>
+                      </ToggleButton>
+                      <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center" ToolTip.Tip="{Binding EntryPath}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <TextBlock Name="RecommendationTokenKind" Classes="size-13" FontWeight="Medium" Foreground="{DynamicResource KpTextPrimary}" VerticalAlignment="Center"
+                                     Text="{Binding Keys[0].TokenKind}" IsVisible="{Binding HasOneKey}" />
+                          <TextBlock Name="RecommendationKey" Classes="size-13" Classes.mono="{Binding HasOneKey}" Text="{Binding Heading}" Foreground="{DynamicResource KpTextPrimary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                          <Border Classes="chip outline state" VerticalAlignment="Center" IsVisible="{Binding IsDismissed}">
+                            <TextBlock Text="{x:Static res:Strings.Dismissed}" />
+                          </Border>
+                        </StackPanel>
+                        <TextBlock Classes="caption" Classes.mono="{Binding HasSeveralKeys}" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" />
                       </StackPanel>
-                      <TextBlock Classes="caption" Text="{Binding Where}" TextTrimming="CharacterEllipsis" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                      <Button Classes="sm" Content="{x:Static res:Strings.MoveToAField}" AutomationProperties.Name="{Binding Key, StringFormat={x:Static res:Strings.MoveValueToAField}}" IsVisible="{Binding NeedsReview}" Command="{Binding MoveCommand}" />
-                      <Button Classes="sm ghost" Content="{x:Static res:Strings.Dismiss}" AutomationProperties.Name="{Binding Key, StringFormat={x:Static res:Strings.DismissValue}}" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
-                      <Button Classes="sm ghost" Content="{x:Static res:Strings.ReviewAgain}" AutomationProperties.Name="{Binding Key, StringFormat={x:Static res:Strings.ReviewValueAgain}}" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
-                    </StackPanel>
-                  </Grid>
+                      <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <Button Classes="sm" Content="{x:Static res:Strings.MoveToFields}" AutomationProperties.Name="{Binding Entry, StringFormat={x:Static res:Strings.MoveTheKeysOfValueToFields}}" IsVisible="{Binding NeedsReview}" Command="{Binding MoveCommand}" />
+                        <Button Classes="sm" Content="{x:Static res:Strings.MoveToStage}" AutomationProperties.Name="{Binding Entry, StringFormat={x:Static res:Strings.MoveTheKeysOfValueToAStage}}" IsVisible="{Binding NeedsReview}" Command="{Binding AskMoveToStageCommand}" />
+                        <Button Classes="sm ghost on-point" Content="{x:Static res:Strings.Dismiss}" AutomationProperties.Name="{Binding Entry, StringFormat={x:Static res:Strings.DismissValue}}" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
+                        <Button Classes="sm ghost" Content="{x:Static res:Strings.ReviewAgain}" AutomationProperties.Name="{Binding Entry, StringFormat={x:Static res:Strings.ReviewValueAgain}}" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
+                      </StackPanel>
+                    </Grid>
+                    <!-- Each key, ticked to move with the rest. -->
+                    <ItemsControl Name="RecommendationKeys" ItemsSource="{Binding Keys}" IsVisible="{Binding IsExpanded}" Margin="32,0,0,0">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:NoteKeyRow">
+                          <CheckBox IsChecked="{Binding IsIncluded}" IsEnabled="{Binding $parent[ItemsControl].((vm:RecommendationRow)DataContext).NeedsReview}" AutomationProperties.Name="{Binding Key}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <TextBlock Classes="mono size-13" Text="{Binding Key}" VerticalAlignment="Center" />
+                              <TextBlock Classes="caption" Text="{Binding TokenKind}" IsVisible="{Binding IsToken}" VerticalAlignment="Center" />
+                            </StackPanel>
+                          </CheckBox>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <!-- The stage a project tag puts the item in, and every variable it brings, shown before anything is written. -->
+                    <Border Classes="form" IsVisible="{Binding IsChoosingStage}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmMoveToStageCommand}" ctl:FormKeys.Cancel="{Binding CancelMoveToStageCommand}">
+                      <StackPanel Spacing="8">
+                        <TextBlock Classes="label" Text="{x:Static res:Strings.StageLabel}" />
+                        <ComboBox Name="RecommendationStage" MinWidth="200" ItemsSource="{Binding Stages}" SelectedItem="{Binding ChosenStage}" AutomationProperties.Name="{x:Static res:Strings.StageLabel}" />
+                        <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding StagePreview}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <Button Classes="sm ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelMoveToStageCommand}" />
+                          <Button Classes="sm primary" Content="{x:Static res:Strings.Move}" Command="{Binding ConfirmMoveToStageCommand}" />
+                        </StackPanel>
+                      </StackPanel>
+                    </Border>
+                  </StackPanel>
                 </ctl:FieldRow>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
@@ -171,9 +195,9 @@
         </Border>
       </StackPanel>
 
-      <!-- V.11: a tag goes back only after the person has seen the environment and fields it reaches. -->
-      <StackPanel Name="LostTagsCard" Spacing="6" IsVisible="{Binding HasLostTags}">
-        <TextBlock Classes="th kind-head" AutomationProperties.HeadingLevel="2" Text="{x:Static res:Strings.ProjectTagsDropped}" />
+      <!-- A tag goes back only after the person has seen the stage and fields it reaches. -->
+      <StackPanel Name="LostTagsCard" Classes="section" IsVisible="{Binding HasLostTags}">
+        <TextBlock Classes="section-heading" AutomationProperties.HeadingLevel="3" Text="{x:Static res:Strings.ProjectTagsDropped}" />
         <Border Classes="group">
           <ItemsControl Name="LostTagRows" ItemsSource="{Binding LostTags}">
             <ItemsControl.ItemsPanel>
@@ -183,9 +207,9 @@
               <DataTemplate x:DataType="vm:LostTagRow">
                 <ctl:FieldRow Classes="wide">
                   <StackPanel Spacing="8">
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Background="Transparent"
+                    <Grid Classes="opens-item" ColumnDefinitions="*,Auto" ColumnSpacing="12" Background="Transparent"
                           AutomationProperties.Name="{Binding Description}">
-                      <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                      <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center" ToolTip.Tip="{Binding EntryPath}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                           <TextBlock Name="LostTag"
                                      Classes="mono size-13"
@@ -200,7 +224,7 @@
                       </StackPanel>
                       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                         <Button Classes="sm" Content="{x:Static res:Strings.RestoreTag}" AutomationProperties.Name="{Binding Tag, StringFormat={x:Static res:Strings.RestoreValue}}" IsVisible="{Binding NeedsReview}" Command="{Binding RestoreCommand}" />
-                        <Button Classes="sm ghost" Content="{x:Static res:Strings.Dismiss}" AutomationProperties.Name="{Binding Tag, StringFormat={x:Static res:Strings.DismissValue}}" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
+                        <Button Classes="sm ghost on-point" Content="{x:Static res:Strings.Dismiss}" AutomationProperties.Name="{Binding Tag, StringFormat={x:Static res:Strings.DismissValue}}" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
                         <Button Classes="sm ghost" Content="{x:Static res:Strings.ReviewAgain}" AutomationProperties.Name="{Binding Tag, StringFormat={x:Static res:Strings.ReviewValueAgain}}" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
                       </StackPanel>
                     </Grid>
@@ -215,7 +239,7 @@
                         </ItemsControl>
                         <StackPanel Orientation="Horizontal" Spacing="8">
                           <Button Classes="sm ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelRestoreCommand}" />
-                          <Button Classes="sm" Content="{x:Static res:Strings.AddTag}" Command="{Binding ConfirmRestoreCommand}" />
+                          <Button Classes="sm primary" Content="{x:Static res:Strings.AddTag}" Command="{Binding ConfirmRestoreCommand}" />
                         </StackPanel>
                       </StackPanel>
                     </Border>
@@ -227,30 +251,17 @@
         </Border>
       </StackPanel>
 
-      <!-- V.9: each problem says its reason once, in a tooltip on its heading; a row names the item and what is its own. -->
+      <!-- Each problem's reason is its heading's tooltip; a row names the item and, muted under it, what is its own. -->
       <ItemsControl Name="PasswordGroups" ItemsSource="{Binding PasswordGroups}" IsVisible="{Binding HasPasswords}">
         <ItemsControl.ItemsPanel>
           <ItemsPanelTemplate>
-            <StackPanel Spacing="12" />
+            <StackPanel Spacing="20" />
           </ItemsPanelTemplate>
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:PasswordGroup">
-            <StackPanel Spacing="6">
-              <StackPanel Orientation="Horizontal" Spacing="8" Classes="kind-head">
-                <TextBlock Name="PasswordProblem" Classes="th" AutomationProperties.HeadingLevel="2" VerticalAlignment="Center" Text="{Binding Heading}" />
-                <Button Classes="link" Content="{x:Static res:Strings.LearnMore}"
-                        AutomationProperties.Name="{Binding Heading, StringFormat={x:Static res:Strings.LearnMoreAboutValue}}">
-                  <Button.Flyout>
-                    <Flyout Placement="Bottom">
-                      <StackPanel MaxWidth="320" Spacing="8">
-                        <TextBlock Classes="size-13" TextWrapping="Wrap" Text="{Binding Reason}" />
-                        <TextBlock Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.ReplaceAWeakOrReusedPasswordOnX22ee0c}" />
-                      </StackPanel>
-                    </Flyout>
-                  </Button.Flyout>
-                </Button>
-              </StackPanel>
+            <StackPanel Classes="section">
+              <TextBlock Name="PasswordProblem" Classes="section-heading" AutomationProperties.HeadingLevel="3" Text="{Binding Heading}" ToolTip.Tip="{Binding Reason}" />
               <Border Classes="group">
                 <ItemsControl ItemsSource="{Binding Rows}">
                   <ItemsControl.ItemsPanel>
@@ -259,18 +270,19 @@
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:PasswordRow">
                       <ctl:FieldRow Classes="wide">
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Background="Transparent"
+                        <Grid Classes="opens-item" ColumnDefinitions="*,Auto" ColumnSpacing="12" Background="Transparent"
                               AutomationProperties.Name="{Binding Description}">
-                          <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                            <TextBlock Name="PasswordItem" Classes="mono size-13" TextWrapping="Wrap" Text="{Binding Line}" Foreground="{DynamicResource KpTextPrimary}" VerticalAlignment="Center" />
-                            <Border Classes="chip outline state" VerticalAlignment="Center" IsVisible="{Binding IsDismissed}">
-                              <TextBlock Text="{x:Static res:Strings.Dismissed}" />
-                            </Border>
+                          <StackPanel Spacing="2" VerticalAlignment="Center" ToolTip.Tip="{Binding EntryPath}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <TextBlock Name="PasswordItem" Classes="size-13" TextTrimming="CharacterEllipsis" Text="{Binding Entry}" Foreground="{DynamicResource KpTextPrimary}" VerticalAlignment="Center" />
+                              <Border Classes="chip outline state" VerticalAlignment="Center" IsVisible="{Binding IsDismissed}">
+                                <TextBlock Text="{x:Static res:Strings.Dismissed}" />
+                              </Border>
+                            </StackPanel>
+                            <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding Detail}" IsVisible="{Binding HasDetail}" />
                           </StackPanel>
                           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                            <Button Classes="sm ghost" Content="{x:Static res:Strings.OpenItem}" Command="{Binding OpenCommand}"
-                                    AutomationProperties.Name="{Binding OpenLabel}" />
-                            <Button Classes="sm ghost" Content="{x:Static res:Strings.Dismiss}" AutomationProperties.Name="{Binding Entry, StringFormat={x:Static res:Strings.DismissValue}}" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
+                            <Button Classes="sm ghost on-point" Content="{x:Static res:Strings.Dismiss}" AutomationProperties.Name="{Binding Entry, StringFormat={x:Static res:Strings.DismissValue}}" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
                             <Button Classes="sm ghost" Content="{x:Static res:Strings.ReviewAgain}" AutomationProperties.Name="{Binding Entry, StringFormat={x:Static res:Strings.ReviewValueAgain}}" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
                           </StackPanel>
                         </Grid>
@@ -288,26 +300,13 @@
       <ItemsControl Name="ReminderGroups" ItemsSource="{Binding ReminderGroups}" IsVisible="{Binding HasReminders}">
         <ItemsControl.ItemsPanel>
           <ItemsPanelTemplate>
-            <StackPanel Spacing="12" />
+            <StackPanel Spacing="20" />
           </ItemsPanelTemplate>
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:ReminderGroup">
-            <StackPanel Spacing="6">
-              <StackPanel Orientation="Horizontal" Spacing="8" Classes="kind-head">
-                <TextBlock Name="ReminderReason" Classes="th" AutomationProperties.HeadingLevel="2" VerticalAlignment="Center" Text="{Binding Heading}" />
-                <Button Classes="link" Content="{x:Static res:Strings.LearnMore}"
-                        AutomationProperties.Name="{Binding Heading, StringFormat={x:Static res:Strings.LearnMoreAboutValue}}">
-                  <Button.Flyout>
-                    <Flyout Placement="Bottom">
-                      <StackPanel MaxWidth="320" Spacing="8">
-                        <TextBlock Classes="size-13" TextWrapping="Wrap" Text="{Binding Reason}" />
-                        <TextBlock Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.ReplaceAnItemBeforeItExpires}" />
-                      </StackPanel>
-                    </Flyout>
-                  </Button.Flyout>
-                </Button>
-              </StackPanel>
+            <StackPanel Classes="section">
+              <TextBlock Name="ReminderReason" Classes="section-heading" AutomationProperties.HeadingLevel="3" Text="{Binding Heading}" ToolTip.Tip="{Binding Reason}" />
               <Border Classes="group">
                 <ItemsControl ItemsSource="{Binding Rows}">
                   <ItemsControl.ItemsPanel>
@@ -316,20 +315,21 @@
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:ReminderRow">
                       <ctl:FieldRow Classes="wide">
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Background="Transparent"
+                        <Grid Classes="opens-item" ColumnDefinitions="*,Auto" ColumnSpacing="12" Background="Transparent"
                               AutomationProperties.Name="{Binding Description}">
-                          <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                            <TextBlock Name="ReminderItem" Classes="mono size-13" TextWrapping="Wrap" Text="{Binding Line}" Foreground="{DynamicResource KpTextPrimary}" VerticalAlignment="Center" />
-                            <Border Classes="chip outline state" VerticalAlignment="Center" IsVisible="{Binding IsDismissed}">
-                              <TextBlock Text="{x:Static res:Strings.Dismissed}" />
-                            </Border>
+                          <StackPanel Spacing="2" VerticalAlignment="Center" ToolTip.Tip="{Binding EntryPath}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <TextBlock Name="ReminderItem" Classes="size-13" TextTrimming="CharacterEllipsis" Text="{Binding Entry}" Foreground="{DynamicResource KpTextPrimary}" VerticalAlignment="Center" />
+                              <Border Classes="chip outline state" VerticalAlignment="Center" IsVisible="{Binding IsDismissed}">
+                                <TextBlock Text="{x:Static res:Strings.Dismissed}" />
+                              </Border>
+                            </StackPanel>
+                            <TextBlock Classes="caption" Text="{Binding Detail}" IsVisible="{Binding HasDetail}" />
                           </StackPanel>
                           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                             <Button Name="OpenReminderPage" Classes="sm ghost" Content="{Binding PageLabel}" Command="{Binding OpenPageCommand}" IsVisible="{Binding HasPage}"
                                     ToolTip.Tip="{Binding PageAddress}" AutomationProperties.Name="{Binding PageDescription}" />
-                            <Button Classes="sm ghost" Content="{x:Static res:Strings.OpenItem}" Command="{Binding OpenCommand}"
-                                    AutomationProperties.Name="{Binding OpenLabel}" />
-                            <Button Classes="sm ghost" Content="{x:Static res:Strings.Dismiss}" AutomationProperties.Name="{Binding Entry, StringFormat={x:Static res:Strings.DismissValue}}" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
+                            <Button Classes="sm ghost on-point" Content="{x:Static res:Strings.Dismiss}" AutomationProperties.Name="{Binding Entry, StringFormat={x:Static res:Strings.DismissValue}}" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
                             <Button Classes="sm ghost" Content="{x:Static res:Strings.ReviewAgain}" AutomationProperties.Name="{Binding Entry, StringFormat={x:Static res:Strings.ReviewValueAgain}}" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />
                           </StackPanel>
                         </Grid>

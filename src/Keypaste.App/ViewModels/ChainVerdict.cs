@@ -1,11 +1,12 @@
 using System.Globalization;
+using Keypaste.App.Resources;
 using Keypaste.Core.Audit;
 
 namespace Keypaste.App.ViewModels;
 
 /// <summary>
-/// The hash chain's verdict as the Activity screen states it: a one-line status, the latest hash, the breaks, what the
-/// signed checkpoints say, and what the check does and does not prove.
+/// The hash chain's verdict as the Activity screen states it: a verdict line and at most one sentence, the latest hash, and
+/// behind Learn more the breaks, what the signed checkpoints say, and what the check does and does not prove.
 /// </summary>
 /// <remarks>
 /// It reads the same <see cref="AuditChainReport"/> that <see cref="AuditText.Verdict"/> renders for
@@ -26,6 +27,14 @@ internal sealed class ChainVerdict
 
     internal string Headline { get; private init; } = string.Empty;
 
+    /// <summary>Where the first edit is and what still holds, or empty when the log holds no edit.</summary>
+    internal string Sentence { get; private init; } = string.Empty;
+
+    internal bool HasSentence => Sentence.Length > 0;
+
+    /// <summary>The local time of day the first edited record states, for the screen's status line, or null.</summary>
+    internal string? EditedAt { get; private init; }
+
     /// <summary>The latest record's hash, or empty when there is none worth keeping.</summary>
     internal string Hash { get; private init; } = string.Empty;
 
@@ -36,7 +45,7 @@ internal sealed class ChainVerdict
 
     internal bool HasBreaks => Breaks.Count > 0;
 
-    /// <summary>What the verdict means, one unwrapped paragraph each.</summary>
+    /// <summary>What the verdict means and what the check can't prove, one unwrapped paragraph each, behind Learn more.</summary>
     internal IReadOnlyList<string> Paragraphs { get; private init; } = [];
 
     /// <summary>The file that was checked.</summary>
@@ -55,13 +64,13 @@ internal sealed class ChainVerdict
             _ when report.Records == 0 => new ChainVerdict(report)
             {
                 Tone = LogTone.Muted,
-                Headline = "No records to verify",
+                Headline = Strings.ActivityCheckedNoRecordsYet,
                 Paragraphs = [.. Forgiven(report)],
             },
             _ => new ChainVerdict(report)
             {
                 Tone = LogTone.Ok,
-                Headline = Invariant($"Chain verified · {Count(report.Records, "record")} · latest seq {report.LatestSequence}"),
+                Headline = $"Activity checked: no edits found in {Count(report.Records, "record")}",
                 Hash = report.LatestHash,
                 Paragraphs =
                 [
@@ -81,16 +90,16 @@ internal sealed class ChainVerdict
     {
         var breaks = report.Findings.Where(finding => finding.IsBreak).ToList();
         var first = breaks.FirstOrDefault();
+        var at = first is null ? null : Local(first.Timestamp, zone);
 
         return new ChainVerdict(report)
         {
             Tone = LogTone.Danger,
-            Headline = first switch
-            {
-                { Timestamp.Length: > 0 } => Invariant($"Chain broken at seq {first.Sequence}"),
-                not null => Invariant($"Chain broken at line {first.Line}"),
-                null => "Chain broken",
-            },
+            Headline = breaks.Count <= 1 ? Strings.ActivityCheckedOneRecordWasEdited : Invariant($"Activity checked: {breaks.Count} records were edited"),
+            Sentence = at is { } when
+                ? $"The record at {when.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)} doesn't match what keypaste wrote. The records before it are intact."
+                : Strings.ARecordDoesntMatch,
+            EditedAt = at?.ToString("HH:mm:ss", CultureInfo.InvariantCulture),
             Breaks = [.. breaks.Select(finding => Break(finding, zone))],
             Paragraphs =
             [
@@ -112,12 +121,13 @@ internal sealed class ChainVerdict
             return Invariant($"Line {finding.Line}: {fault}");
         }
 
-        var when = DateTimeOffset.TryParse(finding.Timestamp, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var at)
-            ? TimeZoneInfo.ConvertTime(at, zone).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)
-            : finding.Timestamp;
+        var when = Local(finding.Timestamp, zone)?.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) ?? finding.Timestamp;
 
         return Invariant($"Line {finding.Line} · seq {finding.Sequence} · {when} · {fault}");
     }
+
+    private static DateTimeOffset? Local(string timestamp, TimeZoneInfo zone) =>
+        DateTimeOffset.TryParse(timestamp, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var at) ? TimeZoneInfo.ConvertTime(at, zone) : null;
 
     /// <summary>What the checkpoints say under this vault's key, or that none was checked because the vault holds no key yet.</summary>
     private static string Checkpoints(AuditChainReport report) =>

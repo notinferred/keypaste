@@ -21,7 +21,7 @@ public sealed class LogViewModelTests : IDisposable
     public void Dispose() => _home.Dispose();
 
     /// <summary>
-    /// The rows are <see cref="AuditReader"/>'s records, newest first, and the footer counts the file's records, so
+    /// The rows are <see cref="AuditReader"/>'s records, newest first, and the status counts the file's records, so
     /// the table cannot drift from what <c>keypaste log</c> reads.
     /// </summary>
     [Fact]
@@ -29,17 +29,33 @@ public sealed class LogViewModelTests : IDisposable
     {
         _home.Append("env/dev/STRIPE_KEY", "env/prod/GITHUB_TOKEN");
 
-        using var model = new LogViewModel(_home.Home);
+        var model = new LogViewModel(_home.Home);
 
         Assert.True(AuditReader.TryRead(_home.LogPath, out var entries, out _, out var error), error);
 
         Assert.Equal(entries.Reverse(), model.Rows.Select(row => row.Source));
         Assert.Equal("GITHUB_TOKEN", model.Rows[0].Secrets);
-        Assert.Equal("env/prod", model.Rows[0].Where);
+        Assert.Equal("prod", model.Rows[0].Where);
+        Assert.Equal("env/prod", model.Rows[0].WhereInFull);
         Assert.All(model.Rows, row => Assert.True(row.Verified));
-        Assert.Equal("2 records", model.Summary);
+        Assert.Equal("Log intact · 2 records", model.Status);
         Assert.Equal(_home.LogPath, model.LogPath);
-        Assert.False(model.HasNotes);
+        Assert.False(model.HasUnreadableNote);
+    }
+
+    /// <summary>Rows run newest first by their full time, whatever order the file has them in, so one day's section holds that day alone.</summary>
+    [Fact]
+    public void Rows_run_newest_first_by_time_and_each_day_is_one_section()
+    {
+        _home.AppendAt(AppClock.Start.AddDays(-1).AddHours(5), "env/dev/YESTERDAY_LATE");
+        _home.AppendAt(AppClock.Start.AddHours(-5), "env/dev/TODAY_EARLY");
+        _home.AppendAt(AppClock.Start.AddDays(-1), "env/dev/YESTERDAY_EARLY");
+        _home.AppendAt(AppClock.Start, "env/dev/TODAY_LATE");
+
+        var model = new LogViewModel(_home.Home, new FixedClock(AppClock.Start.AddHours(1)));
+
+        Assert.Equal(["TODAY_LATE", "TODAY_EARLY", "YESTERDAY_LATE", "YESTERDAY_EARLY"], model.Rows.Select(row => row.Secrets));
+        Assert.Equal(["Today", null, "Yesterday", null], model.Rows.Select(row => row.Day));
     }
 
     /// <summary>A table that runs over several days carries each day once, above its first row.</summary>
@@ -48,12 +64,12 @@ public sealed class LogViewModelTests : IDisposable
     {
         _home.Append("env/dev/A", "env/dev/B");
 
-        using var model = new LogViewModel(_home.Home, new FixedClock(new DateTimeOffset(2026, 7, 29, 10, 0, 0, TimeSpan.Zero)));
+        var model = new LogViewModel(_home.Home, new FixedClock(new DateTimeOffset(2026, 7, 29, 10, 0, 0, TimeSpan.Zero)));
 
         Assert.Equal("Yesterday", model.Rows[0].Day);
         Assert.Null(model.Rows[1].Day);
 
-        using var same = new LogViewModel(_home.Home, new FixedClock(new DateTimeOffset(2026, 7, 28, 23, 0, 0, TimeSpan.Zero)));
+        var same = new LogViewModel(_home.Home, new FixedClock(new DateTimeOffset(2026, 7, 28, 23, 0, 0, TimeSpan.Zero)));
 
         Assert.All(same.Rows, row => Assert.False(row.StartsDay));
     }
@@ -62,7 +78,7 @@ public sealed class LogViewModelTests : IDisposable
     [Fact]
     public void An_absent_log_is_a_sentence_rather_than_an_error()
     {
-        using var model = new LogViewModel(_home.Home);
+        var model = new LogViewModel(_home.Home);
 
         Assert.False(File.Exists(_home.LogPath));
         Assert.Empty(model.Rows);
@@ -75,16 +91,16 @@ public sealed class LogViewModelTests : IDisposable
     }
 
     [Fact]
-    public void An_empty_log_offers_Agents_where_something_can_take_it_there()
+    public void An_empty_log_offers_to_connect_an_AI_tool_where_something_can_take_it_there()
     {
         var opened = false;
-        using var model = new LogViewModel(_home.Home, openAgents: () => opened = true);
-        using var alone = new LogViewModel(_home.Home);
+        var model = new LogViewModel(_home.Home, connect: () => opened = true);
+        var alone = new LogViewModel(_home.Home);
 
-        Assert.True(model.OffersAgents);
-        Assert.False(alone.OffersAgents);
+        Assert.True(model.OffersConnect);
+        Assert.False(alone.OffersConnect);
 
-        model.OpenAgentsCommand.Press();
+        model.ConnectCommand.Press();
 
         Assert.True(opened);
     }
@@ -95,13 +111,13 @@ public sealed class LogViewModelTests : IDisposable
     {
         _home.Append("env/dev/STRIPE_KEY");
 
-        using var model = new LogViewModel(_home.Home);
+        var model = new LogViewModel(_home.Home);
 
         Assert.True(model.HasTable);
         Assert.True(model.HasRows);
         Assert.False(model.HasMessage);
         Assert.Equal("STRIPE_KEY", Assert.Single(model.Rows).Secrets);
-        Assert.Equal("1 record", model.Summary);
+        Assert.Equal("Log intact · 1 record", model.Status);
     }
 
     /// <summary>A record the bridge appends while the window is open shows up on a refresh.</summary>
@@ -110,7 +126,7 @@ public sealed class LogViewModelTests : IDisposable
     {
         _home.Append("env/dev/STRIPE_KEY");
 
-        using var model = new LogViewModel(_home.Home);
+        var model = new LogViewModel(_home.Home);
 
         _home.Append("env/prod/GITHUB_TOKEN");
         Assert.Single(model.Rows);
@@ -127,7 +143,7 @@ public sealed class LogViewModelTests : IDisposable
     {
         _home.Append("env/dev/STRIPE_KEY");
 
-        using var model = new LogViewModel(_home.Home);
+        var model = new LogViewModel(_home.Home);
         _home.Append("env/prod/GITHUB_TOKEN");
 
         Assert.True(model.RefreshCommand.CanExecute(null));
@@ -142,7 +158,7 @@ public sealed class LogViewModelTests : IDisposable
     {
         _home.Append("env/dev/STRIPE_KEY");
 
-        using var model = new LogViewModel(_home.Home);
+        var model = new LogViewModel(_home.Home);
 
         Assert.False(model.VerdictShown);
         Assert.NotNull(model.Verdict);
@@ -152,11 +168,21 @@ public sealed class LogViewModelTests : IDisposable
 
         var report = AuditChainVerifier.Verify(_home.LogPath);
         Assert.True(model.VerdictShown);
-        Assert.Equal("Chain verified · 1 record · latest seq 1", model.Verdict!.Headline);
+        Assert.Equal("Activity checked: no edits found in 1 record", model.Verdict!.Headline);
+        Assert.False(model.Verdict.HasSentence);
         Assert.Equal(report.LatestHash, model.Verdict.Hash);
         Assert.Equal(LogTone.Ok, model.Verdict.Tone);
         Assert.Equal(_home.LogPath, model.Verdict.Path);
         Assert.DoesNotContain(model.Verdict.Paragraphs, paragraph => paragraph.Contains('\n', StringComparison.Ordinal));
+
+        // The limits wait behind Learn more, and Hide folds the verdict away.
+        Assert.False(model.LimitsShown);
+        model.LearnMoreCommand.Press();
+        Assert.True(model.LimitsShown);
+        model.HideVerdictCommand.Press();
+        Assert.False(model.VerdictShown);
+        Assert.False(model.LimitsShown);
+        model.VerifyCommand.Press();
 
         // It described the file as it was read a moment ago, so a fresh read folds it away.
         model.Refresh();
@@ -170,7 +196,7 @@ public sealed class LogViewModelTests : IDisposable
         _home.Checkpoint(Key(_vaultKey, _vault));
         _home.Append("env/prod/GITHUB_TOKEN");
 
-        using var model = new LogViewModel(_home.Home, checkpointKey: () => Key(_vaultKey, _vault));
+        var model = new LogViewModel(_home.Home, checkpointKey: () => Key(_vaultKey, _vault));
 
         Assert.Equal(LogTone.Ok, model.Verdict!.Tone);
         Assert.Contains("1 checkpoint found, 1 signed by this vault's key. Unsigned tail: 1 record after the last signed checkpoint.", model.Verdict.Paragraphs);
@@ -183,7 +209,7 @@ public sealed class LogViewModelTests : IDisposable
         _home.Append("env/dev/STRIPE_KEY");
         _home.Checkpoint(Key(_vaultKey, "fedcba9876543210"));
 
-        using var model = new LogViewModel(_home.Home, checkpointKey: () => Key(_vaultKey, _vault));
+        var model = new LogViewModel(_home.Home, checkpointKey: () => Key(_vaultKey, _vault));
 
         Assert.Equal(LogTone.Ok, model.Verdict!.Tone);
         Assert.Contains(
@@ -197,11 +223,11 @@ public sealed class LogViewModelTests : IDisposable
         _home.Append("env/dev/STRIPE_KEY");
         _home.Checkpoint(Key(new byte[32], _vault));
 
-        using var model = new LogViewModel(_home.Home, checkpointKey: () => Key(_vaultKey, _vault));
+        var model = new LogViewModel(_home.Home, checkpointKey: () => Key(_vaultKey, _vault));
 
         Assert.True(model.IsBroken);
         Assert.Equal(LogTone.Danger, model.Verdict!.Tone);
-        Assert.Equal("Chain broken at seq 2", model.Verdict.Headline);
+        Assert.Equal("Activity checked: one record was edited", model.Verdict.Headline);
         Assert.Contains(AuditText.Describe(AuditChainFault.Forged), Assert.Single(model.Verdict.Breaks), StringComparison.Ordinal);
         Assert.Contains("1 checkpoint found, 0 signed by this vault's key. No checkpoint is signed by this vault's key, so no record is signed.", model.Verdict.Paragraphs);
     }
@@ -212,7 +238,7 @@ public sealed class LogViewModelTests : IDisposable
         _home.Append("env/dev/STRIPE_KEY");
         _home.Checkpoint(Key(_vaultKey, _vault));
 
-        using var model = new LogViewModel(_home.Home, checkpointKey: () => null);
+        var model = new LogViewModel(_home.Home, checkpointKey: () => null);
 
         Assert.Equal(LogTone.Ok, model.Verdict!.Tone);
         Assert.Contains("1 checkpoint found, not checked: this vault holds no checkpoint key yet, so the log is not compacted until a save gives it one.", model.Verdict.Paragraphs);
@@ -220,7 +246,7 @@ public sealed class LogViewModelTests : IDisposable
     }
 
     /// <summary>
-    /// An edited file says so on load, still shows its records, and marks the ones the chain cannot vouch for.
+    /// An edited file says so on load in the status, still shows its records, and marks the one where the chain breaks.
     /// </summary>
     /// <remarks>
     /// Saying nothing until somebody pressed a button would let a tampered log look like an untouched one, and
@@ -232,48 +258,29 @@ public sealed class LogViewModelTests : IDisposable
         _home.Append("env/dev/STRIPE_KEY", "env/prod/GITHUB_TOKEN");
         _home.Alter();
 
-        using var model = new LogViewModel(_home.Home);
+        var model = new LogViewModel(_home.Home);
 
-        Assert.True(model.HasMessage);
-        Assert.True(model.IsBroken);
-        Assert.Contains("edited", model.Message, StringComparison.Ordinal);
-        Assert.Equal(2, model.Rows.Count);
-        Assert.True(model.Rows[^1].Unverified);
-        Assert.True(model.HasUnverifiedNote);
-        Assert.Equal(LogTone.Danger, model.Verdict!.Tone);
-        Assert.Equal("Chain broken at seq 1", model.Verdict.Headline);
-        Assert.Contains(AuditText.Describe(AuditChainFault.Altered), Assert.Single(model.Verdict.Breaks), StringComparison.Ordinal);
-
-        // The banner stands only until the verdict is open, and the verdict says what to do.
-        Assert.EndsWith("Verify chain says where.", model.Message, StringComparison.Ordinal);
-        Assert.True(model.HasNotice);
-        model.VerifyCommand.Press();
         Assert.False(model.HasNotice);
-        Assert.Contains(model.Verdict!.Paragraphs, paragraph => paragraph.Contains("keypaste log verify --expect", StringComparison.Ordinal));
-        model.VerifyCommand.Press();
-        Assert.True(model.HasNotice);
-    }
-
-    /// <summary>The one Activity screen marks what the chain does not vouch for, and sends the person to Verify chain to learn why.</summary>
-    [Fact]
-    public void Activity_marks_an_unverified_record_and_offers_the_check()
-    {
-        _home.Append("env/dev/STRIPE_KEY", "env/prod/GITHUB_TOKEN");
-        _home.Alter();
-
-        using var log = new LogViewModel(_home.Home);
-
-        Assert.True(log.OffersVerify);
-        Assert.True(log.VerifyCommand.CanExecute(null));
-        Assert.True(log.Rows[^1].Unverified);
-        Assert.True(log.HasUnverifiedNote);
-        Assert.EndsWith("Verify chain says why.", LogViewModel.UnverifiedLegend, StringComparison.Ordinal);
-        Assert.EndsWith("Verify chain says where.", log.Message, StringComparison.Ordinal);
+        Assert.True(model.IsBroken);
+        Assert.True(model.StatusIsEdited);
+        Assert.StartsWith("Log edited at ", model.Status, StringComparison.Ordinal);
+        Assert.EndsWith(" · 2 records", model.Status, StringComparison.Ordinal);
+        Assert.Equal(2, model.Rows.Count);
+        Assert.True(model.Rows[^1].Edited);
+        Assert.False(model.Rows[^1].Unchecked);
+        Assert.Contains("Edited", model.Rows[^1].RowName, StringComparison.Ordinal);
+        Assert.False(model.Rows[0].Edited);
+        Assert.Equal(LogTone.Danger, model.Verdict!.Tone);
+        Assert.Equal("Activity checked: one record was edited", model.Verdict.Headline);
+        Assert.EndsWith("doesn't match what keypaste wrote. The records before it are intact.", model.Verdict.Sentence, StringComparison.Ordinal);
+        Assert.Contains(AuditText.Describe(AuditChainFault.Altered), Assert.Single(model.Verdict.Breaks), StringComparison.Ordinal);
+        Assert.Contains(model.Verdict.Paragraphs, paragraph => paragraph.Contains("keypaste log verify --expect", StringComparison.Ordinal));
+        Assert.True(model.VerifyCommand.CanExecute(null));
     }
 
     /// <summary>
     /// Agents keeps what agents and tokens asked for, approvals included, You keeps only what the person did
-    /// themselves, so the two never share a row; Denied keeps every refusal, and the footer says which, with its counts.
+    /// themselves, so the two never share a row; Denied keeps every refusal, and the status says which, with its counts.
     /// </summary>
     [Fact]
     public void Each_filter_keeps_its_records_and_says_so()
@@ -293,7 +300,7 @@ public sealed class LogViewModelTests : IDisposable
                 Reason = "share abc: 1 view, expires 2026-07-29T09:12:44Z, to maya@acme.dev",
             });
 
-        using var model = new LogViewModel(_home.Home);
+        var model = new LogViewModel(_home.Home);
 
         Assert.Equal(5, model.Rows.Count);
 
@@ -309,7 +316,7 @@ public sealed class LogViewModelTests : IDisposable
         model.Filter = model.Filters.Single(option => option.Filter == LogFilter.Denied);
         Assert.All(model.Rows, row => Assert.True(row.Denied));
         Assert.Equal(["Denied", "No answer"], model.Rows.Select(row => row.Result));
-        Assert.Equal("2 of 5 records · refused calls only", model.Summary);
+        Assert.Equal("Log intact · 2 of 5 records · refused calls only", model.Status);
         Assert.False(model.FilterEmpty);
     }
 
@@ -319,11 +326,11 @@ public sealed class LogViewModelTests : IDisposable
     {
         _home.Append("env/dev/STRIPE_KEY");
 
-        using var model = new LogViewModel(_home.Home);
+        var model = new LogViewModel(_home.Home);
         model.Filter = model.Filters.Single(option => option.Filter == LogFilter.You);
 
         Assert.True(model.FilterEmpty);
-        Assert.Equal("0 of 1 record · your own actions only", model.Summary);
+        Assert.Equal("Log intact · 0 of 1 record · your own actions only", model.Status);
     }
 
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider

@@ -457,7 +457,7 @@ public sealed partial class ApproverHandler
                 cancellationToken);
         }
 
-        List<ItemCandidate> candidates = [.. offered.Select(Candidate)];
+        List<ItemCandidate> candidates = [.. offered.Select(item => Candidate(item) with { Protected = RequiresLiveApproval(item.Name) })];
         var prompt = ApprovalPrompt.For(request.ClientName, shared, Shown(request), request.Reason, request.ClientLabel) with
         {
             Candidates = candidates,

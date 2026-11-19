@@ -55,7 +55,10 @@ internal sealed class SetApprovalViewModel : PromptViewModel
     internal string Reason { get; }
 
     /// <summary>Whose words the quote is.</summary>
-    internal string SaysLabel => ApprovalViewModel.Says(Agent);
+    internal string SaysLabel => ApprovalViewModel.Says(Agent, Scrubbed, Truncation);
+
+    /// <summary>What keypaste altered or cut in the quote, or null.</summary>
+    internal string? QuoteNote => ApprovalViewModel.NoteOn(Scrubbed, Truncation);
 
     /// <summary>The agent's words, quoted.</summary>
     internal string Quoted => ApprovalViewModel.Quote(Reason);
@@ -65,5 +68,5 @@ internal sealed class SetApprovalViewModel : PromptViewModel
     internal string Truncation { get; }
 
     /// <summary>What allowing does, in one plain line.</summary>
-    internal string Consequence { get; } = "The agent receives every value at once and can pass them on.";
+    internal string Consequence => $"{Agent} gets all {Count} and can pass them on.";
 }

@@ -3,7 +3,7 @@ using Keypaste.Core.Agents;
 
 namespace Keypaste.App.ViewModels;
 
-/// <summary>One of a category's three rules on Settings › Agents; the one that holds is checked.</summary>
+/// <summary>One of a category's three rules on Settings › Agents; the one that holds is raised.</summary>
 /// <param name="Category">The category it sets.</param>
 /// <param name="Rule">The rule.</param>
 /// <param name="Words">What the segment says.</param>
@@ -16,7 +16,7 @@ internal sealed record CategoryChoice(FieldCategory Category, CategoryRule Rule,
 /// <param name="Choices">Ask, Allow and Block.</param>
 internal sealed record CategoryRow(FieldCategory Category, string Name, IReadOnlyList<CategoryChoice> Choices);
 
-/// <summary>Settings › Agents: what every agent gets of each kind of value on this computer, the username and the hosts and references switches, and each category's rule.</summary>
+/// <summary>Settings › Agents: the defaults every agent gets on this computer, the username and the hosts and references switches, and each category's rule.</summary>
 /// <remarks>
 /// Each change goes through the authority that answers agents, which seals it with the vault's key and records it. Allow and
 /// turning a switch on take the person's confirmation first, since they give agents what nobody is asked about; Ask, Block and
@@ -197,9 +197,9 @@ internal sealed partial class AgentRulesViewModel : ObservableObject, IDisposabl
             category,
             char.ToUpperInvariant(shown[0]) + shown[1..],
             [
-                new CategoryChoice(category, CategoryRule.Ask, "Ask", held == CategoryRule.Ask),
-                new CategoryChoice(category, CategoryRule.Allow, "Allow", held == CategoryRule.Allow),
-                new CategoryChoice(category, CategoryRule.Block, "Block", held == CategoryRule.Block),
+                new CategoryChoice(category, CategoryRule.Ask, Strings.Ask, held == CategoryRule.Ask),
+                new CategoryChoice(category, CategoryRule.Allow, Strings.Allow, held == CategoryRule.Allow),
+                new CategoryChoice(category, CategoryRule.Block, Strings.Block, held == CategoryRule.Block),
             ]);
     }
 

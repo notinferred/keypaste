@@ -20,7 +20,7 @@ public sealed partial class ConnectClientTests
     private const string _claude = "claude-code";
 
     [Fact]
-    public void Claude_Code_is_registered_as_planned_its_bridge_reaches_the_apps_prompt_and_doctor_and_keypaste_alone_find_it_changing_nothing()
+    public void Claude_Code_is_registered_as_planned_its_bridge_reaches_the_app_and_doctor_and_keypaste_alone_find_it_changing_nothing()
     {
         using var home = new ToolHome();
         using var app = home.Hold();
@@ -36,18 +36,12 @@ public sealed partial class ConnectClientTests
         Assert.StartsWith("claude mcp add --scope user --transport stdio keypaste -- ", plan[1], StringComparison.Ordinal);
         Assert.Matches(@" mcp --vault .*vault\.kdbx --client-label claude-code --allow-run --expose \*\*$", plan[1]);
 
-        Assert.Equal("Cancelled. Nothing was changed.", ToolHome.Say(app, "^message ", "cancel").Message());
-        Assert.False(File.Exists(home.ClaudeConfig), "a cancelled plan wrote the tool's configuration");
-        Assert.Equal(plan, ToolHome.Say(app, "^preview end", $"connect {_claude}").Preview());
-        Assert.StartsWith("Connected.", ToolHome.Say(app, "^message ", "confirm").Message(), StringComparison.Ordinal);
+        Assert.False(File.Exists(home.ClaudeConfig), "a plan shown and not run wrote the tool's configuration");
+        var connected = ToolHome.Say(app, "^check end", "confirm");
+        Assert.StartsWith("Connected Claude Code", connected.Message(), StringComparison.Ordinal);
         Assert.Equal(plan[1][(plan[1].IndexOf("keypaste -- ", StringComparison.Ordinal) + "keypaste -- ".Length)..], home.Registered());
         ToolHome.AssertClean(home.ClaudeConfig, session);
-
-        ToolHome.Say(app, "^check-entry n=4", "check");
-        Assert.Contains(app.Driver.Output, line => line == "check-entry n=1 env/ci/DEPLOY_KEY");
-        Assert.Contains($"client=keypaste-check label={_claude} entry=env/ci/DEPLOY_KEY field=password", ToolHome.Say(app, "^prompt client", "pick 1").Last("^prompt client"), StringComparison.Ordinal);
-        Assert.StartsWith("Connected: you approved env/ci/DEPLOY_KEY", ToolHome.Say(app, "^check end", "once").Check(), StringComparison.Ordinal);
-        home.AssertLastAudit("granted", "prompt", session, _claude, "keypaste-check");
+        Assert.Equal("Claude Code can reach keypaste.", connected.Check());
         Assert.Equal("connected", ToolHome.State(app, _claude));
 
         var logged = Workspace.Count(home.Audit);
@@ -77,25 +71,23 @@ public sealed partial class ConnectClientTests
             Assert.Equal(before, home.Tree());
         }
 
+        Assert.Equal(["claude mcp remove --scope user keypaste"], ToolHome.Say(app, "^preview end", $"connect-remove {_claude}").Preview());
+        Assert.StartsWith("Disconnected.", ToolHome.Say(app, "^message ", "confirm").Message(), StringComparison.Ordinal);
+        Assert.DoesNotContain("keypaste", home.Run(Built.FakeClaude, "mcp", "list"), StringComparison.Ordinal);
+        ToolHome.AssertClean(home.ClaudeConfig, session);
+        Assert.Equal("connect", ToolHome.State(app, _claude));
+
         // With another vault chosen, Connect still pins the vault in view, and that bridge still reaches the app.
         var other = Path.Combine(home.Root, "other.kdbx");
         home.Keypaste("init", Workspace.Master, Workspace.Master, other);
         home.Keypaste("use", other);
         var pinned = ToolHome.Say(app, "^preview end", $"connect {_claude}").Preview();
         Assert.Matches(@" --vault .*vault\.kdbx --client-label claude-code --allow-run --expose \*\*$", pinned[1]);
-        Assert.StartsWith("Connected.", ToolHome.Say(app, "^message ", "confirm").Message(), StringComparison.Ordinal);
+        var repinned = ToolHome.Say(app, "^check end", "confirm");
+        Assert.StartsWith("Connected Claude Code", repinned.Message(), StringComparison.Ordinal);
         Assert.Equal(pinned[1][(pinned[1].IndexOf("keypaste -- ", StringComparison.Ordinal) + "keypaste -- ".Length)..], home.Registered());
         ToolHome.AssertClean(home.ClaudeConfig, session);
-        ToolHome.Say(app, "^check-entry n=4", "check");
-        Assert.Contains($"label={_claude} entry=env/ci/DEPLOY_KEY field=password", ToolHome.Say(app, "^prompt client", "pick 1").Last("^prompt client"), StringComparison.Ordinal);
-        Assert.StartsWith("Connected: the request for env/ci/DEPLOY_KEY reached you and was refused.", ToolHome.Say(app, "^check end", "deny").Check(), StringComparison.Ordinal);
-        home.AssertLastAudit("denied", "prompt", session, _claude, name: null);
-
-        Assert.Equal(["claude mcp remove --scope user keypaste"], ToolHome.Say(app, "^preview end", $"connect-remove {_claude}").Preview());
-        Assert.StartsWith("Disconnected.", ToolHome.Say(app, "^message ", "confirm").Message(), StringComparison.Ordinal);
-        Assert.DoesNotContain("keypaste", home.Run(Built.FakeClaude, "mcp", "list"), StringComparison.Ordinal);
-        ToolHome.AssertClean(home.ClaudeConfig, session);
-        Assert.Equal("connect", ToolHome.State(app, _claude));
+        Assert.Equal("Claude Code can reach keypaste.", repinned.Check());
         ToolHome.AssertNoSecretIn(app);
     }
 
@@ -126,12 +118,11 @@ public sealed partial class ConnectClientTests
         var args = entry.GetProperty("args").EnumerateArray().Select(a => a.GetString()!).ToList();
         Assert.Equal(["--client-label", "cursor", "--allow-run", "--expose", "**"], args[args.IndexOf("--client-label")..]);
 
-        Assert.Equal("Cancelled. Nothing was changed.", ToolHome.Say(app, "^message ", "cancel").Message());
         Assert.Equal(seed, File.ReadAllBytes(home.CursorConfig));
-        Assert.False(File.Exists($"{home.CursorConfig}.keypaste-backup"), "a cancelled plan kept a backup");
+        Assert.False(File.Exists($"{home.CursorConfig}.keypaste-backup"), "a plan shown and not run kept a backup");
 
-        Assert.Equal(edit, Assert.Single(ToolHome.Say(app, "^preview end", "connect cursor").Preview()));
-        Assert.Matches("^Connected. Cursor starts keypaste mcp for this vault;.*Restart Cursor to load it.$", ToolHome.Say(app, "^message ", "confirm").Message());
+        var connected = ToolHome.Say(app, "^check end", "confirm");
+        Assert.Equal("Connected Cursor to this vault. Restart Cursor to load it.", connected.Message());
         Assert.Equal(seed, File.ReadAllBytes($"{home.CursorConfig}.keypaste-backup"));
         Assert.Equal(System.Text.Encoding.UTF8.GetString(seed), WithoutKeypaste(File.ReadAllText(home.CursorConfig)));
         var written = JsonDocument.Parse(string.Join('\n', File.ReadAllLines(home.CursorConfig).Where(line => !line.TrimStart().StartsWith("//", StringComparison.Ordinal))));
@@ -139,13 +130,7 @@ public sealed partial class ConnectClientTests
         ToolHome.AssertClean(home.CursorConfig, app.Session);
         Assert.Equal("connected", ToolHome.State(app, "cursor"));
 
-        ToolHome.Say(app, "^check-entry n=4", "check");
-        Assert.Contains(app.Driver.Output, line => line == "check-entry n=3 env/alpha/.env");
-        Assert.Contains(app.Driver.Output, line => line == "check-entry n=4 env/beta/.env");
-        Assert.DoesNotContain(app.Driver.Output, line => line.StartsWith("check-entry n=5", StringComparison.Ordinal));
-        Assert.Contains("client=keypaste-check label=cursor entry=env/beta/.env field=BETA_KEY", ToolHome.Say(app, "^prompt client", "pick 4").Last("^prompt client"), StringComparison.Ordinal);
-        Assert.StartsWith("Connected: you approved env/beta/.env", ToolHome.Say(app, "^check end", "once").Check(), StringComparison.Ordinal);
-        home.AssertLastAudit("granted", "prompt", app.Session, "cursor", name: null);
+        Assert.Equal("Cursor can reach keypaste.", connected.Check());
 
         Assert.Matches("^edit .*mcp.json: remove mcpServers.keypaste$", Assert.Single(ToolHome.Say(app, "^preview end", "connect-remove cursor").Preview()));
         Assert.StartsWith("Disconnected.", ToolHome.Say(app, "^message ", "confirm").Message(), StringComparison.Ordinal);
@@ -317,19 +302,6 @@ public sealed partial class ConnectClientTests
             Assert.DoesNotContain("keyfile", text, StringComparison.OrdinalIgnoreCase);
         }
 
-        internal void AssertLastAudit(string decision, string method, string session, string label, string? name)
-        {
-            var line = Workspace.Lines(Audit)[^1];
-            Assert.Equal(
-                ("request_credential", decision, method, session, label),
-                (line.GetProperty("tool").GetString(), line.GetProperty("decision").GetString(), line.GetProperty("method").GetString(),
-                 line.GetProperty("session").GetString(), line.GetProperty("client").GetProperty("label").GetString()));
-            if (name is not null)
-            {
-                Assert.Equal(name, line.GetProperty("client").GetProperty("name").GetString());
-            }
-        }
-
         internal static void AssertNoSecretIn(HeldApp app) =>
             Assert.DoesNotContain(app.Driver.Output, line => line.Contains(_secret, StringComparison.Ordinal) || line.Contains(_otherSecret, StringComparison.Ordinal));
 
@@ -398,7 +370,7 @@ public sealed partial class ConnectClientTests
 
         internal string Message() => app.Driver.Output.Last(line => line.StartsWith("message ", StringComparison.Ordinal))["message ".Length..];
 
-        internal string Check() => app.Driver.Output.Last(line => line.StartsWith("check ", StringComparison.Ordinal) && !line.StartsWith("check end", StringComparison.Ordinal) && !line.StartsWith("check-entry", StringComparison.Ordinal))["check ".Length..];
+        internal string Check() => app.Driver.Output.Last(line => line.StartsWith("check ", StringComparison.Ordinal) && !line.StartsWith("check end", StringComparison.Ordinal))["check ".Length..];
 
         internal string Last(string pattern) => app.Driver.Output.Last(line => Regex.IsMatch(line, pattern));
     }

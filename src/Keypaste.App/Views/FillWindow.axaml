@@ -20,41 +20,41 @@
     <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
   </Window.Styles>
 
-  <!-- A claim card with no requester line, as the pairing card has: the page and the build are what the extension claims
-       (THREATS.md T-48, T-58, T-59), so they wait under Details, and no password is drawn. No button is the default: Enter
-       fills nothing, and Escape denies. -->
+  <!-- A claim card whose requester line says Not verified: the page and the build are what the extension claims (THREATS.md
+       T-48, T-58, T-59), so the page's origin and the build wait under Details, and no password is drawn. The site is never
+       cut. No button is the default: Enter fills nothing, and Escape denies. -->
 
-  <Border Classes="claim">
+  <Border Classes="claim" Classes.arming="{Binding IsArming}">
     <StackPanel>
       <StackPanel Classes="claim-body">
         <TextBlock Classes="live" ctl:Announcer.Says="{Binding Opening}" />
-        <StackPanel Orientation="Horizontal" Spacing="6" Height="20">
-          <ctl:BrandMark Height="16" VerticalAlignment="Center" />
-          <TextBlock Classes="claim-label size-11" Text="keypaste" VerticalAlignment="Center" />
+        <views:PromptHead />
+
+        <StackPanel Spacing="4">
+          <TextBlock Name="TitleText" Classes="claim-title size-15" AutomationProperties.Name="{Binding Question}">
+            <Run Text="Fill on " /><Run Text="{Binding Site}" /><Run Text="?" />
+          </TextBlock>
+          <StackPanel Orientation="Horizontal" Spacing="6" Height="20">
+            <ctl:KpIcon Classes="claim-muted" Icon="key" Size="14" VerticalAlignment="Center" />
+            <TextBlock Name="ItemText" Classes="claim-muted size-13" Text="{Binding Item}" MaxWidth="380" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+          </StackPanel>
+          <TextBlock Name="LoginText" Classes="claim-muted size-13" Text="{Binding Login}" Margin="20,0,0,0" MaxWidth="380" HorizontalAlignment="Left"
+                     TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" IsVisible="{Binding HasLogin}" />
         </StackPanel>
 
-        <TextBlock Name="TitleText" Classes="claim-title size-16" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"
-                   AutomationProperties.Name="{Binding Question}">
-          <Run Text="{Binding QuestionBefore}" /><Run Text="{Binding Site}" FontWeight="Bold" /><Run Text="?" />
-        </TextBlock>
-
-        <Border Classes="claim-block" Padding="12,8" IsVisible="{Binding HasLogin}">
-          <TextBlock Name="LoginText" Classes="claim-line size-12-5" Text="{Binding Login}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
-        </Border>
-
-        <TextBlock Name="FormText" Classes="size-12-5" Text="{Binding Note}" Foreground="{DynamicResource KpDanger}"
+        <TextBlock Name="FormText" Classes="size-13" Text="{Binding Note}" Foreground="{DynamicResource KpDanger}"
                    TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" IsVisible="{Binding HasNote}" />
 
-        <TextBlock Name="ExplainerText" Classes="claim-muted size-12-5" Text="{Binding Explainer}" TextWrapping="Wrap" />
+        <TextBlock Name="CheckText" Classes="claim-line size-13" Text="{Binding Check}" />
 
         <StackPanel Spacing="8">
           <ToggleButton Name="DetailsToggle" Classes="claim-details" AutomationProperties.Name="Details">
             <StackPanel Orientation="Horizontal" Spacing="4">
               <ctl:KpIcon Icon="chevron-right" Size="14" VerticalAlignment="Center" RenderTransformOrigin="50%,50%" />
-              <TextBlock Classes="size-12-5" Text="Details" VerticalAlignment="Center" />
+              <TextBlock Classes="size-13" Text="Details" VerticalAlignment="Center" />
             </StackPanel>
           </ToggleButton>
-          <Grid Classes="claim-facts size-12-5" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" Margin="20,0,0,0"
+          <Grid Classes="claim-facts size-13" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="4" Margin="20,0,0,0"
                 IsVisible="{Binding #DetailsToggle.IsChecked}">
             <TextBlock Classes="fact" Text="Page" />
             <TextBlock Grid.Column="1" Name="OriginText" Text="{Binding Origin}" TextTrimming="CharacterEllipsis" />
@@ -62,21 +62,20 @@
             <TextBlock Grid.Row="1" Grid.Column="1" Name="IdentityText" Text="{Binding Identity}" TextTrimming="CharacterEllipsis" />
             <TextBlock Grid.Row="2" Classes="fact" Text="Pairing" />
             <TextBlock Grid.Row="2" Grid.Column="1" Name="PairingText" Text="{Binding Pairing}" TextTrimming="CharacterEllipsis" />
+            <TextBlock Grid.Row="3" Grid.ColumnSpan="2" Name="ExplainerText" Text="{Binding Explainer}" />
           </Grid>
         </StackPanel>
       </StackPanel>
 
       <Border Classes="claim-rule" />
 
-      <ctl:HeaderRow Classes="claim-foot" Spacing="8">
-        <ctl:SteadyDigits Name="CountdownText" Classes="claim-muted size-12-5" Text="{Binding DeniesIn}" VerticalAlignment="Center" TextWrapping="NoWrap" />
-        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <Button Name="Deny" Classes="claim keyed" Content="Deny" Tag="esc"
-                  IsCancel="True" Command="{Binding DenyCommand}" />
-          <Button Name="Allow" Classes="claim primary" Content="Fill"
-                  Command="{Binding AllowOnceCommand}" />
-        </StackPanel>
-      </ctl:HeaderRow>
+      <StackPanel Classes="claim-foot">
+        <Button Name="Deny" Classes="claim keyed" Content="Deny" Tag="esc"
+                IsCancel="True" Command="{Binding DenyCommand}" />
+        <Button Name="Allow" Classes="claim primary" Content="Fill"
+                Command="{Binding AllowOnceCommand}" />
+      </StackPanel>
+      <ProgressBar Name="TimeBar" Classes="claim-time" Value="{Binding TimeLeft}" AutomationProperties.Name="{Binding DeniesIn}" />
     </StackPanel>
   </Border>
 

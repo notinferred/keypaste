@@ -98,8 +98,8 @@ internal static class AppMenu
         return flyout;
     }
 
-    // Closing hands the keyboard back to where it was, so a form a choice opened takes it only after that.
-    private static void GiveTheKeyboardToWhatItOpens(MenuFlyout flyout)
+    /// <summary>Closing hands the keyboard back to where it was, so a form a choice opened takes it only after that.</summary>
+    internal static void GiveTheKeyboardToWhatItOpens(MenuFlyout flyout)
     {
         Control? opened = null;
         void Heard(Control form) => opened = form;

@@ -75,7 +75,7 @@ internal sealed record TemplateChoice(ItemTemplate Template, string Label, strin
     {
         ItemTemplate.Login => [NewItemField.Username, NewItemField.Password, NewItemField.Url, NewItemField.OneTimeCode],
         ItemTemplate.ApiKey => [NewItemField.Url],
-        ItemTemplate.Environment or ItemTemplate.Card or ItemTemplate.Identity => [NewItemField.Tags],
+        ItemTemplate.Environment => [NewItemField.Tags],
         ItemTemplate.Note => [NewItemField.Notes],
         ItemTemplate.Server or ItemTemplate.Database => [NewItemField.Username, NewItemField.Password, NewItemField.OneTimeCode],
         ItemTemplate.Wifi => [NewItemField.Password],
@@ -266,6 +266,9 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     /// <summary>The open vaults the Save in pop-up lists, each under its account.</summary>
     internal IReadOnlyList<SaveInChoice> Places { get; }
 
+    /// <summary>Whether Save in shows: only while there is another vault to save in.</summary>
+    internal bool ShowsSaveIn => Places.Count > 1;
+
     /// <summary>The vault the item is saved in.</summary>
     internal SaveInChoice SaveIn
     {
@@ -336,7 +339,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     [
         nameof(ShowsUsername), nameof(ShowsPassword), nameof(ShowsUrl), nameof(ShowsOneTimeCode), nameof(ShowsHost), nameof(ShowsKey),
         nameof(ShowsNotes), nameof(ShowsTags), nameof(FillsInBrowser), nameof(HasPresetRows),
-        nameof(FieldOptions), nameof(HasFieldOptions),
+        nameof(FieldOptions), nameof(HasFieldOptions), nameof(PresetCustomFields), nameof(AddedCustomFields),
     ];
 
     private static readonly NewItemFieldOption[] _allOptions =
@@ -355,7 +358,16 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     internal bool FillsInBrowser => _hasUsername && _hasPassword && _hasUrl;
 
     /// <summary>Whether any standard field is in the form, whose group shows above the custom fields.</summary>
-    internal bool HasPresetRows => _hasKey || _hasHost || _hasUsername || _hasPassword || _hasUrl || _hasOneTimeCode || _added.Count > 0;
+    internal bool HasPresetRows => _hasKey || _hasHost || _hasUsername || _hasPassword || _hasUrl || _hasOneTimeCode || _added.Count > 0 || PresetCustomFields.Count > 0;
+
+    /// <summary>The template's own custom fields, such as a card's Number, drawn among its rows.</summary>
+    internal IReadOnlyList<NewItemCustomField> PresetCustomFields => [.. CustomFields.Where(custom => custom.IsPreset)];
+
+    /// <summary>The fields the person added, under Custom fields.</summary>
+    internal IReadOnlyList<NewItemCustomField> AddedCustomFields => [.. CustomFields.Where(custom => !custom.IsPreset)];
+
+    /// <summary>The tags the Tags row draws: all but the one that makes a card or an identity what it is, which the form keeps without showing.</summary>
+    internal IReadOnlyList<EntryTagChip> ShownTags => [.. Tags.Where(chip => !string.Equals(chip.Tag, SelectedTemplate?.Tag, StringComparison.Ordinal))];
 
     internal RelayCommand<NewItemField> AddFieldCommand { get; }
 
@@ -474,7 +486,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
                 break;
             case NewItemField.Tags:
                 _added.Remove(field);
-                Tags = [];
+                Tags = [.. Tags.Where(chip => SelectedTemplate?.Tag is { } defining && chip.Tag == defining)];
                 DraftTag = string.Empty;
                 break;
             default:
@@ -546,15 +558,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
             return;
         }
 
-        GeneratorPanel = new GeneratePasswordViewModel(
-            _clipboard,
-            Generator,
-            Password,
-            ApplyGenerated,
-            null,
-            AddGeneratedField,
-            Title.Trim().Length > 0 ? Title.Trim() : "this new item",
-            CloseGenerator);
+        GeneratorPanel = new GeneratePasswordViewModel(_clipboard, Generator, Password, ApplyGenerated, CloseGenerator);
     }
 
     private void ApplyGenerated(SecretField value)
@@ -569,14 +573,6 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
         var panel = GeneratorPanel;
         GeneratorPanel = null;
         panel?.Dispose();
-    }
-
-    private void AddGeneratedField(SecretField value, string name)
-    {
-        var field = new NewItemCustomField(true, RemoveCustomField, _clipboard) { Name = name };
-        field.Secret.TakeFrom(value);
-        CustomFields.Add(field);
-        FieldsChanged();
     }
 
     /// <summary>The grid's tiles.</summary>
@@ -718,7 +714,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     internal bool HasOneTimeCodeProblem => OneTimeCodeProblem is not null;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(TagSuggestions), nameof(TagProblem), nameof(HasTagProblem))]
+    [NotifyPropertyChangedFor(nameof(TagSuggestions), nameof(TagProblem), nameof(HasTagProblem), nameof(ShownTags))]
     internal partial IReadOnlyList<EntryTagChip> Tags { get; private set; } = [];
 
     [ObservableProperty]

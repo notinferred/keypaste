@@ -7,6 +7,9 @@ internal interface IRecommendationRow
 
     bool IsDismissed { get; }
 
+    /// <summary>Shows the row's item in Items, which pressing the row does.</summary>
+    RelayCommand OpenCommand { get; }
+
     RelayCommand DismissCommand { get; }
 
     RelayCommand ReviewAgainCommand { get; }

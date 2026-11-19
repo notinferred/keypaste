@@ -199,7 +199,7 @@ public sealed class SessionOwnershipTests
         var failure = authority.LastAuditFailure;
         Assert.NotNull(failure);
         Assert.Equal(AgentActivityViewModel.Unrecorded(failure), agents.AuditRefusal);
-        Assert.Equal("Refusing agents · the audit log won't open", shell.AgentsDetail);
+        Assert.Equal("the audit log won't open", shell.AgentsDetail);
         Assert.Equal((false, true), (dot.DotLive, dot.DotDanger));
 
         Directory.Delete(log);
@@ -212,7 +212,7 @@ public sealed class SessionOwnershipTests
 
         Assert.Null(authority.LastAuditFailure);
         Assert.Empty(agents.AuditRefusal);
-        Assert.StartsWith("Answering agents", shell.AgentsDetail, StringComparison.Ordinal);
+        Assert.StartsWith("Agents · Answering agents", dot.RailTip, StringComparison.Ordinal);
         Assert.Equal((true, false), (dot.DotLive, dot.DotDanger));
     }
 
@@ -356,7 +356,7 @@ public sealed class SessionOwnershipTests
             Assert.Contains("locked by another keypaste process", failure, StringComparison.Ordinal);
             Assert.Contains(failure, agents.AuditRefusal, StringComparison.Ordinal);
             Assert.Contains("can't write its audit log", agents.AuditRefusal, StringComparison.Ordinal);
-            Assert.Equal("Refusing agents · the audit log can't be written", shell.AgentsDetail);
+            Assert.Equal("the audit log can't be written", shell.AgentsDetail);
             Assert.Equal((false, true), (dot.DotLive, dot.DotDanger));
         }
 
@@ -366,7 +366,7 @@ public sealed class SessionOwnershipTests
 
         Assert.Null(authority.LastAuditFailure);
         Assert.Empty(agents.AuditRefusal);
-        Assert.StartsWith("Answering agents", shell.AgentsDetail, StringComparison.Ordinal);
+        Assert.StartsWith("Agents · Answering agents", dot.RailTip, StringComparison.Ordinal);
         Assert.Equal((true, false), (dot.DotLive, dot.DotDanger));
     }
 

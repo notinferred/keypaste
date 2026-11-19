@@ -151,7 +151,7 @@ public sealed partial class SessionLifecycleTests
         app.WaitForOutput("^window hidden");
         AssertRefusedSaying(workspace, other, before);
         AssertRefusedSaying(workspace, chosen, locked);
-        app.WaitForOutput(@"^locked-notice shown .*chosen\.kdbx");
+        app.WaitForOutput(@"^locked-notice shown head=chosen is locked");
         AssertRefusedSaying(workspace, workspace.Vault, locked);
         AssertRefusedSaying(workspace, chosen, locked);
         Assert.DoesNotContain(app.Output, line => line == "window shown");

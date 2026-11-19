@@ -93,8 +93,9 @@ public sealed class ShellImportTests : IDisposable
         var import = shell.Import!;
         await Unlock(import);
 
-        Assert.True(import.ShowsRows);
-        Assert.Equal("KeePass database 4.0 · Argon2id · 3 items · key file + password", import.CardDetail);
+        Assert.False(import.ShowsRows);
+        Assert.Equal("3 items", import.CardDetail);
+        Assert.Equal("KeePass database 4.0 · Argon2id · key file + password", import.CardFormat);
 
         import.ConfirmCommand.Press();
 

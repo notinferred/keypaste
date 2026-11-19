@@ -434,7 +434,6 @@ public sealed class EntryFieldsTests : IDisposable
         Assert.Equal(["replace", "rotate", "save"], asked.Order(StringComparer.Ordinal));
         Assert.False(detail.RotateCommand.CanExecute(null));
         Assert.Contains(nameof(EntryDetailViewModel.HasOwnPrimary), raised);
-        Assert.Contains(nameof(EntryDetailViewModel.TakesWholeView), raised);
         Assert.Contains(nameof(EntryDetailViewModel.IsReplacingField), raised);
         Assert.Contains(nameof(EntryDetailViewModel.ReplaceFieldPrompt), raised);
     }

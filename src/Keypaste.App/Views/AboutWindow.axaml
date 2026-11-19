@@ -26,7 +26,7 @@
       <ctl:BrandMark Width="56" HorizontalAlignment="Center" />
 
       <StackPanel Spacing="4" HorizontalAlignment="Center">
-        <TextBlock Classes="prompt-title size-16" Text="keypaste" HorizontalAlignment="Center" />
+        <TextBlock Classes="prompt-title size-15" Text="keypaste" HorizontalAlignment="Center" />
         <TextBlock Name="VersionText" Classes="mono" HorizontalAlignment="Center" Foreground="{DynamicResource KpTextSecondary}" />
       </StackPanel>
 
@@ -36,7 +36,7 @@
                    Text="{x:Static res:Strings.FreeSoftwareUnderTheGNUAfferoGeneralXba93e5}" />
       </StackPanel>
 
-      <Button Name="Dismiss" Classes="prompt ghost" Content="{x:Static res:Strings.Close}" HorizontalAlignment="Center" IsCancel="True" IsDefault="True" />
+      <Button Name="Dismiss" Classes="lg ghost" Content="{x:Static res:Strings.Close}" HorizontalAlignment="Center" IsCancel="True" IsDefault="True" />
     </StackPanel>
   </Border>
 

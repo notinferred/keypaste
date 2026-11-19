@@ -8,18 +8,22 @@ using Xunit;
 
 namespace Keypaste.App.Tests.Views;
 
-/// <summary>What the list draws to tell two items of one name apart, once at each width.</summary>
+/// <summary>What the list draws to tell two items of one title apart.</summary>
 public sealed class SameNameRowTests
 {
     [Fact]
-    public Task The_tell_shows_after_the_title_of_each_item_sharing_a_name() => HeadlessSession.On(() =>
+    public Task Items_sharing_a_title_are_told_apart_by_their_second_line_alone() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell(seed: Seed);
         shell.Show<EntriesViewModel>(DestinationKind.Entries);
         RenderedShell.Drain();
 
-        Assert.Equal(["alice@example.test", "bob@example.test"], Tells(shell).Select(tell => tell.Text).Order());
-        Assert.All(Tells(shell), tell => Assert.Equal(tell.Text, ToolTip.GetTip(tell)));
+        var mail = shell.Window.GetVisualDescendants().OfType<TextBlock>()
+            .Where(block => block.Name == "RowSecondLine" && block.IsEffectivelyVisible && block.DataContext is EntryRow { Title: "Mail" })
+            .Select(line => line.Text);
+
+        Assert.Equal(["alice@example.test", "bob@example.test"], mail.Order());
+        Assert.Equal(2, shell.Window.GetVisualDescendants().OfType<TextBlock>().Count(block => block.IsEffectivelyVisible && block.Text is "alice@example.test" or "bob@example.test"));
     });
 
     [Fact]
@@ -41,6 +45,4 @@ public sealed class SameNameRowTests
         vault.AddEntry(new VaultEntry { Title = "Forum", Username = "carol@example.test", GroupPath = "services" });
     }
 
-    private static List<TextBlock> Tells(RenderedShell shell) =>
-        [.. shell.Window.GetVisualDescendants().OfType<TextBlock>().Where(block => block.Name == "SharedNameTell" && block.IsEffectivelyVisible)];
 }

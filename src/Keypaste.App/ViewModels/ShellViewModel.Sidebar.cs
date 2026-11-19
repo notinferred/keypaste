@@ -76,10 +76,10 @@ internal sealed partial class ShellViewModel
 
     /// <summary>Whether the window is under <see cref="Views.WindowChrome.NarrowBelow"/>, where the sidebar gives way to the rail, the list and the item.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsSidebar), nameof(SidebarOverlays), nameof(ContentIsTight), nameof(SidebarWayBack))]
+    [NotifyPropertyChangedFor(nameof(ShowsSidebar), nameof(SidebarOverlays), nameof(ContentIsTight))]
     internal partial bool IsNarrow { get; set; }
 
-    /// <summary>Whether the title bar's button opened the sidebar over the content of a narrow window.</summary>
+    /// <summary>Whether View › Show sidebar opened the sidebar over the content of a narrow window.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsSidebar), nameof(SidebarOverlays), nameof(ContentIsTight))]
     private partial bool SidebarOpenedOver { get; set; }
@@ -102,12 +102,7 @@ internal sealed partial class ShellViewModel
     internal bool ContentIsTight =>
         WindowWidth - Views.WindowChrome.RailWidth - (ShowsSidebar && !SidebarOverlays ? Views.WindowChrome.SidebarWidth : 0) < Views.WindowChrome.ContentTightBelow;
 
-    /// <summary>What the title bar's sidebar button adds to its name in a narrow window, where the sidebar opens over the content.</summary>
-    internal string? SidebarWayBack => IsNarrow
-        ? $"Show the sidebar over the list, here, from the View menu or with {(OperatingSystem.IsMacOS() ? "⌃⌘S" : "Ctrl+B")}."
-        : null;
-
-    /// <summary>View › Hide sidebar and Show sidebar, and the title bar's button: the person's kept choice in a wide window, the sidebar over the content in a narrow one.</summary>
+    /// <summary>View › Hide sidebar and Show sidebar: the person's kept choice in a wide window, the sidebar over the content in a narrow one.</summary>
     [RelayCommand]
     internal void ToggleSidebar()
     {
@@ -131,7 +126,7 @@ internal sealed partial class ShellViewModel
         }
     }
 
-    /// <summary>Opens the sidebar over the content of a narrow window: the title bar's button, or an item held over it while dragged.</summary>
+    /// <summary>Opens the sidebar over the content of a narrow window, for an item held over the rail while dragged.</summary>
     internal void OpenSidebarOverlay() => SidebarOpenedOver = IsNarrow;
 
     /// <summary>Closes a sidebar lying over the content: a press outside it, a choice in it, or Escape.</summary>
@@ -535,9 +530,18 @@ internal sealed partial class ShellViewModel
         }
     }
 
-    /// <summary>The sidebar's New: the grid of New item's templates, saving in the vault in view.</summary>
+    /// <summary>New's More templates…: the grid of New item's templates, saving in the vault in view.</summary>
     [RelayCommand]
-    private void NewItem()
+    private void NewItem() => OnItemsPlace()?.ChooseTemplateCommand.Press();
+
+    /// <summary>One of New's templates: its form, saving in the vault in view.</summary>
+    [RelayCommand]
+    private void NewItemOfKind(ItemTemplate kind) => OnItemsPlace()?.BeginAddOfKindCommand.Press(kind);
+
+    /// <summary>The heading of New's menu, naming the vault it adds to.</summary>
+    internal string NewItemHeading => $"New in {_itemsVault.Title}";
+
+    private EntriesViewModel? OnItemsPlace()
     {
         CloseSidebarOverlay();
 
@@ -546,7 +550,7 @@ internal sealed partial class ShellViewModel
             Current = Destinations.Of(DestinationKind.Entries);
         }
 
-        (Content as EntriesViewModel)?.ChooseTemplateCommand.Press();
+        return Content as EntriesViewModel;
     }
 
     /// <summary>What the title bar's search says while empty: the vault it searches.</summary>
@@ -609,6 +613,7 @@ internal sealed partial class ShellViewModel
 
         OnPropertyChanged(nameof(SelectedSidebarRow));
         OnPropertyChanged(nameof(SearchPlaceholder));
+        OnPropertyChanged(nameof(NewItemHeading));
     });
 
     /// <summary>Lists every item of <paramref name="vault"/> on Items.</summary>
@@ -851,6 +856,7 @@ internal sealed partial class ShellViewModel
 
         Count();
         OnPropertyChanged(nameof(SearchPlaceholder));
+        OnPropertyChanged(nameof(NewItemHeading));
         OnPropertyChanged(nameof(SelectedSidebarRow));
     }
 

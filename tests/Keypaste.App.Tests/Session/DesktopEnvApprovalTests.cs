@@ -53,7 +53,7 @@ public sealed class DesktopEnvApprovalTests
         });
 
     [Fact]
-    public Task A_long_variable_name_wraps_whole_rather_than_ending_in_an_ellipsis() =>
+    public Task A_long_variable_name_stays_on_one_line_cut_in_the_middle_and_says_all_of_it_elsewhere() =>
         HeadlessSession.On(() =>
         {
             var longKey = "STRIPE_RESTRICTED_KEY_FOR_WEBHOOK_SIGNING_IN_PRODUCTION_" + new string('A', 30);
@@ -66,10 +66,14 @@ public sealed class DesktopEnvApprovalTests
                 window.CaptureRenderedFrame();
                 var drawn = Assert.Single(KeyNameBlocks(window), block => block.Text == longKey);
 
+                var chip = drawn.FindAncestorOfType<Border>()!;
+
                 Assert.True(longKey.Length >= 80);
-                Assert.Equal(TextTrimming.None, drawn.TextTrimming);
-                Assert.Equal(TextWrapping.Wrap, drawn.TextWrapping);
-                Assert.True(drawn.TextLayout.TextLines.Count > 1);
+                Assert.Equal(TextTrimming.PrefixCharacterEllipsis, drawn.TextTrimming);
+                Assert.Single(drawn.TextLayout.TextLines);
+                Assert.True(drawn.Bounds.Width < longKey.Length * 6, "the chip drew the whole name on one line, past the block");
+                Assert.Equal(longKey, Avalonia.Automation.AutomationProperties.GetName(chip));
+                Assert.StartsWith(longKey, ToolTip.GetTip(chip) as string, StringComparison.Ordinal);
             }
             finally
             {

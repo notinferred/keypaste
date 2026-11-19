@@ -32,10 +32,10 @@ namespace Keypaste.AppDriver;
 /// A start the running app took prints nothing.
 /// While the app is locked, the notice an agent's request raises prints <c>locked-notice shown</c> with its
 /// heading and text, and <c>locked-notice closed</c> when it comes down; the line <c>notice open</c> presses its
-/// Open keypaste once armed, by a click the display routes to the button (G.4b).
+/// Unlock… once armed, by a click the display routes to the button (G.4b).
 /// </para>
 /// <para>
-/// The line <c>continue</c> presses the first-launch screen's Continue;
+/// The line <c>continue</c> presses the first-launch screen's Agree;
 /// <c>unlock &lt;vault&gt;</c> types <c>KEYPASTE_DRIVER_PASSWORD</c> on the unlock screen and presses Unlock;
 /// <c>copy &lt;title&gt;</c> copies that item's password from Items; <c>lock</c> locks; <c>crash &lt;text&gt;</c>
 /// throws on the UI thread an exception whose message and inner exception's message hold the text; and
@@ -132,10 +132,10 @@ internal static class AppLaunch
                         Act(() => PressOpenAsync(app));
                         break;
                     case ["continue"]:
-                        Act(() => ContinueAsync(root, sendCrashReports: false));
+                        Act(() => AgreeAsync(root, sendCrashReports: false));
                         break;
                     case ["continue", "send"]:
-                        Act(() => ContinueAsync(root, sendCrashReports: true));
+                        Act(() => AgreeAsync(root, sendCrashReports: true));
                         break;
                     case ["unlock", var vault]:
                         Act(() => UnlockAsync(root, vault));
@@ -227,7 +227,7 @@ internal static class AppLaunch
         {
             if (DateTime.UtcNow > armedBy)
             {
-                throw new DriverException("Open keypaste never became pressable");
+                throw new DriverException("Unlock… never became pressable");
             }
 
             await Task.Delay(50).ConfigureAwait(true);
@@ -236,7 +236,7 @@ internal static class AppLaunch
         PromptScreen.Click(notice, open);
     }
 
-    private static Task ContinueAsync(ContentControl root, bool sendCrashReports)
+    private static Task AgreeAsync(ContentControl root, bool sendCrashReports)
     {
         if (root.Content is not FirstLaunchView { DataContext: FirstLaunchViewModel screen })
         {
@@ -244,7 +244,7 @@ internal static class AppLaunch
         }
 
         screen.SendCrashReports = sendCrashReports;
-        Press(screen.ContinueCommand, "continue");
+        Press(screen.AgreeCommand, "continue");
         return Task.CompletedTask;
     }
 

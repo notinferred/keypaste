@@ -18,14 +18,14 @@ using Xunit;
 namespace Keypaste.App.Tests.Views;
 
 /// <summary>
-/// The terms of use are agreed to once, on one first-launch screen whose one action is Continue, beside a yes of its own for
+/// The terms of use are agreed to once, on one first-launch screen whose action is Agree, beside a yes of its own for
 /// crash reports that starts off: nothing is sent without that yes, a kept answer stands, and nothing else in the app asks.
 /// </summary>
 public sealed class FirstLaunchTermsTests
 {
-    private const string _agreement = "Continuing agrees to the terms of use for keypaste's online services. The software itself is under AGPL-3.0, and nothing here limits the rights it gives you.";
+    private const string _agreement = "keypaste's online services have terms. The app is open source.";
 
-    private const string _switchAgreement = "Continuing agrees to the terms of use for keypaste's online services and turns crash reports on. The software itself is under AGPL-3.0, and nothing here limits the rights it gives you.";
+    private const string _switchAgreement = "Agreeing accepts the terms for keypaste's online services and turns crash reports on.";
 
     private static string Toml(string home) => KeypasteHome.SettingsPath(home);
 
@@ -60,7 +60,7 @@ public sealed class FirstLaunchTermsTests
     }
 
     [Fact]
-    public Task The_screen_says_what_continuing_means_links_the_terms_asks_crash_reports_apart_and_has_one_action_that_Return_takes() => HeadlessSession.On(() =>
+    public Task The_screen_says_what_agreeing_means_links_the_terms_asks_crash_reports_apart_and_Return_agrees() => HeadlessSession.On(() =>
     {
         var agreed = new List<bool>();
         var window = ShowScreen(agreed.Add);
@@ -69,8 +69,9 @@ public sealed class FirstLaunchTermsTests
         Assert.True(Named<Button>(window, "OpenTerms").IsEffectivelyVisible);
         var crashReports = Assert.Single(window.GetVisualDescendants().OfType<CheckBox>());
         Assert.Equal(("SendCrashReports", false), (crashReports.Name, crashReports.IsChecked));
-        var action = Assert.Single(window.GetVisualDescendants().OfType<Button>(), button => button is not CheckBox && button.Name != "OpenTerms" && button.IsEffectivelyVisible && button.GetVisualAncestors().OfType<FirstLaunchView>().Any());
-        Assert.Equal("Continue", action.Name);
+        Assert.True(Named<Button>(window, "OpenSourceCode").IsEffectivelyVisible);
+        Assert.True(Named<Button>(window, "Quit").IsEffectivelyVisible);
+        var action = Named<Button>(window, "Agree");
         Assert.Contains("primary", action.Classes);
         Assert.True(action.IsFocused);
 
@@ -83,28 +84,27 @@ public sealed class FirstLaunchTermsTests
     });
 
     [Fact]
-    public Task The_screen_says_what_continuing_means_to_a_screen_reader_as_it_opens() => HeadlessSession.On(() =>
+    public Task The_screen_says_what_agreeing_means_to_a_screen_reader_as_it_opens() => HeadlessSession.On(() =>
     {
         var window = ShowScreen(_ => { });
 
         var live = window.GetVisualDescendants().OfType<TextBlock>().First(text => text.Classes.Contains("live"));
-        Assert.Contains(_agreement, live.Text, StringComparison.Ordinal);
-        Assert.Contains("A report holds", live.Text, StringComparison.Ordinal);
+        Assert.Equal($"Terms of use. {_agreement}", live.Text);
         window.Close();
     });
 
     [Fact]
-    public Task Settings_switch_under_terms_not_agreed_to_asks_in_a_window_that_stays_off_on_Escape_and_starts_on_Continue() => HeadlessSession.On(() =>
+    public Task Diagnostics_switch_under_terms_not_agreed_to_asks_in_a_window_that_stays_off_on_Escape_and_starts_on_Agree() => HeadlessSession.On(() =>
     {
         using var fixture = new TempVault();
         using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
         File.WriteAllText(Toml(fixture.Home), "[[settings]]\nstay_in_tray = 1\nsend_crash_reports = 0\nterms = \"2020-01-01\"\n");
         var preferences = new DesktopPreferences(fixture.Home);
         using var crashes = new CrashReporting(fixture.Home, preferences, endpoint: null);
-        using var settings = new SettingsViewModel(session, fixture.Home, preferences, _ => { }) { Crashes = crashes };
+        var settings = new DiagnosticsViewModel(session, fixture.Home, crashes);
         var window = new MainWindow { Width = WindowChrome.DefaultWidth, Height = WindowChrome.DefaultHeight };
         var root = window.FindControl<ContentControl>("Root")!;
-        root.Content = new SettingsView { DataContext = settings };
+        root.Content = new DiagnosticsView { DataContext = settings };
         window.Show();
         RenderedShell.Drain();
         var toggle = Named<ToggleSwitch>(window, "SendCrashReports");
@@ -131,7 +131,7 @@ public sealed class FirstLaunchTermsTests
 
         toggle.IsChecked = true;
         RenderedShell.Drain();
-        Named<Button>(Assert.IsType<TermsAgreementWindow>(Assert.Single(window.OwnedWindows)), "Continue").Command!.Execute(null);
+        Named<Button>(Assert.IsType<TermsAgreementWindow>(Assert.Single(window.OwnedWindows)), "Agree").Command!.Execute(null);
         RenderedShell.Drain();
 
         Assert.True(crashes.IsOn);
@@ -147,10 +147,10 @@ public sealed class FirstLaunchTermsTests
         File.WriteAllText(Toml(fixture.Home), "[[settings]]\nstay_in_tray = 1\nsend_crash_reports = 0\n");
         var preferences = new DesktopPreferences(fixture.Home);
         using var crashes = new CrashReporting(fixture.Home, preferences, endpoint: null);
-        using var settings = new SettingsViewModel(session, fixture.Home, preferences, _ => { }) { Crashes = crashes };
+        var settings = new DiagnosticsViewModel(session, fixture.Home, crashes);
         var window = new MainWindow { Width = WindowChrome.DefaultWidth, Height = WindowChrome.DefaultHeight };
         var root = window.FindControl<ContentControl>("Root")!;
-        root.Content = new SettingsView { DataContext = settings };
+        root.Content = new DiagnosticsView { DataContext = settings };
         window.Show();
         RenderedShell.Drain();
         settings.SendCrashReports = true;
@@ -241,7 +241,7 @@ public sealed class FirstLaunchTermsTests
 
         var screen = Assert.IsType<FirstLaunchViewModel>(view.DataContext);
         screen.SendCrashReports = true;
-        screen.ContinueCommand.Press();
+        screen.AgreeCommand.Press();
         RenderedShell.Drain();
 
         Assert.True(crashes.IsOn);
@@ -270,7 +270,7 @@ public sealed class FirstLaunchTermsTests
     }
 
     [Fact]
-    public void Continue_under_new_terms_keeps_sending_under_them_and_the_next_start_does_not_ask()
+    public void Agree_under_new_terms_keeps_sending_under_them_and_the_next_start_does_not_ask()
     {
         using var fixture = new TempVault();
         File.WriteAllText(Toml(fixture.Home), "[[settings]]\nsend_crash_reports = 1\nterms = \"2020-01-01\"\n");
@@ -287,13 +287,13 @@ public sealed class FirstLaunchTermsTests
     }
 
     [Fact]
-    public void Settings_shows_its_plain_switch_whatever_the_file_says_and_turning_it_off_stops_reports()
+    public void Diagnostics_shows_its_plain_switch_whatever_the_file_says_and_turning_it_off_stops_reports()
     {
         using var fixture = new TempVault();
         using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
         var preferences = new DesktopPreferences(fixture.Home);
         using var crashes = new CrashReporting(fixture.Home, preferences, endpoint: null);
-        using var settings = new SettingsViewModel(session, fixture.Home, preferences, _ => { }) { Crashes = crashes };
+        var settings = new DiagnosticsViewModel(session, fixture.Home, crashes);
         crashes.Agree(send: true);
 
         Assert.True(settings.HasCrashReports);
@@ -314,7 +314,7 @@ public sealed class FirstLaunchTermsTests
         RenderedShell.Drain();
 
         Assert.True(shell.Named<Border>("ShareDialog").IsEffectivelyVisible);
-        Assert.True(shell.Named<TextBox>("Recipient").IsFocused);
+        Assert.True(shell.Named<Button>("CreateLink").IsFocused);
         Assert.True(shell.Shell.Share!.CreateCommand.CanExecute(null));
         Assert.DoesNotContain(shell.Window.GetVisualDescendants().OfType<Control>(), control => control.Name == "OpenTerms");
         Assert.Null(shell.Shell.Preferences.Current.TermsAgreed);

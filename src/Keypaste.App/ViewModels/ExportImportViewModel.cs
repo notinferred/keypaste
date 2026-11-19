@@ -136,9 +136,13 @@ internal sealed partial class ExportImportViewModel : ObservableObject, IDisposa
     /// <summary>Whether the choice between keeping both and skipping shows.</summary>
     internal bool HasHeld => IsPreviewing && HeldCount > 0;
 
-    internal string HeldLabel => HeldCount == 1
-        ? "1 name your vault already has"
-        : string.Create(CultureInfo.InvariantCulture, $"{HeldCount} names your vault already has");
+    /// <summary>The preview's first line: how many items it would import, and how many of them the vault already has a name for.</summary>
+    internal string Summary => HeldCount switch
+    {
+        0 => $"{Items(Plan?.Rows.Count ?? 0)} to import",
+        1 => $"{Items(Plan?.Rows.Count ?? 0)} to import, 1 duplicate",
+        var held => string.Create(CultureInfo.InvariantCulture, $"{Items(Plan?.Rows.Count ?? 0)} to import, {held} duplicates"),
+    };
 
     /// <summary>Whether an item whose name the vault already has lands beside it, the default (D-0566).</summary>
     internal bool KeepHeld
@@ -204,7 +208,7 @@ internal sealed partial class ExportImportViewModel : ObservableObject, IDisposa
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HeldCount), nameof(NotImportedLabel), nameof(HasNotImported), nameof(ConfirmText), nameof(CanConfirm))]
-    [NotifyPropertyChangedFor(nameof(HasHeld), nameof(HeldLabel))]
+    [NotifyPropertyChangedFor(nameof(HasHeld), nameof(Summary))]
     [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
     private partial ExportPlan? Plan { get; set; }
 

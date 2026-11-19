@@ -218,7 +218,7 @@ public sealed class TrashTests : IDisposable
         trash.PurgeCommand.Press();
 
         Assert.True(trash.IsConfirmingPurge);
-        Assert.Contains("cannot be undone", trash.PurgePrompt, StringComparison.Ordinal);
+        Assert.EndsWith("for good?", trash.PurgePrompt, StringComparison.Ordinal);
         Assert.Equal(armed, Digest(_vaultPath));
 
         trash.CancelPurgeCommand.Press();
@@ -562,23 +562,15 @@ public sealed class TrashTests : IDisposable
     /// is still looking at.
     /// </summary>
     [Fact]
-    public void The_format_is_said_once_with_the_delete_that_raises_it()
+    public void A_delete_that_raises_the_format_says_only_where_the_item_went()
     {
         using var context = new Context(_vaultPath);
 
         Assert.True(KdbxHeader.IsOlderThan41(_vaultPath));
         Delete(context, "servers/production");
 
-        Assert.Equal(
-            "Moved servers/production to the Trash. This vault is now saved in the KeePass database format 4.1, which KeePassXC 2.7 and KeePass 2.48 and later read.",
-            context.Entries.Notice,
-            StringComparer.Ordinal);
+        Assert.Equal("Moved production to Trash", context.Entries.Notice, StringComparer.Ordinal);
         Assert.False(KdbxHeader.IsOlderThan41(_vaultPath));
-
-        var other = context.Entries.Rows[0].Path;
-        Delete(context, other);
-
-        Assert.Equal($"Moved {other} to the Trash.", context.Entries.Notice, StringComparer.Ordinal);
     }
 
     [Fact]
@@ -588,7 +580,7 @@ public sealed class TrashTests : IDisposable
         {
             Delete(context, "servers/production");
 
-            Assert.StartsWith("Moved servers/production to the Trash.", context.Entries.Notice, StringComparison.Ordinal);
+            Assert.Equal("Moved production to Trash", context.Entries.Notice, StringComparer.Ordinal);
             Assert.True(context.Entries.CanUndo);
             Assert.DoesNotContain(context.Entries.Rows, row => row.Path == "servers/production");
 
@@ -625,10 +617,7 @@ public sealed class TrashTests : IDisposable
 
         Delete(context, "github");
 
-        Assert.Equal(
-            "Deleted github. This vault has no Trash, so nothing can put it back.",
-            context.Entries.Notice,
-            StringComparer.Ordinal);
+        Assert.Equal("Deleted github.", context.Entries.Notice, StringComparer.Ordinal);
 
         Assert.False(context.Entries.CanUndo);
     }

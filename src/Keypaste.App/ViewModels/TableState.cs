@@ -243,9 +243,9 @@ internal sealed class TableStates
         new(Time, () => Strings.Time, 84, IsShare: false, Least: 84, IsTime: true),
         new(Actor, () => Strings.Actor, 110, IsShare: false, Least: 56),
         new(Action, () => Strings.Action, 100, IsShare: false, Least: 56),
-        new(Secrets, () => Strings.Secrets, 1.6, IsShare: true, Least: 64),
+        new(Secrets, () => Strings.Values, 1.6, IsShare: true, Least: 64),
         new(Where, () => Strings.Where, 1, IsShare: true, Least: 56),
-        new(Result, () => Strings.Result, 100, IsShare: false, Least: 64),
+        new(Result, () => Strings.Result, 120, IsShare: false, Least: 64),
     ];
 
     internal TableState Items { get; } = NewItems();
@@ -253,6 +253,9 @@ internal sealed class TableStates
     internal TableState Trash { get; } = NewTrash();
 
     internal TableState Log { get; } = NewLog();
+
+    /// <summary>The item pane's label column, which no table holds but lasts as long as they do.</summary>
+    internal LabelColumn ItemLabels { get; } = new();
 
     internal string? SortsText => Joined(',', All.Select(table => table.SortText));
 
@@ -265,7 +268,7 @@ internal sealed class TableStates
 
     internal static TableState NewTrash() => new("trash", TrashColumns, new TableOrder(Deleted, Descending: true));
 
-    /// <summary>The log runs in the file's order until a head is pressed, since only the chain vouches for it and a record's clock can be wrong.</summary>
+    /// <summary>The log has no sort: it runs newest first, in day sections, and is only sized.</summary>
     internal static TableState NewLog() => new("log", LogColumns, new TableOrder(Time, Descending: true, AsRowsArrive: true));
 
     /// <summary>Reads what <c>app.toml</c> kept; what does not read leaves its table as it is.</summary>

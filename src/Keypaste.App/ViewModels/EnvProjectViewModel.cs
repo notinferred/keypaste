@@ -21,7 +21,7 @@ namespace Keypaste.App.ViewModels;
 /// <para>
 /// <b>Reading goes through <see cref="EnvResolution"/> and writing through <see cref="EnvStore"/>,
 /// which is what makes the CLI agree.</b> Where a key lives, where a new one lands, the rule for a
-/// name and the outcome of a write are all core's (D-0413). A screen that wrote anywhere else would
+/// name and the outcome of a write are all core's. A screen that wrote anywhere else would
 /// round-trip through <c>Vault.Open</c> perfectly and be invisible to <c>keypaste run</c>, which is
 /// exactly the mutation the consistency tests exist to catch.
 /// </para>
@@ -115,6 +115,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         Import = new EnvImportViewModel(session, name, picker, report, _announce, imported ?? Reload);
         Launch = new ProjectLaunchViewModel(session, name, picker, launching ?? ProjectLaunching.ForThisMachine(authority: null), report, _announce);
         Launch.PropertyChanged += OnLaunchChanged;
+        Import.PropertyChanged += OnImportChanged;
 
         Reload();
     }
@@ -197,7 +198,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     /// </remarks>
     internal string? RunCommand => CopiedRunCommand.For(Name, SelectedProfile, Launch.Mapping?.Command ?? "npm start");
 
-    /// <summary>Whether the card offers <see cref="RunCommand"/>, which a name a terminal could run never gets (D-0453).</summary>
+    /// <summary>Whether the card offers <see cref="RunCommand"/>, which a name a terminal could run never gets.</summary>
     internal bool HasRunCommand => CopiedRunCommand.IsCopyable(Name, OperatingSystem.IsWindows());
 
     /// <summary>What the card says in place of <see cref="RunCommand"/> when it offers none, or empty.</summary>
@@ -222,11 +223,20 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
     internal bool HasRows => Rows.Count > 0;
 
-    /// <summary>Whether the selected profile is protected, so every release of it is asked live (D-0348).</summary>
+    /// <summary>The title of the item holding most of the selected stage's variables, which the From column's heading names once, or null.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FromHeading))]
+    internal partial string? CommonSourceTitle { get; private set; }
+
+    /// <summary>"From .env.staging", or "From item" when no one item holds most of the variables.</summary>
+    internal string FromHeading => CommonSourceTitle is { } title ? UseText.FromItem(title) : Resources.Strings.FromItem;
+
+    /// <summary>Whether the selected profile is protected, so every release of it is asked live.</summary>
     internal bool SelectedIsProtected => EnvProfileNames.IsProtected(SelectedProfile);
 
     /// <summary>Whether the new-profile form is open.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsFormOpen))]
     [NotifyCanExecuteChangedFor(nameof(BeginAddProfileCommand), nameof(ConfirmAddProfileCommand), nameof(CancelAddProfileCommand))]
     internal partial bool IsAddingProfile { get; private set; }
 
@@ -339,11 +349,22 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
     /// <summary>The variable a confirmation is pending for, or null.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(RemovePrompt), nameof(IsRemoving))]
+    [NotifyPropertyChangedFor(nameof(RemovePrompt), nameof(IsRemoving), nameof(IsFormOpen))]
     [NotifyCanExecuteChangedFor(nameof(ConfirmRemoveCommand), nameof(CancelRemoveCommand))]
     internal partial EnvVariableRow? Removing { get; private set; }
 
     internal bool IsRemoving => Removing is not null;
+
+    partial void OnRemovingChanged(EnvVariableRow? oldValue, EnvVariableRow? newValue)
+    {
+        oldValue?.ConfirmRemove(false);
+        newValue?.ConfirmRemove(true);
+    }
+
+    /// <summary>Whether a form or confirmation is open, whose action then takes the accent from Run.</summary>
+    internal bool IsFormOpen =>
+        IsAdding || IsAddingProfile || IsReplacing || IsRemoving || IsAddingEntry || IsConfirmingTagChange
+        || Launch.IsSettingUp || Launch.IsConfirming || Import.IsPreviewing || Import.IsOfferingDelete;
 
     /// <summary>The variable whose value is being replaced, or null.</summary>
     /// <remarks>
@@ -353,7 +374,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     /// thirty buffers in order to use one of them.
     /// </remarks>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ReplacePrompt), nameof(ReplaceWords), nameof(IsReplacing))]
+    [NotifyPropertyChangedFor(nameof(ReplacePrompt), nameof(ReplaceWords), nameof(IsReplacing), nameof(IsFormOpen))]
     [NotifyCanExecuteChangedFor(nameof(ConfirmReplaceCommand), nameof(CancelReplaceCommand))]
     internal partial EnvVariableRow? Replacing { get; private set; }
 
@@ -445,7 +466,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         }
 
         CloseGenerator();
-        GeneratorPanel = new GeneratePasswordViewModel(Clipboard, Generator, field, value => ApplyGenerated(field, value), null, null, null, CloseGenerator);
+        GeneratorPanel = new GeneratePasswordViewModel(Clipboard, Generator, field, value => ApplyGenerated(field, value), CloseGenerator);
     }
 
     private void ApplyGenerated(SecretField field, SecretField value)
@@ -520,7 +541,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
     /// <summary>What the confirmation asks.</summary>
     internal string RemovePrompt => Removing is { } row
-        ? $"Remove {row.DisplayKey} from {ApprovalPrompt.Shown(row.Source.Entry)}{ReadBy(row.Source.Entry)}? Its value stays in the item's history."
+        ? $"Remove {row.DisplayKey} from {EntryNameSanitizer.Sanitize(row.Source.Entry.Title).Text}{ReadBy(row.Source.Entry)}?"
         : string.Empty;
 
     /// <summary>The other environments an entry serves, the open project's by name and another project's as <c>project/environment</c>.</summary>
@@ -547,6 +568,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsFormOpen))]
     [NotifyCanExecuteChangedFor(nameof(BeginAddCommand), nameof(CancelAddCommand), nameof(ConfirmAddCommand))]
     internal partial bool IsAdding { get; private set; }
 
@@ -623,7 +645,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     internal bool IsAddingEntry => AddingEntryTo is not null;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsAddingEntry), nameof(AddEntryTitle))]
+    [NotifyPropertyChangedFor(nameof(IsAddingEntry), nameof(AddEntryTitle), nameof(IsFormOpen))]
     [NotifyCanExecuteChangedFor(nameof(CancelAddEntryCommand))]
     private partial string? AddingEntryTo { get; set; }
 
@@ -654,7 +676,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
             var count = Matching().Count();
 
             return count == 0 ? "No other item matches."
-                : count > _shownCandidates ? Invariant($"{count - _shownCandidates} more. Type part of a path to narrow the list.")
+                : count > _shownCandidates ? Invariant($"{count - _shownCandidates} more. Type part of a title to narrow the list.")
                 : string.Empty;
         }
     }
@@ -672,17 +694,32 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         }
     }
 
-    /// <summary>The tag change waiting for the person's answer, as the entry pane asks it (D-0415).</summary>
+    /// <summary>The tag change waiting for the person's answer, as the entry pane asks it.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TagChangeReturnCommand))]
-    [NotifyPropertyChangedFor(nameof(IsConfirmingTagChange), nameof(TagChangeLines), nameof(TagChangeAdds), nameof(TagChangeAction))]
+    [NotifyPropertyChangedFor(nameof(IsConfirmingTagChange), nameof(TagChangeLines), nameof(TagChangeAdds), nameof(TagChangeAction), nameof(IsFormOpen))]
     [NotifyCanExecuteChangedFor(nameof(ConfirmTagChangeCommand), nameof(CancelTagChangeCommand))]
     internal partial ProjectTagChange? PendingTagChange { get; private set; }
 
     internal bool IsConfirmingTagChange => PendingTagChange is not null;
 
-    /// <summary>What the change does: the environment it reaches and the fields that join or leave it, never a value.</summary>
-    internal IReadOnlyList<string> TagChangeLines => PendingTagChange?.Describe() ?? [];
+    /// <summary>What the change does: the stage it reaches and the fields that join or leave it, never a value; an item added is named by its title.</summary>
+    internal IReadOnlyList<string> TagChangeLines => PendingTagChange switch
+    {
+        null => [],
+        { Adding: true, Moves: true, Read.Environment: { } stage } change => AddingLines(change, EntryNameSanitizer.Sanitize(stage).Text),
+        var change => change.Describe(),
+    };
+
+    private static List<string> AddingLines(ProjectTagChange change, string stage)
+    {
+        var title = TitleOf(change.Entry);
+        var adds = change.Fields.Count == 0
+            ? UseText.NoVariablesToAdd(title, stage)
+            : UseText.AddsVariables(title, string.Join(", ", change.Fields.Select(field => EntryNameSanitizer.Sanitize(field).Text)), stage);
+
+        return change.Read.Protects ? [adds, Resources.Strings.AgentsAreAskedEveryTimeForAProtectedStage] : [adds];
+    }
 
     internal bool TagChangeAdds => PendingTagChange?.Adding ?? false;
 
@@ -819,10 +856,17 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         var selected = Variables.ToDictionary(row => row.Key, StringComparer.Ordinal);
         var keys = (Matrix?.Rows.Select(row => row.Key) ?? []).Union(selected.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal);
 
-        Rows =
-        [
-            .. keys.Select(key => new EnvKeyRow(key, [.. profiles.Select(profile => Cell(key, profile.Name))], SelectedProfile)),
-        ];
+        List<EnvKeyRow> rows = [.. keys.Select(key => new EnvKeyRow(key, [.. profiles.Select(profile => Cell(key, profile.Name))], SelectedProfile))];
+        var common = rows
+            .Select(row => row.Selected)
+            .Where(cell => cell.Sources.Count == 1)
+            .GroupBy(cell => cell.Sources[0], StringComparer.Ordinal)
+            .OrderByDescending(held => held.Count())
+            .ThenBy(held => held.Key, StringComparer.Ordinal)
+            .FirstOrDefault();
+
+        CommonSourceTitle = common?.First().SourceTitles[0];
+        Rows = [.. rows.Select(row => row with { CommonSource = common?.Key })];
 
         Columns =
         [
@@ -832,7 +876,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
                 string.Equals(profile.Name, SelectedProfile, StringComparison.Ordinal),
                 new RelayCommand(() => SelectedProfile = profile.Name))
             {
-                HasMissing = Rows.Any(row => row.Cells.Any(cell => cell.IsMissing && string.Equals(cell.Profile, profile.Name, StringComparison.Ordinal))),
+                MissingCount = Rows.Count(row => row.Cells.Any(cell => cell.IsMissing && string.Equals(cell.Profile, profile.Name, StringComparison.Ordinal))),
             }),
         ];
 
@@ -859,15 +903,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         }
     }
 
-    /// <summary>An item by title, as the table names it; a project's own item, titled like a file, after the project's name.</summary>
-    private string TitleOf(EntryName entry)
-    {
-        var title = EntryNameSanitizer.Sanitize(entry.Title).Text;
-
-        return string.Equals(entry.GroupPath, EnvStore.HomeEntry(Name, EnvProfileNames.Default).GroupPath, StringComparison.Ordinal)
-            ? $"{DisplayName} {title}"
-            : title;
-    }
+    private static string TitleOf(EntryName entry) => EntryNameSanitizer.Sanitize(entry.Title).Text;
 
     private void Act(string key, string profile, EnvCellState state)
     {
@@ -937,6 +973,20 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         {
             OnPropertyChanged(nameof(RunCommand));
         }
+
+        if (e.PropertyName is nameof(ProjectLaunchViewModel.IsSettingUp) or nameof(ProjectLaunchViewModel.IsConfirming))
+        {
+            OnPropertyChanged(nameof(IsFormOpen));
+            StartRunCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    private void OnImportChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(EnvImportViewModel.IsPreviewing) or nameof(EnvImportViewModel.IsOfferingDelete))
+        {
+            OnPropertyChanged(nameof(IsFormOpen));
+        }
     }
 
     /// <summary>Hands a row its value, and takes it away from whichever row had it.</summary>
@@ -978,7 +1028,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
     /// <summary>
     /// Reads one value out of the open vault as it leaves keypaste, for a copy: its placeholders filled in
-    /// from its entry's own fields, or why it cannot leave reported (D-0465).
+    /// from its entry's own fields, or why it cannot leave reported.
     /// </summary>
     /// <returns>The value, or null once what went wrong was reported.</returns>
     internal string? ReadFilled(EnvVariableRow row)
@@ -1034,12 +1084,32 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         Environments = [];
         _catalog = null;
         Launch.PropertyChanged -= OnLaunchChanged;
+        Import.PropertyChanged -= OnImportChanged;
         CloseGenerator();
         NewValue.Dispose();
         ReplacementValue.Dispose();
         Import.Dispose();
         Launch.Dispose();
     }
+
+    /// <summary>Run…: starts the project in a terminal, or, where this copy of keypaste can open none, copies its run command and says so.</summary>
+    [RelayCommand(CanExecute = nameof(CanStartRun))]
+    private async Task StartRunAsync()
+    {
+        if (Launch.IsSupported)
+        {
+            await Launch.RunOrSetUpCommand.ExecuteAsync(null).ConfigureAwait(true);
+            return;
+        }
+
+        if (RunCommand is { } command)
+        {
+            await Clipboard.CopyPlainAsync(command, "Run command").ConfigureAwait(true);
+            _announce(Resources.Strings.TerminalCantOpenHereSoTheRunCommandWasCopied, ToastTone.Information);
+        }
+    }
+
+    private bool CanStartRun() => Launch.IsSupported ? !Launch.IsConfirming : HasRunCommand;
 
     [RelayCommand(CanExecute = nameof(HasRunCommand))]
     private async Task CopyRunCommandAsync()
@@ -1256,7 +1326,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
                 .Select(EntryName.Of)
                 .Distinct()
                 .Where(entry => !members.Contains(entry))
-                .Select(entry => new EnvEntryCandidate(entry, ApprovalPrompt.Shown(entry)))
+                .Select(entry => new EnvEntryCandidate(entry, TitleOf(entry)))
                 .OrderBy(candidate => candidate.Display, StringComparer.Ordinal),
         ];
         ChosenEntry = null;

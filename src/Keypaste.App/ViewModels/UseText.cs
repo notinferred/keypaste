@@ -24,7 +24,65 @@ internal static class UseText
     internal static string Changed(DateTimeOffset at) => string.Format(CultureInfo.CurrentCulture, Strings.ChangedValue, PersonTime.Moment(at.ToLocalTime()));
 
     /// <summary>What the reveal button's tooltip says.</summary>
+    /// <summary>Who wants what, as Agents' waiting row says it.</summary>
+    internal static string Wants(string who, string what) => string.Format(CultureInfo.CurrentCulture, Strings.WantsValue, who, what);
+
+    /// <summary>Where a tool's configuration file is, under the entry to paste into it.</summary>
+    internal static string GoesIn(string path) => string.Format(CultureInfo.CurrentCulture, Strings.GoesInValue, path);
+
+    /// <summary>An agent's rule for every kind of value, the rest of them, or the default's, in a word.</summary>
+    internal static string RuleFor(RuleScope scope, string rule) => string.Format(
+        CultureInfo.CurrentCulture,
+        scope switch
+        {
+            RuleScope.EveryKind => Strings.RuleForEveryKind,
+            RuleScope.TheRest => Strings.RuleForTheRest,
+            _ => Strings.DefaultRuleValue,
+        },
+        rule);
+
     internal static string FragileKeyFile(string name) => string.Format(CultureInfo.CurrentCulture, Strings.FragileKeyFileWarningValue, name);
+
+    /// <summary>A Security finding's keys: how many, and the item whose notes hold them.</summary>
+    internal static string KeysInNotes(int count, string item) => string.Format(CultureInfo.CurrentCulture, Strings.NKeysInTheNotesOfValue, count, item);
+
+    internal static string InNotesOf(string item) => string.Format(CultureInfo.CurrentCulture, Strings.InTheNotesOfValue, item);
+
+    internal static string AlsoOn(string items) => string.Format(CultureInfo.CurrentCulture, Strings.AlsoOnValue, items);
+
+    internal static string RotatePassword(string item, string? host) => host is null
+        ? string.Format(CultureInfo.CurrentCulture, Strings.RotateValuePassword, item)
+        : string.Format(CultureInfo.CurrentCulture, Strings.RotateValuePasswordOnValue, item, host);
+
+    internal static string Modified(string when) => string.Format(CultureInfo.CurrentCulture, Strings.ModifiedValue, when);
+
+    internal static string CopyInto(string vault) => string.Format(CultureInfo.CurrentCulture, Strings.CopyIntoValue, vault);
+
+    internal static string ChangedElsewhere(string vault) => string.Format(CultureInfo.CurrentCulture, Strings.ValueChangedElsewhere, vault);
+
+    internal static string Expired(DateTimeOffset at) => string.Format(CultureInfo.CurrentCulture, Strings.ExpiredValue, PersonTime.Date(at.ToLocalTime()));
+
+    internal static string Expires(DateTimeOffset at) => string.Format(CultureInfo.CurrentCulture, Strings.ExpiresValue, PersonTime.Date(at.ToLocalTime()));
+
+    internal static string Marked(DateTimeOffset at) => string.Format(CultureInfo.CurrentCulture, Strings.MarkedValue, PersonTime.Date(at.ToLocalTime()));
+
+    /// <summary>What moving keys into a stage does: the item joins it with these variables.</summary>
+    internal static string JoinsStage(string item, string stage, string variables) => string.Format(CultureInfo.CurrentCulture, Strings.ValueJoinsValueWithValue, item, stage, variables);
+
+    internal static string MovedIntoStage(string keys, string item, string stage) => string.Format(CultureInfo.CurrentCulture, Strings.MovedValueIntoValue, keys, item, stage);
+
+    /// <summary>"From .env.staging", the From column's heading naming the item most variables come from.</summary>
+    internal static string FromItem(string item) => string.Format(CultureInfo.CurrentCulture, Strings.FromValue, item);
+
+    /// <summary>What adding an item with no variables to a stage does.</summary>
+    internal static string NoVariablesToAdd(string item, string stage) => string.Format(CultureInfo.CurrentCulture, Strings.ValueHasNoVariablesToAddToValue, item, stage);
+
+    internal static string AddsVariables(string item, string variables, string stage) => string.Format(CultureInfo.CurrentCulture, Strings.ValueAddsValueToValue, item, variables, stage);
+
+    /// <summary>A project tag whose stage is cased wrong: ".env's tag Prod isn't a stage name."</summary>
+    internal static string TagIsNotAStage(string item, string stage) => string.Format(CultureInfo.CurrentCulture, Strings.ValuesTagValueIsntAStageName, item, stage);
+
+    internal static string ChangeTo(string stage) => string.Format(CultureInfo.CurrentCulture, Strings.ChangeToValue, stage);
 
     internal static string RevealFor(TimeSpan shownFor) => string.Format(CultureInfo.CurrentCulture, Strings.RevealForSeconds, shownFor.TotalSeconds);
 
@@ -56,16 +114,16 @@ internal static class UseText
             return string.Empty;
         }
 
-        var days = (int)(now - when).TotalDays;
-        var ago = days switch
-        {
-            <= 0 => Strings.DayToday,
-            1 => Strings.DayOneAgo,
-            _ => string.Format(CultureInfo.CurrentCulture, Strings.DaysAgo, days),
-        };
-
-        return $"{PersonTime.Date(when.ToLocalTime())} · {ago}";
+        return $"{PersonTime.Date(when.ToLocalTime())} · {DaysAgo(when, now)}";
     }
+
+    /// <summary>How many whole days ago a time was: "today", "1 day ago" or "22 days ago".</summary>
+    internal static string DaysAgo(DateTimeOffset at, DateTimeOffset now) => (int)(now - at).TotalDays switch
+    {
+        <= 0 => Strings.DayToday,
+        1 => Strings.DayOneAgo,
+        var days => string.Format(CultureInfo.CurrentCulture, Strings.DaysAgo, days),
+    };
 
     /// <summary>A moment as the detail pane's expiry row shows it: <c>yyyy-MM-dd HH:mm</c>, local time.</summary>
     /// <param name="at">The time, or null.</param>
@@ -78,7 +136,7 @@ internal static class UseText
     /// <param name="seeing">The attached agents that can name the entry without having asked yet.</param>
     /// <returns>
     /// "cursor", "ci-staging · token", "claude-code can see it · nothing released"
-    /// or "None active": who, never when, which the card's Last used line says.
+    /// or "None active": who, never when, which the lines say.
     /// </returns>
     internal static string Summary(EntryAgentAccess? access, IReadOnlyList<string> seeing)
     {
@@ -109,15 +167,15 @@ internal static class UseText
     /// <summary>How many lines the Agent access card lists under its summary.</summary>
     internal const int MaximumLines = 5;
 
-    /// <summary>The Agent access card's lines under its summary: each client that received the entry.</summary>
+    /// <summary>The Agent access row's lines: each client that received the entry, when last and how often.</summary>
     /// <param name="access">What agents did with the entry.</param>
     /// <param name="now">The time to measure from.</param>
-    /// <returns>Names, kinds and times, never a value; none when the summary already says all there is.</returns>
+    /// <returns>Names, times and counts, never a value; none when no client received it, where the summary speaks.</returns>
     internal static IReadOnlyList<string> Lines(EntryAgentAccess access, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(access);
 
-        if (access.Clients.Count <= 1)
+        if (access.Clients.Count == 0)
         {
             return [];
         }

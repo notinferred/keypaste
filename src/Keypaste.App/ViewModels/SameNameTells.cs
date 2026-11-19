@@ -46,11 +46,6 @@ internal sealed class SameNameTells
         return held.Count == 1 ? held[0].Value : null;
     }
 
-    /// <summary>The path as a sentence names this item, with its tell when another item has the path too.</summary>
-    /// <param name="item">The item.</param>
-    /// <returns>What to show, sanitized.</returns>
-    internal string Named(EntryName item) => WithTell(RecommendationsViewModel.Shown(item), Of(item));
-
     internal static string WithTell(string path, string? tell) =>
         string.IsNullOrEmpty(tell) ? path : $"{path} ({tell})";
 

@@ -64,18 +64,31 @@ public sealed class SayWhatIsHappeningTests
     }
 
     [Fact]
-    public void A_later_toast_stacks_so_a_warning_outlives_a_success_and_the_oldest_gives_way_to_a_fourth()
+    public void A_later_toast_replaces_the_one_before_and_the_same_one_restarts()
     {
         using var stack = new ToastStack(_clock, action => action());
 
         stack.Show("Not saved. Try again.", ToastTone.Warning);
         stack.Show("Copied.", ToastTone.Success);
-        stack.Show("Copied.", ToastTone.Success);
-        Assert.Equal(["Not saved. Try again.", "Copied."], stack.Shown.Select(toast => toast.Message));
+        Assert.Equal(["Copied."], stack.Shown.Select(toast => toast.Message));
 
-        stack.Show("Third.", ToastTone.Information);
-        stack.Show("Fourth.", ToastTone.Information);
-        Assert.Equal(["Copied.", "Third.", "Fourth."], stack.Shown.Select(toast => toast.Message));
+        _clock.Advance(TimeSpan.FromSeconds(3));
+        stack.Show("Copied.", ToastTone.Success);
+        _clock.Advance(TimeSpan.FromSeconds(3));
+        Assert.Single(stack.Shown);
+    }
+
+    [Fact]
+    public void A_toast_said_while_a_dialog_is_up_waits_for_it_to_close()
+    {
+        using var stack = new ToastStack(_clock, action => action());
+
+        stack.IsHeld = true;
+        stack.Show("Imported 7 items.", ToastTone.Success);
+        Assert.Empty(stack.Shown);
+
+        stack.IsHeld = false;
+        Assert.Equal(["Imported 7 items."], stack.Shown.Select(toast => toast.Message));
     }
 
     [Fact]
@@ -199,20 +212,18 @@ public sealed class SayWhatIsHappeningTests
     });
 
     [Fact]
-    public async Task A_password_alone_that_fails_says_a_second_factor_may_be_needed_and_opens_More_options()
+    public async Task A_password_that_fails_says_so_in_one_line_naming_the_key_file_it_may_also_need()
     {
         using var fixture = new TempVault();
         fixture.RememberSelf();
         using var session = new AppVaultSession(_clock, home: fixture.Home, hardwareKeys: new SoftwareYubiKey(new byte[20]));
         using var model = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => { });
-        Assert.False(model.MoreOptions);
 
         Type(model, "not the password");
         await model.UnlockAsync();
 
-        Assert.StartsWith("That password didn't open this vault. It may also need a key file or a YubiKey: add one below, or type the password again.", model.Message, StringComparison.Ordinal);
-        Assert.True(model.MoreOptions);
-        Assert.True(model.ShowsHardwareKey);
+        Assert.Equal("Wrong password or key file.", model.Message);
+        Assert.True(model.UseHardwareKeyCommand.CanExecute(null));
     }
 
     [Fact]
@@ -251,7 +262,7 @@ public sealed class SayWhatIsHappeningTests
     {
         using var home = new TempAuditHome();
         home.Append("env/dev/STRIPE_KEY");
-        using var model = new LogViewModel(home.Home) { ShowDenied = true };
+        var model = new LogViewModel(home.Home) { ShowDenied = true };
 
         Assert.True(model.OffersShowAll);
 

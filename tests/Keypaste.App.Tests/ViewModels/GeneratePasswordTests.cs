@@ -267,7 +267,6 @@ public sealed class GeneratePasswordTests : IDisposable
 
         detail.OpenGeneratorCommand.Execute(null);
         var panel = detail.NewPasswordGenerator!;
-        Assert.False(panel.OffersNewItem);
         Assert.False(panel.KeepsElsewhere);
         Assert.False(detail.NewPassword.HasValue);
 
@@ -314,7 +313,6 @@ public sealed class GeneratePasswordTests : IDisposable
 
         shell.OpenGeneratorCommand.Execute(null);
         var dialog = shell.GeneratorDialog!;
-        dialog.FieldName = "API_TOKEN";
         dialog.Generator.Letters = false;
         dialog.Generator.Digits = false;
         dialog.Generator.Symbols = false;
@@ -323,21 +321,17 @@ public sealed class GeneratePasswordTests : IDisposable
         Assert.False(dialog.Value.HasValue);
         Assert.Null(dialog.Reveal());
         Assert.False(dialog.CopyCommand.CanExecute(null));
-        Assert.False(dialog.NewItemCommand.CanExecute(null));
-        Assert.False(dialog.AddFieldCommand.CanExecute(null));
         Assert.False(dialog.RegenerateCommand.CanExecute(null));
 
         dialog.Generator.Symbols = true;
 
         Assert.True(dialog.Value.HasValue);
         Assert.True(dialog.CopyCommand.CanExecute(null));
-        Assert.True(dialog.NewItemCommand.CanExecute(null));
-        Assert.True(dialog.AddFieldCommand.CanExecute(null));
         Assert.True(dialog.RegenerateCommand.CanExecute(null));
     });
 
     [Fact]
-    public Task Generate_password_copies_through_the_countdown_and_starts_a_new_item_with_it() => HeadlessSession.On(async () =>
+    public Task Generate_password_copies_through_the_countdown() => HeadlessSession.On(async () =>
     {
         using var vault = new TempVault();
         using var session = Unlocked(vault);
@@ -351,38 +345,10 @@ public sealed class GeneratePasswordTests : IDisposable
         Assert.Equal(PasswordGenerator.DefaultLength, clipboard.Content!.Length);
         Assert.True(clipboard.ContentWasSetAsASecret);
 
-        dialog.NewItemCommand.Execute(null);
+        dialog.CancelCommand.Execute(null);
 
         Assert.Null(shell.GeneratorDialog);
-        var form = Assert.IsType<EntriesViewModel>(shell.Content).NewItem!;
-        Assert.Equal(clipboard.Content, form.Password.Compose());
         Assert.True(dialog.Value.IsZeroed);
-    });
-
-    [Fact]
-    public Task Generate_password_adds_its_value_to_the_chosen_item_as_a_protected_field() => HeadlessSession.On(() =>
-    {
-        using var vault = new TempVault();
-        using var session = Unlocked(vault);
-        using var shell = new ShellViewModel(session, vault.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(AppClock.Start), picker: new FakeVaultFilePicker());
-        var items = Assert.IsType<EntriesViewModel>(shell.Content);
-        items.Selected = items.Rows.Single();
-
-        shell.OpenGeneratorCommand.Execute(null);
-        var dialog = shell.GeneratorDialog!;
-
-        Assert.True(dialog.CanAddField);
-        Assert.Equal("example", dialog.Item);
-        Assert.False(dialog.AddFieldCommand.CanExecute(null));
-
-        dialog.FieldName = "API_TOKEN";
-        var value = dialog.Reveal();
-        dialog.AddFieldCommand.Execute(null);
-
-        var example = new EntryName(string.Empty, "example");
-        Assert.Null(shell.GeneratorDialog);
-        Assert.Equal(value, session.Unlocked!.ReadField(example, "API_TOKEN"));
-        Assert.True(session.Unlocked.Fields(example)!.Single(field => field.Name == "API_TOKEN").IsProtected);
     });
 
     [Fact]

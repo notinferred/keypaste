@@ -10,8 +10,8 @@ using Xunit;
 namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
-/// The first run offers the databases KeePassXC last opened, and the lock screen keeps the YubiKey
-/// under More options unless the vault's recent entry records a slot (N.2).
+/// The first run offers the databases KeePassXC last opened, and the lock screen offers the YubiKey
+/// beside the key file, chosen already where the vault's recent entry records a slot (N.2).
 /// </summary>
 public sealed class FirstRunTests : IDisposable
 {
@@ -45,7 +45,6 @@ public sealed class FirstRunTests : IDisposable
 
         Assert.False(model.HasSelection);
         Assert.True(model.OffersKeePassXc);
-        Assert.False(model.OffersCreateFirst);
         Assert.Equal([home, work], model.KeePassXc.Select(item => item.Path));
         Assert.Equal(["home.kdbx", "work.kdbx"], model.KeePassXc.Select(item => item.ToString()));
 
@@ -62,15 +61,14 @@ public sealed class FirstRunTests : IDisposable
     }
 
     [Fact]
-    public void Without_KeePassXCs_settings_the_welcome_starts_with_creating_a_vault_and_says_what_one_is()
+    public void Without_KeePassXCs_settings_the_welcome_lists_nothing_and_names_no_vault()
     {
         using var model = NewModel(Ini);
 
         Assert.False(model.OffersKeePassXc);
-        Assert.True(model.OffersCreateFirst);
+        Assert.True(model.ShowsWelcome);
         Assert.Empty(model.KeePassXc);
-        Assert.Equal("Keep your keys in one place", model.Heading);
-        Assert.Contains("master password", model.WelcomeSubtitle, StringComparison.Ordinal);
+        Assert.Empty(model.Heading);
     }
 
     [Fact]
@@ -127,17 +125,7 @@ public sealed class FirstRunTests : IDisposable
     }
 
     [Fact]
-    public void Neither_the_welcome_nor_the_lock_screen_speaks_of_agents()
-    {
-        using var model = NewModel(Ini);
-        Assert.DoesNotContain("agent", model.WelcomeSubtitle, StringComparison.OrdinalIgnoreCase);
-
-        model.Offer(MakeVault("work.kdbx"));
-        Assert.DoesNotContain("agent", model.Subtitle, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public void A_vault_with_no_slot_keeps_the_YubiKey_under_More_options_and_one_with_a_slot_shows_it()
+    public void Where_a_build_reaches_YubiKeys_the_form_offers_one_and_a_vault_remembered_with_a_slot_has_it_chosen()
     {
         using var keyed = new AppVaultSession(new ManualClock(AppClock.Start), home: _home.Path, hardwareKeys: new SoftwareYubiKey(new byte[20]));
         var plain = MakeVault("plain.kdbx");
@@ -149,20 +137,12 @@ public sealed class FirstRunTests : IDisposable
         using var model = new UnlockViewModel(keyed, _home.Path, new FakeVaultFilePicker(), () => { });
 
         Assert.Equal(slotted, model.SelectedPath);
-        Assert.True(model.ShowsHardwareKey);
-        Assert.False(model.OffersMoreOptions);
+        Assert.True(model.OffersHardwareKey);
+        Assert.Equal("YubiKey · slot 1", model.HardwareKeyLabel);
 
         model.SelectedRecent = model.Recent.Single(item => item.Path == plain);
-        Assert.False(model.ShowsHardwareKey);
-        Assert.True(model.OffersMoreOptions);
-
-        model.ShowMoreOptionsCommand.Press();
-        Assert.True(model.ShowsHardwareKey);
-        Assert.False(model.OffersMoreOptions);
-
-        model.SelectedRecent = model.Recent.Single(item => item.Path == slotted);
-        model.SelectedRecent = model.Recent.Single(item => item.Path == plain);
-        Assert.False(model.ShowsHardwareKey);
+        Assert.False(model.UsesHardwareKey);
+        Assert.True(model.UseHardwareKeyCommand.CanExecute(null));
     }
 
     private UnlockViewModel NewModel(string? keePassXcConfig) =>

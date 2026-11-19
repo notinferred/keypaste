@@ -1,3 +1,4 @@
+using Keypaste.App.Resources;
 using Keypaste.App.Session;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
@@ -11,6 +12,14 @@ internal enum KeyfileChoice
     Keep = 0,
     Attach = 1,
     Remove = 2,
+}
+
+/// <summary>One way the access sheet's pop-up can change the master password, the key file or the YubiKey.</summary>
+/// <param name="Choice">What the change does to it.</param>
+/// <param name="Label">How the pop-up reads.</param>
+internal sealed record AccessChangeChoice(KeyfileChoice Choice, string Label)
+{
+    public override string ToString() => Label;
 }
 
 /// <summary>
@@ -73,6 +82,69 @@ internal sealed partial class VaultAccessViewModel : ObservableObject, IDisposab
     /// <summary>What unlocks the vault now, read from the vault each time.</summary>
     internal string Factors => Now is { } now ? $"This vault {Opens(now)}" : string.Empty;
 
+    /// <summary>What unlocks the vault now, in a few words: Master password, or Password + key file.</summary>
+    internal string FactorNames => Now switch
+    {
+        null => string.Empty,
+        (var password, var keyfile, var slot) => string.Join(
+            " + ",
+            new[]
+            {
+                password ? (keyfile is null && slot is null ? Strings.MasterPassword : Strings.Password) : null,
+                keyfile is null ? null : (password ? Strings.KeyFileLower : Strings.KeyFile),
+                slot is null ? null : Strings.YubiKey,
+            }.OfType<string>()),
+    };
+
+    /// <summary>The sheet's title, naming the vault.</summary>
+    internal string FormTitle => $"Change what unlocks {(_session.VaultPath is { } path ? Path.GetFileNameWithoutExtension(path) : "this vault")}";
+
+    /// <summary>The master password's pop-up: keep it, or set a new one.</summary>
+    internal IReadOnlyList<AccessChangeChoice> PasswordChanges { get; } =
+        [new(KeyfileChoice.Keep, Strings.KeepAsItIs), new(KeyfileChoice.Attach, Strings.SetANewMasterPassword)];
+
+    internal AccessChangeChoice? PasswordChange
+    {
+        get => PasswordChanges[SetPassword ? 1 : 0];
+        set => SetPassword = value?.Choice == KeyfileChoice.Attach;
+    }
+
+    /// <summary>The key file's pop-up: keep it, add or replace one, or stop using it.</summary>
+    internal IReadOnlyList<AccessChangeChoice> KeyfileChanges =>
+        HasKeyfile
+            ? [new(KeyfileChoice.Keep, Strings.KeepAsItIs), new(KeyfileChoice.Attach, AttachLabel), new(KeyfileChoice.Remove, Strings.StopUsingAKeyFile)]
+            : [new(KeyfileChoice.Keep, Strings.KeepAsItIs), new(KeyfileChoice.Attach, AttachLabel)];
+
+    internal AccessChangeChoice? KeyfileChange
+    {
+        get => KeyfileChanges.FirstOrDefault(choice => choice.Choice == Keyfile);
+        set
+        {
+            if (value is not null)
+            {
+                Choose(true, value.Choice);
+            }
+        }
+    }
+
+    /// <summary>The YubiKey's pop-up: keep it, add one or use another slot, or stop using it.</summary>
+    internal IReadOnlyList<AccessChangeChoice> HardwareKeyChanges =>
+        HasHardwareKey
+            ? [new(KeyfileChoice.Keep, Strings.KeepAsItIs), new(KeyfileChoice.Attach, AttachHardwareKeyLabel), new(KeyfileChoice.Remove, Strings.StopUsingTheYubiKey)]
+            : [new(KeyfileChoice.Keep, Strings.KeepAsItIs), new(KeyfileChoice.Attach, AttachHardwareKeyLabel)];
+
+    internal AccessChangeChoice? HardwareKeyChange
+    {
+        get => HardwareKeyChanges.FirstOrDefault(choice => choice.Choice == HardwareKey);
+        set
+        {
+            if (value is not null)
+            {
+                ChooseHardwareKey(true, value.Choice);
+            }
+        }
+    }
+
     /// <summary>Whether the open vault has a keyfile, so that removing one is offered.</summary>
     internal bool HasKeyfile => Now?.Keyfile is not null;
 
@@ -130,6 +202,7 @@ internal sealed partial class VaultAccessViewModel : ObservableObject, IDisposab
         {
             if (IsEditing && SetProperty(ref _setPassword, value))
             {
+                OnPropertyChanged(nameof(PasswordChange));
                 OnPropertyChanged(nameof(Summary));
                 ReviewCommand.NotifyCanExecuteChanged();
 
@@ -276,13 +349,13 @@ internal sealed partial class VaultAccessViewModel : ObservableObject, IDisposab
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(KeepKeyfile), nameof(AttachKeyfile), nameof(RemoveKeyfile), nameof(Summary), nameof(KeyfileWarning))]
-    [NotifyPropertyChangedFor(nameof(HasKeyfileWarning))]
+    [NotifyPropertyChangedFor(nameof(HasKeyfileWarning), nameof(KeyfileChange))]
     [NotifyCanExecuteChangedFor(nameof(ReviewCommand))]
     private partial KeyfileChoice Keyfile { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(KeepHardwareKey), nameof(AttachHardwareKey), nameof(RemoveHardwareKey), nameof(HardwareKeyWarning))]
-    [NotifyPropertyChangedFor(nameof(Summary), nameof(HasHardwareKeyWarning))]
+    [NotifyPropertyChangedFor(nameof(Summary), nameof(HasHardwareKeyWarning), nameof(HardwareKeyChange))]
     [NotifyCanExecuteChangedFor(nameof(ReviewCommand))]
     private partial KeyfileChoice HardwareKey { get; set; }
 
@@ -631,6 +704,7 @@ internal sealed partial class VaultAccessViewModel : ObservableObject, IDisposab
         IsConfirming = false;
         if (SetProperty(ref _setPassword, false, nameof(SetPassword)))
         {
+            OnPropertyChanged(nameof(PasswordChange));
             OnPropertyChanged(nameof(Summary));
             ReviewCommand.NotifyCanExecuteChanged();
         }
@@ -643,6 +717,11 @@ internal sealed partial class VaultAccessViewModel : ObservableObject, IDisposab
         Message = message;
         OnPropertyChanged(nameof(Now));
         OnPropertyChanged(nameof(Factors));
+        OnPropertyChanged(nameof(FactorNames));
+        OnPropertyChanged(nameof(KeyfileChanges));
+        OnPropertyChanged(nameof(HardwareKeyChanges));
+        OnPropertyChanged(nameof(KeyfileChange));
+        OnPropertyChanged(nameof(HardwareKeyChange));
         OnPropertyChanged(nameof(HasKeyfile));
         OnPropertyChanged(nameof(HasHardwareKey));
         OnPropertyChanged(nameof(Summary));

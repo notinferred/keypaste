@@ -75,11 +75,11 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     private Action? _discard;
     private Action? _keep;
     private bool _disposed;
-    private SecretField? _newItemPassword;
     private readonly Dictionary<AppVaultSession, RecommendationsViewModel> _scans = [];
     private IReadOnlyList<AppVaultSession> _contentVaults = [];
     private bool _contentSpansVaults;
     private VaultSection? _settingsVault;
+    private SettingsSectionChoice? _openingSettingsSection;
     private VaultSection? _agentsVault;
     private VaultSection? _securityVault;
 
@@ -123,6 +123,13 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
         LockCommand = new AsyncRelayCommand(LockAllAsync);
         Toasts = new ToastStack(_clock, Post);
+        PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(HasImport) or nameof(HasShare) or nameof(HasDiscardPrompt) or nameof(HasGeneratorDialog))
+            {
+                Toasts.IsHeld = HasImport || HasShare || HasDiscardPrompt || HasGeneratorDialog;
+            }
+        };
         BackCommand = new RelayCommand(() => Current = Destinations.UpOf(Current), () => HasBack);
         ShareCommand = new RelayCommand<EntryName>(OpenShare, item => item is not null && Share is null);
         ImportCommand = new AsyncRelayCommand(PickImportAsync, () => _picker is not null && !HasImport);
@@ -191,12 +198,11 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     /// <summary>How each table was sorted and sized, which outlives the screens drawing them and is kept with the window.</summary>
     internal TableStates Tables { get; }
 
-    /// <summary>The table the place in view draws, or null.</summary>
+    /// <summary>The table in view whose order Reset list order takes back, or null; Activity has no order to reset.</summary>
     internal TableState? TableInView => Content switch
     {
         EntriesViewModel => Tables.Items,
         TrashViewModel => Tables.Trash,
-        LogViewModel => Tables.Log,
         _ => null,
     };
 
@@ -206,6 +212,10 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     internal partial string? VaultChanged { get; private set; }
 
     internal bool HasVaultChanged => VaultChanged is not null;
+
+    /// <summary>Why keypaste did not merge the save, which the notice's tooltip holds, or null.</summary>
+    [ObservableProperty]
+    internal partial string? VaultChangedDetail { get; private set; }
 
     /// <summary>What the vault holds has just changed under the screen, whichever screen is open and whether or not it reads again.</summary>
     internal event Action? VaultMoved;
@@ -488,7 +498,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             }
             else if (_search.Length > 0)
             {
-                // Typing in the title bar's search from another place searches Items, which takes the query as it is built.
+                // A search typed from another place searches Items, which takes the query as it is built.
                 Leave(() => MoveTo(Destinations.Of(DestinationKind.Entries)), () => TakeBackSearch(before));
             }
         }
@@ -524,7 +534,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     /// <summary>Find's first chord on the search field, in the platform's own spelling.</summary>
     public static string SearchShortcut => OperatingSystem.IsMacOS() ? "⌘F" : "Ctrl F";
 
-    /// <summary>What the bottom-right corner is saying.</summary>
+    /// <summary>What the toast band is saying.</summary>
     internal ToastStack Toasts { get; }
 
     internal void ShowDone(string message) => ShowToast(message, ToastTone.Success);
@@ -748,20 +758,20 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         }
 
         _contentSpansVaults = false;
+        var itemsVault = _itemsVault.Session;
 
         Content = destination.Kind switch
         {
             // The audit log is machine state, which is why `keypaste log` reads it without a vault.
-            DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard, OpenAgents, Tables.Log, CheckpointKey),
+            DestinationKind.Log => new LogViewModel(Home, _clock, Clipboard, ConnectAnAITool, Tables.Log, CheckpointKey),
             DestinationKind.Settings => Settings(),
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => ItemsScreen(),
-            DestinationKind.EnvSets => new EnvSetsViewModel(_itemsVault.Session, Clipboard, _picker, Launching ?? ProjectLaunching.ForThisMachine(AuthorityOf(_itemsVault.Session)), ShowToast),
+            DestinationKind.EnvSets => new EnvSetsViewModel(_itemsVault.Session, Clipboard, _picker, Launching ?? ProjectLaunching.ForThisMachine(AuthorityOf(_itemsVault.Session)), ShowToast, name => OpenEntry(name, itemsVault)),
             DestinationKind.Trash => new TrashViewModel(_itemsVault.Session, Tables.Trash),
             DestinationKind.Sharing => Sharing(),
             DestinationKind.Tokens => new ScopedTokensViewModel(_session, Clipboard, ShowDone),
-            DestinationKind.Diagnostics => new DiagnosticsViewModel(_session, Home, _crashes, Authority),
-            DestinationKind.Advanced => new AdvancedViewModel(_session, kind => Current = Destinations.Of(kind)),
+            DestinationKind.Diagnostics => new DiagnosticsViewModel(_session, Home, _crashes, Authority, Clipboard),
             DestinationKind.Recommendations => SecurityInView,
             _ => null,
         };
@@ -808,14 +818,18 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         var vault = Chosen(_settingsVault, VaultForScreens);
         _settingsVault = vault;
 
-        return new SettingsViewModel(vault.Session, Home, Preferences, ApplyTheme, _picker, kind => Current = Destinations.Of(kind), Clipboard.TryPasteIntoAsync)
+        var section = _openingSettingsSection ?? SettingsSectionChoice.General;
+        _openingSettingsSection = null;
+
+        return new SettingsViewModel(vault.Session, Home, Preferences, ApplyTheme, _picker, Clipboard.TryPasteIntoAsync)
         {
+            Section = section,
             OffersTheme = OffersTheme,
             Login = LoginItem,
             CliLink = CliLink,
-            Crashes = _crashes,
             BrowserFill = Authority is null ? null : new BrowserFillViewModel(Authority, _post),
             BrowserHosts = Authority is null || BrowserHosts is not { } hosts ? null : new BrowserHostsViewModel(hosts.Hosts, hosts.Unavailable),
+            AgentDefaults = AuthorityOf(vault.Session) is { } authority ? new AgentRulesViewModel(authority) : null,
             VaultChoices = VaultChoices(withAll: false),
             ShowVault = choice => ShowAnother(choice, chosen => _settingsVault = chosen, () =>
             {
@@ -825,6 +839,21 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
                 }
             }),
         };
+    }
+
+    /// <summary>Opens one of Settings' sections, on Settings itself or on the screen of its own that shows it.</summary>
+    internal void OpenSettings(SettingsSectionChoice section)
+    {
+        ArgumentNullException.ThrowIfNull(section);
+
+        if (section.Screen is DestinationKind.Settings && Content is SettingsViewModel settings)
+        {
+            settings.Section = section;
+            return;
+        }
+
+        _openingSettingsSection = section.Screen is DestinationKind.Settings ? section : null;
+        Current = Destinations.Of(section.Screen);
     }
 
     /// <summary>Security: one vault's check, or every unlocked vault's under each one's title.</summary>
@@ -929,7 +958,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         IReadOnlyList<AppVaultSession> others = _allAccounts ? [.. unlocked.Where(vault => vault != home).Select(vault => vault.Session)] : [];
         var inView = ReferenceEquals(home.Session, _session);
         _contentSpansVaults = _allAccounts;
-        var entries = new EntriesViewModel(home.Session, Clipboard, inView ? EntryActivity : null, _web, _post, _picker, Tables.Items, others, session => SectionOf(session).Title) { AskDiscard = AskDiscard, Toast = ShowToast, EndReveals = () => VaultMoved?.Invoke(), StartNewItemWith = NewItemWith, Place = _place, VaultTitle = home.Title, ListSubtitle = ListSubtitle(), SaveInPlaces = () => [.. Account.Vaults.Select(vault => new SaveInChoice(vault.Session, Account.Title, vault.Title))] };
+        var entries = new EntriesViewModel(home.Session, Clipboard, inView ? EntryActivity : null, _web, _post, _picker, Tables.Items, others, session => SectionOf(session).Title) { AskDiscard = AskDiscard, Toast = ShowToast, EndReveals = () => VaultMoved?.Invoke(), PaneLabels = Tables.ItemLabels, ShowActivity = () => Current = Destinations.Of(DestinationKind.Log), Place = _place, VaultTitle = home.Title, ListSubtitle = ListSubtitle(), SaveInPlaces = () => [.. Account.Vaults.Select(vault => new SaveInChoice(vault.Session, Account.Title, vault.Title))] };
 
         entries.ClearSearchBox = () => Search = string.Empty;
 
@@ -958,7 +987,8 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
         return new(authority, Home, _clock, _post, authority is null ? null : Tools(), ShowToast, () => Current = Destinations.Of(DestinationKind.Log), Clipboard, _web)
         {
-            RulesForEveryAgent = authority is null ? null : new AgentRulesViewModel(authority),
+            OpenDefaults = () => OpenSettings(SettingsSectionChoice.Agents),
+            OpenSettingsScreen = () => OpenSettings(SettingsSectionChoice.General),
             VaultChoices = authority is null ? [] : VaultChoices(withAll: false),
             ShowVault = choice => ShowAnother(choice, chosen => _agentsVault = chosen, null),
         };
@@ -1062,46 +1092,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             return;
         }
 
-        var detail = (Content as EntriesViewModel)?.Detail;
-        GeneratorDialog = new GeneratePasswordViewModel(
-            Clipboard,
-            value => NewItemWith(value, CloseGenerator),
-            detail is null ? null : (value, name) => detail.AddGeneratedField(name, value),
-            detail?.Name.Title,
-            CloseGenerator);
-    }
-
-    // New item with the generated value as its password, taken character by character into the form's own field.
-    private void NewItemWith(SecretField value, Action close)
-    {
-        // Discarding the form a pane's generator belongs to disposes that generator's value, so the shell holds a copy.
-        DropNewItemPassword();
-        var password = new SecretField(Clipboard);
-        password.TakeFrom(value);
-        _newItemPassword = password;
-
-        // The generator stays open behind "Discard …?", so keeping the draft leaves the panel as it was.
-        Leave(
-            () =>
-            {
-                MoveTo(Destinations.Of(DestinationKind.Entries));
-
-                if (Content is EntriesViewModel items)
-                {
-                    items.BeginAddOfKindCommand.Press(ItemTemplate.Login);
-                    items.NewItem?.Password.TakeFrom(password);
-                }
-
-                DropNewItemPassword();
-                close();
-            },
-            DropNewItemPassword);
-    }
-
-    private void DropNewItemPassword()
-    {
-        _newItemPassword?.Dispose();
-        _newItemPassword = null;
+        GeneratorDialog = new GeneratePasswordViewModel(Clipboard, CloseGenerator);
     }
 
     [RelayCommand]
@@ -1245,10 +1236,10 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             }
 
             AgentsDetail = AgentsRefusing
-                ? unwritten ? "Refusing agents · the audit log can't be written" : "Refusing agents · the audit log won't open"
+                ? unwritten ? "the audit log can't be written" : "the audit log won't open"
                 : waiting > 0
-                    ? string.Create(CultureInfo.InvariantCulture, $"Answering agents · {waiting} waiting · {ClientCount(clients)}")
-                    : "Answering agents · " + ClientCount(clients);
+                    ? string.Create(CultureInfo.InvariantCulture, $"{waiting} waiting · {ClientCount(clients)}")
+                    : ClientCount(clients);
             SetCount(DestinationKind.AgentActivity, waiting);
             AgentsRow.Waiting = AgentsRefusing ? 0 : waiting;
             return;
@@ -1260,7 +1251,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         {
             AuthorityStatus.HeldBy => "another keypaste holds this vault",
             AuthorityStatus.NotServing => "agents cannot reach this vault",
-            _ => "not serving agents",
+            _ => string.Empty,
         };
         SetCount(DestinationKind.AgentActivity, 0);
         AgentsRow.Waiting = 0;
@@ -1455,8 +1446,9 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         if (session.MergeRefusal() is { } refused)
         {
             OffersSaveOverFile = refused.Outcome == VaultMergeSaveOutcome.Unreadable;
+            VaultChangedDetail = $"keypaste could not merge it: {MergeNotice.Refused(refused)}.";
             VaultChanged = string.Concat(
-                $"Another program saved {VaultName}, and keypaste could not merge it: {MergeNotice.Refused(refused)}. Agents are refused until you reload it.",
+                UseText.ChangedElsewhere(VaultName),
                 state.Unwritten ? Discarded() : string.Empty,
                 _reloadFailure is { } failed ? $" Reloading failed: {failed}" : string.Empty);
             return;
@@ -1468,13 +1460,19 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             return;
         }
 
+        VaultChangedDetail = null;
         VaultChanged = string.Concat(
-            $"Another program saved {VaultName}. Agents are refused until you reload it.",
+            UseText.ChangedElsewhere(VaultName),
             state.Unwritten ? Discarded() : string.Empty,
             _reloadFailure is { } failure ? $" Reloading failed: {failure}" : string.Empty);
     }
 
-    private void OpenAgents() => Current = Destinations.Of(DestinationKind.AgentActivity);
+    /// <summary>Opens Agents with its Connect sheet over it.</summary>
+    private void ConnectAnAITool()
+    {
+        Current = Destinations.Of(DestinationKind.AgentActivity);
+        (Content as AgentActivityViewModel)?.StartConnect();
+    }
 
     private void ShowMerging()
     {
@@ -1807,7 +1805,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
         _scans.Clear();
         CloseDiscardPrompt();
-        DropNewItemPassword();
         CloseShare();
         CloseGenerator();
 

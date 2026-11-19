@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ctl="using:Keypaste.App.Controls">
 
-  <!-- The design's MCP approval dialog, shared by the three prompt windows. The window is chromeless
+  <!-- The design's MCP approval dialog, shared by the prompt windows. The window is chromeless
        and transparent, so the card and its shadow are all there is of it; where the platform cannot
        draw transparency, PromptWindow marks the window opaque and the card fills it edge to edge. -->
 
@@ -76,17 +76,6 @@
     <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
   </Style>
 
-  <!-- Time left is said, not signalled: the prompt's one amber element is its primary answer. -->
-  <Style Selector="Grid.prompt-head Border.dot.waiting">
-    <Setter Property="Background" Value="{DynamicResource KpTextMuted}" />
-    <Setter Property="BoxShadow" Value="0 0 0 0 Transparent" />
-  </Style>
-  <Style Selector="TextBlock.prompt-countdown">
-    <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
-    <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
-    <Setter Property="VerticalAlignment" Value="Center" />
-  </Style>
-
   <!-- The tool call: what was asked, machine-readable, on the app ink. -->
   <Style Selector="Border.prompt-call">
     <Setter Property="Background" Value="{DynamicResource KpBgApp}" />
@@ -149,23 +138,10 @@
     <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
   </Style>
 
-  <Style Selector="Button.prompt">
-    <Setter Property="Height" Value="34" />
-    <Setter Property="MinHeight" Value="34" />
-    <Setter Property="Padding" Value="12,0" />
-  </Style>
-  <Style Selector="Button.prompt.primary, Button.prompt.danger">
-    <Setter Property="Padding" Value="16,0" />
-  </Style>
-  <!-- While arming, Allow once keeps its fill and shape; only its label fades, and stays readable because a person is reading the prompt by then. -->
-  <Style Selector="Button.prompt:not(.primary):not(.danger):not(.ghost):disabled /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
-    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
-  </Style>
 
-  <!-- The claim card every agent's prompt is: keypaste's header and who is asking, as keypaste checked it, then the
-       question, the item, the agent's own words, one plain consequence and Details; a hairline; the footer's quiet
-       countdown and at most three buttons, the narrowest answer the primary. -->
+  <!-- The claim card every prompt is: keypaste's header and who is asking, as keypaste checked it, then the
+       question, the item, the agent's own words, one plain consequence and Details; a hairline; at most three buttons,
+       the narrowest answer the primary; and along the bottom edge the time left, draining. -->
 
   <Style Selector="Border.claim">
     <Setter Property="Background" Value="{DynamicResource KpBgCard}" />
@@ -197,9 +173,31 @@
     <Setter Property="Height" Value="1" />
     <Setter Property="Background" Value="{DynamicResource KpBorderSubtle}" />
   </Style>
-  <!-- The countdown beside the buttons, or over them where the system's font draws them too wide to share the line. -->
-  <Style Selector="ctl|HeaderRow.claim-foot">
-    <Setter Property="Margin" Value="20,12,20,16" />
+  <Style Selector="StackPanel.claim-foot">
+    <Setter Property="Orientation" Value="Horizontal" />
+    <Setter Property="Spacing" Value="8" />
+    <Setter Property="HorizontalAlignment" Value="Right" />
+    <Setter Property="Margin" Value="20,12" />
+  </Style>
+
+  <!-- The time left to answer: a bar along the card's bottom edge that drains, quiet, since the card's one accent is its answer.
+       While the allows arm it is fainter, so the wait shows there and the buttons keep their look. -->
+  <Style Selector="ProgressBar.claim-time">
+    <Setter Property="MinHeight" Value="3" />
+    <Setter Property="Height" Value="3" />
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="Minimum" Value="0" />
+    <Setter Property="Maximum" Value="1" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <DoubleTransition Property="Value" Duration="0:0:1" />
+      </Transitions>
+    </Setter>
+  </Style>
+  <Style Selector="Border.claim.arming ProgressBar.claim-time">
+    <Setter Property="Foreground" Value="{DynamicResource KpBorderDefault}" />
   </Style>
 
   <!-- Small words that label what follows: keypaste, and whose words the quote is. -->
@@ -230,6 +228,12 @@
   <Style Selector="StackPanel.claim-verified ctl|KpIcon">
     <Setter Property="Foreground" Value="{DynamicResource KpOk}" />
   </Style>
+  <!-- A warning the card gives in its own words, on a line of its own after the ⚠. -->
+  <Style Selector="ctl|KpIcon.claim-warn">
+    <Setter Property="Foreground" Value="{DynamicResource KpWarn}" />
+    <Setter Property="VerticalAlignment" Value="Top" />
+    <Setter Property="Margin" Value="0,2,0,0" />
+  </Style>
 
   <!-- The question: a heading, wrapping, whose field or item name is in the mono a step down. -->
   <Style Selector="TextBlock.claim-title">
@@ -244,8 +248,8 @@
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
 
-  <!-- The agent's words: a box two lines tall whatever it says, scrolling past them, so no reason moves the buttons (THREATS T-2);
-       the quote's rule at its start is exactly as tall as the words, and the rest of the box stays empty. -->
+  <!-- The agent's words alone: a box exactly two lines tall whatever it says, scrolling past them, so no reason moves the buttons
+       (THREATS T-2); the quote's rule at its start is exactly as tall as the words. What keypaste altered is said on the label. -->
   <Style Selector="Border.claim-quote">
     <Setter Property="Height" Value="38" />
   </Style>
@@ -277,9 +281,13 @@
     <Setter Property="CornerRadius" Value="10" />
     <Setter Property="Padding" Value="8,2" />
   </Style>
+  <!-- A chip stays on one line, a long name cut in the middle; its tooltip and accessible name hold all of it. -->
   <Style Selector="Border.claim-chip TextBlock">
     <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    <Setter Property="TextWrapping" Value="NoWrap" />
+    <Setter Property="TextTrimming" Value="PrefixCharacterEllipsis" />
+    <Setter Property="MaxWidth" Value="380" />
   </Style>
 
   <!-- Details: a quiet disclosure; open, its rows are label and value, values in the mono where they are paths or names. -->
@@ -319,7 +327,7 @@
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
 
-  <!-- The footer's buttons: 28 tall, each with the key that answers it after its label, quieter than the label. -->
+  <!-- The footer's buttons: 28 tall, each with the key that answers it after its label, quieter than the label, where a key does. -->
   <Style Selector="Button.claim">
     <Setter Property="MinHeight" Value="28" />
     <Setter Property="Height" Value="28" />
@@ -344,13 +352,28 @@
     <Setter Property="Foreground" Value="{DynamicResource KpOnAccent}" />
     <Setter Property="Opacity" Value="0.75" />
   </Style>
-  <!-- While arming, every button keeps its shape and its label stays readable; only its ink fades. -->
-  <Style Selector="Button.claim:disabled">
-    <Setter Property="Opacity" Value="0.42" />
-  </Style>
-  <Style Selector="Button.claim.primary:disabled /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource KpTextMuted}" />
+  <Style Selector="Button.claim.primary:disabled TextBlock.claim-key">
+    <Setter Property="Foreground" Value="{DynamicResource KpTextDisabled}" />
     <Setter Property="Opacity" Value="1" />
+  </Style>
+  <!-- While arming, the buttons keep the look they will have: the time bar shows the wait. An allow that waits for more than
+       arming, as a picker's does for a pick, is greyed as any disabled button is. -->
+  <Style Selector="Border.claim.arming Button.claim:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource ButtonBackground}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ButtonBorderBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource ButtonForeground}" />
+  </Style>
+  <Style Selector="Border.claim.arming Button.claim.primary:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentButtonBackground}" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentButtonForeground}" />
+  </Style>
+  <Style Selector="Border.claim.arming Button.claim.danger:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource KpDangerTint}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpDanger}" />
+  </Style>
+  <Style Selector="Border.claim.arming Button.claim.primary:disabled TextBlock.claim-key">
+    <Setter Property="Foreground" Value="{DynamicResource KpOnAccent}" />
+    <Setter Property="Opacity" Value="0.75" />
   </Style>
 
   <!-- After this sheet's own rules, so a size named on an element holds over them here as it does elsewhere. -->

@@ -6,7 +6,7 @@ namespace Keypaste.App.ViewModels;
 /// <remarks>
 /// Pair is armed after the prompt has been up a moment, as every allow is, and only while the name is one a new pairing can
 /// take. The build is what the browser named when it started keypaste, which any program can name, so the window asks the
-/// person to pair only when the code matches the one their browser shows.
+/// person to pair only when the code matches the one their browser shows, and its requester line says Not verified. Return pairs nothing.
 /// </remarks>
 internal sealed class PairingViewModel : PromptViewModel
 {
@@ -14,6 +14,7 @@ internal sealed class PairingViewModel : PromptViewModel
     private string _name;
 
     internal PairingViewModel(PairingPrompt prompt)
+        : base(FillViewModel.Extension(prompt?.Identity))
     {
         ArgumentNullException.ThrowIfNull(prompt);
 
@@ -53,10 +54,19 @@ internal sealed class PairingViewModel : PromptViewModel
             {
                 OnPropertyChanged(nameof(NameProblem));
                 OnPropertyChanged(nameof(HasNameProblem));
-                AllowCommand.NotifyCanExecuteChanged();
+                Refresh();
             }
         }
     }
+
+    /// <inheritdoc/>
+    internal override string VerificationExplained => FillViewModel.Explained(_prompt.Identity);
+
+    /// <inheritdoc/>
+    internal override bool AnswersReturn => false;
+
+    /// <inheritdoc/>
+    protected override bool CanAllow => NameProblem is null;
 
     /// <inheritdoc/>
     protected override string Asks => $"{_prompt.Identity.Browser} asks to pair, showing the code {Code}";

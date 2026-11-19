@@ -28,7 +28,7 @@ internal sealed class PasswordRow : IRecommendationRow
 
     internal PasswordFinding Finding { get; }
 
-    /// <summary>The item's path, sanitized for display.</summary>
+    /// <summary>The item's title as a sentence names it.</summary>
     internal string Entry { get; }
 
     internal string Problem => Finding.Problem switch
@@ -47,15 +47,18 @@ internal sealed class PasswordRow : IRecommendationRow
             $"on {Entry}, whose expiry date {(Finding.ExpiredUtc is { } expired ? PersonTime.Moment(expired.ToLocalTime()) : string.Empty)} has passed"),
     };
 
-    /// <summary>What the row says under its group's heading: the item, and what only it has.</summary>
-    internal string Line => Finding.Problem switch
+    /// <summary>The row's muted second line: what only this item has, or empty.</summary>
+    internal string Detail => Finding.Problem switch
     {
-        PasswordProblem.Weak => Entry,
-        PasswordProblem.Reused => $"{Entry}, also on {Sharers()}",
-        _ => string.Create(
-            CultureInfo.InvariantCulture,
-            $"{Entry}, {(Finding.ExpiredUtc is { } expired ? PersonTime.Moment(expired.ToLocalTime()) : string.Empty)}"),
+        PasswordProblem.Weak => string.Empty,
+        PasswordProblem.Reused => UseText.AlsoOn(Sharers()),
+        _ => Finding.ExpiredUtc is { } expired ? UseText.Expired(expired) : string.Empty,
     };
+
+    internal bool HasDetail => Detail.Length > 0;
+
+    /// <summary>The item's group path and title, for its tooltip.</summary>
+    internal string EntryPath => RecommendationsViewModel.Shown(Finding.Entry);
 
     /// <summary>A group's heading.</summary>
     internal static string Heading(PasswordProblem problem) => problem switch
@@ -82,11 +85,8 @@ internal sealed class PasswordRow : IRecommendationRow
     /// <summary>What a screen reader hears for the row.</summary>
     internal string Description => $"{Problem} {Where}, {StateLabel.ToLowerInvariant()}";
 
-    /// <summary>What a screen reader hears for Open item: the item, never its password.</summary>
-    internal string OpenLabel => $"Open {Entry} in Items";
-
     /// <summary>Shows the item in Items, selected, where its password is replaced.</summary>
-    internal RelayCommand OpenCommand { get; }
+    public RelayCommand OpenCommand { get; }
 
     public RelayCommand DismissCommand { get; }
 

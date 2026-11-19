@@ -1,8 +1,9 @@
 <UserControl xmlns:res="using:Keypaste.App.Resources"
-  xmlns="https://github.com/avaloniaui"
+             xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ctl="using:Keypaste.App.Controls"
              xmlns:vm="using:Keypaste.App.ViewModels"
+             xmlns:views="using:Keypaste.App.Views"
              x:Class="Keypaste.App.Views.SharingView"
              x:DataType="vm:SharingViewModel">
 
@@ -17,46 +18,31 @@
     <Style Selector="TextBlock.status.info">
       <Setter Property="Foreground" Value="{DynamicResource KpInfo}" />
     </Style>
-
-    <!-- A 24px target that takes a text line's height in the row. Revoke is the danger tint; Remove only forgets, so it stays quiet. -->
-    <Style Selector="Button.row-action">
-      <Setter Property="MinHeight" Value="24" />
-      <Setter Property="Height" Value="24" />
-      <Setter Property="Padding" Value="8,0" />
-      <Setter Property="Margin" Value="0,-4" />
-      <Setter Property="HorizontalAlignment" Value="Right" />
+    <!-- A row's Revoke… or Remove shows only while the row is pointed at or holds the keyboard; its menu offers it too. -->
+    <Style Selector="Border.share-row Button.row-action">
+      <Setter Property="Opacity" Value="0" />
     </Style>
-    <Style Selector="Button.row-action.quiet /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
-    </Style>
-    <Style Selector="Button.row-action.quiet:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource KpBgHover}" />
-      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+    <Style Selector="Border.share-row:pointerover Button.row-action, Border.share-row:focus-within Button.row-action">
+      <Setter Property="Opacity" Value="1" />
     </Style>
   </UserControl.Styles>
 
-  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-    <!-- The design's max-width 1080, left-aligned: the star column fills up to it. -->
-    <Grid Margin="32,12,32,24">
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="*" MaxWidth="1080" />
-        <ColumnDefinition Width="Auto" />
-      </Grid.ColumnDefinitions>
-      <Grid>
+  <views:SettingsFrame Section="{x:Static vm:SettingsSectionChoice.ShareLinks}">
+    <views:SettingsFrame.Page>
+      <!-- The links this vault made: what, to whom and on what terms, and whether each still opens. -->
+      <StackPanel Classes="sections">
 
-        <!-- The links this vault made: what, to whom and on what terms, and whether each still opens. -->
-        <StackPanel Grid.Column="0" Spacing="16" MinWidth="296">
-          <Grid ColumnDefinitions="*,Auto">
-            <TextBlock Grid.Column="0" Classes="h1"
-                       Text="{x:Static res:Strings.ShareLinks}"
+        <ctl:EmptyState Icon="link" Text="{x:Static res:Strings.NoLinksYet}" Helper="{x:Static res:Strings.ChooseShareInAnItemsMenuToMakeOne}"
+                        IsVisible="{Binding IsEmpty}" />
+
+        <StackPanel Classes="section" IsVisible="{Binding !IsEmpty}">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <TextBlock Name="CheckedText" Classes="caption" VerticalAlignment="Center" Margin="14,0,0,0" Text="{Binding CheckedText}"
                        ToolTip.Tip="{x:Static res:Strings.LinksYouMadeFromAnItemsMenuXfaa446}" />
             <Button Grid.Column="1"
                     x:Name="CheckStatus"
-                    Classes="ghost sm"
-                    VerticalAlignment="Top"
-                    Margin="12,0,0,0"
-                    IsVisible="{Binding !IsEmpty}"
+                    Classes="sm"
+                    Classes.busy="{Binding RefreshCommand.IsRunning}"
                     ToolTip.Tip="{x:Static res:Strings.AskTheShareServerHowManyViewsXbaa6a2}"
                     Command="{Binding RefreshCommand}"
                     AutomationProperties.Name="{x:Static res:Strings.CheckStatus}">
@@ -68,68 +54,44 @@
             </Button>
           </Grid>
 
-          <Border Classes="group" IsVisible="{Binding IsEmpty}" Padding="16,12">
-            <TextBlock Classes="caption"
-                       Text="{x:Static res:Strings.NoLinksYetChooseShareInAnX8aa94b}" />
-          </Border>
-
-          <Border x:Name="Shares"
-                  Classes="group"
-                  ClipToBounds="True"
-                  IsVisible="{Binding !IsEmpty}">
+          <Border x:Name="Shares" Classes="group" ClipToBounds="True">
             <ItemsControl ItemsSource="{Binding Rows}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:SharingRow">
-                  <Border Padding="16,12"
-                          BorderBrush="{DynamicResource KpBorderSubtle}"
-                          BorderThickness="0,0,0,1">
-                    <Panel>
-                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding $parent[ItemsControl].((vm:SharingViewModel)DataContext).CancelRevokeCommand}">
-                      <TextBlock Name="RevokeQuestion" Text="{Binding ConfirmText}" Classes="size-13" TextWrapping="Wrap" VerticalAlignment="Center" />
-                      <Button Grid.Column="1" Classes="ghost sm size-12" Content="{x:Static res:Strings.Cancel}" VerticalAlignment="Center"
-                              Command="{Binding $parent[ItemsControl].((vm:SharingViewModel)DataContext).CancelRevokeCommand}" />
-                      <Button Grid.Column="2" Name="ConfirmRevoke" Classes="danger sm size-12" Content="{x:Static res:Strings.RevokeLink}" AutomationProperties.Name="{Binding What, StringFormat={x:Static res:Strings.RevokeValue}}" VerticalAlignment="Center"
-                              Command="{Binding $parent[ItemsControl].((vm:SharingViewModel)DataContext).ConfirmRevokeCommand}"
-                              CommandParameter="{Binding}" />
-                    </Grid>
-                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="4" IsVisible="{Binding !IsConfirming}">
-                      <TextBlock Grid.Row="0" Grid.Column="0"
-                                 Classes="mono size-13"
-                                 Text="{Binding What}"
-                                 TextTrimming="CharacterEllipsis"
-                                 ToolTip.Tip="{Binding What}" />
-                      <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="6"
-                                  HorizontalAlignment="Right">
-                        <Border Classes="dot" Classes.ok="{Binding IsOk}" Classes.info="{Binding IsInfo}" />
-                        <TextBlock Classes="status size-12" Classes.ok="{Binding IsOk}" Classes.info="{Binding IsInfo}"
-                                   Text="{Binding Status}" />
-                      </StackPanel>
-                      <TextBlock Grid.Row="1" Grid.Column="0"
-                                 Classes="size-13"
-                                 Foreground="{DynamicResource KpTextMuted}"
-                                 Text="{Binding Detail}"
-                                 TextTrimming="CharacterEllipsis" />
-                      <Button Grid.Row="1" Grid.Column="1"
-                              Classes="row-action size-12"
-                              Classes.danger="{Binding Opens}"
-                              Classes.quiet="{Binding !Opens}"
-                              Content="{Binding RevokeLabel}"
-                              Command="{Binding $parent[ItemsControl].((vm:SharingViewModel)DataContext).RevokeRowCommand}"
-                              CommandParameter="{Binding}" />
-                    </Grid>
+                  <Border Classes="share-row" Background="Transparent" Padding="14,8" MinHeight="52" BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,0,1">
+                    <Panel VerticalAlignment="Center">
+                      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding IsConfirming}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding $parent[ItemsControl].((vm:SharingViewModel)DataContext).CancelRevokeCommand}">
+                        <TextBlock Name="RevokeQuestion" Text="{Binding ConfirmText}" Classes="size-13" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Classes="ghost sm" Content="{x:Static res:Strings.Cancel}" VerticalAlignment="Center"
+                                Command="{Binding $parent[ItemsControl].((vm:SharingViewModel)DataContext).CancelRevokeCommand}" />
+                        <Button Grid.Column="2" Name="ConfirmRevoke" Classes="danger sm" Content="{x:Static res:Strings.RevokeLink}" AutomationProperties.Name="{Binding What, StringFormat={x:Static res:Strings.RevokeValue}}" VerticalAlignment="Center"
+                                Command="{Binding $parent[ItemsControl].((vm:SharingViewModel)DataContext).ConfirmRevokeCommand}"
+                                CommandParameter="{Binding}" />
+                      </Grid>
+                      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12" IsVisible="{Binding !IsConfirming}">
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                          <TextBlock Classes="mono size-13" Text="{Binding What}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding What}" />
+                          <TextBlock Classes="caption" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Detail}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                          <Border Classes="dot" Classes.ok="{Binding IsOk}" Classes.info="{Binding IsInfo}" />
+                          <TextBlock Classes="status size-12" Classes.ok="{Binding IsOk}" Classes.info="{Binding IsInfo}" Text="{Binding Status}" />
+                        </StackPanel>
+                        <Button Grid.Column="2"
+                                Classes="ghost sm row-action"
+                                VerticalAlignment="Center"
+                                Content="{Binding RevokeLabel}"
+                                Command="{Binding $parent[ItemsControl].((vm:SharingViewModel)DataContext).RevokeRowCommand}"
+                                CommandParameter="{Binding}" />
+                      </Grid>
                     </Panel>
                   </Border>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
           </Border>
-
-          <TextBlock Classes="caption"
-                     IsVisible="{Binding HasUnchecked}"
-                     Text="{x:Static res:Strings.OpeningThisScreenAsksTheShareServerXdb6227}" />
         </StackPanel>
-
-      </Grid>
-    </Grid>
-  </ScrollViewer>
+      </StackPanel>
+    </views:SettingsFrame.Page>
+  </views:SettingsFrame>
 </UserControl>

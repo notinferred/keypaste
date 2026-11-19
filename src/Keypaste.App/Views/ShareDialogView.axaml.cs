@@ -17,7 +17,9 @@ internal sealed partial class ShareDialogView : UserControl
 
         if (DataContext is SharingViewModel)
         {
-            Dispatcher.UIThread.Post(() => this.FindControl<TextBox>("Recipient")?.Focus(), DispatcherPriority.Loaded);
+            Dispatcher.UIThread.Post(
+                () => new[] { this.FindControl<Button>("CreateLink"), this.FindControl<Button>("RetryShare") }.FirstOrDefault(button => button is { IsVisible: true })?.Focus(),
+                DispatcherPriority.Loaded);
         }
     }
 }

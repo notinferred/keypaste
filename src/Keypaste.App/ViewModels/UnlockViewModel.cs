@@ -19,6 +19,9 @@ internal sealed class RecentVaultItem(string path, bool exists)
 
     internal string Name { get; } = DisplayTextSanitizer.Sanitize(System.IO.Path.GetFileName(path)).Text;
 
+    /// <summary>The vault's name, its file's without the extension, as a sidebar row names a vault.</summary>
+    internal string Title { get; } = DisplayTextSanitizer.Sanitize(System.IO.Path.GetFileNameWithoutExtension(path)).Text;
+
     internal string Location { get; } = DisplayTextSanitizer.Escaped(path);
 
     /// <summary>Whether the file is still where it was.</summary>
@@ -37,6 +40,9 @@ internal sealed class KeePassXcDatabaseItem(string path)
     internal string Path { get; } = path;
 
     internal string Name { get; } = DisplayTextSanitizer.Sanitize(System.IO.Path.GetFileName(path)).Text;
+
+    /// <summary>The database's name in words, its file's without the extension.</summary>
+    internal string Title { get; } = DisplayTextSanitizer.Sanitize(System.IO.Path.GetFileNameWithoutExtension(path)).Text;
 
     internal string Location { get; } = DisplayTextSanitizer.Escaped(path);
 
@@ -70,7 +76,6 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     private string? _createdKeyfile;
     private string _message = string.Empty;
     private string? _heldMessage;
-    private string? _handOffPath;
     private string? _notice;
     private string? _chosenNotice;
     private bool _disposed;
@@ -107,7 +112,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
         ChooseKeyfileCommand = new AsyncRelayCommand(ChooseKeyfileAsync, () => !Busy);
         CreateKeyfileCommand = new AsyncRelayCommand(CreateKeyfileAsync, () => !Busy && IsCreating);
         ClearKeyfileCommand = new RelayCommand(() => KeyfilePath = null, () => !Busy && KeyfilePath is not null);
-        ShowMoreOptionsCommand = new RelayCommand(() => MoreOptions = true, () => !MoreOptions);
+        UsePasswordCommand = new RelayCommand(() => UsesPassword = true, () => ShowsQuickUnlockAlone);
         UseHardwareKeyCommand = new RelayCommand(() => HardwareKeySlot = 2, () => !Busy && OffersHardwareKey && HardwareKeySlot is null);
         SwitchSlotCommand = new RelayCommand(() => HardwareKeySlot = HardwareKeySlot == 1 ? 2 : 1, () => !Busy && HardwareKeySlot is not null);
         ClearHardwareKeyCommand = new RelayCommand(() => HardwareKeySlot = null, () => !Busy && HardwareKeySlot is not null);
@@ -129,25 +134,10 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
 
     internal bool HasLockNote => LockNote.Length > 0;
 
-    /// <summary>The screen's heading: which vault is locked, or an invitation to create or open one.</summary>
+    /// <summary>The form's heading: the selected vault's name, its file muted under it.</summary>
     internal string Heading => _selectedPath is null
-        ? OffersCreateFirst ? "Keep your keys in one place" : "Open a vault"
-        : IsRestoreOnly ? $"{SelectedName} can't be opened"
-        : IsHandOff ? $"Open {SelectedName}"
-        : $"{SelectedName} is locked";
-
-    /// <summary>
-    /// Whether the selection is a file the import dialog handed over to keep editing in place. keypaste
-    /// has not opened it before, so the screen asks for it rather than calling it locked.
-    /// </summary>
-    internal bool IsHandOff => _handOffPath is not null
-        && string.Equals(_handOffPath, _selectedPath, PathIdentity.Comparison);
-
-    /// <summary>The line under the heading while a vault is selected.</summary>
-    internal string Subtitle => IsHandOff
-        ? "Enter its master password to keep editing it in place."
-        : OffersQuickUnlock ? $"Unlock it with {QuickUnlockName} or its master password."
-        : "Enter its master password to open it.";
+        ? string.Empty
+        : Shown(System.IO.Path.GetFileNameWithoutExtension(_selectedPath));
 
     /// <summary>What the person knows the quick unlock as, such as "Windows Hello", or empty where the app offers none.</summary>
     internal string QuickUnlockName => _session.QuickUnlock?.Name ?? string.Empty;
@@ -157,8 +147,8 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
 
     /// <summary>Whether the selected vault has a quick unlock copy, so the screen offers to unlock it without its password.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(OffersQuickUnlock), nameof(Subtitle), nameof(QuickUnlockIsPrimary), nameof(UnlockIsPrimary))]
-    [NotifyCanExecuteChangedFor(nameof(ResumeCommand))]
+    [NotifyPropertyChangedFor(nameof(OffersQuickUnlock), nameof(QuickUnlockIsPrimary), nameof(ShowsQuickUnlockAlone), nameof(ShowsPasswordForm))]
+    [NotifyCanExecuteChangedFor(nameof(ResumeCommand), nameof(UsePasswordCommand))]
     internal partial bool Resumable { get; private set; }
 
     /// <summary>Whether the screen offers its quick unlock, beside the master password, which always stays.</summary>
@@ -167,8 +157,23 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     /// <summary>Whether the quick unlock is the screen's amber action, which it is unless a YubiKey waits for a touch.</summary>
     internal bool QuickUnlockIsPrimary => OffersQuickUnlock && !IsWaitingForTouch;
 
-    /// <summary>Whether Unlock is the screen's amber action: not while the quick unlock is offered or a YubiKey waits.</summary>
-    internal bool UnlockIsPrimary => !OffersQuickUnlock && !IsWaitingForTouch;
+    /// <summary>Whether Unlock is the form's amber action, which it is unless a YubiKey waits for a touch.</summary>
+    internal bool UnlockIsPrimary => !IsWaitingForTouch;
+
+    /// <summary>Whether the person asked for the master password where the quick unlock is offered alone.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsQuickUnlockAlone), nameof(ShowsPasswordForm))]
+    [NotifyCanExecuteChangedFor(nameof(UsePasswordCommand))]
+    internal partial bool UsesPassword { get; private set; }
+
+    /// <summary>Whether the form shows only the quick unlock and a way to the master password.</summary>
+    internal bool ShowsQuickUnlockAlone => OffersQuickUnlock && !UsesPassword;
+
+    /// <summary>Whether the master password, its second factors and Unlock show.</summary>
+    internal bool ShowsPasswordForm => !ShowsQuickUnlockAlone;
+
+    /// <summary>Use master password: shows the form the quick unlock stood in for.</summary>
+    internal RelayCommand UsePasswordCommand { get; }
 
     /// <summary>Opens the selected vault without its password, once the person answers Windows Hello.</summary>
     internal AsyncRelayCommand ResumeCommand { get; }
@@ -177,19 +182,11 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     internal partial bool IsKeepingQuickUnlock { get; private set; }
 
-    /// <summary>The line under the heading with no vault selected.</summary>
-    internal string WelcomeSubtitle => OffersKeePassXc
-        ? "Open a vault KeePassXC opened, another file, or a new vault."
-        : "A vault is an encrypted file on this computer that keeps your passwords and keys, and its master password is the one password that opens it.";
-
     /// <summary>The databases KeePassXC last opened, offered while no vault is selected.</summary>
     internal IReadOnlyList<KeePassXcDatabaseItem> KeePassXc { get; private set; } = [];
 
     /// <summary>Whether the welcome lists KeePassXC's databases.</summary>
     internal bool OffersKeePassXc => _selectedPath is null && KeePassXc.Count > 0;
-
-    /// <summary>Whether "Create a vault…" is the welcome's first action, which it is while KeePassXC offers nothing, with "Open a vault…" after it.</summary>
-    internal bool OffersCreateFirst => _selectedPath is null && KeePassXc.Count == 0;
 
     /// <summary>Choosing a database KeePassXC opened goes to the ordinary unlock with its path.</summary>
     internal KeePassXcDatabaseItem? SelectedKeePassXc
@@ -205,20 +202,16 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>What the heading of the create form says.</summary>
-    internal string CreateHeading => $"Create {NewVaultName}";
-
-    /// <summary>Whether the recent list has a vault in it other than the one already selected.</summary>
-    internal bool ShowsRecent => Recent.Any(item => !string.Equals(item.Path, _selectedPath, PathIdentity.Comparison));
+    /// <summary>What heads the vaults this computer opened, as the shell heads its local account.</summary>
+#pragma warning disable CA1822
+    internal string RecentHeading => AccountSection.LocalTitle;
+#pragma warning restore CA1822
 
     /// <summary>The vaults this machine has opened, most recent first.</summary>
     internal IReadOnlyList<RecentVaultItem> Recent { get; private set; } = [];
 
-    /// <summary>Whether there is anything to show in the recent list.</summary>
+    /// <summary>Whether the screen lists vaults this computer opened, as locked sidebar rows.</summary>
     internal bool HasRecent => Recent.Count > 0;
-
-    /// <summary>Shown when there is not.</summary>
-    internal bool HasNoRecent => Recent.Count == 0;
 
     /// <summary>Opens the picker for an existing vault, from Browse or <c>Ctrl/Cmd+O</c>.</summary>
     /// <remarks>Off wherever Browse is hidden, so the chord cannot reach past a create or restore form.</remarks>
@@ -238,8 +231,8 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
 
     /// <summary>The restore panel, while it is open.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsRestoring), nameof(IsOpening), nameof(OffersQuickUnlock), nameof(OffersRestore), nameof(HasLooseError))]
-    [NotifyPropertyChangedFor(nameof(Subtitle), nameof(QuickUnlockIsPrimary), nameof(UnlockIsPrimary))]
+    [NotifyPropertyChangedFor(nameof(IsRestoring), nameof(IsOpening), nameof(OffersQuickUnlock), nameof(OffersRestore), nameof(HasLooseError), nameof(ShowsWelcome))]
+    [NotifyPropertyChangedFor(nameof(QuickUnlockIsPrimary), nameof(ShowsQuickUnlockAlone), nameof(ShowsPasswordForm), nameof(OffersRestoreLink))]
     [NotifyCanExecuteChangedFor(nameof(CloseRestoreCommand), nameof(BrowseCommand), nameof(StartCreateCommand), nameof(StartRestoreCommand), nameof(ResumeCommand))]
     internal partial RestoreBackupViewModel? Restore { get; private set; }
 
@@ -247,21 +240,24 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
 
     /// <summary>Whether the selected vault has backups V.4a's saves left beside it.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(OffersRestore))]
+    [NotifyPropertyChangedFor(nameof(OffersRestore), nameof(OffersRestoreLink))]
     [NotifyCanExecuteChangedFor(nameof(StartRestoreCommand))]
     internal partial bool HasBackups { get; private set; }
 
-    /// <summary>Whether the quiet "Restore a backup" action shows under the unlock controls.</summary>
+    /// <summary>Whether a backup can be restored from here, as File › Restore a backup… does.</summary>
     internal bool OffersRestore => HasBackups && IsOpening;
+
+    /// <summary>Whether "Restore a backup…" shows under the form: after a refused unlock, or for a vault only a backup can bring back.</summary>
+    internal bool OffersRestoreLink => OffersRestore && (IsError || IsRestoreOnly);
 
     /// <summary>
     /// Whether the selection is a path with no readable vault at it, chosen only because it has
     /// backups. There is nothing to unlock, so the password field and the button stay off.
     /// </summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Heading), nameof(OffersQuickUnlock), nameof(CanTypePassword), nameof(Subtitle), nameof(QuickUnlockIsPrimary))]
-    [NotifyPropertyChangedFor(nameof(UnlockIsPrimary))]
-    [NotifyCanExecuteChangedFor(nameof(ResumeCommand), nameof(UnlockCommand))]
+    [NotifyPropertyChangedFor(nameof(OffersQuickUnlock), nameof(CanTypePassword), nameof(QuickUnlockIsPrimary), nameof(ShowsQuickUnlockAlone))]
+    [NotifyPropertyChangedFor(nameof(ShowsPasswordForm), nameof(OffersRestoreLink))]
+    [NotifyCanExecuteChangedFor(nameof(ResumeCommand), nameof(UnlockCommand), nameof(UsePasswordCommand))]
     internal partial bool IsRestoreOnly { get; private set; }
 
     internal bool CanTypePassword => _selectedPath is not null && !IsRestoreOnly;
@@ -319,24 +315,6 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     /// <summary>Whether this build reaches hardware keys, so the screen offers one.</summary>
     internal bool OffersHardwareKey => _session.HardwareKeys is not null;
 
-    /// <summary>Shows the controls a vault needs only sometimes, the YubiKey's.</summary>
-    internal RelayCommand ShowMoreOptionsCommand { get; }
-
-    /// <summary>Whether More options has been opened for the selected vault.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsHardwareKey), nameof(OffersMoreOptions))]
-    [NotifyCanExecuteChangedFor(nameof(ShowMoreOptionsCommand))]
-    internal partial bool MoreOptions { get; private set; }
-
-    /// <summary>
-    /// Whether the YubiKey controls show: straight away for a vault whose recent entry records a slot,
-    /// otherwise under More options.
-    /// </summary>
-    internal bool ShowsHardwareKey => OffersHardwareKey && (MoreOptions || HardwareKeySlot is not null);
-
-    /// <summary>Whether More options is offered, which it is while it hides something.</summary>
-    internal bool OffersMoreOptions => OffersHardwareKey && !ShowsHardwareKey;
-
     /// <summary>Asks for the YubiKey as well, in slot 2 until another is chosen.</summary>
     internal RelayCommand UseHardwareKeyCommand { get; }
 
@@ -354,35 +332,37 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     /// vault fills it with the slot that vault last opened with, and a successful open remembers it.
     /// </summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowsHardwareKey), nameof(UsesHardwareKey), nameof(HardwareKeyLabel), nameof(OtherSlotLabel))]
-    [NotifyPropertyChangedFor(nameof(OffersMoreOptions))]
+    [NotifyPropertyChangedFor(nameof(UsesHardwareKey), nameof(HardwareKeyLabel), nameof(OtherSlotLabel))]
     [NotifyCanExecuteChangedFor(nameof(UnlockCommand), nameof(UseHardwareKeyCommand), nameof(SwitchSlotCommand), nameof(ClearHardwareKeyCommand))]
     internal partial int? HardwareKeySlot { get; private set; }
 
     internal bool UsesHardwareKey => HardwareKeySlot is not null;
 
-    internal string HardwareKeyLabel => HardwareKeySlot is { } slot ? Invariant($"YubiKey, slot {slot}") : string.Empty;
+    internal string HardwareKeyLabel => HardwareKeySlot is { } slot ? Invariant($"YubiKey · slot {slot}") : string.Empty;
 
     internal string OtherSlotLabel => HardwareKeySlot == 1 ? "Use slot 2" : "Use slot 1";
 
     /// <summary>Whether the YubiKey is waiting to be touched.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(QuickUnlockIsPrimary), nameof(UnlockIsPrimary))]
+    [NotifyPropertyChangedFor(nameof(QuickUnlockIsPrimary), nameof(UnlockIsPrimary), nameof(IsUnlocking))]
     [NotifyCanExecuteChangedFor(nameof(CancelTouchCommand))]
     internal partial bool IsWaitingForTouch { get; private set; }
 
     /// <summary>Whether the create fields are showing instead of the unlock ones.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(KeyfileNote), nameof(IsOpening), nameof(HasKeyfileNote), nameof(OffersQuickUnlock), nameof(OffersRestore))]
-    [NotifyPropertyChangedFor(nameof(HasLooseError), nameof(Subtitle), nameof(QuickUnlockIsPrimary), nameof(UnlockIsPrimary))]
+    [NotifyPropertyChangedFor(nameof(KeyfileNote), nameof(IsOpening), nameof(HasKeyfileNote), nameof(OffersQuickUnlock), nameof(OffersRestore), nameof(ShowsWelcome))]
+    [NotifyPropertyChangedFor(nameof(HasLooseError), nameof(QuickUnlockIsPrimary), nameof(ShowsQuickUnlockAlone), nameof(ShowsPasswordForm), nameof(OffersRestoreLink))]
     [NotifyCanExecuteChangedFor(nameof(CreateCommand), nameof(CreateKeyfileCommand), nameof(BrowseCommand), nameof(StartCreateCommand), nameof(StartRestoreCommand))]
-    [NotifyCanExecuteChangedFor(nameof(ResumeCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ResumeCommand), nameof(UsePasswordCommand))]
     internal partial bool IsCreating { get; private set; }
 
     /// <summary>The other half of <see cref="IsCreating"/>, for the open controls' visibility.</summary>
     internal bool IsOpening => !IsCreating && Restore is null;
 
-    /// <summary>The file name the new vault will have, for the heading.</summary>
+    /// <summary>Whether the screen welcomes rather than asks for a vault: nothing is chosen to open.</summary>
+    internal bool ShowsWelcome => IsOpening && _selectedPath is null;
+
+    /// <summary>The file name the new vault will have, under the heading.</summary>
     internal string NewVaultName =>
         NewVaultPath is null ? string.Empty : System.IO.Path.GetFileName(NewVaultPath);
 
@@ -402,26 +382,23 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
             {
                 OnPropertyChanged(nameof(Heading));
                 OnPropertyChanged(nameof(SelectedRecent));
-                OnPropertyChanged(nameof(IsHandOff));
                 OnPropertyChanged(nameof(OffersQuickUnlock));
                 OnPropertyChanged(nameof(OffersKeePassXc));
-                OnPropertyChanged(nameof(OffersCreateFirst));
-                OnPropertyChanged(nameof(ShowsRecent));
                 OnPropertyChanged(nameof(CanTypePassword));
                 OnPropertyChanged(nameof(SelectedName));
                 OnPropertyChanged(nameof(SelectedLocation));
                 OnPropertyChanged(nameof(HasSelection));
-                OnPropertyChanged(nameof(Subtitle));
+                OnPropertyChanged(nameof(ShowsWelcome));
                 OnPropertyChanged(nameof(QuickUnlockIsPrimary));
-                OnPropertyChanged(nameof(UnlockIsPrimary));
-                OnPropertyChanged(nameof(WelcomeSubtitle));
+                OnPropertyChanged(nameof(ShowsQuickUnlockAlone));
+                OnPropertyChanged(nameof(ShowsPasswordForm));
                 OnPropertyChanged(nameof(HasLooseError));
                 ResumeCommand.NotifyCanExecuteChanged();
                 UnlockCommand.NotifyCanExecuteChanged();
                 Message = string.Empty;
                 NewFileLocation = null;
                 Owner = string.Empty;
-                MoreOptions = false;
+                UsesPassword = false;
                 KeyfilePath = RememberedKeyfile(value);
                 HardwareKeySlot = OffersHardwareKey ? Remembered(value)?.HardwareKeySlot : null;
                 Look();
@@ -429,7 +406,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>The selected vault's file name, for the heading.</summary>
+    /// <summary>The selected vault's file name, under the heading.</summary>
     internal string SelectedName =>
         _selectedPath is null ? string.Empty : Shown(System.IO.Path.GetFileName(_selectedPath));
 
@@ -504,14 +481,18 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     [NotifyCanExecuteChangedFor(nameof(CreateCommand), nameof(CancelCreateCommand), nameof(StartRestoreCommand), nameof(ChooseKeyfileCommand))]
     [NotifyCanExecuteChangedFor(nameof(CreateKeyfileCommand), nameof(ClearKeyfileCommand), nameof(UseHardwareKeyCommand), nameof(SwitchSlotCommand))]
     [NotifyCanExecuteChangedFor(nameof(ClearHardwareKeyCommand))]
+    [NotifyPropertyChangedFor(nameof(IsUnlocking))]
     internal partial bool Busy { get; private set; }
 
+    /// <summary>Whether Unlock says it is working, rather than that a YubiKey waits for its touch.</summary>
+    internal bool IsUnlocking => Busy && !IsWaitingForTouch;
+
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsError), nameof(HasNote), nameof(HasLooseError))]
+    [NotifyPropertyChangedFor(nameof(IsError), nameof(HasNote), nameof(HasLooseError), nameof(OffersRestoreLink))]
     private partial bool Failed { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(KeyfileNote), nameof(NewVaultName), nameof(HasKeyfileNote), nameof(CreateHeading))]
+    [NotifyPropertyChangedFor(nameof(KeyfileNote), nameof(NewVaultName), nameof(HasKeyfileNote))]
     [NotifyCanExecuteChangedFor(nameof(CreateCommand))]
     private partial string? NewVaultPath { get; set; }
 
@@ -775,10 +756,6 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
             HardwareKeySlot = hardwareKeySlot;
         }
 
-        _handOffPath = _selectedPath;
-        OnPropertyChanged(nameof(IsHandOff));
-        OnPropertyChanged(nameof(Heading));
-        OnPropertyChanged(nameof(Subtitle));
         return true;
     }
 
@@ -925,6 +902,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
             }
 
             Resumable = _session.CanResume(path);
+            UsesPassword = true;
 
             if (ExplainResume(outcome) is { } refusal)
             {
@@ -1058,19 +1036,9 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            // A KDBX file does not record that it needs a second factor, so the password alone failing may mean that.
-            var maybeSecondFactor = outcome == UnlockOutcome.WrongPassword && keyfile is null && slot is null;
-            var explained = outcome == UnlockOutcome.KeyfileUnusable && keyfile is not null
+            Fail(outcome == UnlockOutcome.KeyfileUnusable && keyfile is not null
                 ? ExplainKeyfile(VaultKeyfile.Inspect(keyfile).Outcome)
-                : maybeSecondFactor
-                    ? ExplainPasswordAlone()
-                    : Explain(outcome, keyfile is not null, slot is not null);
-
-            MoreOptions |= maybeSecondFactor;
-
-            Fail(HasBackups && outcome != UnlockOutcome.KeyfileUnusable
-                ? $"{explained} If the file is damaged, or its password or key file was changed and lost, restore a backup."
-                : explained);
+                : Explain(outcome, slot is not null));
             ResetPassword();
         }
         finally
@@ -1395,11 +1363,11 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
 
         return reason switch
         {
-            VaultLockReason.Idle => $"Locked at {time} after {Duration(idleTimeout)} without use",
-            VaultLockReason.Manual => $"You locked it at {time}",
-            VaultLockReason.Minimized => $"Locked at {time} when the window was minimized",
-            VaultLockReason.Closed => $"Locked at {time} when the window was closed",
-            VaultLockReason.Requested => $"Locked at {time} by keypaste lock",
+            VaultLockReason.Idle => $"Locked at {time} · idle {Duration(idleTimeout)}",
+            VaultLockReason.Manual => $"Locked at {time} · by you",
+            VaultLockReason.Minimized => $"Locked at {time} · window minimized",
+            VaultLockReason.Closed => $"Locked at {time} · window closed",
+            VaultLockReason.Requested => $"Locked at {time} · from the terminal",
             _ => string.Empty,
         };
     }
@@ -1423,26 +1391,16 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     /// What went wrong opening, in words that do not shout: red text under the field and never an
     /// icon or a dialog, because a mistyped password is routine.
     /// </summary>
-    private static string Explain(UnlockOutcome outcome, bool withKeyfile = false, bool withHardwareKey = false) => outcome switch
+    /// <remarks>A KDBX file does not record which factors it needs, so a refusal names every one the person could have got wrong.</remarks>
+    private static string Explain(UnlockOutcome outcome, bool withHardwareKey = false) => outcome switch
     {
-        // Naming both factors when both were given, or a good password and the wrong file sends the
-        // person to retype the half that was right. A wrong key or slot is refused the same
-        // way, because it answers, only differently.
-        UnlockOutcome.WrongPassword when withKeyfile && withHardwareKey =>
-            "That password, key file and YubiKey didn't open this vault. If the vault uses the other slot, switch to it.",
-        UnlockOutcome.WrongPassword when withHardwareKey =>
-            "That password and YubiKey didn't open this vault. If the vault uses the other slot, switch to it.",
-        UnlockOutcome.WrongPassword when withKeyfile => "That password and key file didn't open this vault. Check both, then try again.",
-        UnlockOutcome.WrongPassword => "That password didn't open this vault. Type it again.",
+        UnlockOutcome.WrongPassword when withHardwareKey => "Wrong password, key file or YubiKey slot.",
+        UnlockOutcome.WrongPassword => "Wrong password or key file.",
         UnlockOutcome.KeyfileUnusable => "That key file can't be used. Choose it again, or another.",
         UnlockOutcome.NotFound => "That file isn't there any more. Choose it from where it is now.",
         UnlockOutcome.NotAKdbx => "That isn't a KeePass vault. Choose a .kdbx file.",
         _ => "That vault couldn't be opened. Check that you can read the file, then try again.",
     };
-
-    private string ExplainPasswordAlone() => OffersHardwareKey
-        ? "That password didn't open this vault. It may also need a key file or a YubiKey: add one below, or type the password again."
-        : "That password didn't open this vault. It may also need a key file: add one below, or type the password again.";
 
     private void Remember(string path, string? keyfile, int? hardwareKeySlot = null)
     {
@@ -1492,8 +1450,6 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
                 : [.. KeePassXcDatabases.ReadAll(_keePassXcConfigs()).Select(path => new KeePassXcDatabaseItem(path))];
             OnPropertyChanged(nameof(KeePassXc));
             OnPropertyChanged(nameof(OffersKeePassXc));
-            OnPropertyChanged(nameof(OffersCreateFirst));
-            OnPropertyChanged(nameof(WelcomeSubtitle));
         }
     }
 
@@ -1501,9 +1457,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     {
         Recent = [.. _remembered.Select(vault => new RecentVaultItem(vault.Path, File.Exists(vault.Path)))];
         OnPropertyChanged(nameof(Recent));
-        OnPropertyChanged(nameof(ShowsRecent));
         OnPropertyChanged(nameof(HasRecent));
-        OnPropertyChanged(nameof(HasNoRecent));
     }
 
     private void Fail(string text) => Say(text, failed: true);
@@ -1518,6 +1472,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(IsError));
             OnPropertyChanged(nameof(HasNote));
             OnPropertyChanged(nameof(HasLooseError));
+            OnPropertyChanged(nameof(OffersRestoreLink));
         }
     }
 

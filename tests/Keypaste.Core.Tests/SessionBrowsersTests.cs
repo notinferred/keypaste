@@ -354,7 +354,7 @@ public sealed class SessionBrowsersTests : IDisposable
     [InlineData(" laptop", "the name cannot begin or end with whitespace")]
     [InlineData("work/laptop", "the name cannot contain '/'")]
     [InlineData("work‮laptop", "the name cannot contain invisible or unassigned characters")]
-    [InlineData("taken", "another pairing already has this name")]
+    [InlineData("taken", "Another pairing has this name.")]
     public void A_name_must_be_plain_short_and_new(string name, string problem) =>
         Assert.Equal(problem, PairingNames.Problem(name, ["taken"]));
 

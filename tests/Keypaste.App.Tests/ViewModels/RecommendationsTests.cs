@@ -9,8 +9,8 @@ using Xunit;
 namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
-/// V-C.2 in the app: keys left in notes are listed only under Settings, counted quietly, moved in
-/// one revision, remembered when dismissed, and never shown by value.
+/// V-C.2 in the app: keys left in notes are listed only under Security, one finding for each item's keys, counted
+/// quietly, moved together in one revision, remembered when dismissed, and never shown by value.
 /// </summary>
 public sealed class RecommendationsTests : IDisposable
 {
@@ -56,18 +56,22 @@ public sealed class RecommendationsTests : IDisposable
     }
 
     [Fact]
-    public async Task Unlocking_lists_three_keys_needing_review_and_counts_them_quietly_on_settings()
+    public async Task Unlocking_lists_one_items_three_keys_as_one_finding_and_counts_it_quietly()
     {
         using var shell = Shell();
         await shell.Recommendations.Checking;
 
-        Assert.Equal(["STRIPE_SECRET_KEY", "OPENAI_API_KEY", "GITHUB_TOKEN"], shell.Recommendations.Rows.Select(row => row.Key));
-        Assert.All(shell.Recommendations.Rows, row => Assert.Equal("Needs review", row.StateLabel));
-        Assert.All(shell.Recommendations.Rows, row => Assert.Equal("services/Stripe", row.Entry));
-        Assert.Equal("GitHub token", shell.Recommendations.Rows[2].TokenKind);
+        var row = Assert.Single(shell.Recommendations.Rows);
+        Assert.Equal(["STRIPE_SECRET_KEY", "OPENAI_API_KEY", "GITHUB_TOKEN"], Keys(shell.Recommendations));
+        Assert.True(row.NeedsReview);
+        Assert.Equal("Stripe", row.Entry);
+        Assert.Equal("services/Stripe", row.EntryPath);
+        Assert.Equal("3 keys in the notes of Stripe", row.Heading);
+        Assert.Equal("GitHub token", row.Keys[2].TokenKind);
+        Assert.False(shell.Recommendations.OffersBulkMove);
 
         var settings = Settings(shell);
-        Assert.Equal("3", settings.Count);
+        Assert.Equal("1", settings.Count);
         Assert.Null(shell.Notice);
         Assert.Empty(shell.Toasts.Shown);
     }
@@ -79,13 +83,10 @@ public sealed class RecommendationsTests : IDisposable
         await shell.Recommendations.Checking;
         var list = shell.Recommendations;
 
-        Assert.False(list.HasSelectedKeys);
-        list.SelectAllCommand.Press();
-        Assert.True(list.HasSelectedKeys);
-        list.MoveSelectedCommand.Press();
+        Assert.Single(list.Rows).MoveCommand.Press();
         await list.Checking;
 
-        Assert.StartsWith("Moved 3 keys from the notes of services/Stripe", list.Message, StringComparison.Ordinal);
+        Assert.StartsWith("Moved 3 keys from the notes of Stripe", list.Message, StringComparison.Ordinal);
         Assert.Empty(list.Rows);
         Assert.Equal(string.Empty, Settings(shell).Count);
 
@@ -107,11 +108,10 @@ public sealed class RecommendationsTests : IDisposable
         {
             await shell.Recommendations.Checking;
 
-            var openAi = shell.Recommendations.Rows.Single(row => row.Key == "OPENAI_API_KEY");
-            openAi.DismissCommand.Press();
+            Assert.Single(shell.Recommendations.Rows).DismissCommand.Press();
 
-            Assert.Equal("2", Settings(shell).Count);
-            Assert.Equal("Dismissed", shell.Recommendations.Rows[^1].StateLabel);
+            Assert.Equal(string.Empty, Settings(shell).Count);
+            Assert.True(Assert.Single(shell.Recommendations.Rows).IsDismissed);
         }
 
         var stored = File.ReadAllText(KeypasteHome.RecommendationsPath(_fixture.Home));
@@ -124,13 +124,13 @@ public sealed class RecommendationsTests : IDisposable
 
         using var again = Shell();
         await again.Recommendations.Checking;
-        Assert.Equal("2", Settings(again).Count);
+        Assert.Equal(string.Empty, Settings(again).Count);
         var dismissed = again.Recommendations.Rows.Single(row => row.IsDismissed);
-        Assert.Equal("OPENAI_API_KEY", dismissed.Key);
+        Assert.Equal(3, dismissed.Keys.Count);
 
         dismissed.ReviewAgainCommand.Press();
 
-        Assert.Equal("3", Settings(again).Count);
+        Assert.Equal("1", Settings(again).Count);
         Assert.DoesNotContain(again.Recommendations.Rows, row => row.IsDismissed);
     }
 
@@ -149,10 +149,9 @@ public sealed class RecommendationsTests : IDisposable
         var bytes = File.ReadAllBytes(_fixture.Path_);
         var history = vault.ReadHistory(_stripe)!.Count;
 
-        shell.Recommendations.SelectAllCommand.Press();
-        shell.Recommendations.MoveSelectedCommand.Press();
+        shell.Recommendations.Rows[0].MoveCommand.Press();
 
-        Assert.StartsWith("The notes of services/Stripe changed after they were checked, so nothing was moved.", shell.Recommendations.Message, StringComparison.Ordinal);
+        Assert.StartsWith("The notes of Stripe changed after they were checked, so nothing was moved.", shell.Recommendations.Message, StringComparison.Ordinal);
         Assert.Equal(bytes, File.ReadAllBytes(_fixture.Path_));
         Assert.Equal(history, vault.ReadHistory(_stripe)!.Count);
         Assert.Empty(vault.Fields(_stripe)!);
@@ -166,7 +165,7 @@ public sealed class RecommendationsTests : IDisposable
 
         using var shell = Shell();
         await shell.Recommendations.Checking;
-        Assert.Equal(3, shell.Recommendations.NeedsReview);
+        Assert.Equal(1, shell.Recommendations.NeedsReview);
 
         shell.Recommendations.Rows[0].DismissCommand.Press();
 
@@ -191,7 +190,7 @@ public sealed class RecommendationsTests : IDisposable
         vault.Save();
         await shell.Recommendations.Checking;
 
-        Assert.Contains(shell.Recommendations.Rows, row => row.Key == "NEW_KEY");
+        Assert.Contains("NEW_KEY", Keys(shell.Recommendations));
     }
 
     /// <summary>
@@ -214,7 +213,7 @@ public sealed class RecommendationsTests : IDisposable
             };
 
             list.Check();
-            return (Environment.CurrentManagedThreadId, shownOn, list.Rows.Count);
+            return (Environment.CurrentManagedThreadId, shownOn, Keys(list).Count);
         });
 
         Assert.Equal(asked, shown);
@@ -232,7 +231,7 @@ public sealed class RecommendationsTests : IDisposable
         using var list = new RecommendationsViewModel(_session, _fixture.Home, post: posted.Enqueue);
         await list.Checking;
         Run(posted);
-        Assert.Equal(3, list.Rows.Count);
+        Assert.Equal(3, Keys(list).Count);
 
         var vault = _session.Unlocked!;
         vault.UpdateEntry(vault.Find(_plain)! with { Notes = "FIRST_KEY=one" });
@@ -244,12 +243,12 @@ public sealed class RecommendationsTests : IDisposable
 
         Assert.True(posted.TryDequeue(out var superseded));
         superseded();
-        Assert.Equal(3, list.Rows.Count);
+        Assert.Equal(3, Keys(list).Count);
 
         Assert.True(posted.TryDequeue(out var latest));
         latest();
-        Assert.Contains(list.Rows, row => row.Key == "SECOND_KEY");
-        Assert.DoesNotContain(list.Rows, row => row.Key == "FIRST_KEY");
+        Assert.Contains("SECOND_KEY", Keys(list));
+        Assert.DoesNotContain("FIRST_KEY", Keys(list));
 
         vault.UpdateEntry(vault.Find(_plain)! with { Notes = "THIRD_KEY=three" });
         list.Check();
@@ -258,9 +257,58 @@ public sealed class RecommendationsTests : IDisposable
 
         Assert.True(posted.TryDequeue(out var overtaken));
         overtaken();
-        Assert.DoesNotContain(list.Rows, row => row.Key == "THIRD_KEY");
+        Assert.DoesNotContain("THIRD_KEY", Keys(list));
         Assert.True(posted.IsEmpty);
     }
+
+    [Fact]
+    public async Task Unticked_keys_stay_in_the_notes_while_the_rest_move_together()
+    {
+        using var shell = Shell();
+        await shell.Recommendations.Checking;
+        var row = Assert.Single(shell.Recommendations.Rows);
+
+        row.Keys.Single(key => key.Key == "OPENAI_API_KEY").IsIncluded = false;
+        row.MoveCommand.Press();
+        await shell.Recommendations.Checking;
+
+        Assert.StartsWith("Moved 2 keys from the notes of Stripe", shell.Recommendations.Message, StringComparison.Ordinal);
+        Assert.Equal(["OPENAI_API_KEY"], Keys(shell.Recommendations));
+        var vault = _session.Unlocked!;
+        Assert.Equal(["GITHUB_TOKEN", "STRIPE_SECRET_KEY"], vault.Fields(_stripe)!.Select(field => field.Name).Order(StringComparer.Ordinal));
+        Assert.Single(vault.ReadHistory(_stripe)!);
+    }
+
+    [Fact]
+    public async Task Moving_into_a_stage_shows_what_it_brings_then_tags_the_item_in_the_same_revision()
+    {
+        var vault = _session.Unlocked!;
+        vault.AddEntry(new VaultEntry { GroupPath = "env/billing", Title = ".env.staging", Password = _plainLogin + "-billing" });
+        vault.AddTag(new EntryName("env/billing", ".env.staging"), "env:billing:staging");
+        vault.Save();
+        using var shell = Shell();
+        await shell.Recommendations.Checking;
+        var row = Assert.Single(shell.Recommendations.Rows);
+
+        row.AskMoveToStageCommand.Press();
+        Assert.True(row.IsChoosingStage);
+        row.ChosenStage = row.Stages.Single(stage => stage.Environment == "staging");
+        row.Keys.Single(key => key.Key == "GITHUB_TOKEN").IsIncluded = false;
+
+        Assert.Equal("Stripe joins billing/staging with OPENAI_API_KEY, STRIPE_SECRET_KEY.", row.StagePreview);
+
+        row.ConfirmMoveToStageCommand.Press();
+        await shell.Recommendations.Checking;
+
+        Assert.StartsWith("Moved 2 keys from the notes of Stripe into billing/staging.", shell.Recommendations.Message, StringComparison.Ordinal);
+        Assert.Equal(["env:billing:staging"], vault.Tags(_stripe));
+        Assert.Equal("sk_test_1", vault.ReadField(_stripe, "STRIPE_SECRET_KEY"));
+        Assert.Single(vault.ReadHistory(_stripe)!);
+        Assert.Equal(["GITHUB_TOKEN"], Keys(shell.Recommendations));
+    }
+
+    private static List<string> Keys(RecommendationsViewModel list) =>
+        [.. list.Rows.SelectMany(row => row.Keys).Select(key => key.Key)];
 
     private static void Run(ConcurrentQueue<Action> posted)
     {

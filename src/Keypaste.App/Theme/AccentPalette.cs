@@ -106,6 +106,7 @@ internal sealed record AccentPalette(Color Accent, Color Hover, Color Pressed, C
             ["KpAccentTint"] = new SolidColorBrush(Tint),
             ["KpAccentHalo"] = new SolidColorBrush(WithAlpha(Text, 0x40)),
             ["KpFieldGlow"] = glow,
+            ["KpFocusRingInset"] = new BoxShadows(new BoxShadow { IsInset = true, Spread = 2, Color = Ring }),
             ["KpWaitingHalo"] = new BoxShadows(new BoxShadow { Spread = 3, Color = WithAlpha(Text, 0x40) }),
 
             ["SystemAccentColor"] = Accent,

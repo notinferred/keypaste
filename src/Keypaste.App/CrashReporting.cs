@@ -143,7 +143,6 @@ internal sealed class CrashReporting : IDisposable
         DestinationKind.AgentActivity => "agents",
         DestinationKind.Log => "activity",
         DestinationKind.Settings => "settings",
-        DestinationKind.Advanced => "advanced",
         DestinationKind.Recommendations => "recommendations",
         DestinationKind.Trash => "trash",
         DestinationKind.Sharing => "share-links",

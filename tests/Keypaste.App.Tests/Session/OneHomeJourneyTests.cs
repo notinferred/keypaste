@@ -2,6 +2,7 @@ using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
 using Keypaste.App.Session;
@@ -19,10 +20,9 @@ using static Keypaste.App.Tests.Session.JourneyDriver;
 namespace Keypaste.App.Tests.Session;
 
 /// <summary>
-/// V-N.1b: through the app as launch composes it (D-0342), each advanced feature is reached from its
-/// one home: scoped tokens, the log's hash check and diagnostics from Settings › Advanced, and an
-/// agent's settings from the Settings disclosure on its row on Agents; none of them is left on Agents,
-/// on Settings' page or on Advanced's.
+/// Through the app as launch composes it, each advanced feature is reached from its one home: scoped
+/// tokens and diagnostics from their Settings sections, the log's hash check from Activity, and an
+/// agent's settings from its row on Agents; none of them is left on Agents or on Settings' own sections.
 /// </summary>
 /// <remarks>
 /// Driven as <see cref="FourPlacesJourneyTests"/> is, pressing controls where the window draws them.
@@ -36,7 +36,7 @@ public sealed class OneHomeJourneyTests
 
     /// <summary>What only the moved controls and facts are called; none may be named where they no longer live.</summary>
     private static readonly string[] _moved =
-        ["New token", "Token name", "Token scope", "Create token", "Copy token", "Verify chain", "Copy latest hash", "KEYPASTE_HOME", "keypaste home"];
+        ["New token", "Token name", "Token scope", "Create token", "Copy token", "Check log integrity", "Copy latest hash", "KEYPASTE_HOME", "keypaste home"];
 
     [Fact]
     public Task Every_advanced_feature_is_reached_from_its_one_home() =>
@@ -75,24 +75,16 @@ public sealed class OneHomeJourneyTests
             await Until(() => root.Content is ShellView);
             var shell = Assert.IsType<ShellViewModel>(Assert.IsType<ShellView>(root.Content).DataContext);
 
-            // Settings' own page opens Advanced, which opens each advanced screen; neither carries their controls or facts.
+            // Settings' own sections carry none of the controls or facts of the sections that are screens of their own.
             Chord(main, PhysicalKey.Digit4);
             AssertNamesNone(main, "Settings");
-            Assert.Contains("Open Advanced", AutomationNames(main));
-            Assert.DoesNotContain("Open the scoped tokens", AutomationNames(main));
             AccentElements.AssertOne(main, null, "Settings");
-            Press(main, Named<Button>(main, "OpenAdvanced"));
-            Assert.IsType<AdvancedViewModel>(shell.Content);
-            AssertNamesNone(main, "Advanced");
-            Assert.Contains("Open the scoped tokens", AutomationNames(main));
-            Assert.Contains("Open diagnostics", AutomationNames(main));
-            AccentElements.AssertOne(main, null, "Advanced");
 
-            // A scoped token minted, copied and revoked, from Settings › Advanced.
-            Press(main, Named<Button>(main, "OpenScopedTokens"));
+            // A scoped token minted, copied and revoked, from Settings › Scoped tokens.
+            OpenSection(main, SettingsSectionChoice.ScopedTokens);
             var tokens = Assert.IsType<ScopedTokensViewModel>(shell.Content);
-            AccentElements.AssertOne(main, Named<Button>(main, "NewToken"), "Scoped tokens");
-            Press(main, Named<Button>(main, "NewToken"));
+            AccentElements.AssertOne(main, Named<Button>(main, "NewTokenFromEmpty"), "Scoped tokens");
+            Press(main, Named<Button>(main, "NewTokenFromEmpty"));
             Fill(main, "Token name", _token);
             Fill(main, "Token scope", "read:billing/dev/*");
             AccentElements.AssertOne(main, Named<Button>(main, "CreateToken"), "a new token's form");
@@ -104,20 +96,19 @@ public sealed class OneHomeJourneyTests
             Assert.Equal(_token, shell.Clipboard.Label);
             Assert.Contains(new TokenStore(app.Authority!.Session.Unlocked!).List(), token => token.Name == _token);
             Press(main, Named<Button>(main, "DoneToken"));
-            Press(main, VisibleButton(main, "Revoke"));
-            Press(main, VisibleButton(main, "Revoke"));
+            Press(main, VisibleButton(main, "Revoke…"));
+            Press(main, VisibleButton(main, "Revoke token"));
             Assert.DoesNotContain(new TokenStore(app.Authority.Session.Unlocked!).List(), token => token.Name == _token);
-            AccentElements.AssertOne(main, Named<Button>(main, "NewToken"), "Scoped tokens, the token revoked");
-
-            // The facts a support question needs, from Settings › Advanced.
-            Press(main, Named<Button>(main, "Back"));
             DismissToasts(shell);
-            Press(main, Named<Button>(main, "OpenDiagnostics"));
-            Assert.IsType<DiagnosticsViewModel>(shell.Content);
+            AccentElements.AssertOne(main, Named<Button>(main, "NewTokenFromEmpty"), "Scoped tokens, the token revoked");
+
+            // The facts a support question needs, from Settings › Diagnostics.
+            OpenSection(main, SettingsSectionChoice.Diagnostics);
+            var diagnostics = Assert.IsType<DiagnosticsViewModel>(shell.Content);
             var facts = AutomationNames(main);
             Assert.Contains(vault, facts);
             Assert.Contains(KeypasteHome.Resolve(home), facts);
-            Assert.Contains(DiagnosticsViewModel.Version, facts);
+            Assert.Contains(diagnostics.Version, facts);
             AccentElements.AssertOne(main, null, "Diagnostics");
 
             // An agent's settings, opened by choosing its row on Agents, which carries no dropdown until they are.
@@ -141,7 +132,7 @@ public sealed class OneHomeJourneyTests
             var log = Assert.IsType<LogViewModel>(shell.Content);
             Assert.Contains(log.Rows, row => row.Actor == _label);
             AccentElements.AssertOne(main, null, "Activity");
-            Press(main, Named<Button>(main, "VerifyChain"));
+            log.VerifyCommand.Press();
             Assert.True(log.VerdictShown);
             Press(main, Named<Button>(main, "CopyHash"));
             await Until(() => shell.Clipboard.Label == "Latest hash");
@@ -177,6 +168,13 @@ public sealed class OneHomeJourneyTests
         var box = window.GetVisualDescendants().OfType<TextBox>().Single(box => AutomationProperties.GetName(box) == field && box.IsEffectivelyVisible);
         WindowInput.Click(window, box);
         WindowInput.Type(window, text);
+    }
+
+    /// <summary>Chooses a section in the Settings section list in view, as a press on its row does.</summary>
+    private static void OpenSection(Window window, SettingsSectionChoice section)
+    {
+        window.GetVisualDescendants().OfType<ListBox>().Single(list => list is { Name: "SettingsSections", IsEffectivelyVisible: true }).SelectedItem = section;
+        Dispatcher.UIThread.RunJobs();
     }
 
     private static Button VisibleButton(Window window, string content) =>

@@ -1,6 +1,7 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:views="using:Keypaste.App.Views">
+        xmlns:views="using:Keypaste.App.Views"
+        xmlns:ctl="using:Keypaste.App.Controls">
 
   <!--
     Surfaces, as classes on Border. Depth is lightness; only overlays (dialog, toast) cast shadows.
@@ -90,8 +91,11 @@
   <Style Selector="Border.table-head.top, Border.table ItemsControl > ContentPresenter:nth-child(1) Border.table-head">
     <Setter Property="CornerRadius" Value="10,10,0,0" />
   </Style>
-  <!-- The edge between two heads is a control, so it draws the control edge and changes as one does. -->
+  <!-- The edge between two heads rests as a hairline, and shows as a control while the head row is pointed at or it has focus. -->
   <Style Selector="Border.column-grip-line">
+    <Setter Property="Background" Value="{DynamicResource KpBorderSubtle}" />
+  </Style>
+  <Style Selector="Border.table-head:pointerover Border.column-grip-line, views|ColumnGrip:focus Border.column-grip-line">
     <Setter Property="Background" Value="{DynamicResource KpBorderControl}" />
   </Style>
   <Style Selector="views|ColumnGrip:pointerover Border.column-grip-line">
@@ -259,18 +263,27 @@
     <Setter Property="Background" Value="{DynamicResource KpBorderSubtle}" />
   </Style>
 
-  <!-- A menu a ⋯ or + toggle opens, laid over what is below it. -->
   <Style Selector="Border.sidebar.overlay">
     <Setter Property="BoxShadow" Value="{StaticResource KpShadowPopover}" />
   </Style>
 
-  <Style Selector="Border.menu">
-    <Setter Property="Background" Value="{DynamicResource KpBgCard}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderDefault}" />
-    <Setter Property="BorderThickness" Value="1" />
+  <!-- Every menu, a button's, a row's or the menu button's: 28px rows with an icon gutter, the focused or pointed row filled. -->
+  <Style Selector="MenuFlyoutPresenter">
     <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusCard}" />
-    <Setter Property="BoxShadow" Value="{StaticResource KpShadowPopover}" />
     <Setter Property="Padding" Value="4" />
+    <Setter Property="MinWidth" Value="200" />
+  </Style>
+  <Style Selector="MenuItem">
+    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="Padding" Value="8,4" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="CornerRadius" Value="6" />
+  </Style>
+  <Style Selector="MenuItem.danger">
+    <Setter Property="Foreground" Value="{DynamicResource KpDanger}" />
+  </Style>
+  <Style Selector="MenuItem.danger ctl|KpIcon">
+    <Setter Property="Foreground" Value="{DynamicResource KpDanger}" />
   </Style>
 
 </Styles>

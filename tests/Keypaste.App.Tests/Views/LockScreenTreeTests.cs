@@ -1,4 +1,3 @@
-using Avalonia.Automation;
 using Avalonia.Automation.Peers;
 using Avalonia.Controls;
 using Avalonia.VisualTree;
@@ -18,7 +17,7 @@ namespace Keypaste.App.Tests.Views;
 
 /// <summary>
 /// What a screen reader finds on the welcome and the lock screen (V-N.2): KeePassXC's databases by
-/// name, no word about agents, and the YubiKey only under More options for a vault without a slot.
+/// name, no word about agents, the YubiKey beside the key file, and Windows Hello alone where it can unlock.
 /// </summary>
 public sealed class LockScreenTreeTests
 {
@@ -41,15 +40,14 @@ public sealed class LockScreenTreeTests
         var window = Show(model);
 
         var names = Names(window);
-        Assert.Contains("work.kdbx", names);
-        Assert.Contains("Open another file…", names);
+        Assert.Contains("work", names);
         Assert.Contains("Create a vault…", names);
-        Assert.DoesNotContain("Open a vault…", names);
+        Assert.Contains("Open a vault…", names);
         Assert.DoesNotContain(names, name => name.Contains("agent", StringComparison.OrdinalIgnoreCase));
     });
 
     [Fact]
-    public Task A_vault_without_a_slot_keeps_the_YubiKey_under_More_options_and_the_screen_names_no_agent() => HeadlessSession.On(() =>
+    public Task A_vault_without_a_slot_offers_the_YubiKey_beside_the_key_file_and_the_screen_names_no_agent() => HeadlessSession.On(() =>
     {
         using var fixture = new TempVault();
         fixture.RememberSelf();
@@ -59,19 +57,18 @@ public sealed class LockScreenTreeTests
         var window = Show(model);
 
         var names = Names(window);
-        Assert.Contains("More options", names);
-        Assert.DoesNotContain("Unlock with a YubiKey too", names);
+        Assert.Contains("Unlock with a key file too", names);
+        Assert.Contains("Unlock with a YubiKey too", names);
         Assert.DoesNotContain(names, name => name.Contains("agent", StringComparison.OrdinalIgnoreCase));
 
-        var more = window.GetVisualDescendants().OfType<Button>()
-            .Single(button => button.IsEffectivelyVisible && AutomationProperties.GetName(button) == "More options");
-        WindowInput.Reveal(window, more);
-        WindowInput.Press(window, more);
-        WindowInput.Release(window, more);
+        var yubiKey = window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "UseHardwareKey");
+        WindowInput.Reveal(window, yubiKey);
+        WindowInput.Press(window, yubiKey);
+        WindowInput.Release(window, yubiKey);
 
         names = Names(window);
-        Assert.Contains("Unlock with a YubiKey too", names);
-        Assert.DoesNotContain("More options", names);
+        Assert.Contains("YubiKey · slot 2", names);
+        Assert.DoesNotContain("Unlock with a YubiKey too", names);
     });
 
     [Fact]
@@ -85,14 +82,13 @@ public sealed class LockScreenTreeTests
         var window = Show(model);
 
         var names = Names(window);
-        Assert.Contains("YubiKey, slot 2", names);
+        Assert.Contains("YubiKey · slot 2", names);
         Assert.Contains("Unlock without a YubiKey", names);
-        Assert.DoesNotContain("More options", names);
     });
 
-    /// <summary>A vault Windows Hello can open again names it on the screen, beside the password, as its one amber action.</summary>
+    /// <summary>A vault Windows Hello can open again offers it alone, as the one amber action, with the master password a link away.</summary>
     [Fact]
-    public Task A_vault_Windows_Hello_can_resume_offers_it_as_the_one_amber_action_beside_the_password() => HeadlessSession.On(() =>
+    public Task A_vault_Windows_Hello_can_resume_offers_it_alone_as_the_one_amber_action() => HeadlessSession.On(() =>
     {
         using var fixture = new TempVault();
         fixture.RememberSelf();
@@ -111,10 +107,11 @@ public sealed class LockScreenTreeTests
 
         var names = Names(window);
         Assert.Contains("Unlock with Windows Hello", names);
-        Assert.Contains("Unlock", names);
+        Assert.Contains("Use master password", names);
+        Assert.DoesNotContain("Unlock", names);
+        Assert.DoesNotContain("Master password", names);
         Assert.DoesNotContain(names, name => name.Contains("agent", StringComparison.OrdinalIgnoreCase));
 
-        // Off the password field, whose focused caret is amber too.
         var quick = window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "QuickUnlock");
         quick.Focus();
         AccentElements.AssertOne(window, quick, "the lock screen offering Windows Hello");

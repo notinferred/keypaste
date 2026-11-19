@@ -243,7 +243,7 @@ public sealed partial class LanguageAndRegionTests
     public Task Right_to_left_mirrors_the_shell_and_what_points_a_way_and_leaves_machine_text_alone() => HeadlessSession.On(() =>
     {
         using var pseudo = PseudoLocale.RightToLeft();
-        using var shell = new RenderedShell("keypaste-rtl-");
+        using var shell = new RenderedShell("keypaste-rtl-", secondVault: "acme");
         var items = shell.Show<EntriesViewModel>(DestinationKind.Entries);
         items.Selected = items.Rows[0];
         RenderedShell.Drain();

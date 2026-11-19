@@ -8,7 +8,7 @@
              x:DataType="vm:GeneratePasswordViewModel">
 
   <!-- The one generator: opened from a form's field, where Apply puts its value in that field and Cancel leaves the field as it was,
-       or shown by Generate password… on its own. The value is drawn only while revealed, as every secret is. -->
+       or shown by Generate password… on its own, to copy. The value is drawn only while revealed, as every secret is. -->
   <StackPanel Name="GeneratorBody" Spacing="12" KeyboardNavigation.TabNavigation="Cycle">
 
     <Grid ColumnDefinitions="Auto,*,Auto">
@@ -47,24 +47,9 @@
 
     <views:GeneratorOptions DataContext="{Binding Generator}" />
 
-    <StackPanel Spacing="8" IsVisible="{Binding OffersAddField}">
-      <TextBlock Classes="label" Text="{Binding Item, StringFormat={x:Static res:Strings.AddToValueAsAField}}" />
-      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-        <TextBox Name="GeneratedFieldName"
-                 Classes="mono"
-                 PlaceholderText="API_KEY"
-                 AutomationProperties.Name="{x:Static res:Strings.FieldName}"
-                 Text="{Binding FieldName}" />
-        <Button Grid.Column="1" Name="AddGeneratedField" Content="{x:Static res:Strings.AddAsAField}" Command="{Binding AddFieldCommand}" />
-      </Grid>
-    </StackPanel>
-
-    <TextBlock Classes="caption" TextWrapping="Wrap" IsVisible="{Binding KeepsElsewhere}"
-               Text="{x:Static res:Strings.CopyPutsItOnTheClipboardWhichX66e478}" />
-
     <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8" HorizontalAlignment="Right">
-      <Button Name="CloseGenerator" Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelCommand}" />
-      <Button Name="GeneratedNewItem" Content="{x:Static res:Strings.NewItemLabel}" AutomationProperties.Name="{x:Static res:Strings.NewItem}" IsVisible="{Binding OffersNewItem}" Command="{Binding NewItemCommand}" />
+      <Button Name="CloseGenerator" Classes="ghost" Content="{x:Static res:Strings.Cancel}" IsVisible="{Binding Applies}" Command="{Binding CancelCommand}" />
+      <Button Name="CloseStandaloneGenerator" Classes="ghost" Content="{x:Static res:Strings.Close}" IsVisible="{Binding KeepsElsewhere}" Command="{Binding CancelCommand}" />
       <Button Name="CopyGenerated" Classes="primary" IsVisible="{Binding KeepsElsewhere}" Content="{x:Static res:Strings.Copy}" Command="{Binding CopyCommand}" />
       <!-- Not amber: the form it applies to keeps its own confirm as the screen's one. -->
       <Button Name="ApplyGenerated" Content="{x:Static res:Strings.Apply}" IsVisible="{Binding Applies}" Command="{Binding ApplyCommand}" />

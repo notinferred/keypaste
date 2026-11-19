@@ -33,10 +33,9 @@ public sealed class TerminalEditWindowTests
             var asking = screen.Ask(Prompt("work/github", ["Replaces the password of work/github with the password the terminal sent; the old one stays in its history."]));
             var window = Assert.IsType<TerminalEditWindow>(await screen.ShownAsync());
 
-            Assert.Equal("Allow this change from a terminal?", Text(window, "TitleText"));
-            Assert.Equal("work/github", Text(window, "ItemText"));
+            Assert.Equal("Let a terminal change work/github?", Text(window, "TitleText"));
             Assert.Equal("keypaste set", Text(window, "CommandText"));
-            Assert.Equal("asked from a terminal; any program you run could have typed it", Text(window, "OriginText"));
+            Assert.Equal("Any program you run could have sent this. Allow only a change you made.", Text(window, "WarningText"));
             Assert.Equal(["Replaces the password of work/github with the password the terminal sent; the old one stays in its history."], Changes(window));
             Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
             Assert.False(window.FindControl<Button>("Allow")!.IsEffectivelyEnabled);
@@ -192,7 +191,7 @@ public sealed class TerminalEditWindowTests
 
         var layout = string.Join(
             "; ",
-            new[] { $"window {window.Bounds}", $"origin {window.FindControl<TextBlock>("OriginText")!.TranslatePoint(default, window)}" }.Concat(
+            new[] { $"window {window.Bounds}", $"warning {window.FindControl<TextBlock>("WarningText")!.TranslatePoint(default, window)}" }.Concat(
                 Buttons(window).Select(button => $"{button.Content} {button.TranslatePoint(default, window)} {button.Bounds.Size}")));
 
         return (window, layout);

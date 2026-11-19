@@ -8,7 +8,7 @@ using Xunit;
 namespace Keypaste.App.Tests.Rendering;
 
 /// <summary>
-/// An item's title is words, drawn in the system's interface face; a key is machine text, drawn in its monospace (N.7).
+/// An item's title is words, drawn in the system's interface face, and a field's label takes the label face whatever it names, so the face never tells protected from plain (F.130).
 /// </summary>
 /// <remarks>
 /// Read from the frame: each claim that a text is drawn in one face sits beside the claim that the
@@ -17,7 +17,7 @@ namespace Keypaste.App.Tests.Rendering;
 public sealed class TitleTypographyTests
 {
     [Fact]
-    public Task A_login_is_titled_in_sans_and_its_keys_are_mono() => HeadlessSession.On(() =>
+    public Task A_login_is_titled_in_sans_and_its_field_labels_share_one_face() => HeadlessSession.On(() =>
     {
         using var shell = Open("github");
         var frame = shell.Frame();
@@ -30,8 +30,9 @@ public sealed class TitleTypographyTests
         Assert.True(frame.Shows("github", Row(Sans), row), "the list row's title is not drawn in sans");
         Assert.False(frame.Shows("github", Row(Mono), row), "the list row's title is drawn in mono");
 
-        Assert.True(frame.Shows("API_TOKEN", new TextStyle(new Typeface(Mono), 12.5), frame.Everywhere), "a field's key is not drawn in mono");
-        Assert.False(frame.Shows("API_TOKEN", new TextStyle(new Typeface(Sans), 12.5), frame.Everywhere), "a field's key is drawn in sans");
+        var label = shell.Window.GetVisualDescendants().OfType<TextBlock>().Single(block => block is { Name: "Label", Text: "API_TOKEN" });
+        Assert.Equal(Sans, label.FontFamily);
+        Assert.False(frame.Shows("API_TOKEN", new TextStyle(new Typeface(Mono), 12), frame.Everywhere), "a field's label is drawn in mono");
     });
 
     [Fact]

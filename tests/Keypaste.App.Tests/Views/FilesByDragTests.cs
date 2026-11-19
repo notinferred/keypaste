@@ -458,6 +458,9 @@ public sealed class FilesByDragTests
         shell.Shell.AskOpenHanded(other, () => { });
 
         Assert.False(shell.Shell.HasHandedPrompt);
+        Assert.Empty(shell.Shell.Toasts.Shown);
+
+        shell.Shell.GeneratorDialog!.CancelCommand.Press();
         Assert.Contains(shell.Shell.Toasts.Shown, toast => toast.Message.Contains("left other.kdbx unopened", StringComparison.Ordinal));
     });
 
@@ -466,10 +469,10 @@ public sealed class FilesByDragTests
     {
         using var shell = Shell("keypaste-handed-focus-");
         var other = AnotherVault(shell.Home, "other.kdbx");
-        var search = shell.Named<TextBox>("ShellSearch");
-        search.Focus();
+        var lockButton = shell.Named<Button>("LockButton");
+        lockButton.Focus();
         WindowInput.Drain();
-        Assert.True(search.IsFocused);
+        Assert.True(lockButton.IsFocused);
 
         shell.Shell.AskOpenHanded(other, () => { });
         WindowInput.Drain();
@@ -477,7 +480,7 @@ public sealed class FilesByDragTests
 
         WindowInput.Escape(shell.Window);
         WindowInput.Drain();
-        Assert.True(search.IsFocused);
+        Assert.True(lockButton.IsFocused);
     });
 
     [Fact]
@@ -516,9 +519,10 @@ public sealed class FilesByDragTests
         // A second file while that is asked leaves it asked, and says so.
         shell.Shell.AskOpenHanded(other, () => opened++);
         Assert.False(shell.Shell.HasHandedPrompt);
-        Assert.Contains(shell.Shell.Toasts.Shown, toast => toast.Message.Contains("left other.kdbx unopened", StringComparison.Ordinal));
+        Assert.Empty(shell.Shell.Toasts.Shown);
 
         shell.Shell.KeepDraftCommand.Press();
+        Assert.Contains(shell.Shell.Toasts.Shown, toast => toast.Message.Contains("left other.kdbx unopened", StringComparison.Ordinal));
         Assert.Equal(0, opened);
         Assert.Equal("typed", entries.NewItem!.Title);
     });

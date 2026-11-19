@@ -79,6 +79,20 @@ public sealed class ItemPickerTests : IDisposable
         Assert.DoesNotContain("-password", prompt.ToString(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task A_protected_item_is_marked_on_the_picker_which_then_offers_no_always_answer()
+    {
+        var alice = _vault.ReadEntries().Single(entry => entry.Username == "alice");
+        _vault.AddTag(new EntryName(alice.GroupPath, alice.Title) { Uuid = alice.Uuid }, "env:billing:prod");
+        _vault.Save();
+
+        await AskAsync("services/Mail");
+
+        var prompt = Assert.IsType<ApprovalPrompt>(_fixture.Channel.LastPrompt);
+        Assert.Equal([("alice", true), ("bob", false)], prompt.Candidates.Select(candidate => (candidate.Username, candidate.Protected)));
+        Assert.False(prompt.OffersAlways);
+    }
+
     [Theory]
     [InlineData("alice")]
     [InlineData("bob")]

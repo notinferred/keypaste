@@ -47,6 +47,36 @@ public sealed class ItemPickViewModelTests
     }
 
     [Fact]
+    public void A_protected_item_is_marked_and_says_so_once_picked()
+    {
+        var picker = new ItemPickViewModel(Picker() with { Candidates = [Candidate("alice") with { Protected = true }, Candidate("bob")] });
+
+        Assert.Equal([true, false], picker.Rows.Select(row => row.Protected));
+        Assert.EndsWith(", protected", picker.Rows[0].Spoken, StringComparison.Ordinal);
+        Assert.True(picker.AnyProtected);
+        Assert.False(picker.PickedIsProtected);
+
+        picker.Picked = picker.Rows[0];
+        Assert.True(picker.PickedIsProtected);
+
+        picker.Picked = picker.Rows[1];
+        Assert.False(picker.PickedIsProtected);
+    }
+
+    [Fact]
+    public void A_standard_field_is_asked_for_in_words_and_a_key_by_its_name()
+    {
+        var words = new ItemPickViewModel(Picker());
+        var key = new ItemPickViewModel(ApprovalPrompt.For("claude-code", new EntryName("services", "Mail"), "SMTP_TOKEN", "send", "mail-bot") with
+        {
+            Candidates = [Candidate("alice"), Candidate("bob")],
+        });
+
+        Assert.Equal((" the password for Mail", string.Empty), (words.Asked, words.Key));
+        Assert.Equal((" ", "SMTP_TOKEN"), (key.Asked, key.Key));
+    }
+
+    [Fact]
     public async Task The_pick_made_as_the_person_answered_is_the_one_kept()
     {
         var picker = new ItemPickViewModel(Picker());

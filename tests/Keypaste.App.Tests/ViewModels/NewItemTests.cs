@@ -315,16 +315,6 @@ public sealed class NewItemTests : IDisposable
     }
 
     [Fact]
-    public void New_items_own_generator_does_not_offer_another_new_item()
-    {
-        var form = NewItemForm.Open(_entries);
-        form.OpenGeneratorCommand.Execute(null);
-
-        Assert.False(form.GeneratorPanel!.OffersNewItem);
-        Assert.False(form.GeneratorPanel.NewItemCommand.CanExecute(null));
-    }
-
-    [Fact]
     public void Adding_a_field_announces_the_rows_and_the_buttons_that_read_it()
     {
         var form = NewItemForm.Open(_entries);
@@ -349,6 +339,8 @@ public sealed class NewItemTests : IDisposable
             nameof(NewItemViewModel.HasPresetRows),
             nameof(NewItemViewModel.FieldOptions),
             nameof(NewItemViewModel.HasFieldOptions),
+            nameof(NewItemViewModel.PresetCustomFields),
+            nameof(NewItemViewModel.AddedCustomFields),
         ];
         Assert.Equal(shown.Order(StringComparer.Ordinal), raised.Order(StringComparer.Ordinal));
 
@@ -417,7 +409,9 @@ public sealed class NewItemTests : IDisposable
         var form = NewItemForm.Open(_entries, "mine", Enum.Parse<ItemTemplate>(template));
 
         Assert.Equal([tag], form.Tags.Select(chip => chip.Tag));
-        Assert.True(form.ShowsTags);
+        Assert.False(form.ShowsTags);
+        Assert.Empty(form.ShownTags);
+        Assert.Contains(form.PresetCustomFields, custom => custom.Name == field);
 
         Type(form.CustomFields.Single(custom => custom.Name == field).Secret, "4111");
         _entries.ConfirmAddCommand.Press();
@@ -509,21 +503,16 @@ public sealed class NewItemTests : IDisposable
     }
 
     [Fact]
-    public void The_lists_plus_opens_the_places_kind_and_says_so_and_where_every_kind_is_listed_it_asks()
+    public void New_item_opens_the_places_kind_or_a_login_where_every_kind_is_listed()
     {
         using var entries = new EntriesViewModel(_session, _countdown) { VaultTitle = "Acme", Place = ItemPlace.Cards };
 
-        Assert.True(entries.AddsInPlace);
-        Assert.Equal("New card in Acme", entries.AddInPlaceTip);
         entries.BeginAddCommand.Press();
         Assert.Equal(ItemTemplate.Card, entries.NewItem!.Template);
         entries.CancelAddCommand.Press();
 
         entries.Place = ItemPlace.All;
 
-        Assert.False(entries.AddsInPlace);
-        Assert.Equal("New in Acme", entries.AddMenuHeading);
-        Assert.Equal(["Login", "API key", "Environment", "Card", "Note"], entries.Kinds.Select(kind => kind.Label));
         entries.BeginAddCommand.Press();
         Assert.Equal(ItemTemplate.Login, entries.NewItem!.Template);
     }

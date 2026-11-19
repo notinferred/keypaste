@@ -317,8 +317,8 @@ public sealed class OpenVaultsTests : IDisposable
 
         shell.SelectedSidebarRow = acme;
         var locked = Assert.IsType<LockedVaultViewModel>(shell.Content);
-        Assert.Equal("acme is locked", locked.Heading);
-        Assert.Equal("acme.kdbx", locked.FileName);
+        Assert.Equal("acme", locked.Unlock.Heading);
+        Assert.Equal("acme.kdbx", locked.Unlock.SelectedName);
         Assert.Equal(AcmePath, locked.Unlock.SelectedPath);
 
         Unlock(_acme.Session, AcmePath);
@@ -344,7 +344,7 @@ public sealed class OpenVaultsTests : IDisposable
 
         var acme = Assert.Single(_vaults.Listed, vault => vault != _personal);
         var form = Assert.IsType<LockedVaultViewModel>(shell.Content);
-        Assert.Equal("acme is locked", form.Heading);
+        Assert.Equal("acme", form.Unlock.Heading);
         Assert.Equal(shell.SidebarRows.OfType<VaultRow>().Single(row => row.Title == "acme"), shell.SelectedSidebarRow);
         Assert.True(_personal.Session.IsUnlocked);
 
@@ -399,7 +399,7 @@ public sealed class OpenVaultsTests : IDisposable
 
         shell.ShowAsked(Core.Ipc.BrowserShow.Unlock, "acme", string.Empty);
 
-        Assert.Equal("acme is locked", Assert.IsType<LockedVaultViewModel>(shell.Content).Heading);
+        Assert.Equal("acme", Assert.IsType<LockedVaultViewModel>(shell.Content).Unlock.Heading);
         Assert.Equal(acme, shell.SelectedSidebarRow);
     }
 

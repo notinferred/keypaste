@@ -35,7 +35,7 @@ public sealed class EntriesTaggedOnTheProjectsScreenAreWhatTheCliRunsTests
         var project = screen.OpenProject!;
 
         project.Environments[0].AddEntry.Execute(null);
-        project.EntryFilter = "services/Queue";
+        project.EntryFilter = "Queue";
         project.ChosenEntry = Assert.Single(project.EntryCandidates);
         project.ConfirmTagChangeCommand.Execute(null);
         Assert.Null(screen.Error);

@@ -77,28 +77,51 @@ internal sealed class Toast : IDisposable
     }
 }
 
-/// <summary>What the corner is saying: up to three toasts, the oldest closing early for a fourth.</summary>
+/// <summary>What the toast band is saying: one toast, the newest replacing the one before, and while a dialog is up the newest waits for it to close.</summary>
 internal sealed class ToastStack(TimeProvider clock, Action<Action> post) : IDisposable
 {
-    private const int _mostShown = 3;
     private static readonly TimeSpan _shortest = TimeSpan.FromSeconds(4);
     private static readonly TimeSpan _perCharacter = TimeSpan.FromMilliseconds(60);
+    private (string Message, ToastTone Tone)? _waiting;
+    private bool _isHeld;
 
     internal ObservableCollection<Toast> Shown { get; } = [];
 
     internal static TimeSpan DurationOf(string message) => TimeSpan.FromTicks(Math.Max(_shortest.Ticks, _perCharacter.Ticks * message.Length));
 
+    /// <summary>Whether a dialog is up, so a toast waits rather than lying over it.</summary>
+    internal bool IsHeld
+    {
+        get => _isHeld;
+        set
+        {
+            _isHeld = value;
+
+            if (!value && _waiting is var (message, tone))
+            {
+                _waiting = null;
+                Show(message, tone);
+            }
+        }
+    }
+
     internal void Show(string message, ToastTone tone)
     {
+        if (_isHeld)
+        {
+            _waiting = (message, tone);
+            return;
+        }
+
         if (Shown.FirstOrDefault(toast => toast.Message == message && toast.Tone == tone) is { } same)
         {
             same.Restart();
             return;
         }
 
-        if (Shown.Count == _mostShown)
+        foreach (var older in Shown.ToList())
         {
-            Remove(Shown[0]);
+            Remove(older);
         }
 
         Shown.Add(new Toast(message, tone, clock, post, Remove));

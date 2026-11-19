@@ -6,88 +6,10 @@
              x:Class="Keypaste.App.Views.KdbxImportView"
              x:DataType="vm:KdbxImportViewModel">
 
-  <!-- The KDBX import dialog, drawn over the shell on the modal backdrop: the file, what unlocks it,
-       where each of its groups lands, and whether to keep editing the file itself instead. -->
+  <!-- The KDBX import dialog, drawn over the shell on the modal backdrop: the file, then a choice of copying its items into the open vault or
+       opening it as its own vault; a copy asks what unlocks the file and shows where its groups land only where one cannot. -->
 
   <UserControl.Resources>
-
-    <!-- The design's 32x18 switch: amber track and an ink knob when on. -->
-    <ControlTheme x:Key="Switch" TargetType="ToggleButton">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Padding" Value="0" />
-      <Setter Property="HorizontalContentAlignment" Value="Left" />
-      <Setter Property="Template">
-        <ControlTemplate>
-          <Grid ColumnDefinitions="Auto,*" Background="Transparent">
-            <Border Name="Track"
-                    Width="32" Height="18"
-                    CornerRadius="10"
-                    VerticalAlignment="Top"
-                    Margin="0,2,8,0"
-                    Background="{DynamicResource KpBgActive}"
-                    BorderBrush="{DynamicResource KpBorderControl}"
-                    BorderThickness="1">
-              <Border Name="Knob"
-                      Width="14" Height="14"
-                      CornerRadius="7"
-                      HorizontalAlignment="Left"
-                      Margin="2,0,0,0"
-                      Background="{DynamicResource KpTextMuted}" />
-            </Border>
-            <ContentPresenter Grid.Column="1"
-                              Content="{TemplateBinding Content}"
-                              ContentTemplate="{TemplateBinding ContentTemplate}"
-                              VerticalAlignment="Center" />
-          </Grid>
-        </ControlTemplate>
-      </Setter>
-      <Style Selector="^:checked /template/ Border#Track">
-        <Setter Property="Background" Value="{DynamicResource KpTextPrimary}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource KpTextPrimary}" />
-      </Style>
-      <Style Selector="^:checked /template/ Border#Knob">
-        <Setter Property="Margin" Value="16,0,0,0" />
-        <Setter Property="Background" Value="{DynamicResource KpBgApp}" />
-      </Style>
-      <Style Selector="^:focus-visible /template/ Border#Track">
-        <Setter Property="BoxShadow" Value="{DynamicResource KpFieldGlow}" />
-      </Style>
-      <Style Selector="^:disabled">
-        <Setter Property="Opacity" Value="0.5" />
-      </Style>
-    </ControlTheme>
-
-    <!-- A 16px include box: hairline when off, a quiet filled box with a check when on. -->
-    <ControlTheme x:Key="IncludeBox" TargetType="CheckBox">
-      <Setter Property="Margin" Value="0,0,8,0" />
-      <Setter Property="VerticalAlignment" Value="Center" />
-      <Setter Property="Template">
-        <ControlTemplate>
-          <Border Name="Box"
-                  Width="16" Height="16"
-                  CornerRadius="{DynamicResource KpRadiusChip}"
-                  BorderThickness="1"
-                  BorderBrush="{DynamicResource KpBorderControl}"
-                  Background="Transparent">
-            <ctl:KpIcon Name="Check" Icon="check" Size="14" IsVisible="False"
-                        HorizontalAlignment="Center"
-                        Foreground="{DynamicResource KpTextPrimary}" />
-          </Border>
-        </ControlTemplate>
-      </Setter>
-      <Style Selector="^:checked /template/ Border#Box">
-        <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
-      </Style>
-      <Style Selector="^:checked /template/ ctl|KpIcon#Check">
-        <Setter Property="IsVisible" Value="True" />
-      </Style>
-      <Style Selector="^:pointerover /template/ Border#Box">
-        <Setter Property="BorderBrush" Value="{DynamicResource CheckBoxCheckBackgroundStrokeUncheckedPointerOver}" />
-      </Style>
-      <Style Selector="^:focus-visible /template/ Border#Box">
-        <Setter Property="BorderBrush" Value="{DynamicResource KpFocusRing}" />
-      </Style>
-    </ControlTheme>
 
     <!-- The field a destination is typed into: text until hovered or focused, and a red-bordered
          field while it blocks the import, so the fix is visible where the problem is. -->
@@ -111,21 +33,13 @@
       <Style Selector="^:focus /template/ Border#PART_BorderElement">
         <Setter Property="Background" Value="{DynamicResource KpBgApp}" />
         <Setter Property="BorderBrush" Value="{DynamicResource KpFocusRing}" />
+        <Setter Property="BoxShadow" Value="{DynamicResource KpFieldGlow}" />
       </Style>
     </ControlTheme>
 
   </UserControl.Resources>
 
   <UserControl.Styles>
-    <Style Selector="Button.dialog-action">
-      <Setter Property="Height" Value="34" />
-      <Setter Property="MinHeight" Value="34" />
-      <Setter Property="Padding" Value="12,0" />
-    </Style>
-    <Style Selector="Button.dialog-action.primary">
-      <Setter Property="Padding" Value="16,0" />
-    </Style>
-
     <Style Selector="Border.map-row">
       <Setter Property="Padding" Value="12,8" />
       <Setter Property="BorderBrush" Value="{DynamicResource KpBorderDefault}" />
@@ -158,15 +72,25 @@
       </Grid>
 
       <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,16,0,0">
-        <Button Classes="ghost dialog-action" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelCommand}" />
+        <Button Classes="ghost lg" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelCommand}" />
         <Button x:Name="ChooseAnother"
-                Classes="dialog-action"
+                Classes="lg"
                 IsVisible="{Binding CanChooseAnother}"
                 Content="{x:Static res:Strings.ChooseAnotherFile}"
                 Command="{Binding ChooseAnotherCommand}" />
-        <Button Classes="dialog-action"
+        <Button x:Name="ChooseOpen"
+                Classes="lg"
+                IsVisible="{Binding ShowsChoice}"
+                Content="{x:Static res:Strings.OpenAsItsOwnVault}"
+                Command="{Binding ChooseOpenCommand}" />
+        <Button x:Name="ChooseCopy"
+                Classes="primary lg"
+                IsVisible="{Binding ShowsChoice}"
+                Content="{Binding CopyChoice}"
+                Command="{Binding ChooseCopyCommand}" />
+        <Button Classes.busy="{Binding Busy}" Classes="lg"
                 Classes.primary="{Binding UnlockIsPrimary}"
-                IsVisible="{Binding NeedsUnlock}"
+                IsVisible="{Binding ShowsUnlockForm}"
                 Command="{Binding UnlockCommand}"
                 AutomationProperties.Name="{x:Static res:Strings.Unlock}">
           <StackPanel Orientation="Horizontal" Spacing="8">
@@ -175,7 +99,7 @@
           </StackPanel>
         </Button>
         <Button x:Name="ImportConfirm"
-                Classes="primary dialog-action"
+                Classes="primary lg"
                 IsVisible="{Binding ShowsConfirm}"
                 Content="{Binding ConfirmText}"
                 Command="{Binding ConfirmCommand}" />
@@ -183,19 +107,10 @@
 
       <!-- A choice with no sign of itself on a small screen would pass unseen, so it stays with the answers. -->
       <StackPanel DockPanel.Dock="Bottom" Spacing="16" Margin="0,16,0,0">
-      <StackPanel Spacing="6" IsVisible="{Binding IsReadable}">
-        <ToggleButton Theme="{StaticResource Switch}" IsChecked="{Binding KeepEditingInPlace}" AutomationProperties.Name="{x:Static res:Strings.KeepEditingThisFileInPlaceSoX072ed7}">
-          <TextBlock Classes="size-13"
-                     FontWeight="Normal"
-                     TextWrapping="Wrap"
-                     Foreground="{DynamicResource KpTextPrimary}"
-                     Text="{x:Static res:Strings.KeepEditingThisFileInPlaceSoX072ed7}" />
-        </ToggleButton>
-        <TextBlock Classes="caption"
-                   Margin="40,0,0,0"
-                   Text="{Binding InPlaceNote}"
-                   IsVisible="{Binding KeepEditingInPlace}" />
-      </StackPanel>
+      <TextBlock Classes="caption"
+                 TextWrapping="Wrap"
+                 Text="{Binding InPlaceNote}"
+                 IsVisible="{Binding KeepEditingInPlace}" />
 
       <TextBlock ctl:MachineRuns.InText="True" Classes="danger size-13"
                  TextWrapping="Wrap"
@@ -207,13 +122,9 @@
       <ScrollViewer Margin="-4,-4,-12,-4" HorizontalScrollBarVisibility="Disabled">
       <StackPanel Margin="4,4,12,4" Spacing="16">
 
-      <!-- The file card, on a dashed hairline. -->
-      <Panel>
-        <Rectangle RadiusX="10" RadiusY="10"
-                   Stroke="{DynamicResource KpBorderStrong}"
-                   StrokeThickness="1"
-                   StrokeDashArray="4,3" />
-        <Grid ColumnDefinitions="Auto,*,Auto" Margin="16">
+      <!-- The file card: its name and, once unlocked, how many items it holds; its format is the tooltip. -->
+      <Border Classes="group padded" ToolTip.Tip="{Binding CardFormat}">
+        <Grid ColumnDefinitions="Auto,*,Auto">
           <ctl:KpIcon Grid.Column="0" Icon="file-lock-2" Size="16" Margin="0,0,12,0" Foreground="{DynamicResource KpTextMuted}" />
           <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
             <TextBlock Classes="mono size-13" Text="{Binding FileName}" TextTrimming="CharacterEllipsis" />
@@ -221,7 +132,7 @@
                        Classes="muted size-13"
                        Text="{Binding CardDetail}"
                        TextTrimming="CharacterEllipsis"
-                       IsVisible="{Binding IsReadable}" />
+                       IsVisible="{Binding IsDecrypted}" />
             <TextBlock ctl:MachineRuns.InText="True"
                        Classes="danger size-13"
                        ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}"
@@ -256,10 +167,10 @@
             <TextBlock Classes="danger size-13" Text="{x:Static res:Strings.CantRead}" VerticalAlignment="Center" />
           </StackPanel>
         </Grid>
-      </Panel>
+      </Border>
 
       <!-- What opens the file. The password, typed or pasted, goes to a buffer and is cleared once it has been tried. -->
-      <StackPanel Spacing="8" IsVisible="{Binding NeedsUnlock}">
+      <StackPanel Spacing="8" IsVisible="{Binding ShowsUnlockForm}">
         <TextBlock Classes="label" Text="{x:Static res:Strings.PasswordForThisFile}" />
         <ctl:MaskedInput x:Name="ImportPassword"
                          Sink="{Binding}"
@@ -338,7 +249,11 @@
                   <Border Classes="map-row">
                     <Grid ColumnDefinitions="Auto,*,20,*" RowDefinitions="Auto,Auto">
                       <CheckBox Grid.Column="0"
-                                Theme="{StaticResource IncludeBox}"
+                                MinWidth="0"
+                                MinHeight="0"
+                                Padding="0"
+                                Margin="0,0,8,0"
+                                VerticalAlignment="Center"
                                 IsChecked="{Binding Include}"
                                 AutomationProperties.Name="{Binding SourceGroup, StringFormat={x:Static res:Strings.CopyGroupValue}}"
                                 ToolTip.Tip="{x:Static res:Strings.CopyThisGroup}" />

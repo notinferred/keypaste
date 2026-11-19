@@ -561,7 +561,7 @@ public sealed class KeepUnsavedWorkTests
         shell.Shell.ConfirmDiscardCommand.Press();
         Assert.Equal(DestinationKind.Entries, shell.Shell.Current.Kind);
         RenderedShell.Drain();
-        Assert.True(shell.Named<TextBox>("ShellSearch").IsFocused);
+        Assert.True(shell.Named<TextBox>("ListSearch").IsFocused);
     });
 
     [Fact]
@@ -596,43 +596,6 @@ public sealed class KeepUnsavedWorkTests
 
         Assert.True(shell.IsLocked);
         Assert.Null(entries.NewItem);
-    });
-
-    [Fact]
-    public Task New_item_from_the_generator_waits_for_the_answer() => HeadlessSession.On(() =>
-    {
-        using var shell = new RenderedShell();
-        var pane = shell.OpenPane();
-        pane.EditCommand.Press();
-        pane.DraftUsername = "half typed";
-        shell.Shell.OpenGeneratorCommand.Press();
-        var generated = shell.Shell.GeneratorDialog!.MaskedLength;
-
-        shell.Shell.GeneratorDialog.NewItemCommand.Press();
-        Assert.True(shell.Shell.HasDiscardPrompt);
-        Assert.True(shell.Shell.HasGeneratorDialog);
-
-        shell.Shell.ConfirmDiscardCommand.Press();
-        Assert.False(shell.Shell.HasGeneratorDialog);
-        Assert.Equal(generated, Assert.IsType<EntriesViewModel>(shell.Shell.Content).NewItem!.Password.MaskedLength);
-    });
-
-    [Fact]
-    public Task New_item_from_an_edits_generator_starts_with_the_value_it_showed_after_the_edit_is_discarded() => HeadlessSession.On(() =>
-    {
-        using var shell = new RenderedShell();
-        var pane = shell.OpenPane();
-        pane.EditCommand.Press();
-        pane.DraftUsername = "half typed";
-        pane.OpenGeneratorCommand.Press();
-        var panel = pane.NewPasswordGenerator!;
-        var shown = panel.Reveal();
-
-        panel.NewItemCommand.Press();
-        Assert.True(shell.Shell.HasDiscardPrompt);
-
-        shell.Shell.ConfirmDiscardCommand.Press();
-        Assert.Equal(shown, Assert.IsType<EntriesViewModel>(shell.Shell.Content).NewItem!.Password.Compose());
     });
 
     [Theory]

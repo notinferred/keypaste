@@ -16,9 +16,7 @@ namespace Keypaste.App.Views;
 /// <remarks>
 /// Everything this screen does — searching, building the group tree, reading and writing the vault —
 /// belongs to <see cref="ViewModels.EntriesViewModel"/>, which names no Avalonia type and is
-/// therefore assertable with no application and no display. What is here is layout: the screen's
-/// menus, the list's sort and "+" and the pane's ⋯, each of which opens with focus on its first item and closes
-/// on a choice, Escape or a press elsewhere; and the keyboard's place when a narrow width swaps the list for the detail.
+/// therefore assertable with no application and no display. What is here is layout: the keyboard's place when a narrow width swaps the list for the detail.
 /// </remarks>
 internal sealed partial class EntriesView : UserControl
 {
@@ -35,7 +33,6 @@ internal sealed partial class EntriesView : UserControl
         _split = this.FindControl<ListDetail>("Split")!;
         _split.HidKeyboardPane += OnKeyboardPaneHid;
 
-        ToggleMenus.Attach(this, ("EntryMenu", "EntryMenuPanel"), ("AddEntry", "AddMenuPanel"), ("SortMenu", "SortMenuPanel"));
         AddHandler(Button.ClickEvent, OnClick, RoutingStrategies.Bubble);
 
         _rows = this.FindControl<ListBox>("Rows")!;

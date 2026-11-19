@@ -79,6 +79,13 @@
     <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
   </Style>
 
+  <!-- A form's heading that names its one field is that field's label, in the heading's face. -->
+  <Style Selector=":is(TextBlock).dialog-title.label">
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
+  </Style>
+
   <!-- A helper line under a field: its label's size at a lighter weight, so it never reads above its label. -->
   <Style Selector=":is(TextBlock).caption">
     <Setter Property="FontSize" Value="12" />
@@ -99,7 +106,7 @@
   <Style Selector=":is(TextBlock).mono">
     <Setter Property="FlowDirection" Value="LeftToRight" />
     <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
-    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="FontSize" Value="12" />
   </Style>
 
   <!-- An item's title is words, so sans: in its pane at heading size, in a list at row size.

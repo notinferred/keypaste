@@ -163,7 +163,7 @@ public sealed class BrowserHostTests
         var status = Status(app, ref statuses);
         foreach (var browser in _browsers)
         {
-            Assert.Equal($"on=false other=false answer=Not set up. Turn on so {Name(browser)} can start keypaste for its extension. extension={Name(browser)} isn't installed.", status[browser]);
+            Assert.Equal("on=false other=false status=Not installed program=none", status[browser]);
         }
 
         Assert.Equal(!OperatingSystem.IsLinux(), app.Driver.Output.Contains("browser-shared Chrome and Brave read one setting, so they turn on and off together."));
@@ -172,8 +172,8 @@ public sealed class BrowserHostTests
         Directory.CreateDirectory(Path.Combine(roots.ProfileFolder("chrome"), "Default", "Extensions", _chrome));
         Directory.CreateDirectory(Path.Combine(roots.ProfileFolder("edge"), "Default"));
         status = Status(app, ref statuses);
-        Assert.EndsWith(" extension=keypaste's extension is installed in Chrome.", status["chrome"], StringComparison.Ordinal);
-        Assert.EndsWith(" extension=keypaste's extension isn't installed in Edge. Get it from Microsoft Edge Add-ons.", status["edge"], StringComparison.Ordinal);
+        Assert.EndsWith(" status=Extension installed program=none", status["chrome"], StringComparison.Ordinal);
+        Assert.EndsWith(" status=Extension not installed program=none", status["edge"], StringComparison.Ordinal);
 
         // Each browser finds the manifest Turn on wrote, starts the built keypaste through it and is answered with the vault's hash.
         string? hash = null;
@@ -185,7 +185,9 @@ public sealed class BrowserHostTests
                 : browser == "chrome" ? " Brave reads the same setting, so it is on too."
                 : string.Empty;
             Assert.Equal($"browser-on {browser}: {Name(browser)} now starts keypaste at {keypaste}.{sharing}", app.Act($"browser-on {browser}"));
-            Assert.StartsWith($"on=true other=false answer={Name(browser)} starts keypaste at {keypaste}. ", Status(app, ref statuses)[browser], StringComparison.Ordinal);
+            var on = Status(app, ref statuses)[browser];
+            Assert.StartsWith("on=true other=false ", on, StringComparison.Ordinal);
+            Assert.EndsWith($" program={keypaste}", on, StringComparison.Ordinal);
 
             using (var found = Find(workspace, roots, browser, "get-databasehash"))
             {
@@ -196,7 +198,9 @@ public sealed class BrowserHostTests
             }
 
             Assert.Equal($"browser-off {browser}: {Name(browser)} no longer starts keypaste.{sharing.Replace(" on ", " off ", StringComparison.Ordinal)}", app.Act($"browser-off {browser}"));
-            Assert.StartsWith("on=false other=false answer=Not set up.", Status(app, ref statuses)[browser], StringComparison.Ordinal);
+            var off = Status(app, ref statuses)[browser];
+            Assert.StartsWith("on=false other=false ", off, StringComparison.Ordinal);
+            Assert.EndsWith(" program=none", off, StringComparison.Ordinal);
             using var gone = Find(workspace, roots, browser, "get-databasehash");
             Assert.Equal(_notFound, gone.WaitForExit());
             Assert.Empty(gone.Output);
@@ -217,7 +221,7 @@ public sealed class BrowserHostTests
         File.WriteAllBytes(otherManifest, otherBytes);
         roots.SetChromiumKey(otherManifest);
 
-        Assert.Equal($"on=false other=true answer=Chromium starts another program for keypaste's extension: {other}. extension=Chromium isn't installed.", Status(app, ref statuses)["chromium"]);
+        Assert.Equal($"on=false other=true status=Not installed program={other}", Status(app, ref statuses)["chromium"]);
         Assert.StartsWith("browser-off chromium not offered:", app.Act("browser-off chromium"), StringComparison.Ordinal);
         Assert.Equal($"browser-on chromium confirm: Turning on replaces {other} for Chromium, and keypaste can't put it back.", app.Act("browser-on chromium"));
         Assert.Equal(otherBytes, File.ReadAllBytes(otherManifest));
@@ -227,7 +231,7 @@ public sealed class BrowserHostTests
         Assert.StartsWith("browser-on edge: ", app.Act("browser-on edge"), StringComparison.Ordinal);
         var missing = Path.Combine(roots.Directory, "gone", Path.GetFileName(keypaste));
         File.WriteAllText(manifests["edge"], File.ReadAllText(manifests["edge"]).Replace(JsonSerializer.Serialize(keypaste), JsonSerializer.Serialize(missing), StringComparison.Ordinal));
-        Assert.StartsWith($"on=false other=false answer=Edge looks for keypaste at {missing}, which no longer exists. Turn on to point it at this keypaste. ", Status(app, ref statuses)["edge"], StringComparison.Ordinal);
+        Assert.Equal($"on=false other=false status=keypaste moved, so turn it on again program={missing}", Status(app, ref statuses)["edge"]);
         Assert.Equal($"browser-on edge: Edge now starts keypaste at {keypaste}.", app.Act("browser-on edge"));
         using (var found = Find(workspace, roots, "edge", "get-databasehash"))
         {

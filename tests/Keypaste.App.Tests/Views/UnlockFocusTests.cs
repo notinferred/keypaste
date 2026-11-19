@@ -74,7 +74,7 @@ public sealed class UnlockFocusTests
     /// disabled rather than by swallowing keystrokes.
     /// </summary>
     [Fact]
-    public Task With_no_vault_selected_the_password_field_is_disabled() => HeadlessSession.On(() =>
+    public Task With_no_vault_selected_the_welcome_shows_and_no_password_field_can_take_keys() => HeadlessSession.On(() =>
     {
         using var fixture = new TempVault();
         using var session = new AppVaultSession(new ManualClock(AppClock.Start));
@@ -83,7 +83,8 @@ public sealed class UnlockFocusTests
         var window = Show(model);
 
         Assert.False(model.HasSelection);
-        Assert.False(Password(window).IsEnabled);
+        Assert.True(model.ShowsWelcome);
+        Assert.DoesNotContain(window.GetVisualDescendants().OfType<MaskedInput>(), field => field.IsEffectivelyVisible);
     });
 
     [Fact]

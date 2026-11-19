@@ -61,7 +61,7 @@ public sealed partial class BrowserPairingTests
 
         var row = Assert.Single(browserFill.Rows);
         Assert.Equal(("work laptop", "keypaste's extension from the Chrome Web Store (fipabobollckgdobkjfkkchimlphcicg)"), (row.Name, row.Identity));
-        Assert.Contains("last used", row.Used, StringComparison.Ordinal);
+        Assert.StartsWith("Chrome · last used", row.Summary, StringComparison.Ordinal);
     });
 
     [Fact]
@@ -77,7 +77,7 @@ public sealed partial class BrowserPairingTests
         Assert.Equal("keypaste's extension from Firefox Add-ons (browser@keypaste.invalid)", Text(window, "IdentityText"));
         window.FindControl<TextBox>("NameBox")!.Text = "work laptop";
         app.Clock.Advance(PromptViewModel.ArmingDelay);
-        await PromptedApp.UntilAsync(() => Text(window, "NameProblemText") == "another pairing already has this name");
+        await PromptedApp.UntilAsync(() => Text(window, "NameProblemText") == "Another pairing has this name.");
         await Task.Delay(200, Token);
         Assert.False(window.FindControl<Button>("Allow")!.IsEffectivelyEnabled);
 
@@ -157,7 +157,7 @@ public sealed partial class BrowserPairingTests
         Assert.Empty(new BrowserFillViewModel(app.Authority).Rows);
     });
 
-    /// <summary>The card says nothing in the words D-0457 retired and names every control by its words.</summary>
+    /// <summary>The Browser section says nothing in retired words and names every control by its words.</summary>
     [Fact]
     public Task The_Browser_fill_card_holds_no_retired_word_and_names_its_controls() => HeadlessSession.On(async () =>
     {
@@ -169,13 +169,14 @@ public sealed partial class BrowserPairingTests
         window.Show();
         WindowInput.Drain();
 
-        var card = window.GetVisualDescendants().OfType<Border>().Single(border => border.Name == "BrowserFillCard");
+        var card = window.GetVisualDescendants().OfType<StackPanel>().Single(panel => panel.Name == "BrowserFillCard");
         Assert.True(card.IsEffectivelyVisible);
 
         var said = card.GetVisualDescendants().OfType<TextBlock>().Where(block => block.IsEffectivelyVisible).Select(block => block.Text ?? string.Empty).ToList();
-        Assert.Contains("Browser fill", said);
+        Assert.Contains("Paired browsers", said);
         Assert.Contains("work laptop", said);
-        Assert.Contains(Keypaste.App.Resources.Strings.PairInTheExtension, said);
+        Assert.Contains("Fills without asking", said);
+        Assert.DoesNotContain(Keypaste.App.Resources.Strings.PairInTheExtension, said);
         Assert.DoesNotContain(said, text => Retired().IsMatch(text));
 
         var names = card.GetVisualDescendants().OfType<Button>().Where(button => button.IsEffectivelyVisible)
@@ -207,7 +208,9 @@ public sealed partial class BrowserPairingTests
         Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
         Assert.False(window.FindControl<Button>("Allow")!.IsEffectivelyEnabled);
         Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(), button => button.IsDefault);
-        Assert.Equal("Fill GitHub work on github.com?", window.FindControl<TextBlock>("TitleText")!.Inlines!.OfType<Avalonia.Controls.Documents.Run>().Aggregate(string.Empty, (text, run) => text + run.Text));
+        var title = window.FindControl<TextBlock>("TitleText")!;
+        Assert.Equal("Fill on github.com?", title.Inlines!.OfType<Avalonia.Controls.Documents.Run>().Aggregate(string.Empty, (text, run) => text + run.Text).Replace("\u200b", string.Empty, StringComparison.Ordinal));
+        Assert.Equal("Fill GitHub work on github.com?", Avalonia.Automation.AutomationProperties.GetName(title));
         Assert.Equal("https://github.com:443", window.FindControl<TextBlock>("OriginText")!.Text);
         Assert.DoesNotContain(window.GetVisualDescendants().OfType<TextBlock>(), text => (text.Text ?? string.Empty).Contains("s3cret", StringComparison.Ordinal));
 
@@ -239,12 +242,15 @@ public sealed partial class BrowserPairingTests
 
         using var browserFill = new BrowserFillViewModel(app.Authority);
         var row = Assert.Single(browserFill.Allowances);
-        Assert.Equal(("GitHub", "on https://github.com:443 in laptop"), (row.Item, row.Where));
+        Assert.Equal(("GitHub", "github.com in laptop · until you remove it"), (row.Item, row.Where));
 
         var atOnce = await link.ReleaseAsync(Release(app, "https://github.com/", item), Token);
         Assert.Single(atOnce!.Logins);
         Assert.Equal(2, app.Windows.Count);
 
+        browserFill.AskUnallowCommand.Execute(row);
+        Assert.True(row.IsConfirmingStop);
+        Assert.Single(browserFill.Allowances);
         browserFill.UnallowCommand.Execute(row);
         Assert.Empty(browserFill.Allowances);
         var askedAgain = link.ReleaseAsync(Release(app, "https://github.com/", item), Token).AsTask();

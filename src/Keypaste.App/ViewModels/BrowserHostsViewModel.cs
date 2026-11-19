@@ -11,20 +11,36 @@ internal sealed partial class BrowserHostRow(HostStatus status) : ObservableObje
 
     internal string Name => status.Browser.ToString();
 
-    internal string Answer => status.State switch
+    /// <summary>Whether the browser is on this computer; a browser that isn't shows no switch.</summary>
+    internal bool IsInstalled => status.Extension != ExtensionState.BrowserNotFound;
+
+    /// <summary>The row's one line: whether keypaste answers the browser's extension, or what is in the way.</summary>
+    internal string Status => status switch
     {
-        HostState.Keypaste => $"{Name} starts keypaste at {status.Program}.",
-        HostState.KeypasteMissing => $"{Name} looks for keypaste at {status.Program}, which no longer exists. Turn on to point it at this keypaste.",
-        HostState.Other => $"{Name} starts another program for keypaste's extension: {status.Program}.",
-        _ => $"Not set up. Turn on so {Name} can start keypaste for its extension.",
+        { Extension: ExtensionState.BrowserNotFound } => Strings.NotInstalled,
+        { State: HostState.KeypasteMissing } => Strings.KeypasteMovedTurnOnAgain,
+        { State: HostState.Other } => Strings.AnotherProgramAnswersItsExtension,
+        { Extension: ExtensionState.Installed } => Strings.ExtensionInstalled,
+        _ => Strings.ExtensionNotInstalled,
     };
 
-    internal string Extension => status.Extension switch
-    {
-        ExtensionState.Installed => $"keypaste's extension is installed in {Name}.",
-        ExtensionState.NotFound => $"keypaste's extension isn't installed in {Name}. Get it from {Store}.",
-        _ => $"{Name} isn't installed.",
-    };
+    /// <summary>Where to get the extension, while the browser lacks it.</summary>
+    internal string Hint => IsInstalled && status.Extension == ExtensionState.NotFound
+        ? $"Get it from {Store}."
+        : string.Empty;
+
+    internal bool HasHint => Hint.Length > 0;
+
+    /// <summary>The program the browser starts for keypaste's extension, for the row's tooltip.</summary>
+    internal string? Program => status.Program;
+
+    internal bool OffersSwitch => IsInstalled && !IsConfirmingReplace;
+
+    /// <summary>The switch's position: on while keypaste answers, and while turning on over another program waits on its confirmation.</summary>
+    internal bool SwitchedOn => IsOn || IsConfirmingReplace;
+
+    /// <summary>Whether the browser has the extension and keypaste doesn't answer it, so the Browsers disclosure starts open.</summary>
+    internal bool NeedsAttention => IsInstalled && (status.State is HostState.KeypasteMissing or HostState.Other || (status.Extension == ExtensionState.Installed && !IsOn));
 
     internal bool IsOn => status.State == HostState.Keypaste;
 
@@ -34,8 +50,6 @@ internal sealed partial class BrowserHostRow(HostStatus status) : ObservableObje
     /// <summary>Whether turning on would overwrite another program's manifest, which keypaste cannot put back.</summary>
     internal bool ReplacesAnother => status.State == HostState.Other;
 
-    internal string ActionLabel => IsOn ? Strings.TurnOff : Strings.TurnOn;
-
     internal string ActionName => IsOn ? $"Turn off for {Name}" : $"Turn on for {Name}";
 
     internal string ReplaceName => $"Replace the other program for {Name}";
@@ -43,6 +57,7 @@ internal sealed partial class BrowserHostRow(HostStatus status) : ObservableObje
     internal string ReplacePrompt => $"Turning on replaces {status.Program} for {Name}, and keypaste can't put it back.";
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OffersSwitch), nameof(SwitchedOn))]
     internal partial bool IsConfirmingReplace { get; set; }
 
     private string Store => status.Browser switch
@@ -74,7 +89,12 @@ internal sealed partial class BrowserHostsViewModel : ObservableObject
         ReplaceCommand = new RelayCommand<BrowserHostRow>(row => TurnOn(row!), row => row is { ReplacesAnother: true } && _hosts is not null);
 
         Rows = Read();
+        IsOpen = Rows.Any(row => row.NeedsAttention);
     }
+
+    /// <summary>Whether the Browsers disclosure is open; it starts open while any browser needs attention.</summary>
+    [ObservableProperty]
+    internal partial bool IsOpen { get; set; }
 
     /// <summary>Turns a browser off when keypaste answers it, else on, asking first over another program.</summary>
     internal RelayCommand<BrowserHostRow> ChangeCommand { get; }

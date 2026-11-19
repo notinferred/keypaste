@@ -15,7 +15,7 @@ internal sealed class TerminalEditViewModel : PromptViewModel
 
         Command = prompt.Command;
         Item = prompt.Item;
-        Origin = prompt.OriginText;
+        Question = $"Let a terminal change {prompt.Item}?";
         Changes = prompt.Changes;
         DeletesForGood = prompt.DeletesForGood;
     }
@@ -24,13 +24,11 @@ internal sealed class TerminalEditViewModel : PromptViewModel
 
     internal string Item { get; }
 
-    /// <summary>The question.</summary>
-    internal string Question { get; } = "Allow this change from a terminal?";
+    /// <summary>The question, which names the item or environment once.</summary>
+    internal string Question { get; }
 
     /// <inheritdoc/>
-    protected override string Asks => $"{Question} {Item}, {Command}";
-
-    internal string Origin { get; }
+    protected override string Asks => $"{Question} {Command}";
 
     internal IReadOnlyList<string> Changes { get; }
 
@@ -44,5 +42,6 @@ internal sealed class TerminalEditViewModel : PromptViewModel
     /// <inheritdoc/>
     internal override bool AnswersReturn => !DeletesForGood;
 
-    internal string Explainer { get; } = "Allowing saves this in the vault now. Allow only a change you made yourself.";
+    /// <summary>Where the request came from, which never proves the person asked, and what to check, on one line.</summary>
+    internal string Warning { get; } = "Any program you run could have sent this. Allow only a change you made.";
 }

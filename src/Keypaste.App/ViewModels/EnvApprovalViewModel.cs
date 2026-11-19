@@ -13,7 +13,8 @@ internal sealed class EnvApprovalViewModel : PromptViewModel
         Project = prompt.Project;
         Profile = prompt.Profile;
         AskedBy = prompt.Requester ?? string.Empty;
-        Title = $"Start this command with {prompt.Keys.Count} secret{(prompt.Keys.Count == 1 ? string.Empty : "s")}?";
+        Values = RunApprovalViewModel.CountOfValues(prompt.Keys.Count);
+        Named = RunApprovalViewModel.ShortCommand(prompt.Command);
         Keys = [.. prompt.Keys.Select((key, i) => new EnvApprovalKey(key, i < prompt.Entries.Count ? prompt.Entries[i] : string.Empty))];
         Entries = string.Join(", ", prompt.Entries.Distinct(StringComparer.Ordinal));
         FileLines = string.Join(Environment.NewLine, prompt.FileLines);
@@ -24,11 +25,14 @@ internal sealed class EnvApprovalViewModel : PromptViewModel
             : string.Empty;
     }
 
-    /// <summary>The question, which names how many values the command gets.</summary>
-    internal string Title { get; }
+    /// <summary>The command as the question and the consequence name it, cut so it never wraps a line; the block holds all of it.</summary>
+    internal string Named { get; }
+
+    /// <summary>How many values the command gets, in words: <c>3 values</c>.</summary>
+    internal string Values { get; }
 
     /// <inheritdoc/>
-    protected override string Asks => Title;
+    protected override string Asks => $"Run {Command} with {Values}?";
 
     internal string Project { get; }
 
@@ -54,8 +58,15 @@ internal sealed class EnvApprovalViewModel : PromptViewModel
     internal string Scrubbed { get; }
 
     /// <summary>What allowing does, in one plain line.</summary>
-    internal string Consequence { get; } = "keypaste can't check the command. Allow only a run you started: every value goes into its environment.";
+    internal string Consequence => $"{Named} gets {Values} in its environment.";
+
+    /// <summary>What the person checks before allowing, on its own line.</summary>
+    internal string Warning { get; } = "keypaste can't check the command. Allow only a run you started.";
 }
 
 /// <summary>One variable of the set: its name, and the item its value lives in.</summary>
-internal sealed record EnvApprovalKey(string Key, string Entry);
+internal sealed record EnvApprovalKey(string Key, string Entry)
+{
+    /// <summary>What pointing at its chip says: the whole name and where its value comes from.</summary>
+    internal string Tip => Entry.Length > 0 ? $"{Key} from {Entry}" : Key;
+}

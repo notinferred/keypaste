@@ -152,7 +152,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
 
     /// <summary>What the screen says when the bin holds nothing.</summary>
     internal string EmptyNote => RecyclesDeletedEntries
-        ? "Nothing has been deleted from this vault, or what was has already been erased."
+        ? Resources.Strings.TrashIsEmpty
         : "Nothing can be recovered from this vault.";
 
     /// <summary>Whether the permanent deletion is waiting to be confirmed.</summary>
@@ -167,7 +167,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
 
     /// <summary>What that confirmation asks.</summary>
     internal string PurgePrompt => _selected is { } row
-        ? $"Delete {row.DisplayTitle} for good? This one cannot be undone."
+        ? $"Delete {row.DisplayTitle} for good?"
         : string.Empty;
 
     /// <summary>Whether emptying the whole bin is waiting to be confirmed.</summary>

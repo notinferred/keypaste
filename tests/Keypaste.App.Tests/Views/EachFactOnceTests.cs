@@ -54,7 +54,7 @@ public sealed class EachFactOnceTests
         RenderedShell.Drain();
     }
 
-    /// <summary>A field keeps Reveal and Copy on its row; the rest is its ⋯ menu, on while each command can run.</summary>
+    /// <summary>A field keeps Reveal and Copy on its row, with a shield while it is protected; the rest is its ⋯ menu, on while each command can run.</summary>
     [Fact]
     public Task A_fields_row_keeps_Reveal_and_Copy_and_its_menu_holds_the_rest() => HeadlessSession.On(() =>
     {
@@ -63,7 +63,7 @@ public sealed class EachFactOnceTests
 
         var row = FieldMenu(shell, "API_TOKEN").GetVisualAncestors().OfType<StackPanel>().First();
         Assert.Equal(
-            ["Reveal API_TOKEN", "More actions for API_TOKEN"],
+            ["protected", "Reveal API_TOKEN", "More actions for API_TOKEN"],
             row.GetVisualChildren().OfType<Control>().Where(control => control.IsVisible).Select(AutomationProperties.GetName));
         Assert.Equal("Copy API_TOKEN", AutomationProperties.GetName(FieldMenu(shell, "API_TOKEN").GetVisualAncestors().OfType<FieldRow>().First().GetVisualDescendants().OfType<PressToCopy>().Single()));
 
@@ -146,10 +146,9 @@ public sealed class EachFactOnceTests
 
         value.BeginReveal();
         Assert.True(value.IsRevealed);
-        shell.Named<ToggleButton>("EntryMenu").IsChecked = true;
-        RenderedShell.Drain();
+        var (paneMenu, _) = shell.OpenMenu("EntryMenu");
         Assert.False(value.IsRevealed, "a value stayed shown under the pane's menu");
-        shell.Named<ToggleButton>("EntryMenu").IsChecked = false;
+        paneMenu.Hide();
         RenderedShell.Drain();
 
         AutomationSurface.AssertNothingExposes(shell.Window, RenderedShell.FieldValue);
@@ -269,7 +268,7 @@ public sealed class EachFactOnceTests
         Assert.DoesNotContain(shell.Named<ListBox>("RailNav").GetVisualDescendants().OfType<Border>(), border => border.Name == "RailBadge" && border.IsEffectivelyVisible);
     });
 
-    /// <summary>Then and Now show what changed, with the rest in one line; a custom field's value is never read to say so.</summary>
+    /// <summary>Then and Now show what changed, and the revision's row names it; a custom field's value is never read to say so.</summary>
     [Fact]
     public Task History_compares_only_what_changed() => HeadlessSession.On(() =>
     {
@@ -283,12 +282,12 @@ public sealed class EachFactOnceTests
         Assert.True(revision.PasswordDiffers);
         Assert.False(revision.UsernameDiffers);
         Assert.False(revision.TitleDiffers);
-        Assert.Equal("Unchanged: username, URL, notes, custom field names and tags. Custom field values aren't compared here.", shell.Named<TextBlock>("RevisionUnchanged").Text);
+        Assert.Equal("Password", revision.Changes);
         Assert.False(shell.Named<TextBlock>("RevisionFields").IsEffectivelyVisible);
         Assert.True(shell.Named<RevealedValue>("RevisionPassword").IsEffectivelyVisible);
     });
 
-    /// <summary>A revision differing only in what drawing leaves out still counts as changed, and one differing in a field's value says values are not compared.</summary>
+    /// <summary>A revision differing only in what drawing leaves out still counts as changed, and one differing only in a field's value names nothing.</summary>
     [Fact]
     public Task History_compares_what_is_stored_and_says_what_it_does_not_compare() => HeadlessSession.On(() =>
     {
@@ -313,7 +312,7 @@ public sealed class EachFactOnceTests
         Assert.False(replaced.PasswordDiffers);
         Assert.False(replaced.NotesDiffer);
         Assert.False(replaced.FieldNamesDiffer);
-        Assert.EndsWith("Custom field values aren't compared here.", replaced.Unchanged, StringComparison.Ordinal);
+        Assert.Empty(replaced.Changes);
     });
 
     /// <summary>What was typed in one field form is not lost to another opened from a row's menu.</summary>
@@ -384,7 +383,9 @@ public sealed class EachFactOnceTests
         var detail = entries.Detail!;
 
         Assert.False(detail.RotateCommand.CanExecute(null));
-        Assert.False(shell.Named<Button>("RotateFromPane").IsEffectivelyVisible);
+        var (menu, _) = shell.OpenMenu("EntryMenu");
+        Assert.False(Menus.Item(menu, "RotateFromPane").IsVisible);
+        menu.Hide();
         Assert.False(shell.Named<Button>("CopyPassword").IsEffectivelyVisible);
     });
 
@@ -435,7 +436,7 @@ public sealed class EachFactOnceTests
         {
             using var shell = new RenderedShell("keypaste-diagnostics-answering-");
 
-            Assert.Equal("no", new DiagnosticsViewModel(shell.Session, shell.Home).AnsweringAgents);
+            Assert.Equal(("No", string.Empty), (new DiagnosticsViewModel(shell.Session, shell.Home).AnsweringAgents, new DiagnosticsViewModel(shell.Session, shell.Home).AnsweringAgentsDetail));
         });
     }
 }

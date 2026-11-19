@@ -96,7 +96,7 @@ public sealed class RestoreBackupTests : IDisposable
 
         Assert.True(restore.IsConfirming);
         // The variable is a field of billing's home entry, and env and env/billing are groups: counts, and no names.
-        Assert.Equal("It holds 2 items in 3 groups, and 1 env project.", restore.Holds);
+        Assert.Equal("It holds 2 items and 1 project.", restore.Holds);
         Assert.DoesNotContain("production", restore.Holds + restore.Taken + restore.Replaces, StringComparison.Ordinal);
         Assert.Contains("vault.kdbx", restore.Replaces, StringComparison.Ordinal);
         Assert.Equal(replaced, File.ReadAllBytes(_vaultPath));
@@ -172,7 +172,8 @@ public sealed class RestoreBackupTests : IDisposable
         await unlock.UnlockAsync();
 
         Assert.False(session.IsUnlocked);
-        Assert.Contains("restore a backup", unlock.Message, StringComparison.Ordinal);
+        Assert.True(unlock.IsError);
+        Assert.True(unlock.OffersRestoreLink);
 
         await RestoreNewest(unlock);
 
@@ -597,7 +598,7 @@ public sealed class RestoreBackupTests : IDisposable
         await restore.ConfirmAsync();
     }
 
-    /// <summary>Moves every backup's stamp back an hour, so the next save is outside the floor (D-0263).</summary>
+    /// <summary>Moves every backup's stamp back an hour, so the next save is outside the floor.</summary>
     private void AgeBackups()
     {
         foreach (var backup in VaultBackups.List(_vaultPath).Reverse())

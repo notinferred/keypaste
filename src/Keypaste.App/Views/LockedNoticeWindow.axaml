@@ -18,36 +18,27 @@
     <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
   </Window.Styles>
 
-  <!-- Said when an agent asks while the app is locked (D-0466). The bridge sends nothing, so the vault is named
-       from this computer's own settings. It has no field and does not take focus, so typing meant for another
-       window reaches nothing here; Close is its default, and Open keypaste is armed only after a moment. It wears the
-       claim card with no requester line: keypaste says it, and no agent is named. -->
+  <!-- Said when an agent asks while the app is locked. The bridge sends nothing, so the vault is named from this computer's
+       own settings. It has no field and does not take focus, so typing meant for another window reaches nothing here; Close is
+       its default for Return and Escape, and Unlock… is armed only after a moment. It wears the claim card with keypaste's
+       wordmark and no requester line: keypaste says it, and no agent is named. -->
 
-  <Border Classes="claim">
+  <Border Name="Card" Classes="claim arming">
     <StackPanel>
       <StackPanel Classes="claim-body">
-        <StackPanel Orientation="Horizontal" Spacing="6">
-          <ctl:BrandMark Height="16" VerticalAlignment="Center" />
-          <TextBlock Classes="claim-label size-11" Text="keypaste" VerticalAlignment="Center" />
-        </StackPanel>
+        <ctl:BrandWordmark Height="13" HorizontalAlignment="Left" />
 
         <StackPanel Spacing="4">
-          <TextBlock Name="HeadText" Classes="claim-title size-16" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <ctl:KpIcon Classes="claim-muted" Icon="lock" Size="14" VerticalAlignment="Center" />
-            <TextBlock Name="SubText" Classes="claim-muted size-12-5" Text="It's locked, so the request was refused" VerticalAlignment="Center" />
-          </StackPanel>
+          <TextBlock Name="HeadText" Classes="claim-title size-15" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" />
+          <TextBlock Name="NoticeText" Classes="claim-line size-13" Text="An agent's request was refused. Unlock to let agents ask." />
         </StackPanel>
-
-        <TextBlock Name="NoticeText" Classes="claim-line size-12-5"
-                   Text="Agents can use this vault only while it's unlocked. Unlock it in keypaste, then ask the agent to try again. You won't see this again until you've unlocked keypaste." />
       </StackPanel>
 
       <Border Classes="claim-rule" />
 
-      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="20,12,20,16">
-        <Button Name="Open" Classes="claim" Content="Open keypaste" AutomationProperties.Name="Open keypaste" IsEnabled="False" />
-        <Button Name="Dismiss" Classes="claim keyed primary" Content="Close" Tag="&#x21A9;" IsCancel="True" IsDefault="True" />
+      <StackPanel Classes="claim-foot">
+        <Button Name="Dismiss" Classes="claim keyed" Content="Close" Tag="esc" IsCancel="True" IsDefault="True" />
+        <Button Name="Open" Classes="claim primary" Content="Unlock&#x2026;" AutomationProperties.Name="Unlock&#x2026;" IsEnabled="False" />
       </StackPanel>
     </StackPanel>
   </Border>

@@ -114,12 +114,12 @@ public sealed class VaultExportTests
         using var model = Screen(session, fixture, new FakeVaultFilePicker());
 
         Assert.Equal(VaultBackups.DirectoryFor(fixture.Path_), model.BackupsPath);
-        Assert.StartsWith("No copies yet", model.BackupsSummary, StringComparison.Ordinal);
+        Assert.Equal("No copies yet", model.BackupsSummary);
 
         session.Unlocked!.AddEntry(new VaultEntry { Title = "second", Password = "p" });
         session.Unlocked.Save();
 
-        Assert.StartsWith("1 copy, from ", model.BackupsSummary, StringComparison.Ordinal);
+        Assert.StartsWith("1 copy · latest ", model.BackupsSummary, StringComparison.Ordinal);
         Assert.Contains("fifteen minutes", model.BackupsRule, StringComparison.Ordinal);
         Assert.Contains("password it was made under", model.BackupsRule, StringComparison.Ordinal);
         Assert.Contains("unlock screen", model.RestoreHint, StringComparison.Ordinal);

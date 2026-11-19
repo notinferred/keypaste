@@ -158,8 +158,8 @@ internal sealed class PromptScreen : IDisposable
                 $"command={Text(window, "CommandText")} directory={Text(window, "DirectoryText")} " +
                 $"always={window.FindControl<Button>("AlwaysAllow")?.IsVisible == true}",
             TerminalEditWindow =>
-                $"edit-prompt command={Text(window, "CommandText")} item={Text(window, "ItemText")} " +
-                $"asked={Text(window, "OriginText")} changes={string.Join("; ", Changes(window))}",
+                $"edit-prompt command={Text(window, "CommandText")} title={Text(window, "TitleText")} " +
+                $"warning={Text(window, "WarningText")} changes={string.Join("; ", Changes(window))}",
             PairingWindow =>
                 $"pair-prompt identity={Text(window, "IdentityText")} code={Text(window, "CodeText")} name={window.FindControl<TextBox>("NameBox")?.Text}",
             FillWindow when window.DataContext is FillViewModel fill =>

@@ -9,7 +9,7 @@ namespace Keypaste.App.ViewModels;
 /// </summary>
 /// <remarks>
 /// Nothing is entered for them. Save works a moment after the prompt is up, as every allow does, only once a value is
-/// entered, and where it replaces a value only once they confirm that; Cancel, Escape and closing the window save nothing.
+/// entered, and where it replaces a value only once they confirm that; Deny, Escape and closing the window save nothing.
 /// </remarks>
 internal sealed partial class SaveValueViewModel : PromptViewModel, IDisposable
 {
@@ -90,14 +90,17 @@ internal sealed partial class SaveValueViewModel : PromptViewModel, IDisposable
     /// <summary>That the reason shown is shorter than the one sent, or nothing.</summary>
     internal string Truncation { get; }
 
-    /// <summary>The item the value goes in, as the card names it: its vault, then its title.</summary>
-    internal string Item => Vault is { } vault ? $"{vault} \u203a {_itemTitle}" : _itemTitle;
+    /// <summary>The item the value goes in, as the card names it: its title and its vault.</summary>
+    internal string Item => InVault(_itemTitle);
 
     /// <summary>That the agent never gets what the person types.</summary>
     internal string NeverReceives => $"{Agent} never receives what you type here.";
 
     /// <summary>Whose words the quote is.</summary>
-    internal string SaysLabel => ApprovalViewModel.Says(Agent);
+    internal string SaysLabel => ApprovalViewModel.Says(Agent, Scrubbed, Truncation);
+
+    /// <summary>What keypaste altered or cut in the quote, or null.</summary>
+    internal string? QuoteNote => ApprovalViewModel.NoteOn(Scrubbed, Truncation);
 
     /// <summary>The agent's words, quoted.</summary>
     internal string Quoted => ApprovalViewModel.Quote(Reason);

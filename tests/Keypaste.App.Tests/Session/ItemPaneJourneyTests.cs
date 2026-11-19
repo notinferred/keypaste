@@ -4,7 +4,6 @@ using System.Text;
 using Avalonia.Automation.Peers;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.VisualTree;
@@ -90,15 +89,18 @@ public sealed class ItemPaneJourneyTests
                 await Task.Delay(20, Token);
             }
 
-            // The reference and the identifier are not in the tree until "…" is opened.
-            Assert.DoesNotContain(Names(main), name => name.StartsWith("kp://", StringComparison.Ordinal) || name.StartsWith("uuid ", StringComparison.Ordinal));
-            Assert.DoesNotContain("Copy the reference", Names(main));
-            Press(main, Named<ToggleButton>(main, "EntryMenu"));
-            var menu = Names(main);
-            Assert.Contains(menu, name => name.StartsWith("kp:///Work/pane-login", StringComparison.Ordinal));
-            Assert.Contains(menu, name => name.StartsWith("uuid ", StringComparison.Ordinal));
-            Assert.Contains("Copy the reference", menu);
-            Key(main, PhysicalKey.Escape);
+            // The item's menu holds commands that copy its reference and KeePass ID, and neither as text.
+            Assert.DoesNotContain(Names(main), name => name.StartsWith("kp://", StringComparison.Ordinal));
+            Assert.DoesNotContain("Copy reference", Names(main));
+            var paneMenu = Named<Button>(main, "EntryMenu");
+            Press(main, paneMenu);
+            var rows = Menus.Rows((MenuFlyout)paneMenu.Flyout!);
+            var menu = Names(TopLevel.GetTopLevel(rows.First())!);
+            Assert.DoesNotContain(menu, name => name.StartsWith("kp://", StringComparison.Ordinal) || name.StartsWith("uuid ", StringComparison.Ordinal));
+            Assert.Contains("Copy reference", menu);
+            Assert.Contains("Copy KeePass ID", menu);
+            Assert.StartsWith("kp:///Work/pane-login", ToolTip.GetTip(rows.Single(row => row.Name == "CopyReference")) as string, StringComparison.Ordinal);
+            ((MenuFlyout)paneMenu.Flyout!).Hide();
 
             // Any other scheme is text that opens nothing and says why.
             foreach (var title in (string[])["bookmarklet", "calculator"])
@@ -137,6 +139,27 @@ public sealed class ItemPaneJourneyTests
             main.Close();
         });
 
+    /// <summary>A field's row names its kind on hover, but not over the input that replaces its value, where the tip would cover what is typed.</summary>
+    [Fact]
+    public Task A_field_row_keeps_its_tip_off_the_input_that_replaces_it() =>
+        HeadlessSession.On(() =>
+        {
+            using var shell = new RenderedShell("keypaste-row-tip-");
+            var input = shell.OpenField("ReplacementFieldValue");
+            var row = input.FindAncestorOfType<FieldRow>()!;
+            Assert.Equal("protected", ToolTip.GetTip(row));
+
+            WindowInput.Click(shell.Window, input);
+            var typing = DateTime.UtcNow + TimeSpan.FromMilliseconds(ToolTip.GetShowDelay(row) * 3);
+
+            while (DateTime.UtcNow < typing)
+            {
+                Thread.Sleep(100);
+                WindowInput.Type(shell.Window, "x");
+                Assert.False(ToolTip.GetIsOpen(row), "the row's tip opens over the input that replaces its value");
+            }
+        });
+
     private static CredentialRequest Request(string vault, string session) => new()
     {
         Entry = "Work/pane-login",
@@ -168,10 +191,10 @@ public sealed class ItemPaneJourneyTests
         Assert.Equal(title, items.Selected?.Title);
     }
 
-    private static List<string> Names(Window window)
+    private static List<string> Names(TopLevel root)
     {
         WindowInput.Drain();
-        return [.. Visible(ControlAutomationPeer.CreatePeerForElement(window)).Select(peer => peer.GetName() ?? string.Empty)];
+        return [.. Visible(ControlAutomationPeer.CreatePeerForElement(root)).Select(peer => peer.GetName() ?? string.Empty)];
     }
 
     private static IEnumerable<AutomationPeer> Visible(AutomationPeer peer)

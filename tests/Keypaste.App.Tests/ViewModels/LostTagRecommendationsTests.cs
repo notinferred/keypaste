@@ -68,7 +68,7 @@ public sealed class LostTagRecommendationsTests : IDisposable
         var lost = Assert.Single(shell.Recommendations.LostTags);
         Assert.Equal("env:billing:prod", lost.Tag);
         Assert.Equal("Needs review", lost.StateLabel);
-        Assert.StartsWith("dropped from services/Billing in a change saved ", lost.Where, StringComparison.Ordinal);
+        Assert.StartsWith("dropped from Billing in a change saved ", lost.Where, StringComparison.Ordinal);
         Assert.EndsWith(", so agents are no longer asked live for it", lost.Where, StringComparison.Ordinal);
         Assert.Equal("1", Settings(shell).Count);
         Assert.Null(shell.Notice);
@@ -97,7 +97,7 @@ public sealed class LostTagRecommendationsTests : IDisposable
         var vault = _session.Unlocked!;
         Assert.Equal(["env:billing:prod"], vault.Tags(_billing));
         Assert.Equal(history + 1, vault.ReadHistory(_billing)!.Count);
-        Assert.StartsWith("Put env:billing:prod back on services/Billing.", shell.Recommendations.Message, StringComparison.Ordinal);
+        Assert.StartsWith("Put env:billing:prod back on Billing.", shell.Recommendations.Message, StringComparison.Ordinal);
         Assert.Empty(shell.Recommendations.LostTags);
         Assert.Equal(string.Empty, Settings(shell).Count);
     }

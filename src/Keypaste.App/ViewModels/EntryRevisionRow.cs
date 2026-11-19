@@ -117,34 +117,12 @@ internal sealed class EntryRevisionRow : ObservableObject, IRevealSource
 
     internal bool TagsDiffer => !_tags.SequenceEqual(_owner.Current.Tags.Select(chip => chip.Tag), StringComparer.Ordinal);
 
-    /// <summary>What did not change, in one line, saying that custom field values are not compared, since one is not read to compare it.</summary>
-    internal string Unchanged
+    /// <summary>What this revision holds that the item does not now, by field name, such as "Password, Notes"; custom field values are never read to compare them.</summary>
+    internal string Changes => string.Join(", ", new (bool Differs, string Name)[]
     {
-        get
-        {
-            List<string> same =
-            [
-                .. new (bool Differs, string Name)[]
-                {
-                    (PasswordDiffers, "password"), (UsernameDiffers, "username"), (UrlDiffers, "URL"), (NotesDiffer, "notes"),
-                    (FieldNamesDiffer, "custom field names"), (TagsDiffer, "tags"),
-                }.Where(part => !part.Differs).Select(part => part.Name),
-            ];
-
-            var unchanged = same.Count switch
-            {
-                0 => string.Empty,
-                1 => $"Unchanged: {same[0]}.",
-                _ => $"Unchanged: {string.Join(", ", same.SkipLast(1))} and {same[^1]}.",
-            };
-
-            return _fields.Count > 0 || _owner.Current.Fields.Count > 0
-                ? $"{unchanged} Custom field values aren't compared here.".TrimStart()
-                : unchanged;
-        }
-    }
-
-    internal bool HasUnchanged => Unchanged.Length > 0;
+        (TitleDiffers, Resources.Strings.Title), (PasswordDiffers, Resources.Strings.Password), (UsernameDiffers, Resources.Strings.Username),
+        (UrlDiffers, Resources.Strings.URL), (NotesDiffer, Resources.Strings.Notes), (FieldNamesDiffer, Resources.Strings.CustomFields), (TagsDiffer, Resources.Strings.Tags),
+    }.Where(part => part.Differs).Select(part => part.Name));
 
     /// <summary>This revision's custom fields by name, each protected one saying so, and never a value (D-0487).</summary>
     internal string FieldsSummary { get; }

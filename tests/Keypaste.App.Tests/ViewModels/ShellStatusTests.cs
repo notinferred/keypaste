@@ -84,7 +84,7 @@ public sealed class ShellStatusTests
             clock.Advance(TimeSpan.FromSeconds(1));
         }
 
-        Assert.Equal($"Another program saved {name}. Agents are refused until you reload it.", shell.VaultChanged);
+        Assert.Equal($"{name} changed elsewhere. Agents are refused until you reload it.", shell.VaultChanged);
 
         session.Unlocked!.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "MINE", Password = "z" });
         Assert.Throws<VaultChangedOnDiskException>(session.Unlocked.Save);
@@ -201,7 +201,7 @@ public sealed class ShellStatusTests
         }
 
         using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
-        Assert.Equal("Answering agents · none connected", shell.AgentsDetail);
+        Assert.Equal("none connected", shell.AgentsDetail);
 
         var endpoint = Assert.IsType<AuthorityStatus.Serving>(authority.Status).Endpoint;
         List<ApproverClient> clients = [];
@@ -216,7 +216,7 @@ public sealed class ShellStatusTests
 
         clock.Advance(TimeSpan.FromSeconds(1));
 
-        Assert.Equal("Answering agents · 2 connected", shell.AgentsDetail);
+        Assert.Equal("2 connected", shell.AgentsDetail);
 
         foreach (var client in clients)
         {
@@ -276,8 +276,8 @@ public sealed class ShellStatusTests
 
         clock.Advance(TimeSpan.FromSeconds(1));
 
-        Assert.Equal("Answering agents · 1 waiting · 2 connected", shell.AgentsDetail);
-        Assert.Equal("Agents, live, 1 waiting", shell.RailPlaces.Single(place => place.Destination.Kind == Navigation.DestinationKind.AgentActivity).RailName);
+        Assert.Equal("1 waiting · 2 connected", shell.AgentsDetail);
+        Assert.Equal("Agents, Answering agents, 1 waiting", shell.RailPlaces.Single(place => place.Destination.Kind == Navigation.DestinationKind.AgentActivity).RailName);
 
         await stop.CancelAsync();
         await waiting;
@@ -595,9 +595,8 @@ public sealed class ShellStatusTests
         File.Copy(other, fixture.Path_, overwrite: true);
         await MergedByThePoll(shell, clock);
 
-        Assert.Equal(
-            $"Another program saved {name}, and keypaste could not merge it: the file now holds another vault. Agents are refused until you reload it.",
-            shell.VaultChanged);
+        Assert.Equal($"{name} changed elsewhere. Agents are refused until you reload it.", shell.VaultChanged);
+        Assert.Equal("keypaste could not merge it: the file now holds another vault.", shell.VaultChangedDetail);
         Assert.Equal("changed on disk", shell.VaultSaveWords);
         Assert.Equal(1, merges);
 

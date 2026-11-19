@@ -10,7 +10,7 @@ namespace Keypaste.App.Windows.Tests;
 
 /// <summary>
 /// The app's Windows build reaches Windows Hello only on Windows, and on a hosted runner, where nobody has set Windows
-/// Hello up, reports it unavailable, so a password unlock keeps nothing and the screen offers only the full unlock (D-0549).
+/// Hello up, reports it unavailable, so a password unlock keeps nothing and the screen offers only the full unlock.
 /// </summary>
 /// <remarks>
 /// A machine with Windows Hello set up needs a person: making the key, the prompt's focus, cancelling, the PIN and a
@@ -76,7 +76,7 @@ public sealed class WindowsHelloTests : IDisposable
         using var locked = new UnlockViewModel(session, _directory, new NoPicker(), () => landed++, lockedBy: VaultLockReason.Manual);
         Assert.False(locked.OffersQuickUnlock);
         Assert.True(locked.UnlockIsPrimary);
-        Assert.Equal("Enter its master password to open it.", locked.Subtitle);
+        Assert.True(locked.ShowsPasswordForm);
     }
 
     /// <summary>A picker nobody answers; these tests choose no file.</summary>

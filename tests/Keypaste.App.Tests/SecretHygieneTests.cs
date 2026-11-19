@@ -280,7 +280,7 @@ public sealed class SecretHygieneTests
     }
 
     /// <summary>
-    /// A search that matched a username names the field it was in, and its result holds no secret.
+    /// A search that matched a username shows it on the row, and its result holds no secret.
     /// </summary>
     /// <remarks>
     /// The test above is about an unfiltered list. This one is about the case V.5b added, where a
@@ -289,7 +289,7 @@ public sealed class SecretHygieneTests
     /// an unfiltered one does.
     /// </remarks>
     [Fact]
-    public void A_search_that_matched_a_username_names_the_field_and_holds_no_secret()
+    public void A_search_that_matched_a_username_shows_it_and_holds_no_secret()
     {
         using var fixture = new SentinelVault();
         using var session = Unlocked(fixture);
@@ -304,7 +304,8 @@ public sealed class SecretHygieneTests
         // is the shape every negative claim in this file is written against.
         var row = Assert.Single(entries.Rows);
         Assert.Equal(SentinelTitle, row.Title);
-        Assert.Equal("username", row.Why);
+        Assert.Equal(string.Empty, row.Why);
+        Assert.Equal(row.DisplayUsername, row.SecondLine);
 
         AssertNoSecret(Surface(entries));
     }

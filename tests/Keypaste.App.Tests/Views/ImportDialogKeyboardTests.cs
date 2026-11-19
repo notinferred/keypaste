@@ -1,6 +1,5 @@
 using System.Text;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.VisualTree;
@@ -142,7 +141,7 @@ public sealed class ImportDialogKeyboardTests
         window.Show();
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
 
-        var button = window.GetVisualDescendants().OfType<ToggleButton>().Single(button => button.Name == "AddEntry");
+        var button = window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "SidebarNew");
         button.Focus();
         Drain(shell.ImportCommand.PressAsync());
         Assert.NotNull(shell.Import);
@@ -223,6 +222,7 @@ public sealed class ImportDialogKeyboardTests
 
     private static Window Show(KdbxImportViewModel import, Control? behind = null)
     {
+        import.ChooseCopyCommand.Execute(null);
         var panel = new StackPanel();
 
         if (behind is not null)

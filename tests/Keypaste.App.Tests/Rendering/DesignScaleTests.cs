@@ -18,8 +18,8 @@ public sealed partial class DesignScaleTests
     private static readonly HashSet<double> _radii = [0, 4, 6, 7, 8, 10, 12, 14];
     private static readonly HashSet<double> _icons = [14, 16, 20, 26];
 
-    // Display, heading, list header, dialog title, body and mono, label and helper line, and table header. The half sizes are inside the design system's ranges.
-    private static readonly HashSet<double> _typeSizes = [54, 24, 20, 16, 15, 14, 13.5, 13, 12.5, 12, 11];
+    // Display, heading, list header and dialog title, a mask, body and mono, label, helper line and mono, and table header.
+    private static readonly HashSet<double> _typeSizes = [54, 20, 15, 14, 13, 12, 11];
 
     private static readonly HashSet<string> _spacingProperties = ["Margin", "Padding", "Spacing", "RowSpacing", "ColumnSpacing", "ItemSpacing", "LineSpacing"];
 
@@ -30,14 +30,12 @@ public sealed partial class DesignScaleTests
         ["ShellView -4,0,2,0"] = "A vault's fold sits in the row's start padding, so its title lines up with the places' icons.",
         ["ShellView 2,0,-6,0"] = "The Groups row's fold sits in the row's end padding, under the counts above it.",
         ["Surfaces 0,-2,-6,-2"] = "A chip's remove, a 20 by 20 target, keeps the chip's height.",
-        ["SharingView 0,-4"] = "A row's action, 24 tall, keeps a text line's height.",
         ["LogView 12,-4,-6,-4"] = "Copy, 24 tall, keeps the verdict's line height and sits in the card's padding.",
         ["EnvSetsView -6,-4"] = "A value's press face stands out from its text, so the text lines up with its column's head.",
         ["KdbxImportView -8,0,0,0"] = "A destination is text until hovered, and its field's face stands out from that text.",
         ["LogView 0,0,-12,0"] = "A result may run into the row's end padding before it trims.",
         ["ShareDialogView -4,-4,-12,-4"] = "A scroll viewer leaves a focused field its glow and takes the card's padding for its bar.",
         ["KdbxImportView -4,-4,-12,-4"] = "A scroll viewer leaves a focused field its glow and takes the card's padding for its bar.",
-        ["UnlockView -56,0"] = "The quieter ways in stay on one line, wider than the form's fixed 360 column.",
         ["NewItemSheet -20,8,-20,0"] = "The template grid's foot rule runs through the sheet's padding to its edges.",
     };
 

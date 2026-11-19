@@ -5,13 +5,17 @@ using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
+using Keypaste.App.Session;
+using Keypaste.App.ViewModels;
+using Keypaste.App.Views;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Rendering;
 
 /// <summary>
-/// The wordmark alone at the top of the sidebar and the icon alone on the lock screen, never both,
-/// each drawn in the palette's ink with its amber dot at the end (N.7).
+/// The icon alone on the welcome screen, drawn in the palette's ink with its amber dot at the end; the unlocked app and the
+/// lock screen show no mark (N.7, F.130).
 /// </summary>
 public sealed class BrandMarksTests
 {
@@ -19,7 +23,7 @@ public sealed class BrandMarksTests
 
     [Theory]
     [MemberData(nameof(Palettes))]
-    public Task The_unlocked_app_shows_no_mark_and_the_lock_screen_the_icon(string palette) => HeadlessSession.On(() =>
+    public Task The_unlocked_app_and_the_lock_screen_show_no_mark(string palette) => HeadlessSession.On(() =>
     {
         PlatformTheme.Set(palette == "light" ? PlatformThemeVariant.Light : PlatformThemeVariant.Dark);
         using var shell = new RenderedShell("keypaste-marks-");
@@ -30,9 +34,26 @@ public sealed class BrandMarksTests
         shell.PressLock();
         Assert.True(shell.IsLocked);
 
-        var icon = Assert.Single(Visible<BrandMark>(shell.Window));
         Assert.Empty(Visible<BrandWordmark>(shell.Window));
-        AssertDrawn(shell.Window, icon);
+        Assert.Empty(Visible<BrandMark>(shell.Window));
+    });
+
+    [Theory]
+    [MemberData(nameof(Palettes))]
+    public Task The_welcome_shows_the_icon(string palette) => HeadlessSession.On(() =>
+    {
+        PlatformTheme.Set(palette == "light" ? PlatformThemeVariant.Light : PlatformThemeVariant.Dark);
+        using var fixture = new TempVault();
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start));
+        using var model = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => { });
+        var window = new Window { Width = 960, Height = 720, Content = new UnlockView { DataContext = model } };
+        window.Show();
+
+        Assert.True(model.ShowsWelcome);
+        var icon = Assert.Single(Visible<BrandMark>(window));
+        Assert.Empty(Visible<BrandWordmark>(window));
+        AssertDrawn(window, icon);
+        window.Close();
     });
 
     private static IEnumerable<T> Visible<T>(TopLevel window)

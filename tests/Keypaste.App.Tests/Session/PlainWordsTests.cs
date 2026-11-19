@@ -3,7 +3,6 @@ using System.Text.RegularExpressions;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
-using Avalonia.Controls.Primitives;
 using Avalonia.VisualTree;
 using CommunityToolkit.Mvvm.Input;
 using Keypaste.App.Navigation;
@@ -34,7 +33,7 @@ namespace Keypaste.App.Tests.Session;
 /// </remarks>
 public sealed partial class PlainWordsTests
 {
-    [GeneratedRegex(@"\b(grants?|granted|entry|entries|exposure|exposed|expose|sessions?|kdbx|stdio|profiles?|clients?|(?-i:recycle bins?)|keyfiles?|the root|ceilings?|selectors?|unlock id|relay|(?-i:(?<!(?:command's|its|their) )environments?\b(?! variables?))|(?-i:\bEnvironment\b))", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\b(grants?|granted|entry|entries|exposure|exposed|expose|sessions?|kdbx|stdio|profiles?|clients?|(?-i:recycle bins?)|keyfiles?|the root|ceilings?|selectors?|unlock id|relay|(?-i:(?<!(?:command's|its|their) )environments?\b(?! variables?)))", RegexOptions.IgnoreCase)]
     private static partial Regex Retired();
 
     [GeneratedRegex(@"`[^`]*`|--[a-z][a-z-]*|\bkeypaste [a-z]+(?: (?:revoke|verify))?|\b[a-z]+(?:_[a-z]+)+\b|\b[\w-]+\.(?:toml|jsonl?|kdbx)\b|\bKEYPASTE_[A-Z_]+\b|kp://\S*")]
@@ -63,11 +62,14 @@ public sealed partial class PlainWordsTests
         var items = shell.Show<EntriesViewModel>(DestinationKind.Entries);
         items.Selected = items.Rows.Single(row => row.Title == "github");
         RenderedShell.Drain();
-        shell.Named<ToggleButton>("EntryMenu").IsChecked = true;
-        shell.Named<ToggleButton>("AddEntry").IsChecked = true;
         said.AddRange(Shown(shell.Window, "Items"));
-        shell.Named<ToggleButton>("EntryMenu").IsChecked = false;
-        shell.Named<ToggleButton>("AddEntry").IsChecked = false;
+
+        foreach (var button in new[] { "EntryMenu", "SidebarNew" })
+        {
+            var (menu, drawn) = shell.OpenMenu(button);
+            said.AddRange(Shown(drawn, "Items"));
+            menu.Hide();
+        }
 
         var detail = items.Detail!;
         var field = detail.Fields[0];
@@ -98,7 +100,7 @@ public sealed partial class PlainWordsTests
         RenderedShell.Drain();
         said.AddRange(Shown(shell.Window, "an item's history"));
 
-        foreach (var kind in new[] { DestinationKind.Trash, DestinationKind.Settings, DestinationKind.Advanced, DestinationKind.Log, DestinationKind.Sharing, DestinationKind.Tokens, DestinationKind.Diagnostics })
+        foreach (var kind in new[] { DestinationKind.Trash, DestinationKind.Settings, DestinationKind.Log, DestinationKind.Sharing, DestinationKind.Tokens, DestinationKind.Diagnostics })
         {
             shell.Shell.Current = Destinations.Of(kind);
             RenderedShell.Drain();
@@ -152,7 +154,7 @@ public sealed partial class PlainWordsTests
             said.AddRange(Shown(agents.Window, $"Agents, {row.Key}'s settings"));
         }
 
-        foreach (var (open, key) in new (IRelayCommand Open, string Key)[] { (model.ConnectCommand, "cursor"), (model.DisconnectCommand, "gemini-cli"), (model.ConnectAgainCommand, "claude-code") })
+        foreach (var (open, key) in new (IRelayCommand Open, string Key)[] { (model.ConnectCommand, "cursor"), (model.DisconnectCommand, "gemini-cli") })
         {
             var target = model.Rows.Single(row => row.Key == key);
             Assert.True(open.CanExecute(target), key);
@@ -172,7 +174,7 @@ public sealed partial class PlainWordsTests
 
     /// <summary>
     /// The screens a person meets before the shell (N.6's limit, done in 4.10a): the first-launch screen
-    /// and the terms it links, the welcome with and without KeePassXC's databases, the lock screen with More options open, with
+    /// and the terms it links, the welcome with and without KeePassXC's databases, the lock screen with a YubiKey chosen, with
     /// Windows Hello offered, and after an access change, the create form, each step of the KeePass database import dialog,
     /// and each of the export import dialog's (9.1f).
     /// </summary>
@@ -220,8 +222,8 @@ public sealed partial class PlainWordsTests
 
         using (var locked = new UnlockViewModel(vaultSession, fixture.Home, picker, () => { }, lockedBy: VaultLockReason.Idle))
         {
-            locked.ShowMoreOptionsCommand.Press();
-            said.AddRange(Seen(new UnlockView { DataContext = locked }, "the lock screen, More options open"));
+            locked.UseHardwareKeyCommand.Press();
+            said.AddRange(Seen(new UnlockView { DataContext = locked }, "the lock screen, a YubiKey chosen"));
 
             picker.NewPath = Path.Combine(fixture.Home, "created.kdbx");
             await locked.StartCreateAsync();

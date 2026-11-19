@@ -3,15 +3,35 @@
         xmlns:ctl="using:Keypaste.App.Controls">
 
   <!--
-    Grouped rows, the design's replacement for boxes and per-field cards: inset panels as System Settings draws them.
-      Border.group           a group's surface, a step off the window with no line round it, holding a ctl:GroupedRows of rows with hairlines between them
-      ctl:FieldRow           a row: label, value, quiet actions; add stacked to put the label above, adaptive to put it above only while the row is narrow, mono-label for a machine name
+    Grouped rows, the design's one container on every screen: inset panels as System Settings draws them.
+      StackPanel.sections    a page's column of sections, 20 apart, at most 640 wide from the page's left edge
+      StackPanel.section     one section: its heading, its group and a caption under it, 6 apart
+      TextBlock.section-heading  the heading over a group, Locking or Custom fields: 12/600 secondary, in line with the rows' labels
+      Border.group           a group's surface, a step off the window with no line round it and radius 10, filling its column and holding a
+                             ctl:GroupedRows of rows with hairlines between them; each row insets itself 14
+      Border.group.padded    the same surface round content that is not rows, a notice or a form, inset 14 by 12
+      ctl:FieldRow           a row: label, value, quiet actions; add stacked to put the label above, adaptive to put it above only while the row is narrow, mono-label for a machine name;
+                             ctl:FieldRow.LabelWidth on an ancestor gives its rows one label column that dragging resizes
       ctl:PressToCopy        a value that copies when pressed, on Button
   -->
+
+  <Style Selector="StackPanel.sections">
+    <Setter Property="Spacing" Value="20" />
+    <Setter Property="MaxWidth" Value="640" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
+  <Style Selector="StackPanel.section">
+    <Setter Property="Spacing" Value="6" />
+  </Style>
 
   <Style Selector="Border.group">
     <Setter Property="Background" Value="{DynamicResource KpBgPanel}" />
     <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusCard}" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+  </Style>
+  <Style Selector="Border.group.padded">
+    <Setter Property="Padding" Value="14,12" />
   </Style>
 
   <Style Selector="ctl|FieldRow">
@@ -23,13 +43,19 @@
       <ControlTemplate>
         <Panel>
         <Border Name="Rule" Height="1" VerticalAlignment="Top" Background="{DynamicResource KpBorderSubtle}" IsVisible="False" />
-        <Grid ColumnDefinitions="130,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" Margin="0,6">
+        <Grid Name="Columns" ColumnDefinitions="130,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" Margin="0,6">
           <TextBlock Name="Label"
                      Classes="label"
                      Text="{TemplateBinding Label}"
-                     ToolTip.Tip="{TemplateBinding Label}"
                      TextTrimming="CharacterEllipsis"
                      VerticalAlignment="Center" />
+          <Border Name="LabelGrip"
+                  Grid.RowSpan="2"
+                  Width="8"
+                  HorizontalAlignment="Right"
+                  Background="Transparent"
+                  Cursor="SizeWestEast"
+                  IsVisible="False" />
           <ContentPresenter Name="PART_ContentPresenter"
                             Grid.Column="1"
                             Content="{TemplateBinding Content}"
@@ -45,10 +71,16 @@
       </ControlTemplate>
     </Setter>
   </Style>
-  <!-- A row's label, as System Settings draws one: muted, in the helper line's size. -->
+  <!-- A row's label, as System Settings draws one: 12/400 in the secondary text. -->
   <Style Selector="ctl|FieldRow /template/ TextBlock#Label">
     <Setter Property="FontWeight" Value="Normal" />
-    <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
+    <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
+  </Style>
+  <Style Selector="ctl|FieldRow:resizable /template/ Border#LabelGrip">
+    <Setter Property="IsVisible" Value="True" />
+  </Style>
+  <Style Selector="ctl|FieldRow.stacked /template/ Border#LabelGrip, ctl|FieldRow.adaptive:narrow /template/ Border#LabelGrip, ctl|FieldRow:no-value /template/ Border#LabelGrip">
+    <Setter Property="IsVisible" Value="False" />
   </Style>
   <Style Selector="ctl|FieldRow:follows /template/ Border#Rule">
     <Setter Property="IsVisible" Value="True" />
@@ -76,15 +108,15 @@
   </Style>
   <Style Selector="ctl|FieldRow.mono-label /template/ TextBlock#Label">
     <Setter Property="FontFamily" Value="{DynamicResource KpMono}" />
-    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="FontSize" Value="12" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
   </Style>
-  <!-- The caption over a group of rows, Custom fields: 12/600, in the secondary text. -->
-  <Style Selector=":is(TextBlock).group-caption">
+  <Style Selector=":is(TextBlock).section-heading">
+    <Setter Property="AutomationProperties.HeadingLevel" Value="3" />
     <Setter Property="FontSize" Value="12" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
-    <Setter Property="Margin" Value="14,2,0,0" />
+    <Setter Property="Margin" Value="14,0,0,0" />
   </Style>
   <Style Selector="ctl|FieldRow.top-label /template/ TextBlock#Label">
     <Setter Property="VerticalAlignment" Value="Top" />
@@ -136,6 +168,22 @@
   </Style>
   <Style Selector="Button.press-to-copy:copied /template/ ctl|KpIcon#CheckGlyph">
     <Setter Property="Opacity" Value="1" />
+  </Style>
+  <!-- On a group's panel the window's hover is nearly its ground, so a pointed control in a group takes the active ground and a press a step beyond. -->
+  <Style Selector="Border.group Button.press-to-copy:pointerover /template/ Border#Surface">
+    <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+  </Style>
+  <Style Selector="Border.group Button.press-to-copy:pressed /template/ Border#Surface">
+    <Setter Property="Background" Value="{DynamicResource KpBgActiveHover}" />
+  </Style>
+  <Style Selector="Border.group Button.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                   Border.group ToggleButton.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                   Border.group Button.ghost:flyout-open /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+  </Style>
+  <Style Selector="Border.group Button.ghost:pressed /template/ ContentPresenter#PART_ContentPresenter,
+                   Border.group ToggleButton.ghost:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource KpBgActiveHover}" />
   </Style>
   <Style Selector="Button.press-to-copy:disabled">
     <Setter Property="Opacity" Value="1" />

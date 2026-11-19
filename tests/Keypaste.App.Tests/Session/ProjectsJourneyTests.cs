@@ -130,34 +130,33 @@ public sealed class ProjectsJourneyTests
                 Assert.Contains("web", names);
                 Assert.Contains("billing", names);
                 Assert.Contains("Stripe", names);
-                Assert.Contains("Mail", names);
+                Assert.Contains("From Mail", names);
                 Assert.Contains("Add stage", names);
                 Assert.Contains("Run with keypaste", names);
-                Assert.Contains(names, name => name.StartsWith("services/Odd has the tag env:billing:Prod, which puts it in no project", StringComparison.Ordinal));
+                Assert.Contains("Odd's tag Prod isn't a stage name.", names);
                 AccentElements.AssertOne(main, ByName<Button>(main, "Run in a terminal"), "a project's keys and entries");
 
                 // An entry added to staging, under Edit's Items in each stage: asked first, nothing written when declined.
                 ChooseFromMore(main, "ProjectItems");
                 Assert.Contains("also dev", AutomationNames(main));
                 Press(main, ByName<Button>(main, "Add an item to staging"));
-                AccentElements.AssertOne(main, ByName<Button>(main, "Run in a terminal"), "the add-entry form");
+                AccentElements.AssertOne(main, null, "the add-entry form, which takes Run's accent and has no action until an item is chosen");
                 Fill(main, "Find an item", "Queue");
-                Press(main, Row(main, "EntryCandidates", candidate => candidate is EnvEntryCandidate { Display: "services/Queue" }));
-                Assert.Contains("env:billing:staging puts services/Queue in billing/staging.", AutomationNames(main));
-                Assert.Contains("Joining billing/staging: QUEUE_KEY.", AutomationNames(main));
+                Press(main, Row(main, "EntryCandidates", candidate => candidate is EnvEntryCandidate { Display: "Queue" }));
+                Assert.Contains("Queue adds QUEUE_KEY to staging.", AutomationNames(main));
                 AssertOneRevealed(main, Named<Button>(main, "ConfirmTagChange"), "adding an entry, asked");
                 Unchanged(vault, () => Press(main, Named<Button>(main, "CancelTagChange")));
-                Press(main, Row(main, "EntryCandidates", candidate => candidate is EnvEntryCandidate { Display: "services/Queue" }));
+                Press(main, Row(main, "EntryCandidates", candidate => candidate is EnvEntryCandidate { Display: "Queue" }));
                 Press(main, Named<Button>(main, "ConfirmTagChange"));
                 Assert.Null(screen.Error);
                 Assert.Contains("env:billing:staging", Saved(vault, queue));
 
                 // Mail taken out of dev, kept with its field; declined first.
-                Press(main, ByName<Button>(main, "Remove services/Mail from dev"));
+                Press(main, ByName<Button>(main, "Remove Mail from dev"));
                 Assert.Contains("Leaving billing/dev: MAIL_KEY.", AutomationNames(main));
-                AccentElements.AssertOne(main, ByName<Button>(main, "Run in a terminal"), "taking an entry out, asked");
+                AccentElements.AssertOne(main, null, "taking an entry out, asked, whose Remove is the danger tint");
                 Unchanged(vault, () => Press(main, Named<Button>(main, "CancelTagChange")));
-                Press(main, ByName<Button>(main, "Remove services/Mail from dev"));
+                Press(main, ByName<Button>(main, "Remove Mail from dev"));
                 Press(main, Named<Button>(main, "ConfirmTagChange"));
                 Assert.Null(screen.Error);
                 Assert.Empty(Saved(vault, mail));
@@ -262,7 +261,9 @@ public sealed class ProjectsJourneyTests
         Press(main, run);
         await Until(() => project.Launch.IsConfirming, () => screen.Error ?? $"no confirmation and no error; the press reached {Hit(main, run)}");
         Assert.Contains(sources, AutomationNames(main));
-        AssertOneRevealed(main, ByCommand(main, project.Launch.ConfirmLaunchCommand), "the run confirmation");
+        WindowInput.Reveal(main, ByCommand(main, project.Launch.ConfirmLaunchCommand));
+        Assert.False(run.IsEffectivelyEnabled);
+        AccentElements.AssertOne(main, ByCommand(main, project.Launch.ConfirmLaunchCommand), "the run confirmation, whose Start takes the accent while Run… is greyed");
         var windows = terminal?.Windows.Count ?? 0;
         Press(main, ByCommand(main, project.Launch.ConfirmLaunchCommand));
 
@@ -394,7 +395,7 @@ public sealed class ProjectsJourneyTests
     private static void AssertOneRevealed(Window window, Control primary, string at)
     {
         WindowInput.Reveal(window, primary);
-        AccentElements.AssertOne(window, ByName<Button>(window, "Run in a terminal"), at);
+        AccentElements.AssertOne(window, primary, at);
     }
 
     private static void ChooseFromMore(Window window, string item)

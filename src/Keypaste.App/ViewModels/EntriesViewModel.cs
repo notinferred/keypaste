@@ -45,9 +45,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     private Undoable? _undo;
     private NewItemViewModel? _newItem;
 
-    /// <summary>Starts a new item with a generated value, set by the shell; the second argument closes the generator the value came from.</summary>
-    internal Action<SecretField, Action>? StartNewItemWith { get; set; }
-
     internal EntriesViewModel(
         AppVaultSession session,
         ClipboardCountdown clipboard,
@@ -116,8 +113,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 OnPropertyChanged(nameof(ListTitle));
                 OnPropertyChanged(nameof(ListEmptyNote));
                 OnPropertyChanged(nameof(ListEmptyOffersImport));
-                OnPropertyChanged(nameof(AddsInPlace));
-                OnPropertyChanged(nameof(AddInPlaceTip));
                 _pinned = null;
                 Filter();
                 ClosePaneTheListHid();
@@ -278,13 +273,12 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
     }
 
-    /// <summary>A search asks for the list, so a form or a comparison holding nothing to lose gives way to it; the shell has already asked about one that does.</summary>
+    /// <summary>A search asks for the list, so a new item's form holding nothing to lose gives way to it; the shell has already asked about one that does.</summary>
     private void ReturnToList()
     {
-        if ((IsAdding || !ShowsList) && PaneDraft is null)
+        if (IsAdding && PaneDraft is null)
         {
             NewItem = null;
-            Detail?.LeaveWholeView();
         }
     }
 
@@ -378,33 +372,13 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     [NotifyCanExecuteChangedFor(nameof(DeleteCommand), nameof(ConfirmDeleteCommand), nameof(CancelDeleteCommand))]
     internal partial bool IsConfirmingDelete { get; private set; }
 
-    /// <summary>What the confirmation asks, naming what goes and whether it can come back.</summary>
-    /// <remarks>
-    /// Read from the vault, because the answer is the vault's: KeePassXC writes the recycle-bin
-    /// setting and a person can turn it off there. <see cref="Notice"/> says what the delete
-    /// actually did, which is the answer that cannot go stale between the question and the act.
-    /// </remarks>
-    internal string DeletePrompt
-    {
-        get
-        {
-            if (Selected is not { } row)
-            {
-                return string.Empty;
-            }
-
-            return row.SharedNameTell is { Length: 0 }
-                ? $"Delete the open item, {row.DisplayPath}? Another item has this name. There is no undo."
-                : $"Delete {row.DisplayPath}? There is no undo.";
-        }
-    }
+    /// <summary>What the confirmation asks, which only a vault with its Trash turned off asks, since there a delete is for good.</summary>
+    internal string DeletePrompt =>
+        Selected is { } row ? $"Delete {row.DisplayName} for good?" : string.Empty;
 
     /// <summary>Whether the open item's Copy password holds the view's amber: not while a form here shows a primary of its own, since a view has one amber element.</summary>
     internal bool CopyPasswordIsPrimary =>
         !IsAdding && !IsOrganizing && _detail is not { HasOwnPrimary: true };
-
-    /// <summary>Whether the list shows beside the chosen item; a comparison of two revisions takes the whole view instead.</summary>
-    internal bool ShowsList => _detail is not { TakesWholeView: true };
 
     /// <summary>The list's sorts: each of its columns, and which way the one in force runs.</summary>
     internal IReadOnlyList<SortChoice> SortChoices =>
@@ -478,7 +452,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             if (SetProperty(ref _detail, value))
             {
                 OnPropertyChanged(nameof(CopyPasswordIsPrimary));
-                OnPropertyChanged(nameof(ShowsList));
                 OnPropertyChanged(nameof(HasOpenPane));
                 OnPropertyChanged(nameof(ShowsPlaceholder));
                 // Disposed on the way out, not left to a collection: it holds a username, a URL and
@@ -497,6 +470,9 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     internal partial string? Error { get; private set; }
 
     internal bool HasError => Error is not null;
+
+    [RelayCommand]
+    private void DismissError() => Error = null;
 
     /// <summary>What the last deletion did, or null.</summary>
     /// <remarks>
@@ -545,7 +521,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 OnPropertyChanged(nameof(IsAdding));
                 OnPropertyChanged(nameof(Selected));
                 OnPropertyChanged(nameof(CopyPasswordIsPrimary));
-                OnPropertyChanged(nameof(ShowsList));
                 OnPropertyChanged(nameof(HasOpenPane));
                 OnPropertyChanged(nameof(ShowsPlaceholder));
                 OnPropertyChanged(nameof(DeletePrompt));
@@ -576,19 +551,17 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         {
             OnPropertyChanged(nameof(CopyPasswordIsPrimary));
         }
-
-        if (e.PropertyName == nameof(EntryDetailViewModel.TakesWholeView))
-        {
-            OnPropertyChanged(nameof(ShowsList));
-        }
     }
 
     /// <summary>Whether the organize form is showing for the selected entry.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CopyPasswordIsPrimary))]
-    [NotifyPropertyChangedFor(nameof(OrganizeTitleProblem), nameof(HasOrganizeTitleProblem))]
+    [NotifyPropertyChangedFor(nameof(OrganizeTitleProblem), nameof(HasOrganizeTitleProblem), nameof(RenameAgentNote), nameof(RenamePrompt))]
     [NotifyCanExecuteChangedFor(nameof(OrganizeCommand), nameof(ConfirmOrganizeCommand), nameof(CancelOrganizeCommand))]
     internal partial bool IsOrganizing { get; private set; }
+
+    /// <summary>The rename form's heading, naming what it renames.</summary>
+    internal string RenamePrompt => $"Rename {_detail?.DisplayTitle}";
 
     /// <summary>Copies the selected item beside it, under a new title, and selects the copy.</summary>
     internal RelayCommand DuplicateCommand { get; }
@@ -607,32 +580,18 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
     internal bool HasOrganizeTitleProblem => OrganizeTitleProblem is not null;
 
-    /// <summary>
-    /// What organizing can do to an authorization, said wherever organizing happens.
-    /// </summary>
+    /// <summary>What renaming the open item can do to what agents see, said only while an attached agent sees it by its title, or null.</summary>
     /// <remarks>
-    /// What an agent can see by place, in its settings, its ceilings or its bridge's exposure, is globs
-    /// matched against an entry's group path and its title (<see cref="EntryExposure"/>), so it follows
-    /// neither the group nor the entry: renaming away from a path an agent sees takes the entry out of
-    /// its view, and renaming onto one brings it in. THREATS.md T-13 records that keypaste does not
-    /// prevent this. That is no reason to
-    /// let somebody do it without being told, so this is a line on the form and never a refusal.
+    /// What an agent can see by place is globs matched against an item's group path and title (<see cref="EntryExposure"/>), so a rename
+    /// can take the item out of its view; THREATS.md T-13 records that keypaste does not prevent this, so it is a line on the form, never a refusal.
     /// </remarks>
-    /// <remarks>
-    /// An instance property over a static one, because a binding needs one — the same trade
-    /// <see cref="ShellViewModel.Destinations_"/> makes, with the same suppression.
-    /// </remarks>
-#pragma warning disable CA1822
-    internal string AccessNote => AccessNoteText;
-#pragma warning restore CA1822
+    internal string? RenameAgentNote =>
+        _detail?.SeeingByName is { Count: > 0 } agents
+            ? $"{string.Join(", ", agents)} sees {_detail.DisplayTitle} by its title; renaming it can hide it from {string.Join(", ", agents)}."
+            : null;
 
-    /// <summary>Says what a drag did beyond the move, which has no form to carry <see cref="AccessNote"/>.</summary>
+    /// <summary>Says what a drag did beyond the move, which has no form to carry <see cref="RenameAgentNote"/>.</summary>
     internal Action<string, ToastTone>? Toast { get; init; }
-
-    /// <summary>The wording of <see cref="AccessNote"/>, for a test that has no screen.</summary>
-    internal const string AccessNoteText =
-        "What an agent can see by place is matched against paths, so this can take these items " +
-        "out of an agent's view or bring them into one.";
 
     /// <summary>Opens the organize form for the selected entry.</summary>
     internal RelayCommand OrganizeCommand { get; }
@@ -642,26 +601,23 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
     internal RelayCommand CancelOrganizeCommand { get; }
 
-    /// <summary>The list's "+" and ⌘N: the form of the kind the place holds, or a login's where it holds every kind.</summary>
+    /// <summary>⌘N: the form of the kind the place holds, or a login's where it holds every kind.</summary>
     internal RelayCommand BeginAddCommand { get; }
 
     /// <summary>Opens the form of the template it is given.</summary>
     internal RelayCommand<ItemTemplate> BeginAddOfKindCommand { get; }
 
-    /// <summary>The sidebar's New and ⇧⌘N: the grid of templates.</summary>
+    /// <summary>New's More templates… and ⇧⌘N: the grid of templates.</summary>
     internal RelayCommand ChooseTemplateCommand { get; }
 
-    /// <summary>The templates the "+" menu offers where the place holds every kind.</summary>
-    internal IReadOnlyList<TemplateChoice> Kinds { get; } = TemplateChoice.Common;
+    /// <summary>The pane's label column, shared by every item while the app runs.</summary>
+    internal LabelColumn PaneLabels { get; init; } = new();
 
-    /// <summary>Whether the place holds one kind, so its "+" opens that kind's form at once rather than a menu.</summary>
-    internal bool AddsInPlace => ItemPlaces.TemplateOf(Place) is not null;
+    /// <summary>Goes to Activity, where each agent's use of the item is told in full; the shell's.</summary>
+    internal Action? ShowActivity { get; init; }
 
-    /// <summary>The direct "+"'s tooltip and name: "New login in Acme".</summary>
-    internal string AddInPlaceTip => $"{TemplateChoice.Of(ItemPlaces.TemplateOf(Place) ?? ItemTemplate.Login).NewTitle} in {VaultTitle}";
-
-    /// <summary>The "+" menu's heading: "New in Acme".</summary>
-    internal string AddMenuHeading => $"New in {VaultTitle}";
+    [RelayCommand]
+    private void OpenActivity() => ShowActivity?.Invoke();
 
     /// <summary>The open vaults a new item can be saved in, the one in view first; the shell gives them, and alone the vault in view is the one.</summary>
     internal Func<IReadOnlyList<SaveInChoice>>? SaveInPlaces { get; init; }
@@ -883,7 +839,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
 
         Error = null;
-        var detail = new EntryDetailViewModel(session, _clipboard, entry, message => Error = message, moved => Reselect(moved, session), _web, _post, _picker) { AskDiscard = AskDiscard, FormClosed = ShowHeldChange, StartNewItemWith = (value, close) => StartNewItemWith?.Invoke(value, close) };
+        var detail = new EntryDetailViewModel(session, _clipboard, entry, message => Error = message, moved => Reselect(moved, session), _web, _post, _picker) { AskDiscard = AskDiscard, FormClosed = ShowHeldChange };
         TellPaneAboutItsName(detail);
         return detail;
     }
@@ -1160,7 +1116,6 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
 
         var session = SessionOf(row);
-        var firstDeleteNote = FirstDeleteNote(session);
         var write = session.Write(
             vault => (Outcome: vault.RemoveEntry(row.Name, out var id), Recycled: id),
             removal => removal.Outcome != DeletionOutcome.NothingMatched);
@@ -1181,7 +1136,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
 
         var (outcome, recycled) = write.Value;
-        var name = row.DisplayPath;
+        var name = row.DisplayName;
 
         Select(null);
         Reload();
@@ -1196,18 +1151,12 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                     Vault: session)
                 : null,
             outcome == DeletionOutcome.Recycled
-                ? $"Moved {name} to the Trash.{firstDeleteNote}"
-                : $"Deleted {name}. This vault has no Trash, so nothing can put it back.");
+                ? $"Moved {name} to Trash"
+                : $"Deleted {name}.");
     }
 
     private static bool PutBack(Vault vault, RecycledEntryId recycled) =>
         vault.RestoreRecycled(recycled) is RestoreOutcome.Restored or RestoreOutcome.RestoredToRoot;
-
-    /// <summary>The format's one mention, for a first delete, which saves the file as KDBX 4.1 (D-0247); empty for a file there already.</summary>
-    private static string FirstDeleteNote(AppVaultSession session) =>
-        session.Unlocked is { RecyclesDeletedEntries: true } vault && KdbxHeader.IsOlderThan41(vault.Path)
-            ? $" {Strings.ThisVaultIsNowSavedInFormat41}"
-            : string.Empty;
 
     /// <summary>Reverses the last delete, rename or duplicate through its inverse write.</summary>
     [RelayCommand(CanExecute = nameof(CanUndo))]

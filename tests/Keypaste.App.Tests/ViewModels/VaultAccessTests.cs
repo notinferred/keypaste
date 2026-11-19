@@ -102,7 +102,7 @@ public sealed class VaultAccessTests : IDisposable
     }
 
     [Fact]
-    public void Settings_shows_one_section_at_a_time_and_says_what_it_holds()
+    public void Settings_shows_one_section_at_a_time()
     {
         using var session = Unlocked(_master);
         using var settings = Settings(session);
@@ -113,7 +113,6 @@ public sealed class VaultAccessTests : IDisposable
 
         Assert.False(settings.ShowsGeneral);
         Assert.True(settings.ShowsThisVault);
-        Assert.Equal(SettingsSectionChoice.ThisVault.Note, settings.SectionNote);
     }
 
     [Fact]
@@ -151,7 +150,7 @@ public sealed class VaultAccessTests : IDisposable
         Type(unlock, _master);
         await unlock.UnlockAsync();
         Assert.Equal(0, landed);
-        Assert.StartsWith("That password didn't open this vault.", unlock.Message, StringComparison.Ordinal);
+        Assert.Equal("Wrong password or key file.", unlock.Message);
 
         Type(unlock, _later);
         await unlock.UnlockAsync();

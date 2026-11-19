@@ -10,24 +10,22 @@
 
   <!-- A row action keeps its word as its content, for the accessibility name, and draws its icon. -->
   <UserControl.Resources>
-    <DataTemplate x:Key="ReplaceGlyph"><ctl:KpIcon Icon="rotate-cw" Size="14" /></DataTemplate>
+    <DataTemplate x:Key="ReplaceGlyph"><ctl:KpIcon Icon="pencil" Size="14" /></DataTemplate>
     <DataTemplate x:Key="RemoveGlyph"><ctl:KpIcon Icon="trash-2" Size="14" /></DataTemplate>
   </UserControl.Resources>
 
   <UserControl.Styles>
-    <!-- A variable missing from a stage, and the dot on that stage's segment, take the warning colour. -->
+    <!-- A variable missing from a stage, and the count of them on that stage's segment, take the warning colour. -->
     <Style Selector="TextBlock.flagged">
       <Setter Property="Foreground" Value="{DynamicResource KpWarn}" />
-    </Style>
-    <Style Selector="Ellipse.missing-dot">
-      <Setter Property="Width" Value="6" />
-      <Setter Property="Height" Value="6" />
-      <Setter Property="Fill" Value="{DynamicResource KpWarn}" />
     </Style>
 
     <!-- A row's reveal, replace and remove show while the row is hovered or holds focus, and while its value shows, so its Hide is there for as long as the value is. -->
     <Style Selector="Border.variable-row StackPanel.row-actions">
       <Setter Property="Opacity" Value="0" />
+    </Style>
+    <Style Selector="Border.variable-row StackPanel.row-actions.asks">
+      <Setter Property="IsVisible" Value="False" />
     </Style>
     <Style Selector="Border.variable-row:pointerover StackPanel.row-actions, Border.variable-row:focus-within StackPanel.row-actions, Border.variable-row StackPanel.row-actions.shows-value">
       <Setter Property="Opacity" Value="1" />
@@ -38,29 +36,13 @@
     <Style Selector="Border.member-row:pointerover StackPanel.row-actions, Border.member-row:focus-within StackPanel.row-actions">
       <Setter Property="Opacity" Value="1" />
     </Style>
-    <Style Selector="Button.row-action">
-      <Setter Property="Width" Value="24" />
-      <Setter Property="Height" Value="24" />
-      <Setter Property="MinHeight" Value="0" />
-      <Setter Property="Padding" Value="0" />
-      <Setter Property="CornerRadius" Value="6" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
-      <Setter Property="Foreground" Value="{DynamicResource KpTextMuted}" />
-    </Style>
-
-    <!-- Edit and Run…, as an item's header draws its actions: 30px, 12px sides. -->
-    <Style Selector="Button.action">
-      <Setter Property="Height" Value="30" />
-      <Setter Property="MinHeight" Value="0" />
-      <Setter Property="Padding" Value="12,0" />
-    </Style>
 
     <!-- Add variable and Set value are the accent as text, as the design draws them, and not links, so they keep the arrow (rule 15). -->
     <Style Selector="Button.link.accent.table-action">
       <Setter Property="Cursor" Value="Arrow" />
     </Style>
 
-    <!-- The three columns of the variables table: the head and every row size them alike. -->
+    <!-- The columns of the variables table, the last a fixed one for the row's actions: the head and every row size them alike. -->
     <Style Selector="Grid.variable-columns">
       <Setter Property="ColumnSpacing" Value="12" />
     </Style>
@@ -104,23 +86,40 @@
                        Foreground="{DynamicResource KpTextSecondary}" />
           </Grid>
         </Border>
-        <!-- Tags that start env: and break the grammar, as keypaste env ls warns of them: they put their item in no project. -->
-        <Border Classes="card" IsVisible="{Binding HasMalformedTags}" Padding="16">
-          <Grid ColumnDefinitions="Auto,*">
-            <ctl:KpIcon Icon="alert-triangle" Size="14" Margin="0,2,8,0" VerticalAlignment="Top"
-                        Foreground="{DynamicResource KpTextMuted}" />
-            <StackPanel Grid.Column="1" Spacing="6">
-              <TextBlock Classes="body primary" Text="{x:Static res:Strings.SomeTagsPutTheirItemInNoXd8ea51}" />
-              <ItemsControl ItemsSource="{Binding MalformedTags}">
+        <!-- A tag that starts env: and breaks the grammar puts its item in no project; one cased wrong offers the lower-case stage, asked before it is written. -->
+        <Border Classes="group padded" IsVisible="{Binding HasMalformedTags}">
+          <StackPanel Spacing="10">
+            <ItemsControl Name="MalformedTags" ItemsSource="{Binding MalformedTags}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:EnvTagProblemRow">
+                  <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                    <ctl:KpIcon Icon="alert-triangle" Size="14" VerticalAlignment="Center" Foreground="{DynamicResource KpWarn}" />
+                    <TextBlock Grid.Column="1" Classes="size-13" Text="{Binding Sentence}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                      <Button Classes="sm" Content="{Binding FixLabel}" IsVisible="{Binding HasFix}" Command="{Binding Change}" />
+                      <Button Classes="sm ghost" Content="{x:Static res:Strings.OpenItem}" Command="{Binding Open}" />
+                    </StackPanel>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <StackPanel Spacing="8" IsVisible="{Binding IsConfirmingFix}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmFixCommand}" ctl:FormKeys.Cancel="{Binding CancelFixCommand}">
+              <ItemsControl ItemsSource="{Binding FixLines}">
                 <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:EnvTagProblemRow">
-                    <TextBlock Classes="caption" Text="{Binding Sentence}" TextWrapping="Wrap" Margin="0,0,0,4" />
+                  <DataTemplate x:DataType="x:String">
+                    <TextBlock Classes="size-13" Text="{Binding}" TextWrapping="Wrap" />
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-              <TextBlock Classes="caption" Text="{x:Static res:Strings.CorrectTheTagOnTheItemInXafafd7}" />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Classes="sm ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelFixCommand}" />
+                <Button Classes="sm primary" Content="{x:Static res:Strings.ChangeTag}" Command="{Binding ConfirmFixCommand}" />
+              </StackPanel>
             </StackPanel>
-          </Grid>
+          </StackPanel>
         </Border>
 
         <Border Classes="card filled" IsVisible="{Binding IsAdding}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding ConfirmAddCommand}" ctl:FormKeys.Cancel="{Binding CancelAddCommand}" ctl:FormKeys.Draft="{Binding NewProjectDraft}">
@@ -142,15 +141,23 @@
           </StackPanel>
         </Border>
 
-        <Border Classes="card" IsVisible="{Binding IsEmpty}" Padding="20">
-          <StackPanel Spacing="12">
-            <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.NoProjectsYet}" />
-            <TextBlock Classes="caption" MaxWidth="560" HorizontalAlignment="Left" ctl:MachineRuns.InText="True" ctl:MachineRuns.Words="keypaste env set billing-api STRIPE_KEY"
-                       Text="{x:Static res:Strings.AProjectIsTheItemsInYourX4fbb7f}" />
-            <Button Content="{x:Static res:Strings.NewProjectLabel}" AutomationProperties.Name="{x:Static res:Strings.NewProject}" Command="{Binding BeginAddCommand}" IsVisible="{Binding !IsAdding}"
-                    Classes="primary" HorizontalAlignment="Left" />
+        <ctl:EmptyState IsVisible="{Binding IsEmpty}"
+                        Icon="layers"
+                        Text="{x:Static res:Strings.NoProjectsYet}">
+          <StackPanel Spacing="8" HorizontalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" IsVisible="{Binding !IsAdding}">
+              <Button Classes="sm" Content="{x:Static res:Strings.NewProjectLabel}" AutomationProperties.Name="{x:Static res:Strings.NewProject}" Command="{Binding BeginAddCommand}" />
+              <Button Classes="sm" Content="{x:Static res:Strings.ImportEnvLabel}" Command="{Binding BeginImportCommand}" />
+            </StackPanel>
+            <Button Classes="link" HorizontalAlignment="Center" Content="{x:Static res:Strings.LearnMore}" AutomationProperties.Name="{x:Static res:Strings.LearnMoreAboutProjects}">
+              <Button.Flyout>
+                <Flyout Placement="Bottom">
+                  <TextBlock MaxWidth="320" Classes="size-13" TextWrapping="Wrap" ctl:MachineRuns.InText="True" ctl:MachineRuns.Words="keypaste env set billing-api STRIPE_KEY" Text="{x:Static res:Strings.AProjectIsTheItemsInYourX4fbb7f}" />
+                </Flyout>
+              </Button.Flyout>
+            </Button>
           </StackPanel>
-        </Border>
+        </ctl:EmptyState>
 
         <ContentControl Content="{Binding OpenProject}" IsVisible="{Binding HasOpenProject}">
           <ContentControl.DataTemplates>
@@ -166,7 +173,7 @@
                   </StackPanel>
                 </Grid>
 
-                <!-- The stages as one segmented control, a dot on a stage missing a value; then Edit's menu and Run…, the one filled accent. -->
+                <!-- The stages as one segmented control, a stage missing values counting them; then Edit's menu and Run…, the one filled accent while no form is open. -->
                 <ctl:HeaderRow Spacing="12">
                   <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                     <Border Classes="segmented" AutomationProperties.Name="{x:Static res:Strings.Stages}">
@@ -185,7 +192,7 @@
                                                AutomationProperties.Name="{Binding Spoken}">
                               <StackPanel Orientation="Horizontal" Spacing="6">
                                 <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" />
-                                <Ellipse Classes="missing-dot" VerticalAlignment="Center" IsVisible="{Binding HasMissing}" />
+                                <TextBlock Classes="size-11 flagged" Text="{Binding MissingCountText}" VerticalAlignment="Center" IsVisible="{Binding HasMissing}" />
                               </StackPanel>
                             </ctl:ChoiceSegment>
                           </DataTemplate>
@@ -201,7 +208,7 @@
                   </StackPanel>
 
                   <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <Button Name="ProjectMore" Classes="action" Content="{x:Static res:Strings.Edit}"
+                    <Button Name="ProjectMore" Content="{x:Static res:Strings.Edit}"
                             AutomationProperties.Name="{x:Static res:Strings.Edit}">
                       <Button.Flyout>
                         <MenuFlyout Placement="BottomEdgeAlignedRight">
@@ -215,7 +222,7 @@
                         </MenuFlyout>
                       </Button.Flyout>
                     </Button>
-                    <Button Name="RunProject" Classes="action primary" Command="{Binding Launch.RunOrSetUpCommand}"
+                    <Button Name="RunProject" Classes.primary="{Binding !IsFormOpen}" Command="{Binding StartRunCommand}"
                             AutomationProperties.Name="{x:Static res:Strings.RunInATerminal}"
                             ToolTip.Tip="{x:Static res:Strings.RunInATerminal}">
                       <StackPanel Orientation="Horizontal" Spacing="6">
@@ -225,9 +232,6 @@
                     </Button>
                   </StackPanel>
                 </ctl:HeaderRow>
-
-                <TextBlock Classes="caption" TextWrapping="Wrap" IsVisible="{Binding !Launch.IsSupported}"
-                           Text="{Binding Launch.UnsupportedReason}" />
 
                 <!-- The confirmation names the command, the directory and the variables' names, never a value. -->
                 <Border Classes="card" IsVisible="{Binding Launch.IsConfirming}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Confirm="{Binding Launch.ConfirmLaunchCommand}" ctl:FormKeys.Cancel="{Binding Launch.CancelLaunchCommand}" BorderBrush="{DynamicResource KpBorderStrong}"
@@ -241,7 +245,7 @@
                     <TextBlock Classes="caption" Text="{x:Static res:Strings.EverythingRunInThatTerminalCanReadX8c42c2}" />
                     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
                       <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding Launch.CancelLaunchCommand}" />
-                      <Button Content="{x:Static res:Strings.Start}" Command="{Binding Launch.ConfirmLaunchCommand}" />
+                      <Button Classes="primary" Content="{x:Static res:Strings.Start}" Command="{Binding Launch.ConfirmLaunchCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -259,11 +263,19 @@
                     <TextBlock Classes="label" Text="{x:Static res:Strings.Command}" />
                     <TextBox Classes="mono" Text="{Binding Launch.Command}" PlaceholderText="npm start"
                              AutomationProperties.Name="{x:Static res:Strings.Command}" />
-                    <TextBlock Classes="caption" TextWrapping="Wrap"
-                               Text="{x:Static res:Strings.ValuesGoOnlyIntoTheCommandsEnvironmentXdfe02c}" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                      <TextBlock Classes="caption" TextWrapping="Wrap" VerticalAlignment="Center" Text="{x:Static res:Strings.TheCommandAndProgramsRunningAsYouCanReadTheseValues}" />
+                      <Button Grid.Column="1" Classes="link" VerticalAlignment="Center" Content="{x:Static res:Strings.LearnMore}" AutomationProperties.Name="{x:Static res:Strings.LearnMoreAboutWhoCanReadTheValues}">
+                        <Button.Flyout>
+                          <Flyout Placement="Bottom">
+                            <TextBlock MaxWidth="320" Classes="size-13" TextWrapping="Wrap" Text="{x:Static res:Strings.ValuesGoOnlyIntoTheCommandsEnvironmentXdfe02c}" />
+                          </Flyout>
+                        </Button.Flyout>
+                      </Button>
+                    </Grid>
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding Launch.CancelSetUpCommand}" />
-                      <Button Content="{x:Static res:Strings.Save}" Command="{Binding Launch.SaveCommand}" />
+                      <Button Classes="primary" Content="{x:Static res:Strings.Save}" Command="{Binding Launch.SaveCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -282,7 +294,7 @@
                     <TextBlock Classes="caption" Text="{Binding Import.Notes}" IsVisible="{Binding Import.HasNotes}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding Import.CancelCommand}" />
-                      <Button Content="{x:Static res:Strings.Import}" Command="{Binding Import.ConfirmCommand}" />
+                      <Button Classes="primary" Content="{x:Static res:Strings.Import}" Command="{Binding Import.ConfirmCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -308,11 +320,12 @@
                       <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="3*" MinWidth="120" MaxWidth="200" />
                         <ColumnDefinition Width="4*" />
-                        <ColumnDefinition Width="2*" MaxWidth="160" />
+                        <ColumnDefinition Width="*" MaxWidth="160" />
+                        <ColumnDefinition Width="96" />
                       </Grid.ColumnDefinitions>
                       <TextBlock Classes="th" Text="{x:Static res:Strings.Variable}" TextTrimming="CharacterEllipsis" />
                       <TextBlock Grid.Column="1" Classes="th" Text="{x:Static res:Strings.ValueLabel}" TextTrimming="CharacterEllipsis" />
-                      <TextBlock Grid.Column="2" Classes="th" Text="{x:Static res:Strings.FromItem}" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Name="FromHeading" Grid.Column="2" Classes="th" Text="{Binding FromHeading}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding FromHeading}" />
                     </Grid>
                     <Border Classes="group">
                       <StackPanel>
@@ -321,11 +334,12 @@
                             <DataTemplate x:DataType="vm:EnvKeyRow">
                               <Border Classes="variable-row" Background="Transparent" ClipToBounds="True">
                                 <Panel>
-                                  <Grid Classes="variable-columns" Margin="14,8" MinHeight="24">
+                                  <Grid Classes="variable-columns" Margin="14,8" MinHeight="24" RowDefinitions="Auto,Auto">
                                     <Grid.ColumnDefinitions>
                                       <ColumnDefinition Width="3*" MinWidth="120" MaxWidth="200" />
                                       <ColumnDefinition Width="4*" />
-                                      <ColumnDefinition Width="2*" MaxWidth="160" />
+                                      <ColumnDefinition Width="*" MaxWidth="160" />
+                                      <ColumnDefinition Width="96" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Spacing="2" VerticalAlignment="Center">
                                       <TextBlock Classes="mono primary" Classes.flagged="{Binding IsFlagged}" Text="{Binding DisplayKey}"
@@ -359,7 +373,7 @@
                                                                    TextOptions.TextRenderingMode="Antialias"
                                                                    Foreground="{DynamicResource KpTextSecondary}"
                                                                    RevealBackground="{DynamicResource KpBgHover}"
-                                                                   KeepsClear="96" />
+                                                                   KeepsClear="110" />
                                               </Panel>
                                             </ctl:PressToCopy>
                                           </DataTemplate>
@@ -381,26 +395,41 @@
 
                                     <TextBlock Grid.Column="2" Classes="caption" TextWrapping="NoWrap" Text="{Binding From}" TextTrimming="CharacterEllipsis"
                                                VerticalAlignment="Center" ToolTip.Tip="{Binding FromTip}" />
-                                  </Grid>
 
-                                  <!-- Over the item's name while hovered or focused, on the group's surface. -->
-                                  <ContentControl Content="{Binding Variable}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0">
-                                    <ContentControl.ContentTemplate>
-                                      <DataTemplate x:DataType="vm:EnvVariableRow">
-                                        <StackPanel Classes="row-actions" Orientation="Horizontal" Spacing="8" Background="{DynamicResource KpBgPanel}">
-                                          <ctl:RevealButton Classes="ghost row-action"
-                                                            TargetSource="{Binding}"
-                                                            Subject="{Binding DisplayKey}" />
-                                          <Button Classes="ghost row-action" Content="{x:Static res:Strings.Replace}" ContentTemplate="{StaticResource ReplaceGlyph}" AutomationProperties.Name="{Binding DisplayKey, StringFormat={x:Static res:Strings.ReplaceValue}}"
-                                                  ToolTip.Tip="{x:Static res:Strings.ReplaceTheValue}"
-                                                  Command="{Binding ReplaceCommand}" />
-                                          <Button Classes="ghost row-action" Content="{x:Static res:Strings.Remove}" ContentTemplate="{StaticResource RemoveGlyph}" AutomationProperties.Name="{Binding DisplayKey, StringFormat={x:Static res:Strings.RemoveValue}}"
-                                                  ToolTip.Tip="{x:Static res:Strings.RemoveThisKeyFromItsItem}"
-                                                  Command="{Binding RemoveCommand}" />
-                                        </StackPanel>
-                                      </DataTemplate>
-                                    </ContentControl.ContentTemplate>
-                                  </ContentControl>
+                                    <!-- Its own column, so the item's name is never under them; shown while hovered or focused, and gone while the row asks to remove. -->
+                                    <ContentControl Grid.Column="3" Content="{Binding Variable}" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                      <ContentControl.ContentTemplate>
+                                        <DataTemplate x:DataType="vm:EnvVariableRow">
+                                          <StackPanel Classes="row-actions" Classes.asks="{Binding IsConfirmingRemove}" Orientation="Horizontal" Spacing="4">
+                                            <ctl:RevealButton Classes="ghost icon sm"
+                                                              TargetSource="{Binding}"
+                                                              Subject="{Binding DisplayKey}" />
+                                            <Button Classes="ghost icon sm" Content="{x:Static res:Strings.Replace}" ContentTemplate="{StaticResource ReplaceGlyph}" AutomationProperties.Name="{Binding DisplayKey, StringFormat={x:Static res:Strings.ReplaceValue}}"
+                                                    ToolTip.Tip="{x:Static res:Strings.ReplaceTheValue}"
+                                                    Command="{Binding ReplaceCommand}" />
+                                            <Button Classes="ghost icon sm" Content="{x:Static res:Strings.Remove}" ContentTemplate="{StaticResource RemoveGlyph}" AutomationProperties.Name="{Binding DisplayKey, StringFormat={x:Static res:Strings.RemoveValue}}"
+                                                    ToolTip.Tip="{x:Static res:Strings.RemoveThisKeyFromItsItem}"
+                                                    Command="{Binding RemoveCommand}" />
+                                          </StackPanel>
+                                        </DataTemplate>
+                                      </ContentControl.ContentTemplate>
+                                    </ContentControl>
+
+                                    <!-- Removing asks in the row it removes from. -->
+                                    <ContentControl Grid.Row="1" Grid.ColumnSpan="4" Content="{Binding Variable}" IsVisible="{Binding Variable.IsConfirmingRemove, FallbackValue={x:False}}">
+                                      <ContentControl.ContentTemplate>
+                                        <DataTemplate x:DataType="vm:EnvVariableRow">
+                                          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,8,0,0" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelRemoveCommand}">
+                                            <TextBlock Classes="size-13" Text="{Binding RemovePrompt}" TextWrapping="Wrap" VerticalAlignment="Center" ctl:Announcer.Says="{Binding RemovePrompt}" />
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                              <Button Classes="sm ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelRemoveCommand}" />
+                                              <Button Classes="danger sm" Content="{x:Static res:Strings.Remove}" Command="{Binding ConfirmRemoveCommand}" />
+                                            </StackPanel>
+                                          </Grid>
+                                        </DataTemplate>
+                                      </ContentControl.ContentTemplate>
+                                    </ContentControl>
+                                  </Grid>
 
                                   <Border Height="1" Margin="14,0,0,0" VerticalAlignment="Bottom" Background="{DynamicResource KpBorderSubtle}" />
                                 </Panel>
@@ -434,7 +463,7 @@
                       <StackPanel Orientation="Horizontal" Spacing="8">
                         <TextBox Classes="mono" Text="{Binding NewProfile}" PlaceholderText="staging" Width="200" AutomationProperties.Name="{x:Static res:Strings.StageName}" />
                         <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelAddProfileCommand}" />
-                        <Button Content="{x:Static res:Strings.AddKey}" Command="{Binding ConfirmAddProfileCommand}" />
+                        <Button Classes="primary" Content="{x:Static res:Strings.AddKey}" Command="{Binding ConfirmAddProfileCommand}" />
                       </StackPanel>
                       <TextBlock x:Name="NewProfileProblem" ctl:ShowInView.Scrolls="True"
                                  Classes="caption danger"
@@ -497,7 +526,7 @@
                                  Text="{Binding NewValue.Note}" />
                       <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelAddCommand}" />
-                        <Button Content="{x:Static res:Strings.Add}" Command="{Binding ConfirmAddCommand}" />
+                        <Button Classes="primary" Content="{x:Static res:Strings.Add}" Command="{Binding ConfirmAddCommand}" />
                       </StackPanel>
                     </StackPanel>
                   </Border>
@@ -532,24 +561,14 @@
                                  Text="{Binding ReplacementValue.Note}" />
                       <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelReplaceCommand}" />
-                        <Button Content="{x:Static res:Strings.Replace}" Command="{Binding ConfirmReplaceCommand}" />
-                      </StackPanel>
-                    </StackPanel>
-                  </Border>
-
-                  <Border Classes="card" IsVisible="{Binding IsRemoving}" BorderBrush="{DynamicResource KpDanger}" ctl:ShowInView.OnShow="True" ctl:FormKeys.Cancel="{Binding CancelRemoveCommand}">
-                    <StackPanel Spacing="8">
-                      <TextBlock Classes="body primary" Text="{Binding RemovePrompt}" />
-                      <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelRemoveCommand}" />
-                        <Button Classes="danger" Content="{x:Static res:Strings.Remove}" Command="{Binding ConfirmRemoveCommand}" />
+                        <Button Classes="primary" Content="{x:Static res:Strings.Replace}" Command="{Binding ConfirmReplaceCommand}" />
                       </StackPanel>
                     </StackPanel>
                   </Border>
 
                   <!-- The same run from a terminal: the selected stage's command, quiet, with its copy. -->
                   <StackPanel Spacing="6">
-                    <TextBlock Classes="group-caption" Text="{x:Static res:Strings.RunWithKeypaste}" />
+                    <TextBlock Classes="section-heading" Text="{x:Static res:Strings.RunWithKeypaste}" />
                     <Border Classes="command-line" IsVisible="{Binding HasRunCommand}">
                       <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
                         <ctl:KpIcon Icon="terminal" Size="16" Foreground="{DynamicResource KpTextMuted}" VerticalAlignment="Center" />
@@ -572,7 +591,7 @@
                        one and Remove takes the tag off, each after saying what it reaches; neither deletes an item or a field. -->
                   <ctl:HeaderRow Spacing="12">
                     <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.ItemsInEachStage}" VerticalAlignment="Center" />
-                    <Button Name="ItemsDone" Classes="action" Content="{x:Static res:Strings.Done}" Command="{Binding ShowKeysCommand}" />
+                    <Button Name="ItemsDone" Content="{x:Static res:Strings.Done}" Command="{Binding ShowKeysCommand}" />
                   </ctl:HeaderRow>
                   <ItemsControl ItemsSource="{Binding Environments}">
                     <ItemsControl.ItemsPanel>
@@ -585,9 +604,11 @@
                         <StackPanel Spacing="6">
                           <Grid ColumnDefinitions="*,Auto" Margin="14,0,0,0">
                             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                              <TextBlock Classes="group-caption" Margin="0" Text="{Binding DisplayName}" />
-                              <ctl:KpIcon Icon="shield-check" Size="14" IsVisible="{Binding IsProtected}"
-                                          Foreground="{DynamicResource KpTextSecondary}" />
+                              <TextBlock Classes="section-heading" Margin="0" Text="{Binding DisplayName}" />
+                              <Border Background="Transparent" IsVisible="{Binding IsProtected}" ToolTip.Tip="{x:Static res:Strings.ApprovalRequired}"
+                                      AutomationProperties.Name="{x:Static res:Strings.ApprovalRequired}">
+                                <ctl:KpIcon Icon="shield-check" Size="14" Foreground="{DynamicResource KpTextSecondary}" />
+                              </Border>
                             </StackPanel>
                             <Button Grid.Column="1" Classes="ghost sm" Command="{Binding AddEntry}"
                                     ToolTip.Tip="{x:Static res:Strings.TagAnItemFromYourVaultIntoX85a64e}"
@@ -610,15 +631,15 @@
                                                 IsVisible="{Binding FollowsAnother}" />
                                         <Grid ColumnDefinitions="3*,4*,Auto" ColumnSpacing="12" Margin="14,8" MinHeight="24">
                                           <StackPanel Spacing="2" VerticalAlignment="Center">
-                                            <TextBlock Classes="mono primary" Text="{Binding Display}" TextWrapping="Wrap"
-                                                       ToolTip.Tip="{Binding Display}" />
+                                            <TextBlock Classes="primary" Text="{Binding Display}" TextWrapping="Wrap"
+                                                       ToolTip.Tip="{Binding DisplayPath}" />
                                             <TextBlock Classes="size-13 muted" Text="{Binding AlsoText}" IsVisible="{Binding HasAlso}"
                                                        TextWrapping="Wrap" />
                                           </StackPanel>
                                           <TextBlock Grid.Column="1" Classes="secondary size-13" Classes.mono="{Binding HasKeys}" VerticalAlignment="Center"
                                                      Text="{Binding KeysText}" TextWrapping="Wrap" />
                                           <StackPanel Grid.Column="2" Classes="row-actions" Orientation="Horizontal" VerticalAlignment="Center">
-                                            <Button Classes="ghost row-action" Command="{Binding Remove}"
+                                            <Button Classes="ghost icon sm" Command="{Binding Remove}"
                                                     ToolTip.Tip="{x:Static res:Strings.TakeThisItemOutOfTheStage}"
                                                     AutomationProperties.Name="{Binding RemoveName}">
                                               <ctl:KpIcon Icon="x" Size="14" />
@@ -642,7 +663,7 @@
                       <TextBlock Classes="dialog-title" Text="{Binding AddEntryTitle}" />
                       <StackPanel Spacing="6">
                         <TextBlock Classes="label" Text="{x:Static res:Strings.FindAnItem}" />
-                        <TextBox Classes="mono" Text="{Binding EntryFilter}" PlaceholderText="{x:Static res:Strings.ExampleItemPath}" Width="420"
+                        <TextBox Text="{Binding EntryFilter}" PlaceholderText="{x:Static res:Strings.ExampleItemTitle}" Width="420"
                                  HorizontalAlignment="Left" AutomationProperties.Name="{x:Static res:Strings.FindAnItem}" />
                       </StackPanel>
                       <ListBox Name="EntryCandidates" ItemsSource="{Binding EntryCandidates}" SelectedItem="{Binding ChosenEntry}"
@@ -650,7 +671,7 @@
                                AutomationProperties.Name="{x:Static res:Strings.ItemsYouCanAdd}">
                         <ListBox.ItemTemplate>
                           <DataTemplate x:DataType="vm:EnvEntryCandidate">
-                            <TextBlock Classes="mono" Text="{Binding Display}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding Display}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding DisplayPath}" />
                           </DataTemplate>
                         </ListBox.ItemTemplate>
                       </ListBox>
@@ -672,7 +693,7 @@
                       <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Name="CancelTagChange" Classes="ghost" Content="{x:Static res:Strings.Cancel}"
                                 Command="{Binding CancelTagChangeCommand}" />
-                        <Button Name="ConfirmTagChange" Classes.danger="{Binding !TagChangeAdds}"
+                        <Button Name="ConfirmTagChange" Classes.danger="{Binding !TagChangeAdds}" Classes.primary="{Binding TagChangeAdds}"
                                 Content="{Binding TagChangeAction}" Command="{Binding ConfirmTagChangeCommand}" />
                       </StackPanel>
                     </StackPanel>

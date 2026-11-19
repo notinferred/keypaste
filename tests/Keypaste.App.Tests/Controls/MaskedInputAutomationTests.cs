@@ -142,7 +142,7 @@ public sealed class MaskedInputAutomationTests
     /// </summary>
     /// <remarks>
     /// A second and third <see cref="MaskedInput"/> inherit the control and its template, not its
-    /// evidence. D-0099 is a claim about every field a master password reaches, and the create form
+    /// evidence. A mask that publishes only its length is a claim about every field a master password reaches, and the create form
     /// is where one is chosen for the first time.
     /// </remarks>
     [Fact]
@@ -252,7 +252,7 @@ public sealed class MaskedInputAutomationTests
     /// </summary>
     /// <remarks>
     /// The fourth master-password field, and the one most likely to hold a password somebody no
-    /// longer uses anywhere else. It is typed on the locked screen, so D-0099 applies to it exactly
+    /// longer uses anywhere else. It is typed on the locked screen, so that claim applies to it exactly
     /// as it does to the first.
     /// </remarks>
     [Fact]
@@ -297,15 +297,13 @@ public sealed class MaskedInputAutomationTests
         // stopped reaching this field would leave the absences above passing on nothing.
         var surface = AutomationSurface.Of(screen.BackupPassword).Select(entry => entry.Text).ToList();
         Assert.Contains(new string('•', Fixture.Length + 1), surface, StringComparer.Ordinal);
-        Assert.Contains("That backup's master password", surface, StringComparer.Ordinal);
+        Assert.Contains("Master password", surface, StringComparer.Ordinal);
     });
 
     private static readonly string[] _unlockScreenLabels =
     [
-        "Recent vaults", "KeePassXC's databases", "Backups", "Unlock", "Master password", "New master password", "Confirm master password", "That backup's master password", "Check this backup", "Unlock with a key file too", "Unlock without a key file", "Unlock with a YubiKey too",
-        "Unlock without a YubiKey", "Open a vault…", "Create a vault…", "Add a key file", "Create a key file", "No key file",
-        "Add a YubiKey", "No YubiKey", "That backup's key file", "Open another vault", "New vault", "Restore a backup", "More options",
-        "Open another file…", "Unlock with Windows Hello", "Create vault",
+        "Recent vaults", "KeePassXC's databases", "Backups", "Unlock", "Master password", "New master password", "Confirm master password", "Check this backup", "Unlock with a key file too", "Unlock without a key file", "Unlock with a YubiKey too",
+        "Unlock without a YubiKey", "Key file", "No key file", "Add a YubiKey", "No YubiKey", "Add vault…", "Unlock with Windows Hello", "Create vault",
     ];
 
     /// <summary>The restore field takes a pasted master password as the unlock field does, and shows only its length.</summary>
@@ -383,7 +381,7 @@ public sealed class MaskedInputAutomationTests
         {
             if (AutomationProperties.GetName(element) is { } name)
             {
-                Assert.True(element is Button or ListBox or MaskedInput, $"{element.GetType().Name} is named {name}");
+                Assert.True(element is Button or ListBox or ComboBox or MaskedInput, $"{element.GetType().Name} is named {name}");
                 Assert.Contains(name, _unlockScreenLabels);
             }
 

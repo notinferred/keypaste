@@ -50,7 +50,7 @@ public sealed class UnlockKeyfileTests : IDisposable
         Type(model, _master);
         await model.UnlockAsync();
         Assert.Equal(0, _unlockedCalls);
-        Assert.Equal("That password didn't open this vault. It may also need a key file: add one below, or type the password again.", model.Message);
+        Assert.Equal("Wrong password or key file.", model.Message);
 
         _picker.KeyfilePath = _keyfile;
         await model.ChooseKeyfileAsync();
@@ -103,7 +103,7 @@ public sealed class UnlockKeyfileTests : IDisposable
         await model.UnlockAsync();
 
         Assert.Equal(0, _unlockedCalls);
-        Assert.Equal("That password and key file didn't open this vault. Check both, then try again.", model.Message);
+        Assert.Equal("Wrong password or key file.", model.Message);
     }
 
     [Fact]

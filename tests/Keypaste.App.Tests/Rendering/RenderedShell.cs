@@ -279,6 +279,9 @@ internal sealed class RenderedShell : IDisposable
         where T : Control =>
         Window.GetVisualDescendants().OfType<T>().Single(control => control.Name == name);
 
+    /// <summary>Opens the menu the named button holds, as pressing it does, and gives back the menu and the window it is drawn in.</summary>
+    internal (MenuFlyout Menu, TopLevel Drawn) OpenMenu(string button) => Menus.Open(Named<Button>(button));
+
     public void Dispose()
     {
         Session.Locked -= OnLocked;

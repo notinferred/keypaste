@@ -37,6 +37,18 @@ internal sealed class Announcer : AvaloniaObject
 
     public static void SetSays(Control control, string? value) => control.SetValue(SaysProperty, value);
 
+    /// <summary>Empties the window's live text, so a line said for a form that has gone is not read again.</summary>
+    internal static void Clear(Visual visual)
+    {
+        if (LiveText(visual) is { } live)
+        {
+            live.Text = string.Empty;
+        }
+    }
+
+    private static TextBlock? LiveText(Visual visual) =>
+        TopLevel.GetTopLevel(visual)?.GetVisualDescendants().OfType<TextBlock>().FirstOrDefault(text => text.Classes.Contains("live"));
+
     // Later than layout: a row's binding and its window's opening both arrive before its window has live text to change.
     private static void Queue(Control control)
     {
@@ -54,7 +66,7 @@ internal sealed class Announcer : AvaloniaObject
         control.SetValue(_isQueuedProperty, false);
         var line = GetSays(control);
 
-        if (string.IsNullOrWhiteSpace(line) || !control.IsEffectivelyVisible || TopLevel.GetTopLevel(control)?.GetVisualDescendants().OfType<TextBlock>().FirstOrDefault(text => text.Classes.Contains("live")) is not { } live)
+        if (string.IsNullOrWhiteSpace(line) || !control.IsEffectivelyVisible || LiveText(control) is not { } live)
         {
             return;
         }

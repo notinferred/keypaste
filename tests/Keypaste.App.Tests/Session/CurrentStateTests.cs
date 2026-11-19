@@ -270,7 +270,7 @@ public sealed class CurrentStateTests : IDisposable
         await shell.Merging.WaitAsync(_connect, Cancel);
 
         Assert.True(shell.HasVaultChanged);
-        Assert.Contains("could not merge it: the file now holds another vault.", shell.VaultChanged, StringComparison.Ordinal);
+        Assert.Contains("could not merge it: the file now holds another vault.", shell.VaultChangedDetail, StringComparison.Ordinal);
         Assert.Equal(AuditMethod.VaultChanged, (await agent.RequestAsync(_token)).Method);
 
         shell.ReloadCommand.Press();

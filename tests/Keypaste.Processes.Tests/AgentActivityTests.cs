@@ -37,7 +37,7 @@ public sealed class AgentActivityTests
 
         var after = shown.Activity();
         Assert.DoesNotContain(after, line => line.StartsWith("waiting ", StringComparison.Ordinal));
-        Assert.Contains(after, line => line.StartsWith("history ", StringComparison.Ordinal) && line.Contains("DEPLOY_KEY", StringComparison.Ordinal) && line.Contains("Approved", StringComparison.Ordinal));
+        Assert.Contains(after, line => line.StartsWith("history ", StringComparison.Ordinal) && line.Contains("DEPLOY_KEY", StringComparison.Ordinal) && line.Contains("Allowed once", StringComparison.Ordinal));
         Assert.DoesNotContain(app.Driver.Output, line => line.Contains(_secret, StringComparison.Ordinal));
     }
 
@@ -72,7 +72,7 @@ public sealed class AgentActivityTests
         app.Unlock();
         var unlocked = shown.Activity();
         Assert.DoesNotContain(unlocked, line => line.StartsWith("unavailable ", StringComparison.Ordinal) || line.StartsWith("waiting ", StringComparison.Ordinal));
-        Assert.Contains(unlocked, line => line.StartsWith("history ", StringComparison.Ordinal) && line.Contains("Approved", StringComparison.Ordinal));
+        Assert.Contains(unlocked, line => line.StartsWith("history ", StringComparison.Ordinal) && line.Contains("Allowed once", StringComparison.Ordinal));
     }
 
     [Fact]

@@ -113,7 +113,7 @@ public sealed class IconRailTests
         Assert.Equal(DestinationKind.Entries, shell.Shell.Current.Kind);
 
         // A screen under a place keeps the place selected, and so do Environments and Trash on Items.
-        shell.Show<AdvancedViewModel>(DestinationKind.Advanced);
+        shell.Show<ScopedTokensViewModel>(DestinationKind.Tokens);
         RenderedShell.Drain();
         Assert.True(Row(shell, DestinationKind.Settings).IsSelected);
 
@@ -188,10 +188,10 @@ public sealed class IconRailTests
     });
 
     [Theory]
-    [InlineData(true, false, 2, "ok", "Agents, live, 2 waiting")]
-    [InlineData(true, false, 0, "ok", "Agents, live")]
-    [InlineData(false, true, 0, "danger", "Agents, refusing")]
-    public Task Agents_keeps_its_signal_and_says_it_in_words(bool live, bool refusing, int waiting, string dotClass, string name) => HeadlessSession.On(() =>
+    [InlineData(true, false, 2, "ok", "Agents, Answering agents, 2 waiting", "Agents · Answering agents · 2 waiting · 1 connected")]
+    [InlineData(true, false, 0, "ok", "Agents, Answering agents", "Agents · Answering agents · 2 waiting · 1 connected")]
+    [InlineData(false, true, 0, "danger", "Agents, Refusing agents", "Agents · Refusing agents · 2 waiting · 1 connected")]
+    public Task Agents_keeps_its_signal_and_says_it_in_words(bool live, bool refusing, int waiting, string dotClass, string name, string tip) => HeadlessSession.On(() =>
     {
         using var shell = Narrow("keypaste-rail-agents-");
         var agents = Place(shell, DestinationKind.AgentActivity);
@@ -199,7 +199,7 @@ public sealed class IconRailTests
         agents.DotLive = live;
         agents.DotDanger = refusing;
         agents.Waiting = waiting;
-        agents.Detail = "Answering agents · 2 waiting · 1 connected";
+        agents.Detail = "2 waiting · 1 connected";
         RenderedShell.Drain();
 
         var row = Row(shell, DestinationKind.AgentActivity);
@@ -207,8 +207,8 @@ public sealed class IconRailTests
         Assert.True(dot.IsEffectivelyVisible);
         Assert.Contains(dotClass, dot.Classes);
         Assert.Equal(name, AutomationProperties.GetName(row));
-        Assert.Equal("Agents · Answering agents · 2 waiting · 1 connected", ToolTip.GetTip(row));
-        Assert.Equal("Answering agents · 2 waiting · 1 connected", AutomationProperties.GetHelpText(row));
+        Assert.Equal(tip, ToolTip.GetTip(row));
+        Assert.Equal("2 waiting · 1 connected", AutomationProperties.GetHelpText(row));
         Assert.False(Row(shell, DestinationKind.Settings).GetVisualDescendants().OfType<Border>().Single(border => border.Name == "RailAgentsDot").IsEffectivelyVisible);
     });
 
@@ -269,18 +269,14 @@ public sealed class IconRailTests
     });
 
     [Fact]
-    public Task The_sidebar_opens_over_a_narrow_window_from_the_title_bar_and_the_menu() => HeadlessSession.On(() =>
+    public Task The_sidebar_opens_over_a_narrow_window_from_the_menu() => HeadlessSession.On(() =>
     {
         using var shell = Narrow("keypaste-rail-overlay-");
-        var open = shell.Named<Button>("ShowSidebar");
         var rail = shell.Named<Border>("Rail");
         var menu = Command(shell, "Hide sidebar");
         var content = shell.Named<ContentControl>("EntryPane").Bounds.Width;
-        Assert.Equal("Show sidebar", AutomationProperties.GetName(open));
-        Assert.Contains(OperatingSystem.IsMacOS() ? "⌃⌘S" : "Ctrl+B", Assert.IsType<string>(ToolTip.GetTip(open)), StringComparison.Ordinal);
 
-        shell.Press(open);
-        shell.Release(open);
+        menu.Run();
         RenderedShell.Drain();
 
         Assert.True(shell.Shell.SidebarOverlays);
@@ -291,8 +287,9 @@ public sealed class IconRailTests
         AccentElements.AssertAtMostOne(shell.Window, "the sidebar opened over a narrow window");
 
         Key(shell, PhysicalKey.Escape);
+        RenderedShell.Drain();
         Assert.False(shell.Shell.SidebarOverlays);
-        Assert.True(open.IsFocused);
+        Assert.True(ChosenRailPlace(shell).IsFocused);
 
         menu.Run();
         RenderedShell.Drain();
@@ -311,7 +308,7 @@ public sealed class IconRailTests
         shell.Shell.OpenSidebarOverlay();
         shell.Frame();
         RenderedShell.Drain();
-        var field = shell.Window.GetVisualDescendants().OfType<TextBox>().First(box => box.IsEffectivelyVisible && box.Name != "ShellSearch");
+        var field = shell.Window.GetVisualDescendants().OfType<TextBox>().First(box => box.IsEffectivelyVisible && box.Name != "ListSearch");
 
         shell.Tap(field);
         RenderedShell.Drain();
@@ -327,7 +324,6 @@ public sealed class IconRailTests
         shell.Window.Width = 1000;
         shell.Frame();
         var rail = shell.Named<Border>("Rail");
-        var button = shell.Named<Button>("ShowSidebar");
         var hide = Command(shell, "Hide sidebar");
         shell.Named<ListBox>("Nav").ContainerFromItem(shell.Shell.SelectedSidebarRow!)!.Focus(NavigationMethod.Tab);
         RenderedShell.Drain();
@@ -340,15 +336,14 @@ public sealed class IconRailTests
         Assert.True(rail.IsEffectivelyVisible);
         Assert.False(shell.Named<Border>("Sidebar").IsEffectivelyVisible);
         Assert.Equal(0, shell.Named<Grid>("BodyColumns").ColumnDefinitions[1].Width.Value);
-        Assert.True(button.IsFocused, "the keyboard follows the sidebar's way back");
-        Assert.True(Bounds(shell, button).X >= WindowChrome.LeadingInset(InterfaceZoom.Factor));
+        Assert.True(ChosenRailPlace(shell).IsFocused, "the keyboard goes to the rail, the sidebar's way back");
 
         shell.Window.Width = 1200;
         shell.Frame();
         Assert.False(shell.Named<Border>("Sidebar").IsEffectivelyVisible, "the choice holds at every wide width");
 
-        shell.Press(button);
-        shell.Release(button);
+        hide.Run();
+        shell.Frame();
         RenderedShell.Drain();
 
         Assert.True(shell.Named<Border>("Sidebar").IsEffectivelyVisible);
@@ -357,7 +352,7 @@ public sealed class IconRailTests
     });
 
     [Fact]
-    public Task Keyboard_inside_the_sidebar_moves_to_its_button_as_the_window_narrows() => HeadlessSession.On(() =>
+    public Task Keyboard_inside_the_sidebar_moves_to_the_rail_as_the_window_narrows() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-rail-narrowing-");
         shell.Window.Width = 1000;
@@ -369,7 +364,7 @@ public sealed class IconRailTests
         shell.Frame();
         RenderedShell.Drain();
 
-        Assert.True(shell.Named<Button>("ShowSidebar").IsFocused);
+        Assert.True(ChosenRailPlace(shell).IsFocused);
     });
 
     [Fact]
@@ -385,7 +380,6 @@ public sealed class IconRailTests
             shell.Shell.Current = Destinations.Of(kind);
             shell.Frame();
             Assert.False(shell.Named<Border>("Sidebar").IsEffectivelyVisible);
-            Assert.False(shell.Named<Button>("ShowSidebar").IsEffectivelyVisible);
             Assert.Equal(0, shell.Named<Grid>("BodyColumns").ColumnDefinitions[1].Width.Value);
             Assert.True(shell.Named<Border>("Rail").IsEffectivelyVisible);
         }
@@ -460,4 +454,10 @@ public sealed class IconRailTests
         Assert.False(shell.Shell.IsNarrow);
         Assert.True(shell.Shell.ShowsSidebar);
     });
+
+    private static Control ChosenRailPlace(RenderedShell shell)
+    {
+        var rail = shell.Named<ListBox>("RailNav");
+        return rail.ContainerFromItem(rail.SelectedItem!)!;
+    }
 }

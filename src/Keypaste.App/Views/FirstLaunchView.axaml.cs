@@ -4,13 +4,13 @@ using Avalonia.Threading;
 
 namespace Keypaste.App.Views;
 
-/// <summary>The one first-launch screen, in front of the unlock screen until the terms of use are agreed to; Continue holds the keyboard, so Return agrees.</summary>
+/// <summary>The one first-launch screen, in front of the unlock screen until the terms of use are agreed to; Agree holds the keyboard, so Return agrees.</summary>
 internal sealed partial class FirstLaunchView : UserControl
 {
     public FirstLaunchView()
     {
         AvaloniaXamlLoader.Load(this);
-        var proceed = this.FindControl<Button>("Continue")!;
+        var proceed = this.FindControl<Button>("Agree")!;
         Loaded += (_, _) => Dispatcher.UIThread.Post(() => proceed.Focus(), DispatcherPriority.Background);
     }
 }
