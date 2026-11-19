@@ -17,10 +17,10 @@ public sealed record BrowserIdentity(string Caller, string Store)
 
     private const string _chromeOrigin = "chrome-extension://";
 
-    // Chrome and Edge carry test IDs, from extension/test-keys' public keys, until those stores assign keypaste's extension its own (H-0029).
+    // Edge carries a test ID, from extension/keys/edge.pub, until Microsoft Edge Add-ons assigns keypaste's extension its own (H-0029).
 
     /// <summary>keypaste's extension from the Chrome Web Store.</summary>
-    public static BrowserIdentity ChromeWebStore { get; } = new("chrome-extension://fipabobollckgdobkjfkkchimlphcicg/", "the Chrome Web Store");
+    public static BrowserIdentity ChromeWebStore { get; } = new("chrome-extension://kabnajpeogcbndlfgibmhiichfkgpdla/", "the Chrome Web Store");
 
     /// <summary>keypaste's extension from Microsoft Edge Add-ons.</summary>
     public static BrowserIdentity EdgeAddOns { get; } = new("chrome-extension://iobkkhmaklkkeiadigbohfaplldmaogd/", "Microsoft Edge Add-ons");
@@ -34,7 +34,7 @@ public sealed record BrowserIdentity(string Caller, string Store)
     /// <summary>The extension's own ID: a Chrome-family origin's host, or the Firefox add-on ID.</summary>
     public string Id => Caller.StartsWith(_chromeOrigin, StringComparison.Ordinal) ? Caller[_chromeOrigin.Length..].TrimEnd('/') : Caller;
 
-    /// <summary>How a confirmation names the build: <c>keypaste's extension from the Chrome Web Store (fipabobollckgdobkjfkkchimlphcicg)</c>.</summary>
+    /// <summary>How a confirmation names the build: <c>keypaste's extension from the Chrome Web Store (kabnajpeogcbndlfgibmhiichfkgpdla)</c>.</summary>
     public string Described => $"keypaste's extension from {Store} ({Id})";
 
     /// <summary>The browser a person most likely runs this build in, which a pairing's suggested name starts with.</summary>

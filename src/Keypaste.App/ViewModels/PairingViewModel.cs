@@ -41,7 +41,7 @@ internal sealed class PairingViewModel : PromptViewModel
     /// <summary>What the person compares before pairing.</summary>
     internal string Check { get; }
 
-    /// <summary>The build the browser named: <c>keypaste's extension from the Chrome Web Store (fipabobollckgdobkjfkkchimlphcicg)</c>.</summary>
+    /// <summary>The build the browser named: <c>keypaste's extension from the Chrome Web Store (kabnajpeogcbndlfgibmhiichfkgpdla)</c>.</summary>
     internal string Identity { get; }
 
     /// <summary>The pairing's name, which becomes its id in the extension.</summary>

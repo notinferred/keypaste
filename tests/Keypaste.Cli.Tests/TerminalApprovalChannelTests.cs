@@ -395,7 +395,7 @@ public sealed class TerminalApprovalChannelTests
         var shown = rig.Stderr.ToString();
         Assert.Contains("keypaste: pair Chrome with keypaste?", shown, StringComparison.Ordinal);
         Assert.Contains("  code     472 913", shown, StringComparison.Ordinal);
-        Assert.Contains("  browser  keypaste's extension from the Chrome Web Store (fipabobollckgdobkjfkkchimlphcicg)", shown, StringComparison.Ordinal);
+        Assert.Contains("  browser  keypaste's extension from the Chrome Web Store (kabnajpeogcbndlfgibmhiichfkgpdla)", shown, StringComparison.Ordinal);
         Assert.Contains("  name     laptop", shown, StringComparison.Ordinal);
         Assert.Contains("Pair only if Chrome shows the same code.", shown, StringComparison.Ordinal);
         Assert.StartsWith("[d] deny  [y] pair", rig.Prompt.PromptsSeen[0], StringComparison.Ordinal);

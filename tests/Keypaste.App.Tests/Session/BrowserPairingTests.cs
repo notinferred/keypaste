@@ -45,7 +45,7 @@ public sealed partial class BrowserPairingTests
         Assert.Equal("Pair Chrome with keypaste?", Text(window, "TitleText"));
         Assert.Equal(PairingCode.Of(_key), Text(window, "CodeText"));
         Assert.Equal("Pair only if Chrome shows the same code.", Text(window, "CheckText"));
-        Assert.Equal("keypaste's extension from the Chrome Web Store (fipabobollckgdobkjfkkchimlphcicg)", Text(window, "IdentityText"));
+        Assert.Equal("keypaste's extension from the Chrome Web Store (kabnajpeogcbndlfgibmhiichfkgpdla)", Text(window, "IdentityText"));
         Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
         Assert.False(window.FindControl<Button>("Allow")!.IsEffectivelyEnabled);
         Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(), button => button.IsDefault);
@@ -60,7 +60,7 @@ public sealed partial class BrowserPairingTests
         await PromptedApp.WithdrawnAsync(window);
 
         var row = Assert.Single(browserFill.Rows);
-        Assert.Equal(("work laptop", "keypaste's extension from the Chrome Web Store (fipabobollckgdobkjfkkchimlphcicg)"), (row.Name, row.Identity));
+        Assert.Equal(("work laptop", "keypaste's extension from the Chrome Web Store (kabnajpeogcbndlfgibmhiichfkgpdla)"), (row.Name, row.Identity));
         Assert.StartsWith("Chrome · last used", row.Summary, StringComparison.Ordinal);
     });
 

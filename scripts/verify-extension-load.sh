@@ -30,8 +30,8 @@ require tar
 for build in chromium firefox; do
   [ -f "artifacts/extension/$build/manifest.json" ] || die "no unpacked $build build; run node extension/build.js first"
 done
-chrome_id="$(node extension/test-keys/ids.js | awk '$1 == "chrome" { print $2 }')"
-[ -n "$chrome_id" ] || die "extension/test-keys/ids.js gave no Chrome ID"
+chrome_id="$(node extension/keys/ids.js | awk '$1 == "chrome" { print $2 }')"
+[ -n "$chrome_id" ] || die "extension/keys/ids.js gave no Chrome ID"
 
 watchdog 720 node Keypaste.AppDriver keypaste chrome firefox geckodriver
 

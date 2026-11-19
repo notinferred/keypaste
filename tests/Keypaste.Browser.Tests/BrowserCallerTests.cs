@@ -10,7 +10,7 @@ namespace Keypaste.Browser.Tests;
 /// </summary>
 public sealed class BrowserCallerTests : IDisposable
 {
-    private const string _chrome = "chrome-extension://fipabobollckgdobkjfkkchimlphcicg/";
+    private const string _chrome = "chrome-extension://kabnajpeogcbndlfgibmhiichfkgpdla/";
 
     private static readonly string _manifest = Path.Combine(Path.GetTempPath(), "com.keypaste.browser.json");
 
@@ -45,7 +45,7 @@ public sealed class BrowserCallerTests : IDisposable
     [InlineData(true, _chrome, "--parent-window=")]
     [InlineData(true, _chrome, "--parent-window=12a")]
     [InlineData(true, _chrome, "--parent-window=0", "--extra")]
-    [InlineData(false, "chrome-extension:/fipabobollckgdobkjfkkchimlphcicg/")]
+    [InlineData(false, "chrome-extension:/kabnajpeogcbndlfgibmhiichfkgpdla/")]
     [InlineData(false, "com.keypaste.browser.json", "browser@keypaste.com")]
     public void Anything_else_is_not(bool windows, params string[] args) => Assert.Null(BrowserCaller.Of(args, windows));
 

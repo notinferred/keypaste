@@ -911,7 +911,7 @@ public sealed class ScreenRenderer
         var settingsScreen = Assert.IsType<SettingsViewModel>(shell.Content);
         settingsScreen.Section = SettingsSectionChoice.Browser;
         var browserFill = settingsScreen.BrowserFill!;
-        var pairing = new PairingItem("work laptop", "Chrome", "keypaste's extension from the Chrome Web Store (fipabobollckgdobkjfkkchimlphcicg)", "last used 2 days ago");
+        var pairing = new PairingItem("work laptop", "Chrome", "keypaste's extension from the Chrome Web Store (kabnajpeogcbndlfgibmhiichfkgpdla)", "last used 2 days ago");
         SetDrawnState(browserFill, nameof(browserFill.Rows), new[] { pairing });
         WindowInput.Drain();
         foreach (var toast in shell.Toasts.Shown.ToList())
