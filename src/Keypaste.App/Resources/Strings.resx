@@ -307,7 +307,7 @@
   <data name="OpenTerminal" xml:space="preserve"><value>Open terminal</value></data>
   <data name="OpenVault" xml:space="preserve"><value>Open vault…</value></data>
   <data name="OptionalOneYouHaveOrANewX7bc1a7" xml:space="preserve"><value>Optional: one you have, or a new one keypaste makes where you choose. Losing it locks the vault.</value></data>
-  <data name="PairInTheExtension" xml:space="preserve"><value>To pair a browser, press Connect in keypaste's extension, then pair only if its code matches the one keypaste shows.</value></data>
+  <data name="PairInTheExtension" xml:space="preserve"><value>To pair a browser, choose Pair this browser… in keypaste's extension, then pair only if its code matches the one keypaste shows.</value></data>
   <data name="PairedBrowsers" xml:space="preserve"><value>Paired browsers</value></data>
   <data name="Password" xml:space="preserve"><value>Password</value></data>
   <data name="PasswordForThisFile" xml:space="preserve"><value>Password for this file</value></data>

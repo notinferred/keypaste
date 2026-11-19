@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The browser extension takes keypaste's look and words: Connect is Pair, each popup names its state and the step that fixes an error, the in-page list has a row for every state, and a login field's button is a key. (F.131)
+
 The desktop app is redrawn to one set of buttons, menus, focus rings and grouped rows: search sits at the top of the list, Lock on the rail, unlock and first launch drop the grid, prompts show their time as a bar, Agents connects a tool from one sheet with its setup prompt and config, Security moves a note's keys together, and Settings is one list of sections. (F.130)
 
 The desktop app shows each vault as one flat list; new items go to the top level, and groups already in a file are kept untouched. (J.1)
