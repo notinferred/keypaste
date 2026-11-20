@@ -1,5 +1,6 @@
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
+using Keypaste.Core.Ownership;
 using Keypaste.Core.Tests;
 using Xunit;
 
@@ -9,12 +10,13 @@ namespace Keypaste.App.Tests.ViewModels;
 public sealed class ConflictedCopyRecommendationTests : IDisposable
 {
     private readonly TempVault _fixture = new();
+    private readonly ManualClock _clock = new(AppClock.Start);
     private readonly AppVaultSession _session;
 
     public ConflictedCopyRecommendationTests()
     {
         _fixture.Sees();
-        _session = new AppVaultSession(new ManualClock(AppClock.Start), home: _fixture.Home);
+        _session = new AppVaultSession(_clock, home: _fixture.Home);
         using var master = TempVault.Secret(TempVault.Password);
         Assert.Equal(UnlockOutcome.Opened, _session.TryUnlock(_fixture.Path_, master.Value));
     }
@@ -28,11 +30,12 @@ public sealed class ConflictedCopyRecommendationTests : IDisposable
     }
 
     [Fact]
-    public async Task A_conflicted_copy_is_reviewed_then_merged_and_leaves_the_list()
+    public async Task A_conflicted_copy_its_owner_found_is_reviewed_then_merged_and_leaves_the_list()
     {
         File.Copy(_fixture.Path_, Copy);
         using var recommendations = new RecommendationsViewModel(_session, _fixture.Home);
-        recommendations.LookForConflictedCopies();
+        using var watch = new VaultFileWatch(_session);
+        _clock.Advance(VaultFileWatch.Poll);
         var row = Assert.Single(recommendations.ConflictedCopies);
         Assert.False(recommendations.IsEmpty);
 

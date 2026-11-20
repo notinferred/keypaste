@@ -54,6 +54,9 @@ public sealed class HeldVault : IWatchedVault, IDisposable
     public TimeProvider Clock => _clock;
 
     /// <inheritdoc/>
+    public ConflictedCopies ConflictedCopies { get; } = new();
+
+    /// <inheritdoc/>
     public bool MergesAnotherSave
     {
         get

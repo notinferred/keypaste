@@ -297,6 +297,11 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
 
     Vault? IWatchedVault.Open => Unlocked;
 
+    /// <summary>The sync tools' conflicted copies its file watch finds beside the unlocked vault.</summary>
+    internal ConflictedCopies ConflictedCopies { get; } = new();
+
+    ConflictedCopies IWatchedVault.ConflictedCopies => ConflictedCopies;
+
     bool IWatchedVault.MergesAnotherSave => MergeRefusal() is null && Merges;
 
     void IWatchedVault.MergeAnotherSave() => Merge();

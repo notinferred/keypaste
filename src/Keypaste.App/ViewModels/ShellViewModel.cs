@@ -1428,7 +1428,6 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         };
 
         OffersSaveOverFile = false;
-        ScanOf(session).LookForConflictedCopies();
 
         if (!File.Exists(vault.Path))
         {

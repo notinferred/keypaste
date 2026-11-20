@@ -30,6 +30,7 @@ public sealed class VaultConflictedCopyTests : IDisposable
     [InlineData("vault (Dan's conflicted copy 2026-11-09).kdbx", true)]
     [InlineData("vault.sync-conflict-20261109-120000-ABCDEFG.kdbx", true)]
     [InlineData("vault-other.kdbx", false)]
+    [InlineData("vault 2.kdbx", false)]
     [InlineData("other (conflicted copy).kdbx", false)]
     [InlineData("vault (copy).kdbx", false)]
     public void A_conflicted_copy_is_found_by_the_names_sync_tools_give(string name, bool found)
@@ -37,7 +38,60 @@ public sealed class VaultConflictedCopyTests : IDisposable
         File.Delete(CopyPath);
         File.WriteAllBytes(Path.Combine(_directory, name), [1]);
 
-        Assert.Equal(found, ConflictedCopies.Beside(VaultPath).Count == 1);
+        Assert.Equal(found, Found().Count == 1);
+    }
+
+    [Theory]
+    [InlineData("vault 2.kdbx", true)]
+    [InlineData("vault 3.kdbx", true)]
+    [InlineData("vault-JOHNS-SURFACE.kdbx", true)]
+    [InlineData("vault 1.kdbx", false)]
+    [InlineData("vault 02.kdbx", false)]
+    [InlineData("vault2.kdbx", false)]
+    [InlineData("vault two.kdbx", false)]
+    public void A_copy_named_as_iCloud_Drive_or_OneDrive_names_one_is_found_when_it_holds_another_devices_changes(string name, bool found)
+    {
+        File.Move(CopyPath, Path.Combine(_directory, name));
+        Edit(Path.Combine(_directory, name), "stripe", "phone");
+
+        Assert.Equal(found, Found().Count == 1);
+    }
+
+    [Fact]
+    public void A_second_vault_named_as_iCloud_Drive_names_a_copy_is_not_one()
+    {
+        File.Delete(CopyPath);
+        using (var second = ClaimedVault.Create(Path.Combine(_directory, "vault 2.kdbx"), _password))
+        {
+            second.AddEntry(new VaultEntry { Title = "stripe", GroupPath = _work, Username = "user", Password = "second" });
+            second.Save();
+        }
+
+        Assert.Empty(Found());
+    }
+
+    [Fact]
+    public void An_old_copy_named_as_OneDrive_names_one_is_not_one_when_it_holds_nothing_the_vault_lacks()
+    {
+        File.Move(CopyPath, Path.Combine(_directory, "vault-old.kdbx"));
+        Edit(VaultPath, "github", "pc");
+
+        Assert.Empty(Found());
+    }
+
+    [Fact]
+    public void A_lock_forgets_what_was_found()
+    {
+        var copies = new ConflictedCopies();
+        using (var open = ClaimedVault.Open(VaultPath, _password))
+        {
+            copies.Look(open);
+        }
+
+        Assert.Equal(CopyPath, Assert.Single(copies.Found));
+        copies.Clear();
+
+        Assert.Empty(copies.Found);
     }
 
     [Fact]
@@ -117,6 +171,14 @@ public sealed class VaultConflictedCopyTests : IDisposable
 
         Assert.Equal(GroupOutcome.Renamed, vault.RenameGroup(_work, "billing", out _));
         Assert.Equal(GroupOutcome.Moved, vault.MoveGroup("billing", "dest", out _));
+    }
+
+    private IReadOnlyList<string> Found()
+    {
+        var copies = new ConflictedCopies();
+        using var open = ClaimedVault.Open(VaultPath, _password);
+        copies.Look(open);
+        return copies.Found;
     }
 
     private static void Edit(string path, string title, string password)

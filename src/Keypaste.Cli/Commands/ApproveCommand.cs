@@ -195,6 +195,8 @@ internal static class ApproveCommand
         {
             held.MergeThrough(server.Authority, Surface);
             held.Merged += (_, merged) => Merged(merged, console, () => Stop(lifetime, stop));
+            var toldOf = new HashSet<string>(StringComparer.Ordinal);
+            held.ConflictedCopies.Changed += (_, _) => ConflictedCopiesFound(held.ConflictedCopies.Found, toldOf, console);
             using var watch = new VaultFileWatch(held);
 
             // A signal ends the lifetime and then stops the listener, rather than ending the
@@ -373,6 +375,27 @@ internal static class ApproveCommand
             allowed.Count > 0
                 ? "keypaste: every other value waits for you to say yes; agents see each item's URL, and its username unless Settings hides it. Press Ctrl+C to stop."
                 : "keypaste: every value waits for you to say yes; agents see each item's URL, and its username unless Settings hides it. Press Ctrl+C to stop.");
+    }
+
+    /// <summary>Tells the person of each sync tool's conflicted copy beside the vault once, and where to merge it.</summary>
+    /// <param name="found">The copies the owner found.</param>
+    /// <param name="toldOf">The copies already told of, which this adds to.</param>
+    /// <param name="console">The person's terminal.</param>
+    /// <remarks>Merging writes the vault under its claim, which this command holds, so the person stops it before the app can take it.</remarks>
+    internal static void ConflictedCopiesFound(IReadOnlyList<string> found, ISet<string> toldOf, AgentConsole console)
+    {
+        ArgumentNullException.ThrowIfNull(found);
+        ArgumentNullException.ThrowIfNull(toldOf);
+        ArgumentNullException.ThrowIfNull(console);
+
+        lock (toldOf)
+        {
+            foreach (var path in found.Where(toldOf.Add))
+            {
+                console.WriteLine(
+                    $"keypaste: {DisplayTextSanitizer.Sanitize(Path.GetFileName(path)).Text}, beside the vault, is a sync tool's conflicted copy of it, whose changes are not in the vault. To merge it, stop keypaste approve and open the vault in the keypaste app, where Security offers it to review and merge.");
+            }
+        }
     }
 
     private static bool TryLimits(ParseResult line, CliContext context, out ApprovalLimits limits)

@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+Conflicted copies OneDrive and iCloud Drive leave beside a vault are found as Syncthing's, Dropbox's and Nextcloud's are, and `keypaste approve` names each one it finds in its terminal and says where to merge it, as the app's Security lists it. (F.135)
+
 `keypaste init` and restoring a backup from the desktop app's unlock screen are refused while another keypaste process holds the vault, naming it, as the commands that save already were, and both are refused while file locking is turned off (`DOTNET_SYSTEM_IO_DISABLEFILELOCKING`). (F.134)
 
 The macOS app and CLI are signed with keypaste's Developer ID under the hardened runtime, and a release's macOS files are notarized and stapled before they publish. (3.5b)

@@ -106,6 +106,20 @@ public sealed class HeldVaultTests : IDisposable
         Assert.Equal(AgentSaveOutcome.Locked, _held.Save(_ => true).Outcome);
     }
 
+    [Fact]
+    public async Task ItsFileWatch_FindsASyncToolsConflictedCopyAtUnlock()
+    {
+        var copy = Path.Combine(_directory, "vault.sync-conflict-20261120-090000-ABCDEFG.kdbx");
+        File.Copy(VaultPath, copy);
+        var found = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _held.ConflictedCopies.Changed += (_, _) => found.TrySetResult();
+
+        using var watch = new VaultFileWatch(_held);
+
+        await found.Task.WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken);
+        Assert.Equal(copy, Assert.Single(_held.ConflictedCopies.Found));
+    }
+
     private void SaveElsewhere(EntryName name, string password)
     {
         using var other = ClaimedVault.Open(VaultPath, _master);

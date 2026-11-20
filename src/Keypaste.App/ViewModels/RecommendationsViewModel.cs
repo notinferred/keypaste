@@ -93,6 +93,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
             _preferences.Changed += OnPreferencesChanged;
         }
 
+        _session.ConflictedCopies.Changed += OnConflictedCopiesChanged;
         Check();
     }
 
@@ -189,16 +190,18 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
 
     internal bool HasConflictedCopies => ConflictedCopies.Count > 0;
 
-    /// <summary>Looks again for conflicted copies, keeping the rows of those still there.</summary>
-    internal void LookForConflictedCopies()
+    /// <summary>Shows the conflicted copies the vault's owner last found, keeping the rows of those still there.</summary>
+    internal void ShowConflictedCopies()
     {
-        var found = _disposed || _session.Unlocked is not { } vault ? [] : Core.ConflictedCopies.Beside(vault.Path);
+        var found = _disposed || _session.Unlocked is null ? [] : _session.ConflictedCopies.Found;
 
         if (!found.SequenceEqual(ConflictedCopies.Select(row => row.Path), StringComparer.Ordinal))
         {
             ConflictedCopies = [.. found.Select(path => ConflictedCopies.FirstOrDefault(row => row.Path == path) ?? new ConflictedCopyRow(this, path))];
         }
     }
+
+    private void OnConflictedCopiesChanged(object? sender, EventArgs e) => Post(ShowConflictedCopies);
 
     /// <summary>Works out what merging a copy would change, which writes nothing.</summary>
     internal async Task ReviewAsync(ConflictedCopyRow row)
@@ -222,7 +225,13 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
         {
             row.Review = null;
             Message = $"Merged {row.Name} and moved it in with this vault's backups.";
-            LookForConflictedCopies();
+
+            if (_session.Unlocked is { } vault)
+            {
+                await Task.Run(() => _session.ConflictedCopies.Look(vault)).ConfigureAwait(true);
+            }
+
+            ShowConflictedCopies();
         }
     }
 
@@ -444,7 +453,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
         var keyfile = _session.Unlocked?.KeyfilePath;
         FragileKeyFile = keyfile is not null && VaultKeyfile.Inspect(keyfile).IsFragile ? Path.GetFileName(keyfile) : null;
         FragileKeyFileDismissed = FragileKeyFile is not null && _dismissals.Contains(FragileKeyFileDismissal(vaultKey));
-        LookForConflictedCopies();
+        ShowConflictedCopies();
         Rows = [.. _noteKeys
             .GroupBy(finding => (finding.EntryUuid, finding.Entry, Dismissed: IsDismissed(vaultKey, finding)))
             .Select(item => new RecommendationRow(this, [.. item.OrderBy(finding => finding.Line)], item.Key.Dismissed))
@@ -710,6 +719,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
             _preferences.Changed -= OnPreferencesChanged;
         }
 
+        _session.ConflictedCopies.Changed -= OnConflictedCopiesChanged;
         Rows = [];
         LostTags = [];
         Passwords = [];

@@ -1,6 +1,6 @@
 namespace Keypaste.Core.Ownership;
 
-/// <summary>An approver's open vault, as <see cref="VaultFileWatch"/> watches its file for another program's save.</summary>
+/// <summary>An approver's open vault, as <see cref="VaultFileWatch"/> watches its folder for another program's save and a conflicted copy.</summary>
 public interface IWatchedVault
 {
     /// <summary>The clock the poll and the settling run on.</summary>
@@ -8,6 +8,9 @@ public interface IWatchedVault
 
     /// <summary>The open copy, or null while the vault is locked.</summary>
     Vault? Open { get; }
+
+    /// <summary>The sync tools' conflicted copies the watch finds beside the open copy.</summary>
+    ConflictedCopies ConflictedCopies { get; }
 
     /// <summary>
     /// Whether another program's save of the open copy's file is merged now: false while nothing merges for this unlock, or while

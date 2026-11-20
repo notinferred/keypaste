@@ -2,7 +2,7 @@ namespace Keypaste.Core.Ownership;
 
 /// <summary>
 /// Watches one open vault's file for another program's save, such as a sync tool's, and merges it with the open copy
-/// within five seconds, for either approver.
+/// within five seconds, for either approver, and looks beside it for a sync tool's conflicted copy at unlock and each time the poll or the folder watch compares the file.
 /// </summary>
 /// <remarks>
 /// It watches the vault's folder, not the file alone, because another program often saves by renaming a new file over it,
@@ -31,8 +31,8 @@ public sealed class VaultFileWatch : IDisposable
         ArgumentNullException.ThrowIfNull(watched);
 
         _watched = watched;
-        _poll = watched.Clock.CreateTimer(_ => Check(), null, Poll, Poll);
-        _settleTimer = watched.Clock.CreateTimer(_ => Check(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        _poll = watched.Clock.CreateTimer(_ => CheckAndLook(), null, Poll, Poll);
+        _settleTimer = watched.Clock.CreateTimer(_ => CheckAndLook(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         _watched.Opened += OnOpened;
         _watched.Locked += OnLocked;
 
@@ -42,6 +42,7 @@ public sealed class VaultFileWatch : IDisposable
 
             // A save made before the watch began is merged now rather than at the first poll.
             Check();
+            Settle();
         }
     }
 
@@ -102,6 +103,17 @@ public sealed class VaultFileWatch : IDisposable
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>Compares the file, then looks for conflicted copies, which may take a key derivation, off the thread that unlocked.</summary>
+    private void CheckAndLook()
+    {
+        Check();
+
+        if (_watched.Open is { } vault)
+        {
+            _watched.ConflictedCopies.Look(vault);
+        }
+    }
+
     private void StartMerge()
     {
         lock (_gate)
@@ -149,10 +161,16 @@ public sealed class VaultFileWatch : IDisposable
         return done.Task;
     }
 
-    private void OnOpened(object? sender, EventArgs e) => WatchFolder();
+    private void OnOpened(object? sender, EventArgs e)
+    {
+        WatchFolder();
+        Settle();
+    }
 
     private void OnLocked(object? sender, EventArgs e)
     {
+        _watched.ConflictedCopies.Clear();
+
         lock (_gate)
         {
             _folder?.Dispose();

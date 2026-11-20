@@ -200,6 +200,29 @@ public sealed class ApproveCommandTests : IDisposable
         Assert.Equal(moved, File.ReadAllBytes(_harness.VaultPath));
     }
 
+    /// <summary>A copy iCloud Drive kept of the vault, holding another device's change, is told of in the terminal with where to merge it.</summary>
+    [Fact]
+    public async Task AConflictedCopyBesideTheVault_IsToldOfInItsTerminal()
+    {
+        var copy = Path.Combine(_harness.Directory, Path.GetFileNameWithoutExtension(_harness.VaultPath) + " 2.kdbx");
+        File.Copy(_harness.VaultPath, copy);
+
+        using (var phone = ClaimedVault.Open(copy, _master))
+        {
+            phone.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "PHONE", Password = "phone-value" });
+            phone.Save();
+        }
+
+        await using var approver = await RunningApprover.StartAsync(_harness, _master);
+
+        await approver.WaitForAsync(
+            $"keypaste: {Path.GetFileName(copy)}, beside the vault, is a sync tool's conflicted copy of it, whose changes are not in the vault. To merge it, stop keypaste approve and open the vault in the keypaste app, where Security offers it to review and merge.");
+
+        using var terminal = Terminal(approver);
+        await approver.StopAsync(terminal);
+        Assert.True(File.Exists(copy));
+    }
+
     /// <summary>A merge refused because the password or key file unlocked with no longer opens the file says so, and locks.</summary>
     [Fact]
     public void AMergeTheUnlocksKeyNoLongerOpens_SaysSoAndLocks()
