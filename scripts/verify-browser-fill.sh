@@ -52,10 +52,10 @@ require openssl
 for build in chromium firefox; do
   [ -f "artifacts/extension/$build/manifest.json" ] || die "no unpacked $build build; run node extension/build.js first"
 done
-id_of() { node extension/test-keys/ids.js | awk -v store="$1" '$1 == store { print $2 }'; }
+id_of() { node extension/keys/ids.js | awk -v store="$1" '$1 == store { print $2 }'; }
 chrome_id="$(id_of chrome)"
 edge_id="$(id_of edge)"
-[ -n "$chrome_id" ] && [ -n "$edge_id" ] || die "extension/test-keys/ids.js gave no Chrome or Edge ID"
+[ -n "$chrome_id" ] && [ -n "$edge_id" ] || die "extension/keys/ids.js gave no Chrome or Edge ID"
 
 watchdog 1500 node Keypaste.AppDriver keypaste chrome msedge brave firefox geckodriver
 
@@ -86,7 +86,7 @@ node -e '
   const fs = require("node:fs");
   const [ manifest, key ] = process.argv.slice(1);
   fs.writeFileSync(manifest, JSON.stringify({ ...JSON.parse(fs.readFileSync(manifest, "utf8")), key }, null, 4));
-' "$work/edge-build/manifest.json" "$(node extension/test-keys/ids.js | awk '$1 == "edge" { print $3 }')"
+' "$work/edge-build/manifest.json" "$(node extension/keys/ids.js | awk '$1 == "edge" { print $3 }')"
 
 step "Fetch the browsers"
 brave=''

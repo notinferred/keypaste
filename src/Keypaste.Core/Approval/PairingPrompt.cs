@@ -24,7 +24,7 @@ public sealed record PairingPrompt
     /// <summary>The names this computer's pairings already have, which a new one cannot take.</summary>
     public required IReadOnlyList<string> TakenNames { get; init; }
 
-    /// <summary>What the prompt says asked: <c>keypaste's extension from the Chrome Web Store (fipabobollckgdobkjfkkchimlphcicg)</c>.</summary>
+    /// <summary>What the prompt says asked: <c>keypaste's extension from the Chrome Web Store (kabnajpeogcbndlfgibmhiichfkgpdla)</c>.</summary>
     public string IdentityText => Identity.Described;
 
     /// <summary>Why a name cannot be given to this pairing, or null when it can.</summary>

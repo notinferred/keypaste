@@ -21,9 +21,9 @@ namespace Keypaste.Processes.Tests;
 /// </remarks>
 public sealed class BrowserHostTests
 {
-    private const string _chrome = "fipabobollckgdobkjfkkchimlphcicg";
+    private const string _chrome = "kabnajpeogcbndlfgibmhiichfkgpdla";
     private const string _edge = "iobkkhmaklkkeiadigbohfaplldmaogd";
-    private const string _chromeBuild = "keypaste's extension from the Chrome Web Store (fipabobollckgdobkjfkkchimlphcicg)";
+    private const string _chromeBuild = "keypaste's extension from the Chrome Web Store (kabnajpeogcbndlfgibmhiichfkgpdla)";
     private const int _notFound = 20;
     private static readonly string[] _browsers = ["chrome", "chromium", "edge", "brave", "firefox"];
 
@@ -68,7 +68,7 @@ public sealed class BrowserHostTests
             // Deny pairs nothing, and holds the next request back unasked.
             using (var denied = StartBrowser(workspace, "firefox", key, "associate"))
             {
-                Assert.Contains("identity=keypaste's extension from Firefox Add-ons (browser@keypaste.invalid)", app.WaitFor("^pair-prompt identity=", ++prompts), StringComparison.Ordinal);
+                Assert.Contains("identity=keypaste's extension from Firefox Add-ons (browser@keypaste.com)", app.WaitFor("^pair-prompt identity=", ++prompts), StringComparison.Ordinal);
                 app.Send("deny");
                 Assert.Equal("6", Assert.Single(Answers(denied)).GetProperty("errorCode").GetString());
             }

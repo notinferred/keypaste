@@ -65,7 +65,7 @@ public sealed class SessionBrowsersTests : IDisposable
         var prompt = Assert.Single(_fixture.Channel.PairingPrompts);
         Assert.Equal(PairingCode.Of(_key), prompt.Code);
         Assert.Matches("^[0-9]{3} [0-9]{3}$", prompt.Code);
-        Assert.Equal("keypaste's extension from the Chrome Web Store (fipabobollckgdobkjfkkchimlphcicg)", prompt.IdentityText);
+        Assert.Equal("keypaste's extension from the Chrome Web Store (kabnajpeogcbndlfgibmhiichfkgpdla)", prompt.IdentityText);
         Assert.Null(prompt.NameProblem(prompt.SuggestedName));
 
         var file = File.ReadAllText(PairingsPath);
@@ -240,7 +240,7 @@ public sealed class SessionBrowsersTests : IDisposable
             GroupPath = ReservedGroups.Browsers,
             Title = "laptop",
             Password = BrowserPairings.KeyHash(_key)!,
-            Notes = """{"v":1,"identity":"chrome-extension://fipabobollckgdobkjfkkchimlphcicg/","created":"2026-11-01T10:00:00Z"}""",
+            Notes = """{"v":1,"identity":"chrome-extension://kabnajpeogcbndlfgibmhiichfkgpdla/","created":"2026-11-01T10:00:00Z"}""",
         });
         _vault.Save();
         await using var owner = Owner.Start(this);
