@@ -103,6 +103,33 @@ public sealed class VaultSaveTests : IDisposable
         Assert.True(File.Exists(Path.Combine(home, "vault.kdbx")));
     }
 
+    /// <summary>A retry writes the bytes the save already produced, deriving no second key.</summary>
+    [Fact]
+    public void A_retry_writes_the_bytes_the_save_already_produced()
+    {
+        var (vault, home) = NewVaultInItsOwnDirectory("produced-once");
+        using var _ = vault;
+        vault.AddEntry(new VaultEntry { Title = "New", Password = "p" });
+        var produced = 0;
+        vault.AfterSerializing = bytes =>
+        {
+            produced++;
+            return bytes;
+        };
+
+        vault.SaveWaiting(null, duringAttempt: attempt =>
+        {
+            if (attempt == 1)
+            {
+                throw new IOException("another program holds the vault file");
+            }
+        });
+
+        Assert.Equal(1, produced);
+        using var reopened = Vault.Open(Path.Combine(home, "vault.kdbx"), MasterPassword);
+        Assert.Contains(reopened.ReadEntries(), entry => entry.Title == "New");
+    }
+
     /// <summary>
     /// The retry is real, and not a loop that gives up on the first pass. Asserted on elapsed
     /// time, which only ever runs long, so this is exact in both directions: the backoff cannot

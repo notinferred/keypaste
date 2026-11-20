@@ -43,7 +43,7 @@ internal static class SaveTimings
         string.Create(
             CultureInfo.InvariantCulture,
             $"op={timing.Operation} ok={(timing.Succeeded ? 1 : 0)} " +
-            $"check={Ms(timing.Check)} redirect={Ms(timing.Redirect)} " +
+            $"check={Ms(timing.Check)} redirect={Ms(timing.Redirect)} produce={Ms(timing.Produce)} " +
             $"gate={Each(timing, a => Ms(a.Gate))} heldby={Each(timing, a => a.Gate is null ? "-" : a.HeldBy.ToString(CultureInfo.InvariantCulture))} " +
             $"held={Each(timing, a => Ms(a.Held))} rereads={Each(timing, a => Ms(a.Reread))} " +
             $"work={Each(timing, a => Ms(a.Work))} waits={Each(timing, a => Ms(a.Wait))} " +

@@ -282,16 +282,11 @@ public sealed class HardwareKeyVaultTests : IDisposable
     }
 
     /// <summary>
-    /// A write refused for a moment after the key has answered is tried again, and the retry asks the key again,
-    /// because the challenge is the KDF seed each attempt draws (F.53).
+    /// A write refused for a moment after the key has answered is tried again with the bytes it answered for, so one
+    /// access change asks the key once.
     /// </summary>
-    /// <remarks>
-    /// What ci 37627277189 saw on <c>windows-2025</c>, the key asked twice by one access change, made to happen
-    /// every run. A throw from the attempt hook itself lands before the vault is serialised and asks nothing, so the
-    /// refusal is staged where the write meets it, as <see cref="RefusedWrite"/> says.
-    /// </remarks>
     [Fact]
-    public void A_write_refused_after_the_key_answered_asks_it_again_on_the_retry()
+    public void A_write_refused_after_the_key_answered_is_retried_without_asking_it_again()
     {
         var path = PasswordVault("vault.kdbx");
         var device = new SoftwareYubiKey(_secret);
@@ -319,9 +314,8 @@ public sealed class HardwareKeyVaultTests : IDisposable
         }
 
         Assert.Equal(VaultAccessOutcome.Changed, result.Outcome);
-        Assert.Equal([0, 1], askedBefore);
-        Assert.Equal(2, device.Challenges.Count);
-        Assert.NotEqual(device.Challenges[0], device.Challenges[1]);
+        Assert.Equal([1, 1], askedBefore);
+        Assert.Single(device.Challenges);
         Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, _master));
 
         using var fresh = new HardwareKey(new SoftwareYubiKey(_secret), 2);
@@ -507,7 +501,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
     }
 
     /// <summary>
-    /// Refuses the vault's writes, after each has serialised the vault and asked its key, until lifted.
+    /// Refuses the vault's writes where they meet the file, until lifted.
     /// </summary>
     /// <remarks>
     /// Off Windows a write's temporary file is <c>&lt;vault&gt;.tmp</c>, and a directory there refuses it. On Windows the

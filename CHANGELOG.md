@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+A save no longer overwrites another program's save that lands while keypaste derives the vault's keys or writes the file: it is refused as a save over an earlier change is, and an overwrite you chose still replaces it. (F.133)
+
 A vault opened through a symbolic link is saved and restored by replacing the file the link points to with one rename, so the link stays and a failed or interrupted save no longer leaves the vault empty; on Windows the same holds for a file marked as a reparse point that is not a link, as OneDrive marks some. (F.132)
 
 `keypaste approve` merges another program's save of its vault while it runs, as the app does, saying in its terminal what it merged, and answers agents from the merged copy without a restart. (1.4b4)

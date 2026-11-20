@@ -5,7 +5,7 @@ namespace Keypaste.Core.Internal;
 /// <summary>Where one save's caller wait went, component by component (task F.10a).</summary>
 /// <remarks>
 /// The components are disjoint and together are the caller's whole wait: <see cref="Total"/> is
-/// <see cref="Check"/> + <see cref="Redirect"/> + every attempt's parts + <see cref="Stamp"/>, plus
+/// <see cref="Check"/> + <see cref="Redirect"/> + <see cref="Produce"/> + every attempt's parts + <see cref="Stamp"/>, plus
 /// the loop's own overhead. The retry schedule describes the attempts' <see cref="AttemptTiming.Wait"/>
 /// alone and bounds none of the others.
 /// </remarks>
@@ -15,6 +15,7 @@ internal readonly record struct SaveTiming(
     bool Succeeded,
     TimeSpan? Check,
     TimeSpan Redirect,
+    TimeSpan? Produce,
     IReadOnlyList<AttemptTiming> Attempts,
     TimeSpan? Stamp,
     TimeSpan Total);
@@ -40,6 +41,7 @@ internal sealed class SaveClock
     private readonly long _started = Stopwatch.GetTimestamp();
     private readonly List<AttemptTiming> _attempts = [];
     private TimeSpan? _check;
+    private TimeSpan? _produce;
     private TimeSpan? _stamp;
     private TimeSpan _redirect;
     private int _gatedAttempt = -1;
@@ -56,6 +58,8 @@ internal sealed class SaveClock
     internal T Check<T>(Func<T> read) => Time(read, elapsed => _check = elapsed);
 
     internal void Redirect(Action redirect) => Time(redirect, elapsed => _redirect = elapsed);
+
+    internal T Produce<T>(Func<T> produce) => Time(produce, elapsed => _produce = elapsed);
 
     internal void BeginAttempt() => _attempts.Add(default);
 
@@ -89,6 +93,7 @@ internal sealed class SaveClock
             succeeded,
             _check,
             _redirect,
+            _produce,
             _attempts,
             _stamp,
             Stopwatch.GetElapsedTime(_started)));

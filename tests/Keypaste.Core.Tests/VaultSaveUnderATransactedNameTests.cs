@@ -25,17 +25,16 @@ namespace Keypaste.Core.Tests;
 /// </para>
 /// <para>
 /// <b>The retry is the reason a conflict here is resolved from inside the wait rather than on a
-/// timer.</b> An attempt is nearly all Argon2 derivation and the move is its last act, so a commit
-/// landing mid-attempt lets that attempt's move succeed — and a timer cannot say which it will hit.
+/// timer.</b> A commit at an unknown instant meets an attempt's re-read, its check before the move,
+/// or neither, and a timer cannot say which it will hit.
 /// <see cref="Vault.SaveWaiting"/> exists so the commit or rollback lands at the one instant that
 /// makes the outcome the same every run: after an attempt has been refused, before the vault is
 /// re-read.
 /// </para>
 /// <para>
 /// <see cref="ASaveRefusedTheVaultsOwnName_SaysWhichCodeRefusedIt_AndLeavesNothingBesideTheVault"/>
-/// is the exception, and holds the name throughout. It therefore runs the whole budget — eight
-/// Argon2 derivations plus about 2.2 seconds of sleeps, so three or four seconds. That is the test
-/// working, not hanging.
+/// is the exception, and holds the name throughout. It therefore runs the whole budget, about 2.2
+/// seconds of sleeps after the save's one derivation. That is the test working, not hanging.
 /// </para>
 /// <para>
 /// The <c>[SupportedOSPlatform]</c> attributes are for the analyzer, which does not carry an

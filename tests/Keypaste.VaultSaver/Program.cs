@@ -3,8 +3,8 @@ using Keypaste.Core;
 namespace Keypaste.VaultSaver;
 
 /// <summary>
-/// Saves one vault, once, at a given retry budget, and says what happened; or restores a backup as
-/// far as the instant before the vault is replaced, and waits there to be killed.
+/// Saves one vault, once, at a given retry budget, and says what happened; or saves one, or restores a
+/// backup, as far as the instant before the vault is replaced, and waits there to be killed.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -44,11 +44,17 @@ internal static class Program
             return RestoreAndHold(vaultPath, backupName, password);
         }
 
+        if (args is ["save-hold", var heldPath])
+        {
+            return SaveAndHold(heldPath, password);
+        }
+
         if (args.Length != 2 || !int.TryParse(args[1], out var attempts))
         {
             Console.Error.WriteLine(
                 "usage: <vault-path> <attempts>\n" +
                 "       restore-hold <vault-path> <backup-file-name>\n" +
+                "       save-hold <vault-path>\n" +
                 "the master password is read from KEYPASTE_SAVER_PASSWORD");
             return 2;
         }
@@ -80,6 +86,30 @@ internal static class Program
         }
     }
 
+    /// <summary>Saves an edit as far as the instant after the backup and before the write, says so, and waits to be killed.</summary>
+    private static int SaveAndHold(string vaultPath, string password)
+    {
+        try
+        {
+            using var vault = Vault.Open(vaultPath, password);
+            vault.AddEntry(new VaultEntry { Title = "never written", Password = "secret" });
+            vault.SaveWaiting(waitBetweenAttempts: null, duringAttempt: _ => Hold());
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"saver failed: {ex.GetType().Name}: {ex.Message}");
+            return 3;
+        }
+    }
+
+    private static void Hold()
+    {
+        Console.WriteLine("holding");
+        Console.Out.Flush();
+        Thread.Sleep(Timeout.Infinite);
+    }
+
     /// <summary>
     /// Restores a backup as far as the instant before the vault is replaced, says so, and waits to be
     /// killed.
@@ -87,7 +117,7 @@ internal static class Program
     /// <remarks>
     /// Here and not in the public-API restorer because only the internal seam can stop at that
     /// instant. Nothing but a rename lies between keeping the vault and replacing it, so a test that
-    /// polled for the kept copy, as the save's kill test does, would almost never land inside it.
+    /// polled for the kept copy would almost never land inside it.
     /// </remarks>
     private static int RestoreAndHold(string vaultPath, string backupName, string password)
     {
@@ -98,12 +128,7 @@ internal static class Program
 
             VaultBackups.Restore(
                 validated,
-                beforeReplacing: _ =>
-                {
-                    Console.WriteLine("holding");
-                    Console.Out.Flush();
-                    Thread.Sleep(Timeout.Infinite);
-                },
+                beforeReplacing: _ => Hold(),
                 waitBetweenAttempts: null);
 
             return 0;

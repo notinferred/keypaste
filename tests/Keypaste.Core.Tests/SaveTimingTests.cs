@@ -160,7 +160,7 @@ public sealed class SaveTimingTests : IDisposable
     }
 
     [Fact]
-    public void ASaveDoingRealWorkAlone_IsReportedAsWork_NotGateWait()
+    public void ASaveDoingRealWorkAlone_IsReportedAsProducing_OutsideTheGate()
     {
         // The work this weighs against the gate is mostly the save's key derivation, so the vault keeps the production cost.
         using var production = TestKeyDerivation.Production();
@@ -174,9 +174,10 @@ public sealed class SaveTimingTests : IDisposable
         Assert.Equal(0, gated.HeldBy);
         Assert.NotNull(gated.Gate);
         Assert.True(
-            gated.Work > 10 * gated.Gate,
+            timing.Produce > 10 * gated.Gate,
             $"key derivation and encryption did not dominate an uncontended gate: {SaveTimings.Describe(timing)}");
         Assert.True(gated.Held >= gated.Work, $"the hold did not cover the attempt: {SaveTimings.Describe(timing)}");
+        Assert.True(gated.Held < timing.Produce, $"the gate was held across key derivation: {SaveTimings.Describe(timing)}");
         AssertComponentsFitTheTotal(timing);
     }
 
@@ -300,7 +301,7 @@ public sealed class SaveTimingTests : IDisposable
 
     private static void AssertComponentsFitTheTotal(SaveTiming timing)
     {
-        var parts = (timing.Check ?? TimeSpan.Zero) + timing.Redirect + (timing.Stamp ?? TimeSpan.Zero)
+        var parts = (timing.Check ?? TimeSpan.Zero) + timing.Redirect + (timing.Produce ?? TimeSpan.Zero) + (timing.Stamp ?? TimeSpan.Zero)
             + SaveTimings.Sum(timing, a => a.Gate)
             + SaveTimings.Sum(timing, a => a.Reread)
             + SaveTimings.Sum(timing, a => a.Work)

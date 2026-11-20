@@ -463,17 +463,9 @@ public sealed class VaultBackupTests : IDisposable
     // ------------------------------------------------------------------ interrupted
 
     [Fact]
-    public void ASaveKilledAtTheBackupBoundary_LeavesTheVaultAndACompleteBackup()
+    public async Task ASaveKilledAtTheBackupBoundary_LeavesTheVaultAndACompleteBackup()
     {
-        // The boundary needs no product knob to find: the backup file appearing beside the vault is
-        // the instant between "the bytes are preserved" and "the vault is replaced". That instant lasts
-        // one key derivation, so this vault keeps the production cost.
-        string path;
-        using (TestKeyDerivation.Production())
-        {
-            path = SeededVault("before");
-        }
-
+        var path = SeededVault("before");
         var bytes = File.ReadAllBytes(path);
 
         var info = new ProcessStartInfo
@@ -484,46 +476,26 @@ public sealed class VaultBackupTests : IDisposable
             RedirectStandardError = true,
         };
 
+        info.ArgumentList.Add("save-hold");
         info.ArgumentList.Add(path);
-        info.ArgumentList.Add("1");
         info.Environment["KEYPASTE_SAVER_PASSWORD"] = MasterPassword;
 
         using var process = Process.Start(info)
             ?? throw new InvalidOperationException("the saver did not start");
 
-        var waited = Stopwatch.StartNew();
-        var killed = false;
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(60));
 
-        while (waited.Elapsed < TimeSpan.FromSeconds(60))
-        {
-            if (VaultBackups.List(path).Count > 0)
-            {
-                process.Kill(entireProcessTree: true);
-                killed = true;
-                break;
-            }
+        Assert.Equal("holding", await process.StandardOutput.ReadLineAsync(deadline.Token));
 
-            if (process.HasExited)
-            {
-                break;
-            }
-
-            Thread.Sleep(1);
-        }
-
-        process.WaitForExit(TimeSpan.FromSeconds(30));
+        process.Kill(entireProcessTree: true);
+        await process.WaitForExitAsync(deadline.Token);
 
         var backup = Assert.Single(VaultBackups.List(path));
 
         using (var kept = Vault.Open(backup.Path, MasterPassword))
         {
             Assert.Equal("before", Read(kept));
-        }
-
-        if (!killed)
-        {
-            // The save outran the poll. The backup above is still the claim; the vault has moved on.
-            return;
         }
 
         Assert.Equal(bytes, File.ReadAllBytes(path));

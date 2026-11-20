@@ -398,12 +398,14 @@ public sealed class VaultAccessChangeTests : IDisposable
         {
             // The keyfile changes between being read into the key and being read again to check the
             // bytes, which is the one way the new credentials can disagree with what was written.
-            var failure = Assert.Throws<VaultException>(() => vault.ChangeAccess(
-                Attach(keyfile), [], [],
-                duringAttempt: _ => File.WriteAllBytes(keyfile, Enumerable.Repeat((byte)7, 32).ToArray())));
+            vault.AfterSerializing = produced =>
+            {
+                File.WriteAllBytes(keyfile, Enumerable.Repeat((byte)7, 32).ToArray());
+                return produced;
+            };
+            var failure = Assert.Throws<VaultException>(() => vault.ChangeAccess(Attach(keyfile), [], []));
 
             Assert.Contains("did not open", failure.Message, StringComparison.Ordinal);
-            Assert.Contains(Assert.Single(VaultBackups.List(path)).Path, failure.Message, StringComparison.Ordinal);
         }
 
         Assert.Equal(bytes, File.ReadAllBytes(path));

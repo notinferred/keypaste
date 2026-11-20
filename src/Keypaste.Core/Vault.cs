@@ -308,7 +308,7 @@ public sealed class Vault : IDisposable
 
     /// <summary><see cref="MergeAnotherSave()"/>, with <see cref="SaveWaiting"/>'s seams on each merged copy's save.</summary>
     /// <param name="waitBetweenAttempts">Called instead of sleeping between a merged copy's save attempts.</param>
-    /// <param name="duringAttempt">Called inside each of a merged copy's save attempts, before any work.</param>
+    /// <param name="duringAttempt">Called inside each of a merged copy's save attempts, before it writes.</param>
     internal VaultMergeSave MergeAnotherSave(Action<int>? waitBetweenAttempts, Action<int>? duringAttempt = null)
     {
         KeePassInterop.KeyCopy key;
@@ -2806,9 +2806,9 @@ public sealed class Vault : IDisposable
     /// concurrent writer narrowly is not detected here. <b>The retry is not what saves that case —
     /// it used to be what lost it.</b> The replace fails, and a retry that merely outlasted the
     /// other writer would then revert it; what makes the race survivable is that
-    /// <see cref="Internal.KeePassInterop.Save"/> asks this question again across every wait,
-    /// leaving only a writer whose hold outlasts a wait and commits inside the attempt
-    /// that follows.
+    /// <see cref="Internal.KeePassInterop.Save"/> asks this question again across every wait and
+    /// immediately before each rename, leaving only a writer that commits between that last read
+    /// and the rename.
     /// </remarks>
     public bool HasFileChangedSinceOpen()
     {
@@ -3226,9 +3226,8 @@ public sealed class Vault : IDisposable
     /// <remarks>
     /// Exists so the regression for task F.7 can hold the vault's name, and then release
     /// or commit at the one instant that makes the outcome deterministic: after an attempt has been
-    /// refused and before the vault is re-read. A timer cannot do it — an attempt is nearly all key
-    /// derivation and the move is its last act, so a commit landing mid-attempt lets that attempt
-    /// win and the test flakes.
+    /// refused and before the vault is re-read. A timer cannot do it: which of a save's checks a
+    /// commit at an unknown instant meets decides the outcome, and the test flakes.
     /// </remarks>
     /// <param name="waitBetweenAttempts">
     /// Called instead of sleeping, so a test can act at the one deterministic instant.
@@ -3240,8 +3239,8 @@ public sealed class Vault : IDisposable
     /// a smaller budget is strictly worse in production and a larger one hides what V-F.6 catches.
     /// </param>
     /// <param name="duringAttempt">
-    /// Called inside each attempt, after the gate is taken and before any work, so a test can hold
-    /// the gate the way a slow attempt does.
+    /// Called inside each attempt, after the gate is taken and before it writes, so a test can hold
+    /// the gate the way a slow attempt does or land another program's save after the re-read.
     /// </param>
     /// <param name="afterReplacing">
     /// Called once the file is replaced and before this vault takes its new stamp, so a test can land
@@ -3287,13 +3286,12 @@ public sealed class Vault : IDisposable
                 _writing = true;
             }
 
-            _interop.Save(
+            var stamp = _interop.Save(
                 hasChangedOnDisk, waitBetweenAttempts, clock, attempts, duringAttempt,
                 backUp ? path => PreserveBefore(path, applyFloor) : null,
                 keyChange,
                 cancellationToken);
             afterReplacing?.Invoke();
-            var stamp = clock.Stamp(() => _interop.WrittenDigest ?? SourceSnapshot.Digest(Path));
 
             lock (_state)
             {

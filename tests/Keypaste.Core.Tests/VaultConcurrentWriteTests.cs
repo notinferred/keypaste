@@ -235,6 +235,95 @@ public sealed class VaultConcurrentWriteTests : IDisposable
         Assert.Null(reopened.Find("a-later-edit"));
     }
 
+    /// <summary>
+    /// Another program's save landing while this vault derives its keys is refused at the attempt's re-read.
+    /// </summary>
+    [Fact]
+    public void Another_programs_save_landing_while_keys_are_derived_is_refused()
+    {
+        var path = NewVault();
+        var theirs = AnotherProgramsSave(path);
+
+        using var first = Vault.Open(path, MasterPassword);
+        first.AddEntry(new VaultEntry { Title = "from-the-window", Password = "first" });
+        first.AfterSerializing = bytes =>
+        {
+            File.Copy(theirs, path, overwrite: true);
+            return bytes;
+        };
+
+        Assert.Throws<VaultChangedOnDiskException>(first.Save);
+
+        AssertTheirSaveKept(first, path);
+    }
+
+    /// <summary>
+    /// Another program's save landing after the attempt's re-read is refused immediately before the rename.
+    /// </summary>
+    [Fact]
+    public void Another_programs_save_landing_before_the_rename_is_refused()
+    {
+        var path = NewVault();
+        var theirs = AnotherProgramsSave(path);
+
+        using var first = Vault.Open(path, MasterPassword);
+        first.AddEntry(new VaultEntry { Title = "from-the-window", Password = "first" });
+
+        Assert.Throws<VaultChangedOnDiskException>(() =>
+            first.SaveWaiting(null, duringAttempt: _ => File.Copy(theirs, path, overwrite: true)));
+
+        AssertTheirSaveKept(first, path);
+    }
+
+    [Fact]
+    public void Overwriting_still_replaces_a_save_that_landed_while_keys_were_derived()
+    {
+        var path = NewVault();
+        var theirs = AnotherProgramsSave(path);
+
+        using var first = Vault.Open(path, MasterPassword);
+        first.AddEntry(new VaultEntry { Title = "from-the-window", Password = "first" });
+        first.AfterSerializing = bytes =>
+        {
+            File.Copy(theirs, path, overwrite: true);
+            return bytes;
+        };
+
+        first.SaveOverwriting();
+
+        using var reopened = Vault.Open(path, MasterPassword);
+        Assert.NotNull(reopened.Find("from-the-window"));
+        Assert.Null(reopened.Find("from-the-terminal"));
+        Assert.False(first.HasFileChangedSinceOpen());
+    }
+
+    /// <summary>A copy of the vault at <paramref name="path"/> that another program saved with one more item, in a folder of its own.</summary>
+    /// <remarks>The folder's name is short, since its backups' paths must stay within Windows' path limit.</remarks>
+    private string AnotherProgramsSave(string path)
+    {
+        var theirs = Path.Combine(Directory.CreateDirectory(Path.Combine(_directory, Path.GetRandomFileName())).FullName, "vault.kdbx");
+        File.Copy(path, theirs);
+
+        using var other = Vault.Open(theirs, MasterPassword);
+        other.AddEntry(new VaultEntry { Title = "from-the-terminal", Password = "second" });
+        other.Save();
+
+        return theirs;
+    }
+
+    private static void AssertTheirSaveKept(Vault refused, string path)
+    {
+        using (var reopened = Vault.Open(path, MasterPassword))
+        {
+            Assert.NotNull(reopened.Find("from-the-terminal"));
+            Assert.Null(reopened.Find("from-the-window"));
+        }
+
+        Assert.Empty(Directory.GetFiles(Path.GetDirectoryName(path)!, "*.tmp"));
+        Assert.NotNull(refused.Find("from-the-window"));
+        Assert.True(refused.SaveState().Unwritten);
+    }
+
     private string NewVault([System.Runtime.CompilerServices.CallerMemberName] string name = "")
     {
         var home = Directory.CreateDirectory(Path.Combine(_directory, name)).FullName;

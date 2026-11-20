@@ -73,7 +73,6 @@ internal sealed class KeePassInterop : IDisposable
     private readonly PwDatabase _database;
     private bool _disposed;
     private bool _readOnly;
-    private byte[]? _written;
 
     /// <summary>The entries of the file this instance last read or wrote, which a save may drop only by recording their deletion.</summary>
     private HashSet<PwUuid> _entriesOnDisk;
@@ -444,20 +443,6 @@ internal sealed class KeePassInterop : IDisposable
         return fresh;
     }
 
-    /// <summary>Serialises the vault and replaces the file with those bytes.</summary>
-    /// <remarks>
-    /// Never through <c>PwDatabase.Save</c>: KeePassLib writes a vault's last blocks while it closes its
-    /// streams and discards what that write throws, so a disk that filled during the save was committed
-    /// over the vault as a truncated file. Its file lock is off in keypaste and its hash fields
-    /// have no reader here.
-    /// </remarks>
-    private void Write()
-    {
-        Replace(SerializeAndProve);
-        _entriesOnDisk = EntryIds(_database);
-        _database.Modified = false;
-    }
-
     /// <summary>The custom-data item KeePassXC rewrites on every save, so a new value of it is no change to its owner.</summary>
     private const string _keePassXcStamp = "_LAST_MODIFIED";
 
@@ -467,10 +452,10 @@ internal sealed class KeePassInterop : IDisposable
     /// <summary>Changes the bytes a save produced, so a test can stand in for a writer that made a bad file.</summary>
     internal Func<byte[], byte[]>? AfterSerializing { get; set; }
 
-    /// <summary>The vault as KDBX bytes, proven to open again before they can replace the file.</summary>
+    /// <summary>The vault as KDBX bytes, proven to open again, under the new key for a key change, before they can replace the file.</summary>
     /// <remarks>A hardware key is asked once: the bytes open on the answer it gave the save, which <see cref="HardwareKey"/> keeps for the same challenge.</remarks>
-    /// <exception cref="VaultException">The bytes did not open.</exception>
-    private byte[] SerializeAndProve()
+    /// <exception cref="VaultException">The bytes did not open, or must not replace the file.</exception>
+    private byte[] Produce(KeyChange? keyChange)
     {
         var bytes = Serialize();
 
@@ -483,18 +468,20 @@ internal sealed class KeePassInterop : IDisposable
 
         try
         {
-            check.MasterKey = _database.MasterKey;
-            new KdbxFile(check).Load(new MemoryStream(bytes, writable: false), KeePass::KeePassLib.Serialization.KdbxFormat.Default, null);
-        }
-        catch (Exception ex)
-        {
-            CryptographicOperations.ZeroMemory(bytes);
-            check.Close();
-            throw new VaultException("keypaste could not read back what it was about to save. Nothing was replaced.", ex);
-        }
+            try
+            {
+                check.MasterKey = keyChange is null ? _database.MasterKey : Reread(keyChange.Verify);
+                new KdbxFile(check).Load(new MemoryStream(bytes, writable: false), KeePass::KeePassLib.Serialization.KdbxFormat.Default, null);
+            }
+            catch (Exception ex)
+            {
+                throw new VaultException(
+                    keyChange is null
+                        ? "keypaste could not read back what it was about to save. Nothing was replaced."
+                        : "The new credentials did not open what was about to be saved. Nothing was replaced.",
+                    ex);
+            }
 
-        try
-        {
             RefuseUnfaithful(check);
             return bytes;
         }
@@ -547,47 +534,13 @@ internal sealed class KeePassInterop : IDisposable
     private static List<string> Fingerprint(PwDatabase database, ContentDigests digests) =>
         [.. database.RootGroup.GetEntries(true).Select(entry => entry.Uuid.ToHexString() + Convert.ToHexString(digests.Of(entry))).Order(StringComparer.Ordinal)];
 
-    /// <summary>Serialises, proves the bytes open with the new key, and only then replaces the vault.</summary>
-    /// <remarks>A re-keyed vault is closed rather than saved again.</remarks>
-    private void WriteVerified(KeyChange change)
-    {
-        var bytes = Serialize();
-
-        try
-        {
-            PwDatabase check = new();
-            try
-            {
-                check.MasterKey = Reread(change.Verify);
-                new KdbxFile(check).Load(new MemoryStream(bytes, writable: false), KeePass::KeePassLib.Serialization.KdbxFormat.Default, null);
-            }
-            catch (Exception ex)
-            {
-                check.Close();
-                throw new VaultException("The new credentials did not open what was about to be saved. Nothing was replaced.", ex);
-            }
-
-            try
-            {
-                RefuseUnfaithful(check);
-            }
-            finally
-            {
-                check.Close();
-            }
-
-            Replace(() => bytes);
-            _entriesOnDisk = EntryIds(_database);
-            change.Committed = true;
-            _database.Modified = false;
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(bytes);
-        }
-    }
-
     /// <summary>The vault as KDBX bytes, written to memory, where closing KeePassLib's streams cannot fail.</summary>
+    /// <remarks>
+    /// Never through <c>PwDatabase.Save</c>: KeePassLib writes a vault's last blocks while it closes its
+    /// streams and discards what that write throws, so a disk that filled during the save was committed
+    /// over the vault as a truncated file. Its file lock is off in keypaste and its hash fields
+    /// have no reader here.
+    /// </remarks>
     private byte[] Serialize()
     {
         MemoryStream buffer = new();
@@ -605,44 +558,42 @@ internal sealed class KeePassInterop : IDisposable
         }
     }
 
-    /// <summary>Replaces the vault, or the file its link points to, with what <paramref name="serialize"/> returns, flushed to disk before the rename that commits it.</summary>
+    /// <summary>Replaces the vault, or the file its link points to, with <paramref name="bytes"/>, flushed to disk before the rename that commits them.</summary>
     /// <remarks>
-    /// The file is opened before <paramref name="serialize"/> runs, as <c>PwDatabase.Save</c> opened it, so an
-    /// attempt that cannot open its file fails before a key is derived and a doomed save's retries stay cheap.
+    /// <paramref name="hasChangedOnDisk"/> is asked last, after the flush and immediately before the rename, and
+    /// a change it reports discards the written file and leaves the vault as the other program saved it. A
+    /// write onto a vault file that did not exist goes straight to its name, so there is nothing to ask before.
     /// </remarks>
-    private void Replace(Func<byte[]> serialize)
+    /// <exception cref="VaultChangedOnDiskException">Something else wrote to the vault; nothing was replaced.</exception>
+    private void Replace(byte[] bytes, Func<bool>? hasChangedOnDisk)
     {
-        byte[] bytes = [];
+        // Resolved on every save, since a link can be pointed elsewhere while the vault is open.
+        var target = VaultFiles.WriteTarget(_database.IOConnectionInfo.Path);
 
-        try
+        using (FileTransactionEx transaction = new(IOConnectionInfo.FromPath(target), _database.UseFileTransactions))
         {
-            // Resolved on every save, since a link can be pointed elsewhere while the vault is open.
-            var target = VaultFiles.WriteTarget(_database.IOConnectionInfo.Path);
+            string writtenTo;
 
-            using (FileTransactionEx transaction = new(IOConnectionInfo.FromPath(target), _database.UseFileTransactions))
+            using (var written = (FileStream)transaction.OpenWrite())
             {
-                using (Stream written = transaction.OpenWrite())
-                {
-                    bytes = serialize();
-                    written.Write(bytes);
-
-                    if (written is FileStream file)
-                    {
-                        VaultFiles.KeepMode(file, target);
-                        file.Flush(flushToDisk: true);
-                    }
-                }
-
-                transaction.CommitWrite();
+                written.Write(bytes);
+                VaultFiles.KeepMode(written, target);
+                written.Flush(flushToDisk: true);
+                writtenTo = written.Name;
             }
 
-            _ = VaultFiles.SyncDirectory(Path.GetDirectoryName(Path.GetFullPath(target))!);
-            _written = SHA256.HashData(bytes);
+            var inPlace = string.Equals(writtenTo, Path.GetFullPath(target), StringComparison.Ordinal);
+
+            if (!inPlace && hasChangedOnDisk is not null && hasChangedOnDisk())
+            {
+                VaultFiles.Discard(writtenTo);
+                throw new VaultChangedOnDiskException();
+            }
+
+            transaction.CommitWrite();
         }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(bytes);
-        }
+
+        _ = VaultFiles.SyncDirectory(Path.GetDirectoryName(Path.GetFullPath(target))!);
     }
 
     /// <summary>Adds an entry, creating any missing groups along its group path.</summary>
@@ -2897,13 +2848,6 @@ internal sealed class KeePassInterop : IDisposable
     /// </summary>
     internal bool UsesFileTransactions => _database.UseFileTransactions;
 
-    /// <summary>The SHA-256 of the bytes the last successful save wrote, or null before one has.</summary>
-    /// <remarks>
-    /// Hashed as they were written rather than read back afterwards, so a write another program lands
-    /// on the path straight after this save is a change on disk and not this vault's own state.
-    /// </remarks>
-    internal byte[]? WrittenDigest => _written;
-
     /// <summary>KeePassLib's unsaved-changes flag. A test seam.</summary>
     internal bool Modified
     {
@@ -3146,8 +3090,9 @@ internal sealed class KeePassInterop : IDisposable
 
     /// <summary>Writes the vault to its backing file.</summary>
     /// <param name="hasChangedOnDisk">
-    /// Asked across every retry wait, and the save is abandoned if it answers true. Null for a
-    /// caller that has already been told to overwrite whatever is there.
+    /// Asked as each attempt after a wait begins and again immediately before each rename, and the save
+    /// is abandoned if it answers true. Null for a caller that has already been told to overwrite
+    /// whatever is there.
     /// </param>
     /// <param name="waitBetweenAttempts">
     /// Stands in for the wait, so a test can resolve a real conflict at the one moment that makes
@@ -3181,12 +3126,13 @@ internal sealed class KeePassInterop : IDisposable
     /// only check for it ran once, before the first attempt.
     /// </para>
     /// <para>
-    /// <b>What the re-read closes is the wait, and not the attempt.</b> An attempt is nearly all
-    /// key derivation and encryption, and the move that can be refused is its last act, so a writer
-    /// that commits between the re-read and that move is still reverted. The residual is therefore
-    /// a writer whose hold outlasts one of these waits and commits during the attempt that follows
-    /// it — accepted because a KeePassLib saver commits immediately after its own move, so its hold
-    /// is brief. A detector, not a lock.
+    /// <b>The bytes are produced once, before the gate, and the disk is asked again before each rename.</b>
+    /// Key derivation and encryption are nearly all of a save, so they run before the first attempt,
+    /// hold no gate, and every retry writes the same bytes. An attempt re-reads the file as it begins
+    /// and asks again after its flush, immediately before the rename, so another program's save that
+    /// lands while keypaste derives keys or writes is refused rather than overwritten. What remains is
+    /// a writer that commits between that last read and the rename, a few milliseconds: a detector,
+    /// not a lock, since KDBX defines no file lock and KeePassXC takes none.
     /// </para>
     /// <para>
     /// Retrying is otherwise safe because the commit is one replacing move: Transactional NTFS where
@@ -3196,21 +3142,21 @@ internal sealed class KeePassInterop : IDisposable
     /// </para>
     /// <para>
     /// <b>The retry schedule bounds the sleeps and nothing else.</b> A caller waits for the
-    /// changed-on-disk checks, the gate, every attempt's work and the sleeps; <see cref="SaveTiming"/>
+    /// changed-on-disk checks, producing the bytes, the gate, every attempt's work and the sleeps; <see cref="SaveTiming"/>
     /// keeps each separately, because <c>SaveAttempts × SaveRetryDelayMilliseconds</c> describes only
     /// the last of them and a claim about elapsed time needs all of them (F.10a).
     /// </para>
     /// </remarks>
     /// <exception cref="VaultChangedOnDiskException">
-    /// Something else wrote to the vault while this save was waiting to retry or for the gate. Nothing
-    /// was written.
+    /// Something else wrote to the vault after its caller last checked it. Nothing was replaced.
     /// </exception>
+    /// <returns>The SHA-256 of the bytes that replaced the vault.</returns>
     /// <param name="clock">Receives this save's timing; the caller publishes it.</param>
     /// <param name="attempts">
     /// How many times to try. Defaults to the shipped budget; V-F.6 pins it to 1 so the retry
     /// cannot absorb the contention the fix is supposed to remove.
     /// </param>
-    /// <param name="duringAttempt">Called inside each attempt before its work; null outside a test.</param>
+    /// <param name="duringAttempt">Called inside each attempt before it writes; null outside a test.</param>
     /// <param name="beforeReplacing">
     /// Called once, on the attempt that is about to replace an existing vault, after the re-read has
     /// passed and while the gate is held. Preserves the bytes being replaced; a throw from it
@@ -3222,7 +3168,7 @@ internal sealed class KeePassInterop : IDisposable
     /// <see cref="OperationCanceledException"/>, so a save queued behind another writes nothing once
     /// its caller has given up on it; an attempt that holds the gate finishes.
     /// </param>
-    internal void Save(
+    internal byte[] Save(
         Func<bool>? hasChangedOnDisk,
         Action<int>? waitBetweenAttempts,
         SaveClock clock,
@@ -3241,11 +3187,37 @@ internal sealed class KeePassInterop : IDisposable
 
         clock.Redirect(ProcessTemporaryDirectory.EnsureRedirected);
 
-        var wait = waitBetweenAttempts ?? SleepAfter;
-        var attempt = 0;
-        Retries.OnThisThread(attempts, outcome => outcome is { Exception: null, Result: false }, retry => clock.Wait(() => wait(retry)))
-            .Execute(() => TryAttempt(hasChangedOnDisk, clock, ++attempt, attempts, duringAttempt, ref beforeReplacing, keyChange, cancellationToken));
+        byte[] bytes;
+        try
+        {
+            bytes = clock.Produce(() => Produce(keyChange));
+        }
+        catch (Exception ex) when (ex is not VaultException)
+        {
+            throw CouldNotSave(ex);
+        }
+
+        try
+        {
+            var wait = waitBetweenAttempts ?? SleepAfter;
+            var attempt = 0;
+            Retries.OnThisThread(attempts, outcome => outcome is { Exception: null, Result: false }, retry => clock.Wait(() => wait(retry)))
+                .Execute(() => TryAttempt(bytes, hasChangedOnDisk, clock, ++attempt, attempts, duringAttempt, ref beforeReplacing, cancellationToken));
+
+            _entriesOnDisk = EntryIds(_database);
+            keyChange?.Committed = true;
+            _database.Modified = false;
+            return clock.Stamp(() => SHA256.HashData(bytes));
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(bytes);
+        }
     }
+
+    // The cause is named, not merely kept as an inner exception nobody prints: the disk is full, the file is open in KeePassXC, permissions changed.
+    private VaultException CouldNotSave(Exception ex) =>
+        new($"Could not save '{_database.IOConnectionInfo.Path}': {ex.Message}", ex);
 
     /// <summary>Sleeps after a refused save attempt, <see cref="SaveRetryDelayMilliseconds"/> times its number.</summary>
     internal static void SleepAfter(int attempt) => Thread.Sleep(SaveRetryDelayMilliseconds * attempt);
@@ -3265,13 +3237,13 @@ internal sealed class KeePassInterop : IDisposable
     /// </para>
     /// </remarks>
     private bool TryAttempt(
+        byte[] bytes,
         Func<bool>? hasChangedOnDisk,
         SaveClock clock,
         int attempt,
         int attempts,
         Action<int>? duringAttempt,
         ref Action<string>? beforeReplacing,
-        KeyChange? keyChange,
         CancellationToken cancellationToken)
     {
         clock.BeginAttempt();
@@ -3303,14 +3275,7 @@ internal sealed class KeePassInterop : IDisposable
             clock.Attempt(() =>
             {
                 duringAttempt?.Invoke(attempt);
-                if (keyChange is null)
-                {
-                    Write();
-                }
-                else
-                {
-                    WriteVerified(keyChange);
-                }
+                Replace(bytes, hasChangedOnDisk);
             });
             return true;
         }
@@ -3322,13 +3287,7 @@ internal sealed class KeePassInterop : IDisposable
         catch (Exception ex) when (ex is not VaultException)
         {
             strandedATemporary = StrandsATemporary(ex);
-
-            // The cause is named, not merely kept as an inner exception nobody prints. A save can
-            // fail for reasons the user can act on — the disk is full, the file is open in
-            // KeePassXC, permissions changed — and "Could not save 'vault.kdbx'." on its own tells
-            // them none of them.
-            throw new VaultException(
-                $"Could not save '{_database.IOConnectionInfo.Path}': {ex.Message}", ex);
+            throw CouldNotSave(ex);
         }
         finally
         {
