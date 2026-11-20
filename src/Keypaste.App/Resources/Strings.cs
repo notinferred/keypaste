@@ -72,6 +72,7 @@ public static class Strings
     public static string AlwaysAnswers => Manager.GetString("AlwaysAnswers", CultureInfo.CurrentUICulture)!;
     public static string AnotherDevicesChangesWerentMerged => Manager.GetString("AnotherDevicesChangesWerentMerged", CultureInfo.CurrentUICulture)!;
     public static string AnotherProgramAnswersItsExtension => Manager.GetString("AnotherProgramAnswersItsExtension", CultureInfo.CurrentUICulture)!;
+    public static string AnotherProgramSavedThisVaultSoItWasntStrengthened => Manager.GetString("AnotherProgramSavedThisVaultSoItWasntStrengthened", CultureInfo.CurrentUICulture)!;
     public static string AnsweringAgents => Manager.GetString("AnsweringAgents", CultureInfo.CurrentUICulture)!;
     public static string ApiKeys => Manager.GetString("ApiKeys", CultureInfo.CurrentUICulture)!;
     public static string Apply => Manager.GetString("Apply", CultureInfo.CurrentUICulture)!;
@@ -327,6 +328,8 @@ public static class Strings
     public static string KeepInMenuBar => Manager.GetString("KeepInMenuBar", CultureInfo.CurrentUICulture)!;
     public static string KeepInTray => Manager.GetString("KeepInTray", CultureInfo.CurrentUICulture)!;
     public static string Key => Manager.GetString("Key", CultureInfo.CurrentUICulture)!;
+    public static string KeyDerivationArgon2Value => Manager.GetString("KeyDerivationArgon2Value", CultureInfo.CurrentUICulture)!;
+    public static string KeyDerivationNowAndAfterValue => Manager.GetString("KeyDerivationNowAndAfterValue", CultureInfo.CurrentUICulture)!;
     public static string KeyFile => Manager.GetString("KeyFile", CultureInfo.CurrentUICulture)!;
     public static string KeyFileLabel => Manager.GetString("KeyFileLabel", CultureInfo.CurrentUICulture)!;
     public static string KeyFileLower => Manager.GetString("KeyFileLower", CultureInfo.CurrentUICulture)!;
@@ -483,6 +486,7 @@ public static class Strings
     public static string Passphrase => Manager.GetString("Passphrase", CultureInfo.CurrentUICulture)!;
     public static string Password => Manager.GetString("Password", CultureInfo.CurrentUICulture)!;
     public static string PasswordForThisFile => Manager.GetString("PasswordForThisFile", CultureInfo.CurrentUICulture)!;
+    public static string PasswordProtection => Manager.GetString("PasswordProtection", CultureInfo.CurrentUICulture)!;
     public static string Paste => Manager.GetString("Paste", CultureInfo.CurrentUICulture)!;
     public static string PasteItIntoYourAIToolsMcpConfiguration => Manager.GetString("PasteItIntoYourAIToolsMcpConfiguration", CultureInfo.CurrentUICulture)!;
     public static string Places => Manager.GetString("Places", CultureInfo.CurrentUICulture)!;
@@ -645,6 +649,9 @@ public static class Strings
     public static string StrengthFair => Manager.GetString("StrengthFair", CultureInfo.CurrentUICulture)!;
     public static string StrengthStrong => Manager.GetString("StrengthStrong", CultureInfo.CurrentUICulture)!;
     public static string StrengthWeak => Manager.GetString("StrengthWeak", CultureInfo.CurrentUICulture)!;
+    public static string Strengthen => Manager.GetString("Strengthen", CultureInfo.CurrentUICulture)!;
+    public static string StrengthenedThisVaultsPasswordProtection => Manager.GetString("StrengthenedThisVaultsPasswordProtection", CultureInfo.CurrentUICulture)!;
+    public static string StrengtheningSavesTheVaultWithKeypastesSettings => Manager.GetString("StrengtheningSavesTheVaultWithKeypastesSettings", CultureInfo.CurrentUICulture)!;
     public static string Symbols => Manager.GetString("Symbols", CultureInfo.CurrentUICulture)!;
     public static string TOKEN => Manager.GetString("TOKEN", CultureInfo.CurrentUICulture)!;
     public static string TOTP => Manager.GetString("TOTP", CultureInfo.CurrentUICulture)!;
@@ -670,6 +677,7 @@ public static class Strings
     public static string ThisComputer => Manager.GetString("ThisComputer", CultureInfo.CurrentUICulture)!;
     public static string ThisDesktopReportsNoLightOrDark => Manager.GetString("ThisDesktopReportsNoLightOrDark", CultureInfo.CurrentUICulture)!;
     public static string ThisVault => Manager.GetString("ThisVault", CultureInfo.CurrentUICulture)!;
+    public static string ThisVaultProtectsItsPasswordWithOlderSettings => Manager.GetString("ThisVaultProtectsItsPasswordWithOlderSettings", CultureInfo.CurrentUICulture)!;
     public static string ThisWeek => Manager.GetString("ThisWeek", CultureInfo.CurrentUICulture)!;
     public static string ThroughAnAgentOrATokenAXbc5a7a => Manager.GetString("ThroughAnAgentOrATokenAXbc5a7a", CultureInfo.CurrentUICulture)!;
     public static string Time => Manager.GetString("Time", CultureInfo.CurrentUICulture)!;
@@ -744,6 +752,7 @@ public static class Strings
     public static string Words => Manager.GetString("Words", CultureInfo.CurrentUICulture)!;
     public static string Yes => Manager.GetString("Yes", CultureInfo.CurrentUICulture)!;
     public static string You => Manager.GetString("You", CultureInfo.CurrentUICulture)!;
+    public static string YourHardwareKeyAsksForATouchWhenItSaves => Manager.GetString("YourHardwareKeyAsksForATouchWhenItSaves", CultureInfo.CurrentUICulture)!;
     public static string YubiKey => Manager.GetString("YubiKey", CultureInfo.CurrentUICulture)!;
     public static string YubiKeyLabel => Manager.GetString("YubiKeyLabel", CultureInfo.CurrentUICulture)!;
     public static string Zoom => Manager.GetString("Zoom", CultureInfo.CurrentUICulture)!;

@@ -39,6 +39,7 @@ public sealed class KdbxProbeTests : IDisposable
         Assert.True(KdbxImport.TryProbe(path, out var probe, out var error), error);
         Assert.StartsWith("KeePass database 4.", probe.Version, StringComparison.Ordinal);
         Assert.Equal("Argon2id", probe.Kdf);
+        Assert.Equal(new VaultKeyDerivation(KeyDerivationFunction.Argon2id, 1, 1024 * 1024, 2), probe.KeyDerivation);
         Assert.Equal("ChaCha20", probe.Cipher);
     }
 
@@ -52,6 +53,7 @@ public sealed class KdbxProbeTests : IDisposable
         Assert.True(KdbxImport.TryProbe(path, out var probe, out var error), error);
         Assert.Equal("KeePass database 3.1", probe.Version);
         Assert.Equal("AES-KDF", probe.Kdf);
+        Assert.Equal(new VaultKeyDerivation(KeyDerivationFunction.AesKdf, 60_000, 0, 0), probe.KeyDerivation);
         Assert.Equal("AES-256", probe.Cipher);
     }
 

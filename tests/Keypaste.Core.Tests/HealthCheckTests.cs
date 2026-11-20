@@ -452,6 +452,41 @@ public sealed class HealthCheckTests : IDisposable
             PathReading.Read(Scope(McpClientPlatform.Linux, Path.Combine(_root, "empty")), new Runner()).Finding);
     }
 
+    [Fact]
+    public void A_vault_whose_key_derivation_is_weaker_than_keypastes_gets_a_note_saying_where_to_strengthen_it()
+    {
+        var vault = Path.Combine(_root, "old.kdbx");
+        KdbxImportTests.WriteForeign(vault, "health-password", "AES-KDF", "AES-256");
+
+        var reading = VaultReading.Read(Scope(McpClientMachine.CurrentPlatform) with { NamedVault = vault });
+
+        Assert.Equal(
+            [
+                new HealthFinding(HealthArea.Vault, "vault", HealthStatus.Ok, "the vault named with --vault is a KeePass database") { Where = vault },
+                new HealthFinding(HealthArea.Vault, "vault", HealthStatus.Note, "the vault named with --vault protects its password with older, weaker settings (AES-KDF)")
+                {
+                    Fix = "open it in the keypaste app and choose Strengthen in Security",
+                },
+            ],
+            reading.Findings);
+    }
+
+    [Fact]
+    public void A_vault_at_keypastes_key_derivation_is_only_a_keepass_database()
+    {
+        var vault = Path.Combine(_root, "mine.kdbx");
+        using (var created = ClaimedVault.Create(vault, "health-password"))
+        {
+            created.Save();
+        }
+
+        var reading = VaultReading.Read(Scope(McpClientMachine.CurrentPlatform) with { NamedVault = vault });
+
+        Assert.Equal(
+            [new HealthFinding(HealthArea.Vault, "vault", HealthStatus.Ok, "the vault named with --vault is a KeePass database") { Where = vault }],
+            reading.Findings);
+    }
+
     private static string Executable(string name) => OperatingSystem.IsWindows() ? name + ".exe" : name;
 
     private static string PlantAt(string path)

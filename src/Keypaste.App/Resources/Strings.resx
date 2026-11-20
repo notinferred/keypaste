@@ -744,4 +744,13 @@
   <data name="CheckLogIntegrity" xml:space="preserve"><value>Check log integrity</value></data>
   <data name="ConnectAnAIToolEllipsis" xml:space="preserve"><value>Connect an AI tool…</value></data>
   <data name="Running" xml:space="preserve"><value>Running…</value></data>
+  <data name="PasswordProtection" xml:space="preserve"><value>Password protection</value></data>
+  <data name="ThisVaultProtectsItsPasswordWithOlderSettings" xml:space="preserve"><value>This vault protects its password with older settings, which make each guess at it cheaper for anyone who has a copy of the file.</value></data>
+  <data name="KeyDerivationNowAndAfterValue" xml:space="preserve"><value>Now {0}. Strengthen changes it to {1}.</value></data>
+  <data name="KeyDerivationArgon2Value" xml:space="preserve"><value>{0} (memory {1} MiB, iterations {2})</value></data>
+  <data name="Strengthen" xml:space="preserve"><value>Strengthen</value></data>
+  <data name="StrengtheningSavesTheVaultWithKeypastesSettings" xml:space="preserve"><value>Strengthening saves the vault with keypaste's settings. After that, KeePass versions before 2.35, from 2017, can't open it; current KeePass, KeePassXC and the mobile apps can. keypaste keeps a copy of the file as it is now with this vault's backups.</value></data>
+  <data name="YourHardwareKeyAsksForATouchWhenItSaves" xml:space="preserve"><value>Your hardware key asks for a touch when it saves.</value></data>
+  <data name="StrengthenedThisVaultsPasswordProtection" xml:space="preserve"><value>Strengthened this vault's password protection. A copy of the file from before is kept with this vault's backups.</value></data>
+  <data name="AnotherProgramSavedThisVaultSoItWasntStrengthened" xml:space="preserve"><value>Another program saved this vault meanwhile, and keypaste has merged its save, so the vault wasn't strengthened. Strengthen again.</value></data>
 </root>

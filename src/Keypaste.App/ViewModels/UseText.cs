@@ -43,6 +43,14 @@ internal static class UseText
 
     internal static string FragileKeyFile(string name) => string.Format(CultureInfo.CurrentCulture, Strings.FragileKeyFileWarningValue, name);
 
+    /// <summary>How a vault derives its key now and how Strengthen would, as Security's details line names them.</summary>
+    internal static string KeyDerivationNowAndAfter(VaultKeyDerivation now) =>
+        string.Format(CultureInfo.CurrentCulture, Strings.KeyDerivationNowAndAfterValue, Described(now), Described(now.Strengthened));
+
+    private static string Described(VaultKeyDerivation derivation) => derivation.Function == KeyDerivationFunction.AesKdf
+        ? derivation.Name
+        : string.Format(CultureInfo.CurrentCulture, Strings.KeyDerivationArgon2Value, derivation.Name, derivation.Memory / (1024 * 1024), derivation.Iterations);
+
     /// <summary>A Security finding's keys: how many, and the item whose notes hold them.</summary>
     internal static string KeysInNotes(int count, string item) => string.Format(CultureInfo.CurrentCulture, Strings.NKeysInTheNotesOfValue, count, item);
 

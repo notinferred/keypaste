@@ -1,3 +1,4 @@
+using System.Globalization;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Settings;
 
@@ -46,7 +47,7 @@ public enum VaultState
 /// <param name="Source">What named it.</param>
 /// <param name="Path">Its full path, or null when none is named or chosen.</param>
 /// <param name="Findings">What doctor says of it.</param>
-/// <remarks>Only the twelve bytes before anything a password protects are read.</remarks>
+/// <remarks>Only the header before anything a password protects is read.</remarks>
 public sealed record VaultReading(VaultState State, VaultSource Source, string? Path, IReadOnlyList<HealthFinding> Findings)
 {
     private const string _subject = "vault";
@@ -111,18 +112,29 @@ public sealed record VaultReading(VaultState State, VaultSource Source, string? 
             return Found(VaultState.Unreadable, source, path, Fixed($"{vault} could not be read: {ex.Message}", "check that you can read it"));
         }
 
-        var ok = new HealthFinding(HealthArea.Vault, _subject, HealthStatus.Ok, $"{vault} is a KeePass database") { Where = path };
+        List<HealthFinding> findings = [new(HealthArea.Vault, _subject, HealthStatus.Ok, $"{vault} is a KeePass database") { Where = path }];
+
+        if (VaultKeyDerivation.Read(path) is { IsWeakerThanKeypastes: true } derivation)
+        {
+            findings.Add(new HealthFinding(HealthArea.Vault, _subject, HealthStatus.Note, $"{vault} protects its password with older, weaker settings ({Described(derivation)})")
+            {
+                Fix = "open it in the keypaste app and choose Strengthen in Security",
+            });
+        }
 
         if (source != VaultSource.Choice && chosen is not null && !ChosenVault.Same(chosen, path))
         {
-            var note = new HealthFinding(HealthArea.Vault, _subject, HealthStatus.Note, "AI tools use the chosen vault unless their registration names one") { Where = chosen };
-            return new VaultReading(VaultState.Ok, source, path, [ok, note]);
+            findings.Add(new HealthFinding(HealthArea.Vault, _subject, HealthStatus.Note, "AI tools use the chosen vault unless their registration names one") { Where = chosen });
         }
 
-        return Found(VaultState.Ok, source, path, ok);
+        return new VaultReading(VaultState.Ok, source, path, findings);
 
         HealthFinding Fixed(string says, string fix) => new(HealthArea.Vault, _subject, HealthStatus.Fix, says) { Where = path, Fix = fix };
     }
+
+    private static string Described(VaultKeyDerivation derivation) => derivation.Function == KeyDerivationFunction.AesKdf
+        ? derivation.Name
+        : string.Create(CultureInfo.InvariantCulture, $"{derivation.Name}, memory {derivation.Memory / (1024 * 1024)} MiB, iterations {derivation.Iterations}, parallelism {derivation.Parallelism}");
 
     private static VaultReading Found(VaultState state, VaultSource source, string? path, HealthFinding finding) =>
         new(state, source, path, [finding]);

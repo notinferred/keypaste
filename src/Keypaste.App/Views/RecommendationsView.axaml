@@ -107,6 +107,30 @@
         </Border>
       </StackPanel>
 
+      <StackPanel Name="KeyDerivationCard" Classes="section" IsVisible="{Binding HasWeakKeyDerivation}">
+        <TextBlock Classes="section-heading" AutomationProperties.HeadingLevel="3" Text="{x:Static res:Strings.PasswordProtection}" />
+        <Border Classes="group">
+          <ctl:FieldRow Classes="wide">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+              <StackPanel Spacing="8">
+                <TextBlock Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextSecondary}" Text="{x:Static res:Strings.ThisVaultProtectsItsPasswordWithOlderSettings}" />
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding KeyDerivationDetails}" />
+                <TextBlock Name="StrengthenConfirmation" Classes="size-13" TextWrapping="Wrap" Foreground="{DynamicResource KpTextPrimary}" Text="{Binding StrengthenConfirmation}" IsVisible="{Binding ConfirmsStrengthen}" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Name="AskStrengthen" Classes="sm" Content="{x:Static res:Strings.Strengthen}" IsVisible="{Binding OffersStrengthen}" Command="{Binding AskStrengthenCommand}" />
+                  <Button Name="CancelStrengthen" Classes="sm ghost" Content="{x:Static res:Strings.Cancel}" IsVisible="{Binding ConfirmsStrengthen}" Command="{Binding CancelStrengthenCommand}" />
+                  <Button Name="Strengthen" Classes="sm" Content="{x:Static res:Strings.Strengthen}" IsVisible="{Binding ConfirmsStrengthen}" Command="{Binding StrengthenCommand}" />
+                </StackPanel>
+              </StackPanel>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <Button Name="DismissKeyDerivation" Classes="sm ghost on-point" Content="{x:Static res:Strings.Dismiss}" IsVisible="{Binding KeyDerivationNeedsReview}" Command="{Binding DismissKeyDerivationCommand}" />
+                <Button Name="ReviewKeyDerivationAgain" Classes="sm ghost" Content="{x:Static res:Strings.ReviewAgain}" IsVisible="{Binding KeyDerivationDismissed}" Command="{Binding ReviewKeyDerivationAgainCommand}" />
+              </StackPanel>
+            </Grid>
+          </ctl:FieldRow>
+        </Border>
+      </StackPanel>
+
       <TextBlock Name="RecommendationsMessage"
                  Classes="caption"
                  TextWrapping="Wrap"

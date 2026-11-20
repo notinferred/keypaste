@@ -11,7 +11,11 @@ namespace Keypaste.Core.Import;
 /// <param name="Cipher"><c>AES-256</c>, <c>ChaCha20</c> or <c>Twofish</c>, each of which keypaste opens and saves, or <c>unknown</c>.</param>
 /// <param name="Kdf"><c>Argon2id</c>, <c>Argon2d</c>, <c>AES-KDF</c> or <c>unknown</c>.</param>
 /// <param name="SiblingKeyfile">A <c>&lt;stem&gt;.keyx</c> or <c>&lt;stem&gt;.key</c> beside the file, or null.</param>
-public sealed record KdbxProbe(string Path, string FileName, string Version, string Cipher, string Kdf, string? SiblingKeyfile);
+public sealed record KdbxProbe(string Path, string FileName, string Version, string Cipher, string Kdf, string? SiblingKeyfile)
+{
+    /// <summary>How the file derives its key, or null when its header does not say in a way keypaste reads.</summary>
+    public VaultKeyDerivation? KeyDerivation { get; init; }
+}
 
 /// <summary>One group of the source file and where it lands in the vault imported into.</summary>
 /// <param name="Index">Which group of the source this row copies; fixed by the source.</param>

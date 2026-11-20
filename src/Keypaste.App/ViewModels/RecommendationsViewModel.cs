@@ -14,7 +14,7 @@ namespace Keypaste.App.ViewModels;
 /// <param name="Rows">Each item with it.</param>
 internal sealed record PasswordGroup(string Heading, string Reason, IReadOnlyList<PasswordRow> Rows);
 
-/// <summary>Items › Recommendations: keys left in notes (C.2), project tags another app dropped (V.11), weak, reused or expired passwords (V.9), and items expiring soon or marked as needing an update, for review.</summary>
+/// <summary>Items › Recommendations: keys left in notes (C.2), project tags another app dropped (V.11), weak, reused or expired passwords (V.9), items expiring soon or marked as needing an update, and a key derivation weaker than keypaste's, for review.</summary>
 /// <remarks>
 /// <para>
 /// Owned by the shell for one unlock, because the Settings screen is rebuilt on every visit. It is
@@ -282,12 +282,44 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
 
     internal string FragileKeyFileWarning => UseText.FragileKeyFile(FragileKeyFile ?? string.Empty);
 
+    /// <summary>How the vault derives its key, while that is weaker than keypaste's, or null.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NeedsReview), nameof(IsEmpty), nameof(HasWeakKeyDerivation), nameof(KeyDerivationDetails), nameof(Line))]
+    internal partial VaultKeyDerivation? WeakKeyDerivation { get; private set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NeedsReview), nameof(Line), nameof(KeyDerivationNeedsReview), nameof(OffersStrengthen))]
+    internal partial bool KeyDerivationDismissed { get; private set; }
+
+    /// <summary>Whether Strengthen's confirmation is showing.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OffersStrengthen), nameof(StrengthenConfirmation))]
+    internal partial bool ConfirmsStrengthen { get; private set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OffersStrengthen))]
+    internal partial bool Strengthening { get; private set; }
+
+    internal bool HasWeakKeyDerivation => WeakKeyDerivation is not null;
+
+    internal bool KeyDerivationNeedsReview => !KeyDerivationDismissed;
+
+    internal bool OffersStrengthen => !KeyDerivationDismissed && !ConfirmsStrengthen && !Strengthening;
+
+    internal string KeyDerivationDetails => WeakKeyDerivation is { } derivation ? UseText.KeyDerivationNowAndAfter(derivation) : string.Empty;
+
+    /// <summary>What strengthening does to the file and who can still open it, and the touch it asks of a hardware key.</summary>
+    internal string StrengthenConfirmation => _session.Unlocked?.HardwareKey is null
+        ? Resources.Strings.StrengtheningSavesTheVaultWithKeypastesSettings
+        : Resources.Strings.StrengtheningSavesTheVaultWithKeypastesSettings + " " + Resources.Strings.YourHardwareKeyAsksForATouchWhenItSaves;
+
     /// <summary>The one line that sums up what is listed; whatever was dismissed stays reachable from it.</summary>
     internal string Line
     {
         get
         {
-            var dismissed = Rows.Count + LostTags.Count + Passwords.Count + Reminders.Count + (HasFragileKeyFile ? 1 : 0) + ConflictedCopies.Count - NeedsReview;
+            var dismissed = Rows.Count + LostTags.Count + Passwords.Count + Reminders.Count + (HasFragileKeyFile ? 1 : 0) + (HasWeakKeyDerivation ? 1 : 0)
+                + ConflictedCopies.Count - NeedsReview;
 
             return NeedsReview > 0
                 ? string.Create(CultureInfo.InvariantCulture, $"Recommendations: {NeedsReview} to review")
@@ -298,9 +330,11 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     /// <summary>How many findings still need review; the Settings row shows this.</summary>
     internal int NeedsReview =>
         Rows.Count(row => !row.IsDismissed) + LostTags.Count(row => !row.IsDismissed) + Passwords.Count(row => !row.IsDismissed)
-        + Reminders.Count(row => !row.IsDismissed) + (HasFragileKeyFile && !FragileKeyFileDismissed ? 1 : 0) + ConflictedCopies.Count;
+        + Reminders.Count(row => !row.IsDismissed) + (HasFragileKeyFile && !FragileKeyFileDismissed ? 1 : 0)
+        + (HasWeakKeyDerivation && !KeyDerivationDismissed ? 1 : 0) + ConflictedCopies.Count;
 
-    internal bool IsEmpty => Rows.Count == 0 && LostTags.Count == 0 && Passwords.Count == 0 && Reminders.Count == 0 && !HasFragileKeyFile && ConflictedCopies.Count == 0;
+    internal bool IsEmpty => Rows.Count == 0 && LostTags.Count == 0 && Passwords.Count == 0 && Reminders.Count == 0 && !HasFragileKeyFile
+        && !HasWeakKeyDerivation && ConflictedCopies.Count == 0;
 
     internal bool HasNoteKeys => Rows.Count > 0;
 
@@ -447,6 +481,8 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
             Passwords = [];
             Reminders = [];
             FragileKeyFile = null;
+            WeakKeyDerivation = null;
+            ConfirmsStrengthen = false;
             ConflictedCopies = [];
             return;
         }
@@ -455,6 +491,14 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
         var keyfile = _session.Unlocked?.KeyfilePath;
         FragileKeyFile = keyfile is not null && VaultKeyfile.Inspect(keyfile).IsFragile ? Path.GetFileName(keyfile) : null;
         FragileKeyFileDismissed = FragileKeyFile is not null && _dismissals.Contains(FragileKeyFileDismissal(vaultKey));
+        WeakKeyDerivation = _session.Unlocked?.KeyDerivation is { IsWeakerThanKeypastes: true } derivation ? derivation : null;
+        KeyDerivationDismissed = WeakKeyDerivation is not null && _dismissals.Contains(KeyDerivationDismissal(vaultKey));
+
+        if (WeakKeyDerivation is null || KeyDerivationDismissed)
+        {
+            ConfirmsStrengthen = false;
+        }
+
         ShowConflictedCopies();
         Rows = [.. _noteKeys
             .GroupBy(finding => (finding.EntryUuid, finding.Entry, Dismissed: IsDismissed(vaultKey, finding)))
@@ -675,6 +719,56 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
 
     private Dismissal FragileKeyFileDismissal(string vaultKey) =>
         new(vaultKey, RecommendationDismissals.FragileKeyFile, RecommendationDismissals.FragileKeyFile, FragileKeyFile ?? string.Empty);
+
+    [RelayCommand]
+    private void DismissKeyDerivation() => Dismiss(KeyDerivationDismissal(VaultKey()));
+
+    [RelayCommand]
+    private void ReviewKeyDerivationAgain() => ReviewAgain(KeyDerivationDismissal(VaultKey()));
+
+    private Dismissal KeyDerivationDismissal(string vaultKey) =>
+        new(vaultKey, RecommendationDismissals.KeyDerivation, RecommendationDismissals.KeyDerivation, WeakKeyDerivation?.Name ?? string.Empty);
+
+    [RelayCommand]
+    private void AskStrengthen()
+    {
+        Message = string.Empty;
+        ConfirmsStrengthen = true;
+    }
+
+    [RelayCommand]
+    private void CancelStrengthen() => ConfirmsStrengthen = false;
+
+    /// <summary>Gives the vault keypaste's key derivation and saves it, keeping a copy of the file it replaces.</summary>
+    [RelayCommand]
+    internal async Task StrengthenAsync()
+    {
+        ConfirmsStrengthen = false;
+        Strengthening = true;
+
+        try
+        {
+            var write = await Task.Run(() => _session.Write(vault => vault.StrengthenKeyDerivation(), strengthened => strengthened)).ConfigureAwait(true);
+
+            if (write.Problem("strengthen again") is { } problem)
+            {
+                Message = problem;
+            }
+            else if (write.Outcome == WriteOutcome.Saved)
+            {
+                // A save another program made meanwhile is merged into a copy of the file, which keeps the file's key derivation.
+                Message = _session.Unlocked?.KeyDerivation.IsWeakerThanKeypastes == true
+                    ? Resources.Strings.AnotherProgramSavedThisVaultSoItWasntStrengthened
+                    : Resources.Strings.StrengthenedThisVaultsPasswordProtection;
+            }
+        }
+        finally
+        {
+            Strengthening = false;
+        }
+
+        Show();
+    }
 
     /// <summary>Shows the item whose notes hold the keys in Items, found again by its UUID.</summary>
     internal void Open(RecommendationRow row) => Open(row.EntryUuid, row.Entry);

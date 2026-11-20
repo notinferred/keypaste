@@ -35,6 +35,9 @@ public static class RecommendationDismissals
     /// <summary>The kind a warning about a key file keyed by its exact bytes is dismissed under (T-28).</summary>
     public const string FragileKeyFile = "fragile-key-file";
 
+    /// <summary>The kind a vault's key derivation weaker than keypaste's is dismissed under.</summary>
+    public const string KeyDerivation = "key-derivation";
+
     /// <summary>The largest file read, in bytes.</summary>
     public const int MaximumBytes = 256 * 1024;
 

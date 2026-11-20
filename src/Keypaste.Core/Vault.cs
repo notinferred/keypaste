@@ -31,6 +31,7 @@ public sealed class Vault : IDisposable
     private VaultBackup? _lastKept;
     private bool _holdsForeignData;
     private VaultBackup? _foreignDataKept;
+    private bool _keyDerivationChanged;
     private Func<Vault, bool>? _beforeEachSave;
 
     /// <summary>The key this unlock's base digests content with, zeroed on disposal.</summary>
@@ -2304,6 +2305,42 @@ public sealed class Vault : IDisposable
         }
     }
 
+    /// <summary>How this vault derives the key that opens it, as its next save writes it.</summary>
+    public VaultKeyDerivation KeyDerivation
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return _interop.KeyDerivation;
+        }
+    }
+
+    /// <summary>
+    /// Gives this vault <see cref="VaultKeyDerivation.Strengthened"/> when its key derivation is weaker than keypaste's. Call
+    /// <see cref="Save"/> to persist it; that save keeps the file it replaces whatever the backup floor says, since KeePass
+    /// before 2.35 cannot open what it writes.
+    /// </summary>
+    /// <returns><see langword="true"/> if the key derivation was weaker and changed.</returns>
+    public bool StrengthenKeyDerivation()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfRekeyed();
+
+        return Change(
+            () =>
+            {
+                if (!_interop.KeyDerivation.IsWeakerThanKeypastes)
+                {
+                    return false;
+                }
+
+                _interop.StrengthenKeyDerivation();
+                _keyDerivationChanged = true;
+                return true;
+            },
+            changed => changed ? VaultEdit.Of() : null);
+    }
+
     /// <summary>Whether deleting from this vault moves the entry to the recycle bin.</summary>
     /// <remarks>
     /// <para>
@@ -3382,11 +3419,13 @@ public sealed class Vault : IDisposable
         var clock = new SaveClock();
         var succeeded = false;
         bool dropsForeignData;
+        bool changesKeyDerivation;
         VaultBackup? keptBeforeSave = null;
 
         lock (_state)
         {
             dropsForeignData = _holdsForeignData;
+            changesKeyDerivation = _keyDerivationChanged;
         }
 
         try
@@ -3405,7 +3444,7 @@ public sealed class Vault : IDisposable
 
             var stamp = _interop.Save(
                 hasChangedOnDisk, waitBetweenAttempts, clock, attempts, duringAttempt,
-                backUp || dropsForeignData ? path => keptBeforeSave = PreserveBefore(path, applyFloor && !dropsForeignData) : null,
+                backUp || dropsForeignData || changesKeyDerivation ? path => keptBeforeSave = PreserveBefore(path, applyFloor && !dropsForeignData && !changesKeyDerivation) : null,
                 keyChange,
                 cancellationToken);
             SeenSaveCount.Remember(_claim!.Home, _claim.Vault, _interop.SaveCount);
@@ -3419,6 +3458,11 @@ public sealed class Vault : IDisposable
                 _pending = false;
                 _changes++;
                 _writing = false;
+
+                if (changesKeyDerivation)
+                {
+                    _keyDerivationChanged = false;
+                }
 
                 if (dropsForeignData)
                 {
@@ -3473,7 +3517,7 @@ public sealed class Vault : IDisposable
     /// <summary>Keeps the bytes this save is about to replace, returning the copy or null when the floor left it out. Called with the save gate held.</summary>
     /// <remarks>
     /// <paramref name="applyFloor"/> is false only on the overwriting, merging and access-changing paths and for a save that leaves out
-    /// another program's data, and
+    /// another program's data or changes the key derivation, and
     /// <see cref="_backedUp"/> is set only when the floor applies, so an overwriting save can neither
     /// be suppressed by an ordinary edit earlier in the unlock nor suppress one later in it.
     /// </remarks>

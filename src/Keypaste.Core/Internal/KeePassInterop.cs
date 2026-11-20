@@ -3597,21 +3597,22 @@ internal sealed class KeePassInterop : IDisposable
         return NativeArgon2.Bound;
     }
 
-    private static void ApplyKeypasteFormatSettings(PwDatabase database)
+    private static void ApplyKeypasteFormatSettings(PwDatabase database) =>
+        database.KdfParameters = Argon2Parameters(VaultKeyDerivation.Keypastes);
+
+    /// <summary>Argon2 at the parameters keypaste states rather than inherits, with a fresh salt.</summary>
+    /// <remarks>See <see cref="KdbxFormat"/> for why these are pinned here instead of taken from <c>GetDefaultParameters</c>.</remarks>
+    private static KdfParameters Argon2Parameters(VaultKeyDerivation derivation)
     {
-        // KDBX4 with Argon2d, at parameters keypaste states rather than inherits. See
-        // KdbxFormat for why these are pinned here instead of taken from GetDefaultParameters.
-        Argon2Kdf kdf = new(Argon2Type.D);
+        Argon2Kdf kdf = new(derivation.Function == KeyDerivationFunction.Argon2id ? Argon2Type.ID : Argon2Type.D);
         KdfParameters parameters = kdf.GetDefaultParameters();
         kdf.Randomize(parameters);
 
-        bool token = TestKeyDerivation.Applies;
-        parameters.SetUInt64(Argon2Kdf.ParamIterations, token ? TestKeyDerivation.Iterations : KdbxFormat.Argon2Iterations);
-        parameters.SetUInt64(Argon2Kdf.ParamMemory, token ? TestKeyDerivation.Memory : KdbxFormat.Argon2Memory);
-        parameters.SetUInt32(Argon2Kdf.ParamParallelism, KdbxFormat.Argon2Parallelism);
+        parameters.SetUInt64(Argon2Kdf.ParamIterations, derivation.Iterations);
+        parameters.SetUInt64(Argon2Kdf.ParamMemory, derivation.Memory);
+        parameters.SetUInt32(Argon2Kdf.ParamParallelism, derivation.Parallelism);
         parameters.SetUInt32(Argon2Kdf.ParamVersion, KdbxFormat.Argon2Version);
-
-        database.KdfParameters = parameters;
+        return parameters;
     }
 
     /// <summary>
@@ -5797,7 +5798,7 @@ internal sealed class KeePassInterop : IDisposable
 
         var sizeWidth = major >= 4 ? 4 : 2;
         var cipher = "unknown";
-        var kdf = "unknown";
+        VaultKeyDerivation? derivation = null;
         var position = 12;
 
         while (true)
@@ -5827,15 +5828,18 @@ internal sealed class KeePassInterop : IDisposable
             {
                 case 0:
                     error = string.Empty;
-                    return new KdbxProbe(path, Path.GetFileName(path), $"KeePass database {major}.{minor}", cipher, kdf, null);
+                    return new KdbxProbe(path, Path.GetFileName(path), $"KeePass database {major}.{minor}", cipher, derivation?.Name ?? "unknown", null)
+                    {
+                        KeyDerivation = derivation,
+                    };
                 case 2 when size == PwUuid.UuidSize:
                     cipher = CipherName(new PwUuid(data.ToArray()));
                     break;
-                case 6 when major == 3:
-                    kdf = new AesKdf().Name;
+                case 6 when major == 3 && size == sizeof(ulong):
+                    derivation = new VaultKeyDerivation(KeyDerivationFunction.AesKdf, BinaryPrimitives.ReadUInt64LittleEndian(data), 0, 0);
                     break;
                 case 11:
-                    kdf = KdfName(data.ToArray());
+                    derivation = Derivation(data.ToArray());
                     break;
             }
         }
@@ -5847,18 +5851,57 @@ internal sealed class KeePassInterop : IDisposable
         : uuid.Equals(TwofishCipherEngine.TwofishUuid) ? "Twofish"
         : "unknown";
 
-    private static string KdfName(byte[] parameters)
+    private static VaultKeyDerivation? Derivation(byte[] parameters)
     {
         try
         {
-            return KdfParameters.DeserializeExt(parameters) is { } read && KdfPool.Get(read.KdfUuid) is { } engine
-                ? engine.Name
-                : "unknown";
+            return KdfParameters.DeserializeExt(parameters) is { } read ? Derivation(read) : null;
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
-            return "unknown";
+            return null;
         }
+    }
+
+    private static readonly PwUuid _aesKdfUuid = new AesKdf().Uuid;
+    private static readonly PwUuid _argon2dUuid = new Argon2Kdf(Argon2Type.D).Uuid;
+    private static readonly PwUuid _argon2idUuid = new Argon2Kdf(Argon2Type.ID).Uuid;
+
+    private static VaultKeyDerivation Derivation(KdfParameters parameters)
+    {
+        var function = parameters.KdfUuid.Equals(_aesKdfUuid) ? KeyDerivationFunction.AesKdf
+            : parameters.KdfUuid.Equals(_argon2dUuid) ? KeyDerivationFunction.Argon2d
+            : parameters.KdfUuid.Equals(_argon2idUuid) ? KeyDerivationFunction.Argon2id
+            : KeyDerivationFunction.Unknown;
+
+        return function switch
+        {
+            KeyDerivationFunction.AesKdf => new(function, parameters.GetUInt64(AesKdf.ParamRounds, 0), 0, 0),
+            KeyDerivationFunction.Argon2d or KeyDerivationFunction.Argon2id => new(
+                function,
+                parameters.GetUInt64(Argon2Kdf.ParamIterations, 0),
+                parameters.GetUInt64(Argon2Kdf.ParamMemory, 0),
+                parameters.GetUInt32(Argon2Kdf.ParamParallelism, 0)),
+            _ => new(function, 0, 0, 0),
+        };
+    }
+
+    /// <summary>How this vault derives its key, as its next save writes it.</summary>
+    internal VaultKeyDerivation KeyDerivation
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return Derivation(_database.KdfParameters);
+        }
+    }
+
+    /// <summary>Gives this vault <see cref="VaultKeyDerivation.Strengthened"/>; its next save writes it.</summary>
+    internal void StrengthenKeyDerivation()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        _database.KdfParameters = Argon2Parameters(KeyDerivation.Strengthened);
     }
 
     /// <summary>The group tree an import copies from, as names and titles only.</summary>
