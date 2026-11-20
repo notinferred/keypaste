@@ -1964,7 +1964,7 @@ public sealed class SessionAuthority : IApproverHandler
                 ? "only a browser's connection pairs, checks a pairing, fills or locks for a browser"
                 : "a browser's connection only pairs, checks a pairing, fills and locks");
         }
-        else if (!string.Equals(attachment.Vault, vault, StringComparison.Ordinal))
+        else if (!_vault.Names(vault))
         {
             refusal = (AuditMethod.NoSession, "the request named a different vault from its attachment");
         }

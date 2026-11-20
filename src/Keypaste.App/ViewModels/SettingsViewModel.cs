@@ -604,7 +604,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
             var write = await Task.Run(() => _session.Write(
                 vault =>
                 {
-                    if (!string.Equals(vault.Path, path, StringComparison.Ordinal))
+                    if (!PathIdentity.SameFile(vault.Path, path))
                     {
                         return false;
                     }

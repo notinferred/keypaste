@@ -605,7 +605,7 @@ internal sealed class KeePassInterop : IDisposable
         }
     }
 
-    /// <summary>Replaces the vault with what <paramref name="serialize"/> returns, flushed to disk before the rename that commits it.</summary>
+    /// <summary>Replaces the vault, or the file its link points to, with what <paramref name="serialize"/> returns, flushed to disk before the rename that commits it.</summary>
     /// <remarks>
     /// The file is opened before <paramref name="serialize"/> runs, as <c>PwDatabase.Save</c> opened it, so an
     /// attempt that cannot open its file fails before a key is derived and a doomed save's retries stay cheap.
@@ -616,16 +616,19 @@ internal sealed class KeePassInterop : IDisposable
 
         try
         {
-            using (FileTransactionEx transaction = new(_database.IOConnectionInfo, _database.UseFileTransactions))
+            // Resolved on every save, since a link can be pointed elsewhere while the vault is open.
+            var target = VaultFiles.WriteTarget(_database.IOConnectionInfo.Path);
+
+            using (FileTransactionEx transaction = new(IOConnectionInfo.FromPath(target), _database.UseFileTransactions))
             {
-                using (Stream target = transaction.OpenWrite())
+                using (Stream written = transaction.OpenWrite())
                 {
                     bytes = serialize();
-                    target.Write(bytes);
+                    written.Write(bytes);
 
-                    if (target is FileStream file)
+                    if (written is FileStream file)
                     {
-                        VaultFiles.KeepMode(file, _database.IOConnectionInfo.Path);
+                        VaultFiles.KeepMode(file, target);
                         file.Flush(flushToDisk: true);
                     }
                 }
@@ -633,7 +636,7 @@ internal sealed class KeePassInterop : IDisposable
                 transaction.CommitWrite();
             }
 
-            _ = VaultFiles.SyncDirectory(Path.GetDirectoryName(Path.GetFullPath(_database.IOConnectionInfo.Path))!);
+            _ = VaultFiles.SyncDirectory(Path.GetDirectoryName(Path.GetFullPath(target))!);
             _written = SHA256.HashData(bytes);
         }
         finally
@@ -3467,7 +3470,7 @@ internal sealed class KeePassInterop : IDisposable
     private static bool StrandsATemporary(Exception ex) =>
         ex is Win32Exception win32 && IsATransientMoveCode(win32.NativeErrorCode);
 
-    /// <summary>Removes the file the fallback move stranded beside the vault.</summary>
+    /// <summary>Removes the file the fallback move stranded beside the vault, or beside the file its link points to.</summary>
     /// <remarks>
     /// <para>
     /// <b>Opened rather than deleted by name, and only ever this one name.</b> Another writer can
@@ -3487,7 +3490,16 @@ internal sealed class KeePassInterop : IDisposable
     /// failing to tidy up must never replace that message.
     /// </para>
     /// </remarks>
-    private void SweepStrandedTemporary() => VaultFiles.Discard(_database.IOConnectionInfo.Path + StrandedTemporarySuffix);
+    private void SweepStrandedTemporary()
+    {
+        try
+        {
+            VaultFiles.Discard(VaultFiles.WriteTarget(_database.IOConnectionInfo.Path) + StrandedTemporarySuffix);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
 
     /// <inheritdoc/>
     public void Dispose()

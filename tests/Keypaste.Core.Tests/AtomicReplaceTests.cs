@@ -49,6 +49,27 @@ public sealed class AtomicReplaceTests : IDisposable
     }
 
     [Fact]
+    public void A_transaction_handed_a_symbolic_link_writes_through_it_and_keeps_the_link()
+    {
+        var target = Path.Combine(_directory, "vault.kdbx");
+        File.WriteAllBytes(target, [1, 2, 3]);
+        var link = VaultSaveTests.Link(Path.Combine(_directory, "link.kdbx"), target);
+
+        using (var transaction = new FileTransactionEx(IOConnectionInfo.FromPath(link), true))
+        {
+            using (var written = transaction.OpenWrite())
+            {
+                written.Write([4, 5, 6]);
+            }
+
+            transaction.CommitWrite();
+        }
+
+        Assert.NotNull(new FileInfo(link).LinkTarget);
+        Assert.Equal([4, 5, 6], File.ReadAllBytes(target));
+    }
+
+    [Fact]
     public void A_commit_replaces_the_vault_with_what_was_written()
     {
         if (OperatingSystem.IsWindows())

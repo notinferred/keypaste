@@ -32,11 +32,10 @@ public static class ProjectInference
 
         project = null;
 
-        var vault = Path.GetFullPath(vaultPath);
         var here = Normal(directory);
 
         var candidates = mappings
-            .Where(mapping => string.Equals(Path.GetFullPath(mapping.Vault), vault, PathIdentity.Comparison))
+            .Where(mapping => PathIdentity.SameFile(mapping.Vault, vaultPath))
             .Select(mapping => (mapping.Project, Directory: Normal(mapping.Directory)))
             .Where(mapping => Contains(mapping.Directory, here))
             .ToList();

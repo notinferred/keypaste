@@ -39,6 +39,21 @@ public sealed class VaultSaveTests : IDisposable
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 
     /// <summary>Creates a saved vault inside its own subdirectory, and returns both.</summary>
+    /// <summary>Creates a symbolic link, or skips where this machine cannot make one, as Windows without Developer Mode cannot.</summary>
+    internal static string Link(string path, string target)
+    {
+        try
+        {
+            File.CreateSymbolicLink(path, target);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Assert.Skip($"this machine cannot create symbolic links: {ex.Message}");
+        }
+
+        return path;
+    }
+
     private (Vault Vault, string Home) NewVaultInItsOwnDirectory(string name)
     {
         var home = Directory.CreateDirectory(Path.Combine(_directory, name)).FullName;
@@ -277,6 +292,48 @@ public sealed class VaultSaveTests : IDisposable
 
         Assert.IsType<VaultException>(failure);
         Assert.Equal(before, File.ReadAllBytes(path));
+    }
+
+    [Fact]
+    public void A_save_through_a_symbolic_link_replaces_the_file_it_points_to_and_keeps_the_link()
+    {
+        var (created, home) = NewVaultInItsOwnDirectory("linked");
+        created.Dispose();
+        var target = Path.Combine(home, "vault.kdbx");
+        var link = Link(Path.Combine(_directory, "linked.kdbx"), target);
+
+        using (var vault = Vault.Open(link, MasterPassword))
+        {
+            vault.AddEntry(new VaultEntry { Title = "New", Password = "p" });
+            vault.Save();
+        }
+
+        Assert.Equal(target, new FileInfo(link).ResolveLinkTarget(returnFinalTarget: true)?.FullName);
+        Assert.Empty(Directory.GetFiles(home, "*.tmp"));
+        using var reopened = Vault.Open(target, MasterPassword);
+        Assert.Contains(reopened.ReadEntries(), entry => entry.Title == "New");
+    }
+
+    [Fact]
+    public void A_save_through_a_symbolic_link_that_is_refused_leaves_the_file_it_points_to_as_it_was()
+    {
+        var (created, home) = NewVaultInItsOwnDirectory("linked-refused");
+        created.Dispose();
+        var target = Path.Combine(home, "vault.kdbx");
+        var link = Link(Path.Combine(_directory, "linked-refused.kdbx"), target);
+        var before = File.ReadAllBytes(target);
+        using var vault = Vault.Open(link, MasterPassword);
+        vault.AddEntry(new VaultEntry { Title = "New", Password = "p" });
+        vault.AfterSerializing = bytes =>
+        {
+            bytes[bytes.Length / 2] ^= 1;
+            return bytes;
+        };
+
+        Assert.IsType<VaultException>(Record.Exception(vault.Save));
+
+        Assert.Equal(before, File.ReadAllBytes(target));
+        Assert.NotNull(new FileInfo(link).LinkTarget);
     }
 
     [Fact]

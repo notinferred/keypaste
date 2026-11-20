@@ -183,6 +183,23 @@ public sealed class VaultRestoreTests : IDisposable
         Assert.Empty(Staged(path));
     }
 
+    [Fact]
+    public void ARestoreThroughASymbolicLink_PutsTheBackupsBytesInTheFileItPointsTo_AndKeepsTheLink()
+    {
+        var target = SeededVault("before");
+        var link = VaultSaveTests.Link(Path.Combine(_directory, "linked.kdbx"), target);
+        Edit(link, "after");
+        var backup = Assert.Single(VaultBackups.List(link));
+        var bytes = File.ReadAllBytes(backup.Path);
+
+        VaultBackups.Restore(VaultBackups.Inspect(link, backup, _master));
+
+        Assert.Equal(target, new FileInfo(link).ResolveLinkTarget(returnFinalTarget: true)?.FullName);
+        Assert.Equal(bytes, File.ReadAllBytes(target));
+        Assert.Empty(Staged(target));
+        Assert.Empty(Staged(link));
+    }
+
     /// <remarks>
     /// Planted, because the core has no call that changes a master password until V.1a. The file is a
     /// real vault made under another password and given a name <c>List</c> recognises, which is what a

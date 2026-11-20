@@ -104,7 +104,7 @@ internal sealed partial class ShellViewModel
 
     private string? RefusalOfHanded(string path, string name) =>
         !HandedFile.IsLocal(path) ? $"keypaste won't open {name} from a network location it was handed. Lock this vault and choose it with Open a vault instead."
-        : string.Equals(Path.GetFullPath(path), _session.VaultPath, PathIdentity.Comparison) ? $"{name} is already open."
+        : _session.VaultPath is { } open && PathIdentity.SameFile(path, open) ? $"{name} is already open."
         : !KdbxHeader.IsVaultFile(path) ? $"keypaste can't open {name}: it isn't there, or it isn't a readable KeePass vault."
         : null;
 

@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+A vault opened through a symbolic link is saved and restored by replacing the file the link points to with one rename, so the link stays and a failed or interrupted save no longer leaves the vault empty; on Windows the same holds for a file marked as a reparse point that is not a link, as OneDrive marks some. (F.132)
+
 `keypaste approve` merges another program's save of its vault while it runs, as the app does, saying in its terminal what it merged, and answers agents from the merged copy without a restart. (1.4b4)
 
 `keypaste approve` answers a request whose standard input has closed as having nobody to answer, saying so, with no refusal cooldown; an agent's listing that was withdrawn or failed is logged as cancelled or failed, not as no approver; an expiry that passes while a vault is unlocked shows in Security without a save; the locked screen follows `app.toml` being deleted and keeps reading it where the system refuses a file watch; on Linux, Open at login follows an AppImage that was moved; a share link counts as a use only in the vault it was made from; and on macOS the app no longer quits when a screen reader is running and an announcement clears. (F.112)

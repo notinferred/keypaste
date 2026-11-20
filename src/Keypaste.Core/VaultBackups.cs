@@ -367,7 +367,7 @@ public static class VaultBackups
     /// that, and until then a restore can only add to what is recoverable.
     /// </para>
     /// <para>
-    /// Staged beside the vault rather than in the backup directory. A rename within one directory is
+    /// Staged beside the vault, or beside the file its link points to, rather than in the backup directory. A rename within one directory is
     /// on one volume by construction; a backup directory that is a junction to another volume would
     /// turn the rename into a copy over the live vault, which a kill could leave half written.
     /// </para>
@@ -392,12 +392,13 @@ public static class VaultBackups
         VaultBackupSummary validated, Action<string>? beforeReplacing, Action<int>? waitBetweenAttempts)
     {
         var vaultPath = validated.VaultPath;
+        var target = WriteTarget(vaultPath);
 
-        SweepStaged(vaultPath);
+        SweepStaged(target);
 
         var backup = Listed(vaultPath, validated.Backup.Path);
         var bytes = ReadValidated(backup, validated.Digest);
-        var staged = Stage(vaultPath, bytes);
+        var staged = Stage(target, bytes);
 
         try
         {
@@ -417,7 +418,7 @@ public static class VaultBackups
 
             beforeReplacing?.Invoke(staged);
 
-            MoveIntoPlace(staged, vaultPath, live, waitBetweenAttempts);
+            MoveIntoPlace(staged, target, live, waitBetweenAttempts);
 
             return new VaultRestoreReport(backup, preserved, alreadyKeptAs);
         }
@@ -425,6 +426,19 @@ public static class VaultBackups
         {
             VaultFiles.Discard(staged);
             throw;
+        }
+    }
+
+    /// <summary>The file the restore replaces, which is a link's target rather than the link.</summary>
+    private static string WriteTarget(string vaultPath)
+    {
+        try
+        {
+            return VaultFiles.WriteTarget(vaultPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new VaultRestoreException($"Could not find the file '{vaultPath}' links to: {ex.Message}", ex);
         }
     }
 

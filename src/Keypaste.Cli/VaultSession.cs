@@ -275,10 +275,8 @@ internal static class VaultSession
     private static bool LastOpenedWithHardwareKey(string path, CliContext context)
     {
         var recent = KeypasteHome.RecentPath(context.Environment.Get(KeypasteHome.EnvironmentVariable));
-        var full = Path.GetFullPath(path);
-
         return RecentVaults.Load(recent)
-            .Any(vault => vault.HardwareKeySlot is not null && string.Equals(vault.Path, full, PathIdentity.Comparison));
+            .Any(vault => vault.HardwareKeySlot is not null && PathIdentity.SameFile(vault.Path, path));
     }
 
     /// <summary>Says, once, that keypaste has started keeping copies beside this vault.</summary>

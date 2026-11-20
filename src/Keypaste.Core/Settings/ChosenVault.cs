@@ -73,10 +73,9 @@ public static class ChosenVault
             : ChooseOutcome.NotWritten;
     }
 
-    /// <summary>Whether a path is the chosen vault, by this platform's rule for file names.</summary>
+    /// <summary>Whether two paths name one vault file, as <see cref="PathIdentity.SameFile"/> decides.</summary>
     public static bool Same(string? left, string? right) =>
-        left is not null && right is not null
-        && string.Equals(Path.GetFullPath(left), Path.GetFullPath(right), PathIdentity.Comparison);
+        left is not null && right is not null && PathIdentity.SameFile(left, right);
 
     internal static string? FullPath(string text)
     {

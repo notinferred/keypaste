@@ -62,6 +62,27 @@ public sealed class ProjectInferenceTests
         Assert.Equal("acme-api", project);
     }
 
+    [Fact]
+    public void A_vault_opened_through_a_symbolic_link_finds_the_mappings_saved_for_its_file()
+    {
+        var home = Directory.CreateTempSubdirectory("keypaste-inference-link-").FullName;
+
+        try
+        {
+            var target = Path.Combine(home, "vault.kdbx");
+            File.WriteAllBytes(target, [1]);
+            var link = VaultSaveTests.Link(Path.Combine(home, "link.kdbx"), target);
+            var mapping = new ProjectMapping(target, "acme-api", home, "npm start");
+
+            Assert.True(ProjectInference.TryInfer([mapping], link, home, out var project, out _));
+            Assert.Equal("acme-api", project);
+        }
+        finally
+        {
+            Directory.Delete(home, recursive: true);
+        }
+    }
+
     private static bool Infer(IReadOnlyList<ProjectMapping> mappings, string directory, out string? project, out string error) =>
         ProjectInference.TryInfer(mappings, _vault, directory, out project, out error);
 

@@ -65,8 +65,7 @@ public static class ProjectMappings
         ArgumentNullException.ThrowIfNull(vault);
         ArgumentNullException.ThrowIfNull(project);
 
-        var full = Path.GetFullPath(vault);
-        return mappings.FirstOrDefault(mapping => Same(mapping, full, project));
+        return mappings.FirstOrDefault(mapping => Same(mapping, vault, project));
     }
 
     /// <summary>The mappings with <paramref name="mapping"/> in place of any for the same vault and project.</summary>
@@ -272,7 +271,7 @@ public static class ProjectMappings
             ? text
             : null;
 
-    private static bool Same(ProjectMapping mapping, string fullVault, string project) =>
-        string.Equals(mapping.Vault, fullVault, PathIdentity.Comparison)
+    private static bool Same(ProjectMapping mapping, string vault, string project) =>
+        PathIdentity.SameFile(mapping.Vault, vault)
         && string.Equals(mapping.Project, project, StringComparison.Ordinal);
 }

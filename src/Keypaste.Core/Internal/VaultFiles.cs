@@ -103,6 +103,21 @@ internal static class VaultFiles
         }
     }
 
+    /// <summary>The file a save or restore replaces: the final target when <paramref name="path"/> is a symbolic link, so the link stays one.</summary>
+    /// <returns><paramref name="path"/> itself when it is not a link or nothing is there yet.</returns>
+    /// <exception cref="IOException">The links loop.</exception>
+    internal static string WriteTarget(string path)
+    {
+        try
+        {
+            return File.ResolveLinkTarget(path, returnFinalTarget: true)?.FullName ?? path;
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return path;
+        }
+    }
+
     /// <summary>Gives the file about to replace a vault the vault's own permissions, which the rename would otherwise lose.</summary>
     internal static void KeepMode(FileStream replacement, string vaultPath)
     {

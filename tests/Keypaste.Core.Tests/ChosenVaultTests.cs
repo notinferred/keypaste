@@ -36,6 +36,20 @@ public sealed class ChosenVaultTests : IDisposable
     }
 
     [Fact]
+    public void ChoosingALinkToTheChosenVault_KeepsTheChoiceAsItWasWritten()
+    {
+        var target = Vault("a.kdbx");
+        Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+        File.WriteAllBytes(target, [1]);
+        var link = VaultSaveTests.Link(Vault("link.kdbx"), target);
+        ChosenVault.Choose(_home, target, onlyIfNone: true);
+
+        Assert.True(ChosenVault.Same(link, target));
+        Assert.Equal(ChooseOutcome.Chosen, ChosenVault.Choose(_home, link, onlyIfNone: false));
+        Assert.Equal(target, ChosenVault.Read(_home));
+    }
+
+    [Fact]
     public void AFirstChoice_DoesNotReplaceOneAlreadyMade()
     {
         ChosenVault.Choose(_home, Vault("a.kdbx"), onlyIfNone: true);
