@@ -109,6 +109,7 @@ public sealed class RestoreBackupTests : IDisposable
         Assert.Equal("v0", session.Unlocked!.Find(_entry)?.Password);
         Assert.Null(unlock.Restore);
         Assert.Contains("is kept beside it", unlock.Notice, StringComparison.Ordinal);
+        Assert.DoesNotContain(Vault.OlderCopyText, unlock.Notice, StringComparison.Ordinal);
 
         session.Lock(VaultLockReason.Manual);
 
@@ -120,6 +121,35 @@ public sealed class RestoreBackupTests : IDisposable
         Assert.Equal(2, backups.Count);
         Assert.Equal(replaced, File.ReadAllBytes(backups[0].Path));
         Assert.Equal("v1", Read(backups[0].Path));
+    }
+
+    /// <summary>A file another program put back to the copy before the app's save is said once in the shell's notice, and the vault still opens.</summary>
+    [Fact]
+    public async Task An_older_copy_put_back_is_said_in_the_shell_once()
+    {
+        var older = File.ReadAllBytes(_vaultPath);
+        ChangeThroughTheApp("v1");
+        File.WriteAllBytes(_vaultPath, older);
+
+        using var session = new AppVaultSession(_clock);
+        using var unlock = new UnlockViewModel(session, _home, new FakeVaultFilePicker(), () => { });
+
+        Type(unlock, _master);
+        await unlock.UnlockAsync();
+
+        Assert.True(session.IsUnlocked);
+        using (var shell = new ShellViewModel(session, _home, null, notice: unlock.Notice))
+        {
+            Assert.StartsWith(UnlockViewModel.OlderCopyNotice, shell.Notice, StringComparison.Ordinal);
+        }
+
+        session.Lock(VaultLockReason.Manual);
+        Type(unlock, _master);
+        await unlock.UnlockAsync();
+
+        Assert.True(session.IsUnlocked);
+        Assert.DoesNotContain(Vault.OlderCopyText, unlock.Notice ?? string.Empty, StringComparison.Ordinal);
+        session.Lock(VaultLockReason.Manual);
     }
 
     [Fact]

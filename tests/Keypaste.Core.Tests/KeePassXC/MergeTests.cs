@@ -38,6 +38,27 @@ public sealed class MergeTests
         AssertReads(file, "work/github", "UserName", "kpxc-user");
     }
 
+    [Fact]
+    public void KeePassXCs_save_keeps_the_count_of_keypastes_saves_and_the_merged_save_counts_on_from_it()
+    {
+        using var file = Seeded();
+        using var open = file.Open();
+        Update(open, _stripe, "mine");
+
+        Edit(file, "work/github", "-u", "kpxc-user");
+        using (var read = Vault.OpenReadOnly(file.Path_, KeePassXcCli.Password))
+        {
+            Assert.Equal(1, read.SaveCount);
+        }
+
+        var merged = open.MergeAnotherSave();
+        using var copy = merged.Copy;
+
+        Assert.Equal(VaultMergeSaveOutcome.Saved, merged.Outcome);
+        Assert.Equal(2, copy!.SaveCount);
+        file.AssertKdbx4();
+    }
+
     // Which version is newer is read from the stamp KeePassXC wrote, since not every KeePassXC moves it on a CLI edit; a tie keeps the open copy's.
     [Theory]
     [InlineData(true)]

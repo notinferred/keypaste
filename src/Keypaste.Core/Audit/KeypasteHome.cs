@@ -115,6 +115,18 @@ public static class KeypasteHome
     public static string SharedAgentsPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), AgentsFileName);
 
+    /// <summary>The folder of the save count of the copy of each vault this home last opened or saved, one file per vault.</summary>
+    public const string SaveCountsDirectoryName = "save-counts";
+
+    /// <summary>Resolves where this home remembers a vault's save count. The file is not created.</summary>
+    /// <remarks>It holds one number and is named by the vault's identity, never its path.</remarks>
+    public static string SaveCountPath(string? fromEnvironment, Ownership.VaultIdentity vault)
+    {
+        ArgumentNullException.ThrowIfNull(vault);
+
+        return Path.Combine(Resolve(fromEnvironment), SaveCountsDirectoryName, vault.Key);
+    }
+
     /// <summary>Resolves this home's random identity, which every vault's sealed rules cover. The file is not created.</summary>
     public static string HomeIdPath(string? fromEnvironment) =>
         Path.Combine(Resolve(fromEnvironment), "agents.id");

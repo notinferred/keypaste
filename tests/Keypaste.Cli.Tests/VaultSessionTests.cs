@@ -1,4 +1,5 @@
 using System.CommandLine;
+using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ownership;
 using Xunit;
@@ -38,5 +39,36 @@ public sealed class VaultSessionTests : IDisposable
         Assert.Contains("a keypaste command", heldAs, StringComparison.Ordinal);
         Assert.True(VaultClaim.TryAcquire(Home, _harness.VaultPath, OwnerKind.TerminalAgent, out var after, out var refusal), refusal);
         after.Dispose();
+    }
+
+    /// <summary>A verb reading or saving a file put back to an older copy warns on stderr, once, and still runs.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AnOlderCopyPutBack_IsWarnedOfOnStderrOnce_AndTheVerbRuns(bool held)
+    {
+        _harness.SeedVault(_master, ("env/dev/TOKEN", "first"));
+        var older = File.ReadAllBytes(_harness.VaultPath);
+        _harness.Prompt.Enqueue(_master, "later");
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("add", "env/dev/LATER", "--vault", _harness.VaultPath));
+        Assert.DoesNotContain(Vault.OlderCopyText, _harness.Err, StringComparison.Ordinal);
+        File.WriteAllBytes(_harness.VaultPath, older);
+
+        Assert.Equal(CliApp.ExitSuccess, Open(held));
+        Assert.Contains($"keypaste: warning: {Vault.OlderCopyText}", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains(VaultBackups.DirectoryFor(_harness.VaultPath), _harness.Err, StringComparison.Ordinal);
+
+        _harness.Stderr.GetStringBuilder().Clear();
+        Assert.Equal(CliApp.ExitSuccess, Open(held));
+        Assert.DoesNotContain(Vault.OlderCopyText, _harness.Err, StringComparison.Ordinal);
+    }
+
+    private int Open(bool held)
+    {
+        _harness.Prompt.Enqueue(_master);
+        Func<Vault, int> body = _ => CliApp.ExitSuccess;
+        return held
+            ? VaultSession.OpenHeld(_harness.VaultPath, Line(), _harness.NewContext(), body)
+            : VaultSession.Open(_harness.VaultPath, Line(), _harness.NewContext(), body);
     }
 }

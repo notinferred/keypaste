@@ -36,7 +36,8 @@ internal static class ForeignEdit
     private static PwEntry Single(PwDatabase database, string title) =>
         database.RootGroup.GetEntries(true).Single(candidate => candidate.Strings.ReadSafe(PwDefs.TitleField) == title);
 
-    private static void InFile(string path, string masterPassword, Action<PwDatabase> work)
+    /// <summary>Opens the file, runs <paramref name="work"/> on it and saves it, as another KeePass program does.</summary>
+    internal static void InFile(string path, string masterPassword, Action<PwDatabase> work)
     {
         CompositeKey key = new();
         key.AddUserKey(new KcpPassword(Encoding.UTF8.GetBytes(masterPassword), false));

@@ -32,13 +32,17 @@ public sealed class VaultClaim : IDisposable
     private readonly string _ownerPath;
     private volatile bool _disposed;
 
-    private VaultClaim(FileStream held, string ownerPath, VaultIdentity vault, VaultOwner owner)
+    private VaultClaim(FileStream held, string ownerPath, string home, VaultIdentity vault, VaultOwner owner)
     {
         _lock = held;
         _ownerPath = ownerPath;
+        Home = home;
         Vault = vault;
         Owner = owner;
     }
+
+    /// <summary>keypaste's home the claim was taken in.</summary>
+    internal string Home { get; }
 
     /// <summary>The vault this claim holds.</summary>
     public VaultIdentity Vault { get; }
@@ -138,7 +142,7 @@ public sealed class VaultClaim : IDisposable
                 writer.Write(Describe(owner));
             }
 
-            claim = new VaultClaim(held, ownerPath, vault, owner);
+            claim = new VaultClaim(held, ownerPath, home, vault, owner);
             held = null;
             return true;
         }

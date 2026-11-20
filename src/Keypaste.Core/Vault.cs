@@ -50,6 +50,22 @@ public sealed class Vault : IDisposable
     /// <summary>The path of the file backing this vault.</summary>
     public string Path { get; }
 
+    /// <summary>
+    /// Whether the file this unlock opened carries a lower save count than the copy of the vault this computer's keypaste last
+    /// opened or saved, as another program restoring a backup, a sync tool bringing back an earlier version or someone
+    /// replacing the file leaves it. Said once: the open remembers the file's count.
+    /// </summary>
+    /// <remarks>False for a vault without the count, which keypaste's first save starts, and for an open naming no home.</remarks>
+    public bool IsOlderCopy { get; private init; }
+
+    /// <summary>What a person is told when <see cref="IsOlderCopy"/> holds, before what their surface says to do.</summary>
+    public const string OlderCopyText =
+        "This vault's file is older than the copy this computer last opened. Another program restoring a backup, " +
+        "a sync tool bringing back an earlier version or someone replacing the file can do this.";
+
+    /// <summary>The save count of the file as this vault last read or wrote it, or after a merge the larger of both copies'; null when no keypaste save has counted it.</summary>
+    internal long? SaveCount => _interop.SaveCount;
+
     /// <summary>Whether saves write through a temporary file. A test seam; nothing else reads it.</summary>
     internal bool UsesFileTransactions => _interop.UsesFileTransactions;
 
@@ -592,7 +608,7 @@ public sealed class Vault : IDisposable
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
         CheckClaim(claim, path);
-        return OpenWith(claim, path, masterPassword, keyfilePath, hardwareKey);
+        return OpenWith(claim, SeenSaveCount.Read(claim.Home, claim.Vault), path, masterPassword, keyfilePath, hardwareKey);
     }
 
     /// <summary>Opens an existing vault to read, which never saves, so it needs no claim.</summary>
@@ -600,17 +616,22 @@ public sealed class Vault : IDisposable
     /// <param name="masterPassword">The master password, as <see cref="Open(VaultClaim, string, ReadOnlySpan{char}, string?, HardwareKey?)"/> takes it.</param>
     /// <param name="keyfilePath">The keyfile, or <see langword="null"/> for a vault that has none.</param>
     /// <param name="hardwareKey">The hardware key, or <see langword="null"/> for a vault that needs none.</param>
+    /// <param name="home">
+    /// keypaste's home, when this open unlocks the vault for a person, so <see cref="IsOlderCopy"/> compares the file with the copy that home last opened or saved;
+    /// null for a file opened only to check or read it, such as a backup.
+    /// </param>
     /// <exception cref="InvalidMasterPasswordException">The factors do not open the vault.</exception>
     /// <exception cref="HardwareKeyException">The hardware key did not answer, so nothing was opened.</exception>
     public static Vault OpenReadOnly(
-        string path, ReadOnlySpan<char> masterPassword, string? keyfilePath = null, HardwareKey? hardwareKey = null)
+        string path, ReadOnlySpan<char> masterPassword, string? keyfilePath = null, HardwareKey? hardwareKey = null, string? home = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
-        return OpenWith(claim: null, path, masterPassword, keyfilePath, hardwareKey);
+        var seen = home is null ? null : SeenSaveCount.Read(home, VaultIdentity.Of(home, path));
+        return OpenWith(claim: null, seen, path, masterPassword, keyfilePath, hardwareKey);
     }
 
     private static Vault OpenWith(
-        VaultClaim? claim, string path, ReadOnlySpan<char> masterPassword, string? keyfilePath, HardwareKey? hardwareKey)
+        VaultClaim? claim, SeenSaveCount? seen, string path, ReadOnlySpan<char> masterPassword, string? keyfilePath, HardwareKey? hardwareKey)
     {
         if (keyfilePath is not null && VaultKeyfile.Inspect(keyfilePath).Outcome == KeyfileOutcome.XmlUnreadable)
         {
@@ -621,8 +642,12 @@ public sealed class Vault : IDisposable
         // leaves this vault changed on disk rather than stamped with what it never read.
         var stamp = SourceSnapshot.Digest(path);
         var interop = WithUtf8Password(masterPassword, utf8 => KeePassInterop.Open(path, utf8, keyfilePath, hardwareKey));
-        return new Vault(interop, path, stamp ?? SourceSnapshot.Digest(path), claim);
+        return Opened(interop, path, stamp ?? SourceSnapshot.Digest(path), claim, seen);
     }
+
+    /// <summary>The vault just opened, compared with the copy of it this home last opened or saved when there is a home to ask.</summary>
+    private static Vault Opened(KeePassInterop interop, string path, byte[]? stamp, VaultClaim? claim, SeenSaveCount? seen) =>
+        new(interop, path, stamp, claim) { IsOlderCopy = seen?.IsOlder(interop.SaveCount) ?? false };
 
     /// <summary>Opens an existing vault for writing with the parts of the key another open of it exported, as the desktop's quick unlock does.</summary>
     /// <param name="claim">This process's claim on <paramref name="path"/>, which every save of the vault needs.</param>
@@ -648,9 +673,10 @@ public sealed class Vault : IDisposable
             throw new ArgumentException("The hardware key is not in the slot the key's parts name.", nameof(hardwareKey));
         }
 
+        var seen = SeenSaveCount.Read(claim.Home, claim.Vault);
         var stamp = SourceSnapshot.Digest(path);
         var interop = KeePassInterop.Open(path, parts, hardwareKey);
-        return new Vault(interop, path, stamp ?? SourceSnapshot.Digest(path), claim);
+        return Opened(interop, path, stamp ?? SourceSnapshot.Digest(path), claim, seen);
     }
 
     private static void CheckClaim(VaultClaim claim, string path)
@@ -3347,6 +3373,7 @@ public sealed class Vault : IDisposable
                 backUp ? path => PreserveBefore(path, applyFloor) : null,
                 keyChange,
                 cancellationToken);
+            SeenSaveCount.Remember(_claim!.Home, _claim.Vault, _interop.SaveCount);
             afterReplacing?.Invoke();
 
             lock (_state)

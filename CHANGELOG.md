@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+Unlocking a vault in the app, a CLI command or `keypaste approve` warns, and still opens it, when the file is an older copy than the one this computer last opened or saved, as a backup another program restored, a sync tool bringing back an earlier version or someone replacing the file leaves it; restoring a backup in keypaste is not warned of. Each keypaste save counts up a number the vault carries for this. (F.136)
+
 Conflicted copies OneDrive and iCloud Drive leave beside a vault are found as Syncthing's, Dropbox's and Nextcloud's are, and `keypaste approve` names each one it finds in its terminal and says where to merge it, as the app's Security lists it. (F.135)
 
 `keypaste init` and restoring a backup from the desktop app's unlock screen are refused while another keypaste process holds the vault, naming it, as the commands that save already were, and both are refused while file locking is turned off (`DOTNET_SYSTEM_IO_DISABLEFILELOCKING`). (F.134)

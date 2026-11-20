@@ -2,6 +2,7 @@ extern alias KeePass;
 
 using System.Buffers;
 using System.ComponentModel;
+using System.Globalization;
 using KeePass::KeePassLib;
 using KeePass::KeePassLib.Collections;
 using KeePass::KeePassLib.Cryptography;
@@ -77,6 +78,9 @@ internal sealed class KeePassInterop : IDisposable
     /// <summary>The entries of the file this instance last read or wrote, which a save may drop only by recording their deletion.</summary>
     private HashSet<PwUuid> _entriesOnDisk;
 
+    /// <summary>See <see cref="SaveCount"/>.</summary>
+    private long? _saveCount;
+
     /// <summary>The keyfile a vault opened from <see cref="VaultKeyParts"/> was first opened with, which its key no longer names.</summary>
     private string? _partsKeyfilePath;
 
@@ -92,6 +96,7 @@ internal sealed class KeePassInterop : IDisposable
     {
         _database = database;
         _entriesOnDisk = EntryIds(database);
+        _saveCount = SaveCountOf(database);
     }
 
     /// <summary>Creates a new KDBX4 vault protected by the given UTF-8 master password.</summary>
@@ -446,6 +451,16 @@ internal sealed class KeePassInterop : IDisposable
     /// <summary>The custom-data item KeePassXC rewrites on every save, so a new value of it is no change to its owner.</summary>
     private const string _keePassXcStamp = "_LAST_MODIFIED";
 
+    // The root group's custom data counting keypaste's saves of the vault, which KeePassXC keeps, so an older copy put back reads lower (T-26).
+    // Not the database's: KeePassLib dates each of its items, which raises the file to KDBX 4.1.
+    private const string _saveCountKey = "keypaste.save-count";
+
+    /// <summary>What the next save counts up from: the file's count as last read or written, or after a merge the larger of both copies'; null when no keypaste save has counted it.</summary>
+    internal long? SaveCount => _saveCount;
+
+    private static long? SaveCountOf(PwDatabase database) =>
+        long.TryParse(database.RootGroup.CustomData.Get(_saveCountKey), NumberStyles.None, CultureInfo.InvariantCulture, out var count) ? count : null;
+
     // An entry's custom data, which KeePassXC keeps and shows nowhere, naming its UUID and the agent whose approved save created it (T-57).
     private const string _agentCreated = "acaf.agent-created";
 
@@ -457,6 +472,7 @@ internal sealed class KeePassInterop : IDisposable
     /// <exception cref="VaultException">The bytes did not open, or must not replace the file.</exception>
     private byte[] Produce(KeyChange? keyChange)
     {
+        _database.RootGroup.CustomData.Set(_saveCountKey, ((_saveCount ?? 0) + 1).ToString(CultureInfo.InvariantCulture));
         var bytes = Serialize();
 
         if (AfterSerializing is { } change)
@@ -3205,6 +3221,7 @@ internal sealed class KeePassInterop : IDisposable
                 .Execute(() => TryAttempt(bytes, hasChangedOnDisk, clock, ++attempt, attempts, duringAttempt, ref beforeReplacing, cancellationToken));
 
             _entriesOnDisk = EntryIds(_database);
+            _saveCount = SaveCountOf(_database);
             keyChange?.Committed = true;
             _database.Modified = false;
             return clock.Stamp(() => SHA256.HashData(bytes));
@@ -4619,6 +4636,7 @@ internal sealed class KeePassInterop : IDisposable
 
         using Merger merger = new(open, this, lineage);
         report = merger.Run();
+        _saveCount = new[] { _saveCount, open._saveCount }.Max();
         return VaultMergeOutcome.Merged;
     }
 
@@ -5518,7 +5536,7 @@ internal sealed class KeePassInterop : IDisposable
     /// <remarks>
     /// An entry is compared as <c>EqualsEntry</c> compares it with <c>IgnoreParentGroup</c>, <c>IgnoreLastAccess</c>, <c>IgnoreHistory</c>
     /// and <c>NullEmptyEquivStd</c>, times in whole seconds, and a group by what <c>AssignProperties</c> copies but its access times. Each
-    /// attachment enters as its SHA-256, taken once per instance. Custom data's own times, which KeePassLib keeps internal, the stamp KeePassXC rewrites on every save and a merge's mark on a version it kept are left out.
+    /// attachment enters as its SHA-256, taken once per instance. Custom data's own times, which KeePassLib keeps internal, the stamp KeePassXC rewrites on every save, keypaste's save count, which a merge sets itself, and a merge's mark on a version it kept are left out.
     /// </remarks>
     private sealed class ContentDigests(byte[] key) : IDisposable
     {
@@ -5679,7 +5697,7 @@ internal sealed class KeePassInterop : IDisposable
         {
             List<KeyValuePair<string, string>> items =
             [
-                .. data.Where(item => item.Key is not (PwEntry.KeptVersionKey or _keePassXcStamp))
+                .. data.Where(item => item.Key is not (PwEntry.KeptVersionKey or _keePassXcStamp or _saveCountKey))
                     .OrderBy(item => item.Key, StringComparer.Ordinal),
             ];
             Add((long)items.Count);

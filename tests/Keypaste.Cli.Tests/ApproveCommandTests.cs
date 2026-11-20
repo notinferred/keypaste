@@ -223,6 +223,23 @@ public sealed class ApproveCommandTests : IDisposable
         Assert.True(File.Exists(copy));
     }
 
+    /// <summary>A file put back to a copy older than one this computer saved is warned of in its terminal, and the vault still unlocks.</summary>
+    [Fact]
+    public async Task AnOlderCopyPutBack_IsWarnedOfInItsTerminal()
+    {
+        var older = File.ReadAllBytes(_harness.VaultPath);
+        _harness.Prompt.Enqueue(_master, "approve-command-later");
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("add", "env/dev/LATER", "--vault", _harness.VaultPath));
+        File.WriteAllBytes(_harness.VaultPath, older);
+
+        await using var approver = await RunningApprover.StartAsync(_harness, _master);
+
+        Assert.Contains($"keypaste: warning: {Vault.OlderCopyText}", approver.Text, StringComparison.Ordinal);
+
+        using var terminal = Terminal(approver);
+        await approver.StopAsync(terminal);
+    }
+
     /// <summary>A merge refused because the password or key file unlocked with no longer opens the file says so, and locks.</summary>
     [Fact]
     public void AMergeTheUnlocksKeyNoLongerOpens_SaysSoAndLocks()

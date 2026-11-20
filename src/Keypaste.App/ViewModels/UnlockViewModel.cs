@@ -267,13 +267,20 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// What the shell says once on opening: what a restore did, that the vault's keyfile is one
-    /// edit from lost (T-28), and that agents and the CLI now use this vault.
+    /// edit from lost (T-28), that the file is older than a copy this computer saw, and that agents and the CLI now use this vault.
     /// </summary>
     internal string? Notice
     {
         get => _chosenNotice is null ? _notice : _notice is null ? _chosenNotice : $"{_notice} {_chosenNotice}";
         private set => _notice = value;
     }
+
+    /// <summary>What the shell says when the vault's file is older than a copy this computer opened or saved.</summary>
+    internal const string OlderCopyNotice = Vault.OlderCopyText +
+        " If you didn't expect it, look for the newer copy in your sync or backup program's history, or lock keypaste " +
+        "and choose Restore a backup on the unlock screen to see the copies keypaste kept before its saves.";
+
+    private string? OlderCopy() => _session.Unlocked is { IsOlderCopy: true } ? OlderCopyNotice : null;
 
     /// <summary>What the shell says when the first create or unlock chose this vault for agents and the CLI.</summary>
     internal const string ChosenNotice =
@@ -899,7 +906,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
                 var keyfile = _session.Unlocked?.KeyfilePath;
                 Remember(path, keyfile, _session.HardwareKeySlot);
                 ResetPassword();
-                Notice = null;
+                Notice = OlderCopy();
                 _unlocked();
                 return;
             }
@@ -1019,7 +1026,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
             {
                 Remember(path, keyfile, slot);
                 ResetPassword();
-                Notice = null;
+                Notice = OlderCopy();
                 await LandAsync().ConfigureAwait(true);
                 return;
             }

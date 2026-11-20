@@ -325,9 +325,11 @@ public static class VaultBackups
             ?? throw new VaultRestoreException($"The backup '{listed.Path}' could not be read.");
 
         int entries, groups, projects;
+        long? saveCount;
         try
         {
             using var vault = Vault.OpenReadOnly(listed.Path, password, keyfilePath, hardwareKey);
+            saveCount = vault.SaveCount;
             entries = vault.ReadEntries(includeReserved: true).Count;
             groups = vault.ReadGroupPaths(includeReserved: true).Count;
             projects = ProjectCatalog.Read(vault).Projects.Count;
@@ -344,7 +346,7 @@ public static class VaultBackups
             throw new VaultRestoreException($"The backup '{listed.Path}' changed while it was being checked.");
         }
 
-        return new VaultBackupSummary(vaultPath, listed, entries, groups, projects, Facts(vaultPath), digest);
+        return new VaultBackupSummary(vaultPath, listed, entries, groups, projects, Facts(vaultPath), digest) { SaveCount = saveCount };
     }
 
     /// <summary>Puts a validated backup in the vault's place, byte for byte, under this process's claim on the vault.</summary>
@@ -391,7 +393,9 @@ public static class VaultBackups
         ArgumentNullException.ThrowIfNull(validated);
         claim.CheckHolds(validated.VaultPath, nameof(claim));
 
-        return KeePassInterop.WhileNoSaveReplaces(() => Replace(validated, beforeReplacing, waitBetweenAttempts));
+        var restored = KeePassInterop.WhileNoSaveReplaces(() => Replace(validated, beforeReplacing, waitBetweenAttempts));
+        SeenSaveCount.Remember(claim.Home, claim.Vault, validated.SaveCount);
+        return restored;
     }
 
     private static VaultRestoreReport Replace(
@@ -857,6 +861,9 @@ public sealed class VaultBackupSummary
     public VaultFileFacts? Replaces { get; }
 
     internal byte[] Digest { get; }
+
+    /// <summary>The backup's save count, which a restore has this home remember so the unlock after it warns of no older copy.</summary>
+    internal long? SaveCount { get; init; }
 }
 
 /// <summary>What a restore did.</summary>

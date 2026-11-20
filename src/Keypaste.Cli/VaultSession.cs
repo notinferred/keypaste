@@ -65,8 +65,9 @@ internal static class VaultSession
         try
         {
             using var vault = claim is null
-                ? Vault.OpenReadOnly(path, master.Value, keyfile)
+                ? Vault.OpenReadOnly(path, master.Value, keyfile, home: KeypasteHome.Resolve(context.Environment.Get(KeypasteHome.EnvironmentVariable)))
                 : Vault.Open(claim, path, master.Value, keyfile);
+            WarnIfOlder(vault, context);
             var exit = body(vault);
             Announce(vault, context);
             return exit;
@@ -286,6 +287,17 @@ internal static class VaultSession
         var recent = KeypasteHome.RecentPath(context.Environment.Get(KeypasteHome.EnvironmentVariable));
         return RecentVaults.Load(recent)
             .Any(vault => vault.HardwareKeySlot is not null && PathIdentity.SameFile(vault.Path, path));
+    }
+
+    /// <summary>Says, on stderr and before the verb's own output, that the file opened is older than a copy this computer saw; the verb goes on.</summary>
+    private static void WarnIfOlder(Vault vault, CliContext context)
+    {
+        if (vault.IsOlderCopy)
+        {
+            context.Stderr.WriteLine(
+                $"keypaste: warning: {Vault.OlderCopyText} If you didn't expect it, look for the newer copy in your sync or backup "
+                + $"program's history, or among the copies keypaste kept before its saves in '{VaultBackups.DirectoryFor(vault.Path)}'.");
+        }
     }
 
     /// <summary>Says, once, that keypaste has started keeping copies beside this vault.</summary>
