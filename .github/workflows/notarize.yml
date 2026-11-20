@@ -1,0 +1,195 @@
+name: notarize
+
+# Notarizes the macOS code an app run signed, and a release run's CLI if named, in two dispatches so no job waits on
+# Apple: submit records Apple's submission IDs, and finish, dispatched again until Apple has answered every one,
+# staples the tickets, checks the result as Gatekeeper meets it and uploads the notarized packages.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: submit sends the signed code to Apple; finish checks a submit run's submissions once
+        type: choice
+        options: [submit, finish]
+        required: true
+      app_run:
+        description: The app.yml run whose signed macOS bundle, DMG and payload are notarized
+        type: string
+        required: true
+      release_run:
+        description: A release.yml run whose signed macOS CLI is notarized too
+        type: string
+        default: ''
+      submit_run:
+        description: For finish, the notarize.yml submit run whose submissions are checked
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notarize-${{ inputs.app_run }}
+  cancel-in-progress: false
+
+jobs:
+  notarize:
+    name: ${{ inputs.mode }}
+    runs-on: macos-15
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    env:
+      IN: ${{ github.workspace }}/artifacts/in
+      OUT: ${{ github.workspace }}/artifacts/notarized
+      SUBMISSIONS: ${{ github.workspace }}/artifacts/submissions/submissions.tsv
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Resolve the macOS target
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ "${{ inputs.mode }}" = submit ] || [ -n "${{ inputs.submit_run }}" ] || { echo "::error::finish needs the submit run"; exit 1; }
+          echo "rid=$(jq -r '.components.app.targets[] | select(.rid | startswith("osx-")) | .rid' release-targets.json)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: app-${{ steps.target.outputs.rid }}
+          path: ${{ env.IN }}/app
+          run-id: ${{ inputs.app_run }}
+          github-token: ${{ github.token }}
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: macos-bundle-${{ steps.target.outputs.rid }}
+          path: ${{ env.IN }}/bundle
+          run-id: ${{ inputs.app_run }}
+          github-token: ${{ github.token }}
+
+      - if: inputs.release_run != ''
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist-${{ steps.target.outputs.rid }}
+          path: ${{ env.IN }}/cli
+          run-id: ${{ inputs.release_run }}
+          github-token: ${{ github.token }}
+
+      - if: inputs.mode == 'finish'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: notary-submissions
+          path: ${{ github.workspace }}/artifacts/submissions
+          run-id: ${{ inputs.submit_run }}
+          github-token: ${{ github.token }}
+
+      # A tar.gz holds loose code, which Apple takes zipped and which cannot be stapled, so it publishes unchanged.
+      - name: Unpack the archives of loose code
+        shell: bash
+        run: |
+          set -euo pipefail
+          for archive in "$IN"/app/*.tar.gz "$IN"/cli/*.tar.gz; do
+            [ -f "$archive" ] || continue
+            mkdir -p "${archive%.tar.gz}"
+            tar -xzf "$archive" -C "${archive%.tar.gz}"
+          done
+
+      - name: Submit each package to Apple's notary service
+        if: inputs.mode == 'submit'
+        shell: bash
+        env:
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$SUBMISSIONS")"
+          : > "$SUBMISSIONS"
+          for package in "$IN"/bundle/keypaste.app.zip "$IN"/app/*.dmg "$IN"/app/*.tar.gz "$IN"/cli/*.tar.gz; do
+            [ -f "$package" ] || continue
+            code="$package"
+            case "$package" in *.tar.gz) code="${package%.tar.gz}" ;; esac
+            id="$(scripts/macos-signing.sh submit "$code" < /dev/null)"
+            printf '%s\t%s\t%s\n' "${package#"$IN"/}" "$(shasum -a 256 < "$package" | cut -d' ' -f1)" "$id" >> "$SUBMISSIONS"
+          done
+          [ -s "$SUBMISSIONS" ] || { echo "::error::the runs named hold no macOS package"; exit 1; }
+          { echo "Submitted to Apple; dispatch \`mode=finish submit_run=$GITHUB_RUN_ID\` with the same runs once Apple has answered."
+            echo; echo '| Package | Submission |'; echo '|---|---|'
+            while IFS=$'\t' read -r name _ id; do echo "| $name | $id |"; done < "$SUBMISSIONS"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - if: inputs.mode == 'submit'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: notary-submissions
+          path: ${{ env.SUBMISSIONS }}
+          if-no-files-found: error
+          retention-days: 7
+
+      # Apple's answer is asked once; a submission still In Progress leaves this run green and uploads nothing.
+      - name: Staple every ticket Apple has issued
+        id: finish
+        if: inputs.mode == 'finish'
+        shell: bash
+        env:
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          pending=""
+          while IFS=$'\t' read -r name hash id; do
+            package="$IN/$name"
+            [ "$(shasum -a 256 < "$package" | cut -d' ' -f1)" = "$hash" ] || { echo "::error::$name is not the package submit sent"; exit 1; }
+            code="$package"
+            case "$package" in *.tar.gz) code="${package%.tar.gz}" ;; esac
+            rc=0
+            scripts/macos-signing.sh finish "$code" "$id" < /dev/null || rc=$?
+            case "$rc" in
+              0) ;;
+              75) pending="$pending $name ($id)" ;;
+              *) exit "$rc" ;;
+            esac
+          done < "$SUBMISSIONS"
+          if [ -n "$pending" ]; then
+            echo "::notice::Apple has not answered:$pending; dispatch finish again later"
+            echo "Apple has not answered:$pending. Nothing was uploaded; dispatch finish again later." >> "$GITHUB_STEP_SUMMARY"
+            echo "pending=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check the notarized code as Gatekeeper meets it
+        if: inputs.mode == 'finish' && steps.finish.outputs.pending != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$OUT"
+          while IFS=$'\t' read -r name _ _; do
+            package="$IN/$name"
+            case "$package" in
+              *.tar.gz) scripts/verify-macos-signature.sh "${package%.tar.gz}" < /dev/null ;;
+              *) scripts/verify-macos-signature.sh "$package" < /dev/null ;;
+            esac
+            case "$package" in */bundle/*) continue ;; esac
+            cp "$package" "$OUT/"
+            artifact="$(basename "$package")"
+            printf '%s  %s\n' "$(shasum -a 256 < "$package" | cut -d' ' -f1)" "$artifact" > "$OUT/$artifact.sha256"
+          done < "$SUBMISSIONS"
+          ls -l "$OUT"
+          echo "Every submission was accepted, stapled where code can hold a ticket, and checked." >> "$GITHUB_STEP_SUMMARY"
+
+      - if: inputs.mode == 'finish' && steps.finish.outputs.pending != 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: notarized-${{ steps.target.outputs.rid }}
+          path: ${{ env.OUT }}/*
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Remove the notary key
+        if: always()
+        shell: bash
+        run: scripts/macos-signing.sh cleanup

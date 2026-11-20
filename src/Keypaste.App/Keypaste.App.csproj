@@ -48,6 +48,11 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <ApplicationIcon>Assets/keypaste.ico</ApplicationIcon>
   </PropertyGroup>
+  <!-- codesign seals only Mach-O code in a bundle's Contents/MacOS, so on macOS the assemblies and the runtime travel inside the executable. -->
+  <PropertyGroup Condition="$(RuntimeIdentifier.StartsWith('osx'))">
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishDocumentationFiles>false</PublishDocumentationFiles>
+  </PropertyGroup>
 
   <ItemGroup>
     <AvaloniaResource Include="Assets/**" />

@@ -324,6 +324,7 @@ TARGETS
     local policy kind pattern internal signed tool_version tool_sha runtime_version runtime_sha tool_sha512
     policy="$(jqr ".components.\"$c\".signing.policy // empty" "$def")"
     case "$policy" in none | authenticode) ;; *) note "$c: signing policy '$policy' is neither none nor authenticode" ;; esac
+    case "$(jqr ".components.\"$c\".signing.macos // \"none\"" "$def")" in none | developer-id) ;; *) note "$c: macOS signing policy is neither none nor developer-id" ;; esac
     while IFS=$'\037' read -r rid kind pattern internal signed tool_version tool_sha runtime_version runtime_sha tool_sha512; do
       [ -n "$rid" ] || continue
       case "$pattern" in *"{version}"*"{rid}"*) ;; *) note "$c/$rid: $kind package '$pattern' does not carry {version} and {rid}" ;; esac
@@ -841,10 +842,11 @@ validate_prerelease_path() {
 # nothing else in this file can see (4.7a1). A build may live in a script the workflow runs,
 # so those scripts are read with it, except this gate, whose fixtures name every package kind.
 # sign-windows.sh names installers it signs and builds none, verify-desktop-candidate.sh names
-# the ones it refuses and builds none either - which is what lets release.yml call it (4.7c) - and
+# the ones it refuses and builds none either - which is what lets release.yml call it (4.7c) -
+# macos-signing.sh and verify-macos-signature.sh notarize and check a DMG and build none, and
 # install-keepassxc.sh installs KeePassXC's own disk image, or Ubuntu's package, for the gates.
 package_code() {
-  local root="$1" workflow="$2" exempt="${3-sign-windows.sh verify-desktop-candidate.sh install-keepassxc.sh}" script
+  local root="$1" workflow="$2" exempt="${3-sign-windows.sh verify-desktop-candidate.sh install-keepassxc.sh macos-signing.sh verify-macos-signature.sh}" script
   code_of "$root/$workflow"
   for script in $(code_of "$root/$workflow" | grep -oE 'scripts/[A-Za-z0-9._-]+\.sh' | sort -u); do
     case " $(basename "$SELF") $exempt " in *" $(basename "$script") "*) continue ;; esac
@@ -926,7 +928,8 @@ workflow_steps() {
     END { printf "%s\035", step }'
 }
 
-# A Windows build signs only through sign-windows.sh, which reads the policy from the definition;
+# A Windows build signs only through sign-windows.sh, which reads the policy from the definition, as a macOS build does
+# through macos-signing.sh;
 # a rehearsal signature lives only in app.yml's dispatch and never reaches an upload or attestation (3.6b).
 validate_signing() {
   local def="$1" root="$2" c workflow code step project version pin pins
@@ -1011,6 +1014,18 @@ validate_signing() {
           done < <(workflow_steps "$root/$workflow")
         fi ;;
     esac
+
+    # A macOS build signs through sign-macos.sh with the identity macos-signing.sh takes as the definition's policy says.
+    if [ -n "$(jqr ".components.\"$c\" | (.targets // .platforms)[]? | select(.rid | startswith(\"osx-\")) | .rid" "$def")" ]; then
+      case "$code" in
+        *"scripts/macos-signing.sh identity \"\$(jq -r '.components.$c.signing.macos'"*) ;;
+        *) note "$workflow builds a macOS target and never takes its identity from the $c macOS signing policy" ;;
+      esac
+      case "$code" in
+        *"scripts/sign-macos.sh "*) ;;
+        *) note "$workflow builds a macOS target and never signs it through sign-macos.sh" ;;
+      esac
+    fi
 
     code="$(package_code "$root" "$workflow" "")"
     for pin in $pins; do

@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 # Wraps a staged osx-arm64 desktop payload in the internal keypaste.app bundle and zips it as keypaste.app.zip,
 # the build intermediate build-macos-dmg.sh wraps in the DMG release-targets.json declares. The zip is no release
-# package, so nothing uploads or attests it.
+# package: app.yml uploads it only for notarize.yml to notarize, and nothing attests it.
 #
-# The payload goes to Contents/MacOS, where the apphost finds its runtime and the app finds the keypaste it
-# gives clients; the icon, licences and Terminal's launcher go to Contents/Resources. Nothing is signed or
-# notarized while the app's signing policy is none. ditto zips the bundle, keeping its modes in a format notarytool
-# also accepts, and the bundle is then checked as unzipped from that archive, including a --selftest started
-# through LaunchServices that must derive its vault key with the libargon2.1.dylib beside the app.
+# The payload goes to Contents/MacOS, which must hold Mach-O code alone: the single-file app, the keypaste it gives
+# clients and the libraries they load. The icon, licences and Terminal's launcher go to Contents/Resources.
+# sign-macos.sh signs the bundle under the hardened runtime with KEYPASTE_MACOS_IDENTITY, ad hoc by default, and the
+# notarize.yml notarizes the zip. ditto zips the bundle, keeping its modes in a format notarytool also accepts, and the bundle is then
+# checked as unzipped from that archive: its seal holds and refuses a changed byte, and a --selftest started through
+# LaunchServices, like the keypaste's doctor, must derive with the libargon2.1.dylib beside it.
 #
 # Build logs go to stderr; the path of the archive is the only line on stdout.
 #
 # Usage: build-macos-app.sh <staged-payload-dir> <version> <binary-version> <out-dir>
+# Environment: KEYPASTE_MACOS_IDENTITY  the codesign identity (default: -, ad hoc)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -50,9 +52,14 @@ plutil -lint "$app/Contents/Info.plist" >&2
 find "$app" -type d -exec chmod 755 {} +
 find "$app" -type f -exec chmod 644 {} +
 while IFS= read -r -d '' path; do
-  case "$(file -b "$path")" in *Mach-O*executable*) chmod 755 "$path" ;; esac
+  case "$(file -b "$path")" in
+    *Mach-O*executable*) chmod 755 "$path" ;;
+    *Mach-O*) ;;
+    *) die "$(basename "$path") is no Mach-O code, which codesign cannot seal in Contents/MacOS" ;;
+  esac
 done < <(find "$app/Contents/MacOS" -type f -print0)
 chmod 755 "$app/Contents/Resources/keypaste-launch.command"
+"$ROOT/scripts/sign-macos.sh" "$app" "${KEYPASTE_MACOS_IDENTITY:--}"
 
 mkdir -p "$out"
 rm -f "$out/$NAME"
@@ -73,9 +80,21 @@ cmp -s "$ROOT/packaging/macos/keypaste-launch.command" "$contents/Resources/keyp
 [ "$(plist CFBundleDocumentTypes.0.LSHandlerRank)" = Alternate ] || die "$NAME declares .kdbx at rank $(plist CFBundleDocumentTypes.0.LSHandlerRank), not Alternate"
 [ "$(plist CFBundleDocumentTypes.0.CFBundleTypeExtensions.0)" = kdbx ] || die "$NAME declares no .kdbx document type"
 
+codesign --verify --deep --strict "$unzipped/keypaste.app" >&2 || die "$NAME's signature does not verify"
+while IFS= read -r -d '' path; do
+  case "$(codesign -dv "$path" 2>&1)" in *'flags=0x'*'runtime'*) ;; *) die "$(basename "$path") is not signed under the hardened runtime" ;; esac
+done < <(find "$contents/MacOS" -type f -print0)
+ditto "$unzipped/keypaste.app" "$work/changed.app"
+changed="$work/changed.app/Contents/MacOS/libargon2.1.dylib"
+byte="$(xxd -s 4096 -l 1 -p "$changed")"
+printf '%02x' $((0x$byte ^ 1)) | xxd -r -p | dd of="$changed" bs=1 seek=4096 conv=notrunc 2> /dev/null
+! codesign --verify --deep --strict "$work/changed.app" 2> /dev/null || die "$NAME's signature accepts a changed libargon2.1.dylib"
+
 reported="$("$executable" --version | tr -d '[:space:]')"
 [ "$reported" = "$binary_version" ] || die "the bundle's binary reports $reported, not $binary_version"
 case "$("$contents/MacOS/keypaste" mcp --help 2>&1)" in "the MCP server your AI tools start"*) ;; *) die "the bundle's keypaste does not answer mcp --help" ;; esac
+where="$(KEYPASTE_HOME="$work/home" "$contents/MacOS/keypaste" doctor --json | jq -r '.[] | select(.area == "argon2" and .status == "ok") | .where')" || true
+case "$where" in */keypaste.app/Contents/MacOS/libargon2.1.dylib) ;; *) die "the bundle's keypaste did not derive with the libargon2.1.dylib beside it" ;; esac
 
 # LaunchServices, not a shell, reads Info.plist and starts the app from Finder or `open`; its exit code is not open's.
 : > "$work/launched"

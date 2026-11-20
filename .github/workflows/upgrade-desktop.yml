@@ -10,8 +10,8 @@ run-name: ${{ inputs.rehearsal && 'upgrade-desktop rehearsal (not release eviden
 # and on macOS through the /usr/local/bin link, which names the bundle's fixed path that an upgrade replaces.
 #
 # Distinct numeric versions because an MSI ProductVersion and a bundle version are numeric and two candidates of
-# one version cannot be ordered. Nothing here is attested, published or signed: these candidates exist only to
-# be installed over one another. Public downloads and their upgrade evidence are 4.7c.
+# one version cannot be ordered. Nothing here is attested, published or notarized, and only the macOS bundles are
+# signed: these candidates exist only to be installed over one another. Public downloads and their upgrade evidence are 4.7c.
 #
 # A rehearsal makes the data with a CLI/MCP the build job publishes from this run's own commit instead of a
 # published release. It is never release evidence; a candidate is tagged only after its rehearsal passes.
@@ -67,16 +67,32 @@ jobs:
           set -euo pipefail
           bash scripts/apt-install.sh --no-install-recommends squashfs-tools desktop-file-utils file clang zlib1g-dev
 
+      # Signed as a release's bundle is, because macOS guards a signed app in /Applications against replacement.
+      - name: Take the macOS signing identity as the definition's policy says
+        id: macos-signing
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: scripts/macos-signing.sh identity "$(jq -r '.components.app.signing.macos' release-targets.json)" >> "$GITHUB_OUTPUT"
+
       # One commit, three versions: the lower one is installed, the higher upgrades it, and the third
       # is the install that fails partway.
       - name: Build the three candidates
         shell: bash
         env:
           RID: ${{ matrix.rid }}
+          KEYPASTE_MACOS_IDENTITY: ${{ steps.macos-signing.outputs.identity }}
         run: |
           set -euo pipefail
           bash scripts/build-upgrade-candidates.sh "$RID" artifacts/dist 0.0.1 0.0.2 0.0.3
           ls -l artifacts/dist
+
+      - name: Remove the macOS signing identity
+        if: always() && runner.os == 'macOS'
+        shell: bash
+        run: scripts/macos-signing.sh cleanup
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

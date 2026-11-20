@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Wraps the keypaste.app that build-macos-app.sh zipped and checked in the internal disk image release-targets.json
-# declares: the bundle beside a link to /Applications, built by hdiutil alone and left unsigned while the app's
-# signing policy is none. The image is then attached read-only and checked as a person would open it: its entries,
+# declares: the bundle beside a link to /Applications, built by hdiutil and signed with KEYPASTE_MACOS_IDENTITY, which
+# the workflow then notarizes; an ad-hoc build leaves the image unsigned. The image is then attached read-only and checked as a person would open it: its entries,
 # the bundle's bytes and modes against the zip's, the plist versions, the binary's version, the bridge, and a
 # --selftest started through LaunchServices from the image, which is detached afterwards.
 #
@@ -9,6 +9,7 @@
 #
 # Usage: build-macos-dmg.sh <app-zip> <version> <binary-version> <out-dir>
 # Environment: KEYPASTE_RELEASE_DEFINITION  the definition to read (default: release-targets.json)
+#              KEYPASTE_MACOS_IDENTITY     the codesign identity (default: -, ad hoc)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -53,6 +54,8 @@ rm -f "$out/$name"
 # Written with no disk attached: create -srcfolder's temporary disk can fail to eject as busy after its unmount.
 hdiutil makehybrid -hfs -hfs-volume-name keypaste -o "$work/image.dmg" "$stage" >&2
 hdiutil convert "$work/image.dmg" -format UDZO -o "$out/$name" >&2
+identity="${KEYPASTE_MACOS_IDENTITY:--}"
+if [ "$identity" != - ]; then codesign --sign "$identity" --timestamp "$out/$name" >&2; fi
 hdiutil verify "$out/$name" >&2
 
 mkdir -p "$volume"

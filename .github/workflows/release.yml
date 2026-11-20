@@ -331,19 +331,27 @@ jobs:
           scripts/verify-keepassxc-compat.sh artifacts/compat/aot.kdbx
           scripts/verify-keepassxc-writeback.sh artifacts/compat/aot-writeback.kdbx
 
-      # Archive extraction omits the quarantine attribute that browsers apply to downloads.
-      - name: Check the ad-hoc signature and the quarantine behaviour (macOS)
+      # A release is a tag or a dispatch, so under developer-id it refuses without the identity; notarize.yml notarizes it.
+      - name: Take the macOS signing identity as the definition's policy says
+        id: macos-signing
         if: runner.os == 'macOS'
         shell: bash
-        run: |
-          codesign -dv --verbose=4 "$KEYPASTE_BIN" 2>&1 | sed -n '1,6p' || true
-          xattr -w com.apple.quarantine "0081;00000000;Safari;" "$KEYPASTE_BIN"
-          if "$KEYPASTE_BIN" --version >/dev/null 2>&1; then
-            echo "quarantined binary ran: the README's xattr line may be unnecessary"
-          else
-            echo "quarantined binary was blocked, which is what the README's xattr line is for"
-          fi
-          xattr -d com.apple.quarantine "$KEYPASTE_BIN"
+        env:
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: scripts/macos-signing.sh identity "$(jq -r '.components.cli.signing.macos' release-targets.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Sign keypaste and its libargon2 (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          IDENTITY: ${{ steps.macos-signing.outputs.identity }}
+        run: scripts/sign-macos.sh "artifacts/release/${{ matrix.rid }}" "$IDENTITY"
+
+      - name: Remove the macOS signing identity
+        if: always() && runner.os == 'macOS'
+        shell: bash
+        run: scripts/macos-signing.sh cleanup
 
       - name: Check the glibc floor on a clean Debian 12
         if: matrix.rid == 'linux-x64'
@@ -463,6 +471,16 @@ jobs:
           persist-credentials: false
           submodules: true
           fetch-depth: 0
+
+      # This run's macOS payloads are signed and not notarized; only a finished notarize.yml run holds notarized ones.
+      - name: Refuse macOS payloads no notarize.yml run finished
+        shell: bash
+        run: |
+          set -euo pipefail
+          if jq -e '[.components[] | select(.origin != null and .signing.macos == "developer-id") | (.targets // .platforms)[]? | select(.rid | startswith("osx-"))] | length > 0' release-targets.json > /dev/null; then
+            echo "::error::macOS payloads publish only from a finished notarize.yml run's notarized artifacts, which this workflow does not take yet (4.7c2)"
+            exit 1
+          fi
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:

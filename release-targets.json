@@ -24,6 +24,7 @@
       },
       "signing": {
         "policy": "none",
+        "macos": "developer-id",
         "reason": "no signing identity yet",
         "until": [
           "3.5a",
@@ -135,6 +136,7 @@
       },
       "signing": {
         "policy": "none",
+        "macos": "developer-id",
         "reason": "no signing identity yet",
         "until": [
           "3.6a"

@@ -21,7 +21,8 @@
 # Windows the SDK stamps the version resource into it and it is checked; on Linux and macOS it
 # carries no metadata at all, and demanding some would be demanding a field that does not exist.
 # The managed assembly beside it is the artifact that carries the identity. A NativeAOT binary has
-# no such sidecar, which is exactly how release.yml already tells the two apart.
+# no such sidecar, which is exactly how release.yml already tells the two apart. Nor has the
+# single-file app published for macOS, whose executable carries its assemblies and is checked itself.
 #
 # Usage: verify-publisher-metadata.sh <staged-dir> [<staged-dir>...]
 #

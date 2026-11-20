@@ -61,6 +61,9 @@ on:
       - 'scripts/build-libsodium.sh'
       - 'scripts/build-linux-appimage.sh'
       - 'scripts/build-macos-app.sh'
+      - 'scripts/sign-macos.sh'
+      - 'scripts/macos-signing.sh'
+      - 'scripts/verify-macos-signature.sh'
       - 'scripts/build-macos-dmg.sh'
       - 'scripts/verify-macos-cli-link.sh'
       - 'scripts/verify-linux-appimage.sh'
@@ -529,6 +532,23 @@ jobs:
             scripts/sign-windows.sh --component app "$out"
           fi
 
+      # Under developer-id a tag or dispatch refuses without the identity; notarize.yml notarizes what this signs.
+      - name: Take the macOS signing identity as the definition's policy says
+        id: macos-signing
+        if: matrix.dmg
+        shell: bash
+        env:
+          MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: scripts/macos-signing.sh identity "$(jq -r '.components.app.signing.macos' release-targets.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Sign the macOS payload
+        if: matrix.dmg
+        shell: bash
+        env:
+          IDENTITY: ${{ steps.macos-signing.outputs.identity }}
+        run: scripts/sign-macos.sh "artifacts/app/${{ matrix.rid }}" "$IDENTITY"
+
       - name: Package and hash
         shell: bash
         env:
@@ -628,6 +648,7 @@ jobs:
         env:
           VERSION: ${{ steps.v.outputs.version }}
           REPORTED: ${{ steps.v.outputs.reported }}
+          KEYPASTE_MACOS_IDENTITY: ${{ steps.macos-signing.outputs.identity }}
         run: |
           set -euo pipefail
           bundle="$(scripts/build-macos-app.sh artifacts/stage "$VERSION" "$REPORTED" artifacts/bundle)"
@@ -649,6 +670,7 @@ jobs:
           VERSION: ${{ steps.v.outputs.version }}
           REPORTED: ${{ steps.v.outputs.reported }}
           BUNDLE: ${{ steps.bundle.outputs.zip }}
+          KEYPASTE_MACOS_IDENTITY: ${{ steps.macos-signing.outputs.identity }}
         run: |
           set -euo pipefail
           image="$(scripts/build-macos-dmg.sh "$BUNDLE" "$VERSION" "$REPORTED" artifacts/dist)"
@@ -684,6 +706,11 @@ jobs:
         with:
           subject-path: artifacts/dist/keypaste-app-*.dmg
 
+      - name: Remove the macOS signing identity
+        if: always() && matrix.dmg
+        shell: bash
+        run: scripts/macos-signing.sh cleanup
+
       - name: Remove the rehearsal certificates
         if: always() && steps.rehearsal.outputs.trusted != ''
         shell: bash
@@ -694,6 +721,15 @@ jobs:
         with:
           name: app-${{ matrix.rid }}
           path: artifacts/dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+      # notarize.yml submits and staples this bundle, the DMG's input, beside the app-* artifact's DMG and payload.
+      - if: matrix.dmg && steps.rehearsal.outputs.trusted == ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: macos-bundle-${{ matrix.rid }}
+          path: ${{ steps.bundle.outputs.zip }}
           if-no-files-found: error
           retention-days: 7
 

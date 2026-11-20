@@ -8,7 +8,7 @@ The desktop app opens the same `.kdbx` vaults as the CLI and KeePassXC. While it
 
 ## Current limits
 
-The app has no public release. CI builds internal, unsigned candidates (a Windows MSI, a Linux AppImage and a macOS DMG holding `keypaste.app`) and installs them on fresh runners; [RELEASE](RELEASE.md) owns what is packaged, signed, published and installation-verified.
+The app has no public release. CI builds internal candidates (an unsigned Windows MSI and Linux AppImage, and a macOS DMG holding `keypaste.app`, which CI signs with keypaste's Developer ID and a later dispatched run notarizes) and installs them on fresh runners; [RELEASE](RELEASE.md) owns what is packaged, signed, published and installation-verified.
 
 One vault has one holder at a time. When `keypaste approve` already holds the vault in a terminal, the unlock screen names it and the app leaves it running; while the app holds the vault, `keypaste approve` is refused the same way.
 
