@@ -3,8 +3,8 @@
 #
 #   keypaste.app.zip  every Mach-O signed by one team under the hardened runtime with a timestamp, keypaste-app without
 #                     the library-validation exemption, the seal verified, a changed byte refused, spctl accepting the
-#                     bundle, its ticket stapled, and a quarantined copy started through LaunchServices passing
-#                     --selftest with the libargon2.1.dylib beside it, as keypaste's doctor derives with it too.
+#                     bundle, its ticket stapled, and the bundle started through LaunchServices passing --selftest
+#                     with the libargon2.1.dylib beside it, as keypaste's doctor derives with it too.
 #   .dmg              the image signed, its ticket stapled and spctl accepting it to open.
 #   directory         the CLI archive's keypaste and libargon2.1.dylib signed alike, and a quarantined keypaste
 #                     running and its doctor naming the libargon2.1.dylib beside it. Loose code holds no ticket.
@@ -70,16 +70,15 @@ check_bundle() {
   rm -rf "$work/changed.app"
 
   doctor_derives_beside "$macos/keypaste"
-  # Gatekeeper assesses a quarantined bundle when LaunchServices opens it, and a refusal leaves the app stopped.
-  quarantine "$app"
+  # Unquarantined: a quarantined download's first open waits for a person to confirm it, which spctl's verdict above stands in for.
   : > "$work/launched"
   if ! open -W -n -g --stdout "$work/launched" --stderr "$work/launched.err" "$app" --args --selftest 2> "$work/open.err"; then
-    grep -q 'kevent() failed: No such process' "$work/open.err" || die "open could not start the quarantined bundle: $(cat "$work/open.err")"
+    grep -q 'kevent() failed: No such process' "$work/open.err" || die "open could not start the bundle: $(cat "$work/open.err")"
   fi
   grep -q '^keypaste-app: selftest ok ' "$work/launched" \
-    || die "the quarantined bundle did not pass --selftest: $(cat "$work/launched" "$work/launched.err")"
+    || die "the notarized bundle did not pass --selftest: $(cat "$work/launched" "$work/launched.err")"
   grep -q '^keypaste-app: Argon2 derived natively by .*/keypaste\.app/Contents/MacOS/libargon2\.1\.dylib$' "$work/launched" \
-    || die "the quarantined bundle did not derive with the libargon2.1.dylib in its Contents/MacOS: $(cat "$work/launched")"
+    || die "the notarized bundle did not derive with the libargon2.1.dylib in its Contents/MacOS: $(cat "$work/launched")"
   cat "$work/launched" >&2
 }
 
