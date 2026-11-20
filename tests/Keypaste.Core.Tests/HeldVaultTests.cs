@@ -24,7 +24,7 @@ public sealed class HeldVaultTests : IDisposable
     {
         _log = new OwnerLog(_directory);
 
-        using (var seed = Vault.Create(VaultPath, _master))
+        using (var seed = ClaimedVault.Create(VaultPath, _master))
         {
             seed.AddEntry(new VaultEntry { GroupPath = _github.GroupPath, Title = _github.Title, Password = "github-0" });
             seed.AddEntry(new VaultEntry { GroupPath = _stripe.GroupPath, Title = _stripe.Title, Password = "stripe-0" });
@@ -33,7 +33,7 @@ public sealed class HeldVaultTests : IDisposable
 
         // The held vault owns the copy it is given and disposes whichever copy it ends with.
 #pragma warning disable CA2000
-        _held = new HeldVault(Vault.Open(VaultPath, _master), _lifetime);
+        _held = new HeldVault(ClaimedVault.Open(VaultPath, _master), _lifetime);
 #pragma warning restore CA2000
         _server = SessionServer.Build(new SessionServerOptions
         {
@@ -70,7 +70,7 @@ public sealed class HeldVaultTests : IDisposable
         Assert.Equal(AgentSave.Saved, saved);
         Assert.NotSame(copy, _held.Open);
         Assert.Equal(VaultSaveStatus.Saved, _held.Open!.SaveState().Status);
-        using var file = Vault.Open(VaultPath, _master);
+        using var file = ClaimedVault.Open(VaultPath, _master);
         Assert.Equal(("theirs", "mine"), (file.Find(_github)!.Password, file.Find(_stripe)!.Password));
         Assert.Equal("keypaste approve", Assert.Single(_log.Lines()).GetProperty("client").GetProperty("name").GetString());
     }
@@ -108,7 +108,7 @@ public sealed class HeldVaultTests : IDisposable
 
     private void SaveElsewhere(EntryName name, string password)
     {
-        using var other = Vault.Open(VaultPath, _master);
+        using var other = ClaimedVault.Open(VaultPath, _master);
         Assert.True(other.UpdateEntry(new VaultEntry { GroupPath = name.GroupPath, Title = name.Title, Password = password }));
         other.Save();
     }
@@ -117,7 +117,7 @@ public sealed class HeldVaultTests : IDisposable
     {
         var elsewhere = Path.Combine(_directory, "elsewhere.kdbx");
 
-        using (var other = Vault.Create(elsewhere, _master))
+        using (var other = ClaimedVault.Create(elsewhere, _master))
         {
             other.AddEntry(new VaultEntry { GroupPath = "other", Title = Guid.NewGuid().ToString("N"), Password = "elsewhere" });
             other.Save();

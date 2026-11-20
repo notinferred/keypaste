@@ -780,7 +780,7 @@ public sealed class SecretHygieneTests
     {
         using var fixture = new SentinelVault();
 
-        using (var vault = Vault.Open(fixture.VaultFile, Master))
+        using (var vault = ClaimedVault.Open(fixture.VaultFile, Master))
         {
             vault.AddEntry(new VaultEntry { Title = "saved-again", Password = "p" });
             vault.Save();
@@ -967,7 +967,7 @@ public sealed class SecretHygieneTests
             Directory.CreateDirectory(_directory);
             VaultFile = System.IO.Path.Combine(_directory, "sentinel.kdbx");
 
-            using var vault = Vault.Create(VaultFile, Master);
+            using var vault = ClaimedVault.Create(VaultFile, Master);
 
             vault.AddEntry(new VaultEntry
             {

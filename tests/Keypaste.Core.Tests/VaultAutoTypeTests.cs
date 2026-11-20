@@ -24,7 +24,7 @@ public sealed class VaultAutoTypeTests : IDisposable
         // KeePassXC 2.8's TestAutoType::testAutoTypeEffectiveSequences, one entry for each of its cases.
         var path = NewVaultPath();
 
-        using (var vault = Vault.Create(path, _master))
+        using (var vault = ClaimedVault.Create(path, _master))
         {
             vault.AddEntry(new VaultEntry { Title = "entry1" });
             vault.AddEntry(new VaultEntry { Title = "entry2" });
@@ -39,7 +39,7 @@ public sealed class VaultAutoTypeTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, _master);
+        using var reopened = ClaimedVault.Open(path, _master);
 
         Assert.Equal((_default, AutoTypeSource.Default, (int?)null), Chosen(reopened, string.Empty, "entry1"));
         Assert.Equal(("{TEST_ENTRY2}", AutoTypeSource.Item, (int?)null), Chosen(reopened, string.Empty, "entry2"));
@@ -53,7 +53,7 @@ public sealed class VaultAutoTypeTests : IDisposable
     {
         var path = NewVaultPath();
 
-        using (var vault = Vault.Create(path, _master))
+        using (var vault = ClaimedVault.Create(path, _master))
         {
             vault.AddEntry(new VaultEntry { Title = "both", Username = "alice", Password = "pw" });
             vault.AddEntry(new VaultEntry { Title = "username", Username = "alice" });
@@ -66,7 +66,7 @@ public sealed class VaultAutoTypeTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, _master);
+        using var reopened = ClaimedVault.Open(path, _master);
 
         Assert.Equal((_default, AutoTypeSource.Default, (int?)null), Chosen(reopened, string.Empty, "both"));
         Assert.Equal(("{USERNAME}{ENTER}", AutoTypeSource.Default, (int?)null), Chosen(reopened, string.Empty, "username"));
@@ -81,7 +81,7 @@ public sealed class VaultAutoTypeTests : IDisposable
     {
         var path = NewVaultPath();
 
-        using (var vault = Vault.Create(path, _master))
+        using (var vault = ClaimedVault.Create(path, _master))
         {
             vault.AddEntry(new VaultEntry { Title = "nearest", GroupPath = "a/b", Password = "pw" });
             vault.AddEntry(new VaultEntry { Title = "walked", GroupPath = "c/d", Password = "pw" });
@@ -95,7 +95,7 @@ public sealed class VaultAutoTypeTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, _master);
+        using var reopened = ClaimedVault.Open(path, _master);
 
         Assert.Equal("Auto-Type is off for a group this item is in.", Off(reopened, "a/b", "nearest"));
         Assert.Equal("Auto-Type is off for a group this item is in.", Off(reopened, "c/d", "walked"));
@@ -111,7 +111,7 @@ public sealed class VaultAutoTypeTests : IDisposable
         var custom = new EntryName("site", "custom_attr");
         var empty = new EntryName("site", "empty window test");
 
-        using (var vault = Vault.Create(path, _master))
+        using (var vault = ClaimedVault.Create(path, _master))
         {
             vault.AddEntry(new VaultEntry { Title = regex.Title, GroupPath = regex.GroupPath, Password = "regex" });
             vault.AddEntry(new VaultEntry { Title = custom.Title, GroupPath = custom.GroupPath, Password = "custom_attr" });
@@ -128,7 +128,7 @@ public sealed class VaultAutoTypeTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, _master);
+        using var reopened = ClaimedVault.Open(path, _master);
 
         Assert.Equal(("regex1", AutoTypeSource.Association, 1), Chosen(reopened, regex, "lorem REGEX1 ipsum"));
         Assert.Equal(("regex1", AutoTypeSource.Association, 1), Chosen(reopened, regex, "lorem regex1 ipsum"));
@@ -156,7 +156,7 @@ public sealed class VaultAutoTypeTests : IDisposable
         var checking = new EntryName("Banking", "Checking");
         var after = new ManualClock(new DateTimeOffset(2031, 1, 1, 0, 0, 0, TimeSpan.Zero));
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         vault.SetAutoTypeUnchecked(checking, true, false, "{USERNAME}{TAB}{TOTP}{ENTER}", []);
 
         Assert.Null(vault.PlanAutoType(new EntryName(ReservedGroups.Tokens, "planted"), string.Empty, after));
@@ -184,7 +184,7 @@ public sealed class VaultAutoTypeTests : IDisposable
         var path = NewVaultPath();
         var login = new EntryName("work", "login");
 
-        using var vault = Vault.Create(path, _master);
+        using var vault = ClaimedVault.Create(path, _master);
         vault.AddEntry(new VaultEntry { Title = login.Title, GroupPath = login.GroupPath, Username = "alice", Password = "{USERNAME}-{S:API_KEY}", Notes = "{REF:P@I:0123}" });
         vault.SetFields(login, [new FieldWrite("API_KEY", "sk-live", true)]);
         vault.SetFieldsUnchecked(login, [new FieldWrite("a{PASSWORD}b", "braced", false)]);
@@ -217,14 +217,14 @@ public sealed class VaultAutoTypeTests : IDisposable
         var path = NewVaultPath();
         var name = new EntryName(string.Empty, "obfuscated");
 
-        using (var vault = Vault.Create(path, _master))
+        using (var vault = ClaimedVault.Create(path, _master))
         {
             vault.AddEntry(new VaultEntry { Title = name.Title, Username = "alice", Password = "pw" });
             vault.SetAutoTypeUnchecked(name, true, true, string.Empty, []);
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, _master);
+        using var reopened = ClaimedVault.Open(path, _master);
         using var plan = reopened.PlanAutoType(name, string.Empty, TimeProvider.System)!;
 
         Assert.Equal("keypaste can't type this item: its Auto-Type asks for KeePass's two-channel obfuscation, which keypaste does not use.", plan.Refusal);
@@ -237,7 +237,7 @@ public sealed class VaultAutoTypeTests : IDisposable
         var name = new EntryName("work", "mail");
         var off = new EntryName("work/quiet", "silent");
 
-        using (var vault = Vault.Create(path, _master))
+        using (var vault = ClaimedVault.Create(path, _master))
         {
             vault.AddEntry(new VaultEntry { Title = name.Title, GroupPath = name.GroupPath, Username = "alice", Password = "pw" });
             vault.AddEntry(new VaultEntry { Title = off.Title, GroupPath = off.GroupPath, Password = "pw" });
@@ -247,14 +247,14 @@ public sealed class VaultAutoTypeTests : IDisposable
             vault.Save();
         }
 
-        using (var vault = Vault.Open(path, _master))
+        using (var vault = ClaimedVault.Open(path, _master))
         {
             vault.UpdateEntry(vault.Find(name)! with { Notes = "edited", Password = "pw-2" });
             vault.SetFields(name, [new FieldWrite("PIN", "1234")]);
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, _master);
+        using var reopened = ClaimedVault.Open(path, _master);
 
         Assert.Equal(("{USERNAME}{TAB}{PASSWORD}", AutoTypeSource.Association, 1), Chosen(reopened, name, "Inbox - Mail"));
         Assert.Equal(("{PASSWORD}", AutoTypeSource.Item, (int?)null), Chosen(reopened, name, "Other"));

@@ -17,7 +17,7 @@ internal sealed class ShareFixture : IDisposable
 
     internal ShareFixture()
     {
-        using var vault = Vault.Create(VaultPath, Master);
+        using var vault = ClaimedVault.Create(VaultPath, Master);
         vault.AddEntry(new VaultEntry { GroupPath = Stripe.GroupPath, Title = Stripe.Title, Password = StripeValue });
         vault.AddEntry(new VaultEntry
         {
@@ -47,7 +47,7 @@ internal sealed class ShareFixture : IDisposable
     /// <summary>Runs as the service opens the log, which is after the record was saved.</summary>
     internal Action? OnAudit { get; set; }
 
-    internal Vault Open() => Vault.Open(VaultPath, Master);
+    internal Vault Open() => ClaimedVault.Open(VaultPath, Master);
 
     internal ShareService Service(Uri? endpoint = null) =>
         new(new ShareClient(Server, endpoint ?? ShareEndpoint.Default), Clock, Home, OpenAudit);

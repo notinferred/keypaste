@@ -30,7 +30,7 @@ public sealed class ItemReminderRecommendationsTests : IDisposable
 
     public ItemReminderRecommendationsTests()
     {
-        using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
+        using (var vault = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
         {
             Add(vault, _github, "https://github.com", ItemKind.ApiKey);
             vault.SetExpiryUnchecked(_github, AppClock.Start.AddDays(3));

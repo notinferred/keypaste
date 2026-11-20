@@ -31,7 +31,7 @@ public sealed class KdbxImportHardwareKeyTests : IDisposable
         _source = Path.Combine(_vault.Home, "yubikey.kdbx");
 
         using (var key = new HardwareKey(new SoftwareYubiKey(_secret), 2))
-        using (var source = Vault.CreateWith(_source, _sourcePassword, null, key))
+        using (var source = ClaimedVault.CreateWith(_source, _sourcePassword, null, key))
         {
             source.AddEntry(new VaultEntry { GroupPath = "Work", Title = "github", Password = _imported });
             source.Save();
@@ -70,7 +70,7 @@ public sealed class KdbxImportHardwareKeyTests : IDisposable
 
         Assert.Equal(["Imported 1 item from yubikey.kdbx"], _announced);
         _session.Lock(VaultLockReason.Manual);
-        using var reopened = Vault.Open(_vault.Path_, TempVault.Password);
+        using var reopened = ClaimedVault.Open(_vault.Path_, TempVault.Password);
         Assert.Equal(_imported, reopened.Find(new EntryName("yubikey/Work", "github"))!.Password);
     }
 

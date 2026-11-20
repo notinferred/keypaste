@@ -43,7 +43,7 @@ public sealed class ItemReminderCheckTests : IDisposable
             created.SetExpiryUnchecked(_later, _now.AddDays(14).AddSeconds(1));
         });
 
-        using var vault = Vault.Open(VaultPath, _master);
+        using var vault = ClaimedVault.Open(VaultPath, _master);
         var reminders = ItemReminderCheck.Scan(vault, _now, 14);
 
         Assert.Equal([_mail, _github], reminders.Select(reminder => reminder.Entry));
@@ -72,7 +72,7 @@ public sealed class ItemReminderCheckTests : IDisposable
 
         ForeignEdit.Apply(VaultPath, _master, _cloud.Title, _elsewhere, entry => entry.QualityCheck = false);
 
-        using var vault = Vault.Open(VaultPath, _master);
+        using var vault = ClaimedVault.Open(VaultPath, _master);
 
         Assert.Equal(_now.AddHours(2), ItemReminderCheck.NextChange(vault, _now, 14));
         Assert.Equal(_now.AddDays(3), ItemReminderCheck.NextChange(vault, _now, 0));
@@ -91,7 +91,7 @@ public sealed class ItemReminderCheckTests : IDisposable
             Assert.True(created.AddTag(_stripe, ItemChangeRules.NeedsUpdateTag));
         });
 
-        using var vault = Vault.Open(VaultPath, _master);
+        using var vault = ClaimedVault.Open(VaultPath, _master);
         var marked = Assert.Single(ItemReminderCheck.Scan(vault, _now, 0));
 
         Assert.Equal((_stripe, ReminderReason.NeedsUpdate), (marked.Entry, marked.Reason));
@@ -112,14 +112,14 @@ public sealed class ItemReminderCheckTests : IDisposable
 
         string before;
 
-        using (var vault = Vault.Open(VaultPath, _master))
+        using (var vault = ClaimedVault.Open(VaultPath, _master))
         {
             before = Assert.Single(ItemReminderCheck.Scan(vault, _now, 14)).Key;
             vault.SetExpiryUnchecked(_github, _now.AddDays(5));
             vault.Save();
         }
 
-        using var reopened = Vault.Open(VaultPath, _master);
+        using var reopened = ClaimedVault.Open(VaultPath, _master);
         Assert.NotEqual(before, Assert.Single(ItemReminderCheck.Scan(reopened, _now, 14)).Key);
     }
 
@@ -134,7 +134,7 @@ public sealed class ItemReminderCheckTests : IDisposable
 
         ForeignEdit.Apply(VaultPath, _master, _cloud.Title, _elsewhere, entry => entry.QualityCheck = false);
 
-        using var vault = Vault.Open(VaultPath, _master);
+        using var vault = ClaimedVault.Open(VaultPath, _master);
         Assert.Empty(ItemReminderCheck.Scan(vault, _now, 14));
     }
 
@@ -147,7 +147,7 @@ public sealed class ItemReminderCheckTests : IDisposable
             created.SetExpiryUnchecked(_github, _now.AddDays(2));
         });
 
-        using var vault = Vault.Open(VaultPath, _master);
+        using var vault = ClaimedVault.Open(VaultPath, _master);
         var reminder = Assert.Single(ItemReminderCheck.Scan(vault, _now, 14));
 
         Assert.DoesNotContain(_secret, reminder.ToString(), StringComparison.Ordinal);
@@ -183,7 +183,7 @@ public sealed class ItemReminderCheckTests : IDisposable
 
     private void Seed(Action<Vault> fill)
     {
-        using var vault = Vault.Create(VaultPath, _master);
+        using var vault = ClaimedVault.Create(VaultPath, _master);
         fill(vault);
         vault.Save();
     }

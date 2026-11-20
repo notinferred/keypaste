@@ -115,7 +115,7 @@ public sealed class WorkflowsTests
         fixture.AssertIntact("archive/database-old");
 
         var keptKeePassXcBytes = VaultBackups.List(file.Path_)[^1];
-        VaultBackups.Restore(VaultBackups.Inspect(file.Path_, keptKeePassXcBytes, key.Password ?? "", key.Keyfile));
+        ClaimedVault.Restore(VaultBackups.Inspect(file.Path_, keptKeePassXcBytes, key.Password ?? "", key.Keyfile));
         fixture.AssertIntact("servers/database");
         using (var vault = Open(file, key))
         {
@@ -322,7 +322,7 @@ public sealed class WorkflowsTests
         }
     }
 
-    private static Vault Open(KeePassXcVault file, KeePassXcKey key) => Vault.Open(file.Path_, key.Password ?? "", key.Keyfile);
+    private static Vault Open(KeePassXcVault file, KeePassXcKey key) => ClaimedVault.Open(file.Path_, key.Password ?? "", key.Keyfile);
 
     private static string Cipher(string info) =>
         string.Join('\n', info.Split('\n').Where(line => line.StartsWith("Cipher:", StringComparison.Ordinal) || line.StartsWith("KDF:", StringComparison.Ordinal)));

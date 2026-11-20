@@ -38,7 +38,7 @@ public sealed class VaultReservedReadTests : IDisposable
 
     private Vault Seeded()
     {
-        var vault = Vault.Create(Path.Combine(_directory, "reserved.kdbx"), _master);
+        var vault = ClaimedVault.Create(Path.Combine(_directory, "reserved.kdbx"), _master);
         vault.AddEntry(new VaultEntry { Title = "github", GroupPath = "Work", Password = "pw" });
         vault.AddEntry(new VaultEntry { Title = "token record", GroupPath = ReservedGroups.Tokens, Password = "verifier" });
         vault.AddEntry(new VaultEntry { Title = "share record", GroupPath = ".Keypaste/shares", Password = "revoke" });

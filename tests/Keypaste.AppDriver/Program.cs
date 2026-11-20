@@ -13,6 +13,7 @@ using Keypaste.Core.Browser;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Recent;
+using Keypaste.Core.Tests;
 
 namespace Keypaste.AppDriver;
 
@@ -232,7 +233,7 @@ internal static class Program
         var password = Environment.GetEnvironmentVariable("KEYPASTE_DRIVER_PASSWORD") ?? string.Empty;
         var value = Console.In.ReadLine() ?? string.Empty;
 
-        using var v = Vault.Open(vault, password);
+        using var v = ClaimedVault.Open(vault, password);
         v.AddEntry(new VaultEntry { GroupPath = group, Title = title, Password = value });
         v.Save();
         Console.WriteLine("added");

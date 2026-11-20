@@ -32,13 +32,13 @@ public sealed class LaunchEndpointTests : IDisposable
 
     public LaunchEndpointTests()
     {
-        using (var created = Vault.Create(VaultPath, EnvStoreTests.MasterPassword))
+        using (var created = ClaimedVault.Create(VaultPath, EnvStoreTests.MasterPassword))
         {
             ProjectVariables.Set(created, "dev", "TOKEN", _token);
             created.Save();
         }
 
-        _vault = Vault.Open(VaultPath, EnvStoreTests.MasterPassword);
+        _vault = ClaimedVault.Open(VaultPath, EnvStoreTests.MasterPassword);
         Assert.True(AuditLog.TryOpen(AuditPath, _clock, out var audit, out var error), error);
         _audit = audit;
         _server = SessionServer.Build(new SessionServerOptions

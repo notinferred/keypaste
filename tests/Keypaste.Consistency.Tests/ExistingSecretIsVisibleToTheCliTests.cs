@@ -5,6 +5,7 @@ using Keypaste.App.Tests.ViewModels;
 using Keypaste.App.ViewModels;
 using Keypaste.Cli;
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Consistency.Tests;
@@ -208,7 +209,7 @@ public sealed class ExistingSecretIsVisibleToTheCliTests
     /// <summary>History items on one entry, read from the file rather than from the open session.</summary>
     private static int HistoryOf(VaultFixture fixture, string groupPath, string title)
     {
-        using var vault = Vault.Open(fixture.VaultPath, VaultFixture.Master);
+        using var vault = ClaimedVault.Open(fixture.VaultPath, VaultFixture.Master);
         return vault.ReadHistory(new EntryName(groupPath, title))?.Count ?? -1;
     }
 

@@ -32,7 +32,7 @@ public sealed class SessionAuthorityEditTests : IDisposable
     public SessionAuthorityEditTests()
     {
         _log = new OwnerLog(_directory);
-        _vault = Vault.Create(VaultPath, _master);
+        _vault = ClaimedVault.Create(VaultPath, _master);
         _vault.AddEntry(new VaultEntry { GroupPath = _github.GroupPath, Title = _github.Title, Password = "old-password" });
         _vault.Save();
     }
@@ -65,7 +65,7 @@ public sealed class SessionAuthorityEditTests : IDisposable
 
     private string? Password(EntryName name)
     {
-        using var reopened = Vault.Open(VaultPath, _master);
+        using var reopened = ClaimedVault.Open(VaultPath, _master);
         return reopened.Find(name)?.Password;
     }
 
@@ -186,7 +186,7 @@ public sealed class SessionAuthorityEditTests : IDisposable
     [Fact]
     public async Task AVaultAnotherProgramSaved_IsRefusedBeforeAnybodyIsAsked()
     {
-        using (var other = Vault.Open(VaultPath, _master))
+        using (var other = ClaimedVault.Open(VaultPath, _master))
         {
             other.AddEntry(new VaultEntry { Title = "elsewhere", Password = "x" });
             other.Save();

@@ -21,7 +21,7 @@ public sealed class SameNameItemsTests : IDisposable
         _directory = Directory.CreateTempSubdirectory("keypaste-same-name-").FullName;
         _vaultPath = Path.Combine(_directory, "vault.kdbx");
 
-        using var vault = Vault.Create(_vaultPath, _master);
+        using var vault = ClaimedVault.Create(_vaultPath, _master);
         vault.AddEntry(new VaultEntry { Title = "Mail", Username = "alice", Password = "alice-password", GroupPath = "services" });
         vault.AddEntry(new VaultEntry { Title = "Mail", Username = "bob", Password = "bob-password", GroupPath = "services" });
         vault.AddEntry(new VaultEntry { Title = "Forum", Username = "carol", Password = "carol-password", GroupPath = "services" });
@@ -146,7 +146,7 @@ public sealed class SameNameItemsTests : IDisposable
             Assert.Equal(["personal"], detail.Tags.Select(tag => tag.Tag));
         }
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
 
         Assert.Equal("1234", reopened.ReadField(Named(reopened, username), "PIN"));
         Assert.Equal(["personal"], reopened.Tags(Named(reopened, username))!);
@@ -172,7 +172,7 @@ public sealed class SameNameItemsTests : IDisposable
             Assert.Equal(["key.pem"], detail.Attachments.Rows.Select(row => row.Name));
         }
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
 
         Assert.Single(reopened.Attachments(Named(reopened, username))!);
         Assert.Empty(reopened.Attachments(Named(reopened, other))!);
@@ -235,7 +235,7 @@ public sealed class SameNameItemsTests : IDisposable
             Assert.False(context.Entries.CanUndo);
         }
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
 
         Assert.Equal(username + "-password", reopened.Find(new EntryName("services", "Mail 2"))!.Password);
         Assert.Equal(other + "-password", reopened.Find(new EntryName("services", "Mail"))!.Password);
@@ -323,7 +323,7 @@ public sealed class SameNameItemsTests : IDisposable
     [InlineData("bob", "alice")]
     public void With_no_trash_the_question_names_which_and_only_that_one_goes(string username, string other)
     {
-        using (var vault = Vault.Open(_vaultPath, _master))
+        using (var vault = ClaimedVault.Open(_vaultPath, _master))
         {
             vault.SetRecyclesDeletedEntries(false);
             vault.Save();
@@ -341,7 +341,7 @@ public sealed class SameNameItemsTests : IDisposable
             Assert.Null(context.Entries.Error);
         }
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
         Assert.Equal(other, reopened.Find(new EntryName("services", "Mail"))!.Username);
     }
 
@@ -471,7 +471,7 @@ public sealed class SameNameItemsTests : IDisposable
     {
         const string Key = "OPENAI_API_KEY=sk-abcdefghijklmnopqrstuvwxyz0123456789";
 
-        using (var vault = Vault.Open(_vaultPath, _master))
+        using (var vault = ClaimedVault.Open(_vaultPath, _master))
         {
             vault.UpdateEntry(Named(vault, username), vault.Find(Named(vault, username))! with { Notes = Key });
             vault.Save();
@@ -493,7 +493,7 @@ public sealed class SameNameItemsTests : IDisposable
             shell.Recommendations.MoveSelectedCommand.Press();
         }
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
 
         Assert.Equal(["OPENAI_API_KEY"], reopened.Fields(Named(reopened, username))!.Select(field => field.Name));
         Assert.Empty(reopened.Fields(Named(reopened, other))!);
@@ -547,7 +547,7 @@ public sealed class SameNameItemsTests : IDisposable
             Assert.Null(context.Entries.Error);
         }
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
         Assert.Equal("carol-password", reopened.Find(new EntryName("services", "Forum"))!.Password);
         Assert.Equal("twin-password", reopened.Find(new EntryName("services", "Twin2"))!.Password);
         Assert.Null(reopened.Find(new EntryName("services", "Twin")));
@@ -560,7 +560,7 @@ public sealed class SameNameItemsTests : IDisposable
     {
         var seeds = new Dictionary<string, string> { ["alice"] = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ", ["bob"] = "MFRGGZDFMZTWQ2LKMFRGGZDFMZTWQ2LK" };
 
-        using (var vault = Vault.Open(_vaultPath, _master))
+        using (var vault = ClaimedVault.Open(_vaultPath, _master))
         {
             foreach (var (who, seed) in seeds)
             {
@@ -670,7 +670,7 @@ public sealed class SameNameItemsTests : IDisposable
     {
         const string Key = "OPENAI_API_KEY=sk-abcdefghijklmnopqrstuvwxyz0123456789";
 
-        using (var vault = Vault.Open(_vaultPath, _master))
+        using (var vault = ClaimedVault.Open(_vaultPath, _master))
         {
             foreach (var who in new[] { "alice", "bob" })
             {
@@ -709,7 +709,7 @@ public sealed class SameNameItemsTests : IDisposable
     {
         var path = Path.Combine(_directory, $"lone-{seed}.kdbx");
 
-        using (var vault = Vault.Create(path, _master))
+        using (var vault = ClaimedVault.Create(path, _master))
         {
             var lone = new EntryName("services", "Lone");
             vault.AddEntry(new VaultEntry { Title = lone.Title, GroupPath = lone.GroupPath, Username = "lone" });
@@ -725,7 +725,7 @@ public sealed class SameNameItemsTests : IDisposable
     private string PairWith(string firstName, string firstUrl, string secondName, string secondUrl, bool recycles = true)
     {
         var path = Path.Combine(_directory, "pair.kdbx");
-        using var vault = Vault.Create(path, _master);
+        using var vault = ClaimedVault.Create(path, _master);
         vault.AddEntry(new VaultEntry { Title = "Pair", Username = firstName, Url = firstUrl, Password = "first-password", GroupPath = "services" });
         vault.AddEntry(new VaultEntry { Title = "Pair", Username = secondName, Url = secondUrl, Password = "second-password", GroupPath = "services" });
         vault.SetRecyclesDeletedEntries(recycles);
@@ -735,7 +735,7 @@ public sealed class SameNameItemsTests : IDisposable
 
     private static string FirstUuid(string path)
     {
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         return vault.ReadEntries().Single(entry => entry.Password == "first-password").Uuid!;
     }
 
@@ -749,13 +749,13 @@ public sealed class SameNameItemsTests : IDisposable
 
     private VaultEntry Saved(string username)
     {
-        using var vault = Vault.Open(_vaultPath, _master);
+        using var vault = ClaimedVault.Open(_vaultPath, _master);
         return vault.ReadEntries().Single(entry => entry.Username == username);
     }
 
     private IReadOnlyList<EntryRevision> History(string username)
     {
-        using var vault = Vault.Open(_vaultPath, _master);
+        using var vault = ClaimedVault.Open(_vaultPath, _master);
         return vault.ReadHistory(Named(vault, username))!;
     }
 

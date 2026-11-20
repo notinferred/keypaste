@@ -37,7 +37,7 @@ public sealed class VaultAttachmentTests : IDisposable
             vault.Save();
         }
 
-        using (var reopened = Vault.Open(path, _master))
+        using (var reopened = ClaimedVault.Open(path, _master))
         {
             Assert.Equal([new EntryAttachment("statement.pdf", 4096)], reopened.Attachments(_stripe));
             Assert.Single(reopened.ReadHistory(_stripe)!);
@@ -259,7 +259,7 @@ public sealed class VaultAttachmentTests : IDisposable
             original = interop.FactsUnchecked(_checking)!.Attachments["statement.txt"];
         }
 
-        using (var vault = Vault.Open(path, _master))
+        using (var vault = ClaimedVault.Open(path, _master))
         {
             Add(vault, "added.bin", RandomBytes(512), out _, _checking);
             using (var content = new MemoryStream(RandomBytes(256)))
@@ -348,7 +348,7 @@ public sealed class VaultAttachmentTests : IDisposable
 
     private static Vault Seeded(string path)
     {
-        var vault = Vault.Create(path, _master);
+        var vault = ClaimedVault.Create(path, _master);
         vault.AddEntry(new VaultEntry { Title = _stripe.Title, GroupPath = _stripe.GroupPath, Password = "login-password" });
         vault.Save();
         return vault;

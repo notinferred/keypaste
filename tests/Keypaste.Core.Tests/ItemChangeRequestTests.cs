@@ -34,7 +34,7 @@ public sealed class ItemChangeRequestTests : IDisposable
 
     public ItemChangeRequestTests()
     {
-        _vault = Vault.Create(VaultPath, _master);
+        _vault = ClaimedVault.Create(VaultPath, _master);
         _vault.AddEntry(new VaultEntry { GroupPath = _github.GroupPath, Title = _github.Title, Password = "github-password" });
         _vault.AddEntry(new VaultEntry { GroupPath = "env/acme", Title = "dev", Password = "acme-password" });
         Assert.True(_vault.AddTag(new EntryName("env/acme", "dev"), "env:acme:dev"));
@@ -455,7 +455,7 @@ public sealed class ItemChangeRequestTests : IDisposable
 
     private T Reopened<T>(Func<Vault, T> read)
     {
-        using var reopened = Vault.Open(VaultPath, _master);
+        using var reopened = ClaimedVault.Open(VaultPath, _master);
         return read(reopened);
     }
 

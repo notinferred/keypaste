@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -25,7 +26,7 @@ public sealed class ShowVerbTests : IDisposable
     {
         _harness.SeedVault(_master);
 
-        using var vault = Vault.Open(_harness.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
         vault.AddEntry(new VaultEntry
         {
             GroupPath = "api",
@@ -165,7 +166,7 @@ public sealed class ShowVerbTests : IDisposable
     {
         const string stored = "postgres://u:{PASSWORD}@db/{S:STRIPE_SECRET_KEY}";
         const string filled = "postgres://u:" + _password + "@db/" + _secret;
-        using (var vault = Vault.Open(_harness.VaultPath, _master))
+        using (var vault = ClaimedVault.Open(_harness.VaultPath, _master))
         {
             Assert.True(vault.SetFields(new EntryName("api", "Stripe"), [new FieldWrite("DATABASE_URL", stored)]));
             vault.Save();
@@ -190,7 +191,7 @@ public sealed class ShowVerbTests : IDisposable
     public void A_revealed_value_that_could_misrepresent_itself_is_cleaned_and_told()
     {
         var hostile = "safe" + (char)0x202E + "looking";
-        using (var vault = Vault.Open(_harness.VaultPath, _master))
+        using (var vault = ClaimedVault.Open(_harness.VaultPath, _master))
         {
             Assert.True(vault.SetFields(new EntryName("api", "Bare"), [new FieldWrite("TOKEN", hostile)]));
             vault.Save();

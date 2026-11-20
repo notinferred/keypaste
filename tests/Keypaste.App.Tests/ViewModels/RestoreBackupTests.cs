@@ -9,6 +9,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Ownership;
 using Keypaste.Core.Recent;
 using Keypaste.Core.Tests;
 using Xunit;
@@ -28,7 +29,7 @@ namespace Keypaste.App.Tests.ViewModels;
 /// </para>
 /// <para>
 /// <b>What the file holds is asserted by opening it again</b>, through a separate
-/// <see cref="Vault.Open(string, ReadOnlySpan{char})"/> or by its digest, never by what a view model says it did. Every refusal
+/// <see cref="ClaimedVault.Open(string, ReadOnlySpan{char})"/> or by its digest, never by what a view model says it did. Every refusal
 /// asserts the live file byte for byte, and asserts first that the step it refused was reached.
 /// </para>
 /// </remarks>
@@ -48,7 +49,7 @@ public sealed class RestoreBackupTests : IDisposable
         _home = Directory.CreateDirectory(Path.Combine(_directory, "home")).FullName;
         _vaultPath = Path.Combine(_directory, "vault.kdbx");
 
-        using (var vault = Vault.Create(_vaultPath, _master))
+        using (var vault = ClaimedVault.Create(_vaultPath, _master))
         {
             vault.AddEntry(new VaultEntry { Title = "production", GroupPath = "servers", Password = "v0" });
             ProjectVariables.Set(vault, "billing", "API_KEY", "k0");
@@ -367,6 +368,79 @@ public sealed class RestoreBackupTests : IDisposable
         Assert.Equal(digest, Digest(_vaultPath));
     }
 
+    [Fact]
+    public async Task A_vault_another_keypaste_process_holds_is_not_restored()
+    {
+        ChangeThroughTheApp("v1");
+        var digest = Digest(_vaultPath);
+
+        using var session = new AppVaultSession(_clock, home: _home);
+        var landed = 0;
+        using var unlock = new UnlockViewModel(session, _home, new FakeVaultFilePicker(), () => landed++);
+
+        unlock.StartRestoreCommand.Press();
+        var restore = unlock.Restore!;
+        Enter(restore, _master);
+        await restore.CheckAsync();
+        Assert.True(restore.IsConfirming);
+
+        Assert.True(VaultClaim.TryAcquire(_home, _vaultPath, OwnerKind.TerminalAgent, out var holder, out _));
+
+        using (holder)
+        {
+            await restore.ConfirmAsync();
+        }
+
+        Assert.Equal(0, landed);
+        Assert.False(session.IsUnlocked);
+        Assert.Contains("keypaste approve", restore.Message, StringComparison.Ordinal);
+        Assert.Contains("Nothing was replaced", restore.Message, StringComparison.Ordinal);
+        Assert.Equal(0, restore.MaskedLength);
+        Assert.Equal(digest, Digest(_vaultPath));
+    }
+
+    [Fact]
+    public void A_restore_keeps_the_vault_claimed_until_the_unlock_after_it_takes_the_claim_up()
+    {
+        ChangeThroughTheApp("v1");
+        using var session = new AppVaultSession(_clock, home: _home);
+        var validated = VaultBackups.Inspect(_vaultPath, VaultBackups.List(_vaultPath)[0], _master);
+
+        session.RestoreBackup(validated);
+
+        Assert.False(VaultClaim.TryAcquire(_home, _vaultPath, OwnerKind.CommandLine, out _, out _));
+
+        using (var master = TempVault.Secret(_master))
+        {
+            Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(_vaultPath, master.Value));
+        }
+
+        Assert.Equal("v0", session.Unlocked!.Find(_entry)?.Password);
+        Assert.False(VaultClaim.TryAcquire(_home, _vaultPath, OwnerKind.CommandLine, out _, out _));
+
+        session.Lock(VaultLockReason.Manual);
+
+        Assert.True(VaultClaim.TryAcquire(_home, _vaultPath, OwnerKind.CommandLine, out var free, out _));
+        free.Dispose();
+    }
+
+    [Fact]
+    public void A_restore_whose_unlock_is_refused_gives_the_claim_back()
+    {
+        ChangeThroughTheApp("v1");
+        using var session = new AppVaultSession(_clock, home: _home);
+
+        session.RestoreBackup(VaultBackups.Inspect(_vaultPath, VaultBackups.List(_vaultPath)[0], _master));
+
+        using (var wrong = TempVault.Secret("not the password"))
+        {
+            Assert.Equal(UnlockOutcome.WrongPassword, session.TryUnlock(_vaultPath, wrong.Value));
+        }
+
+        Assert.True(VaultClaim.TryAcquire(_home, _vaultPath, OwnerKind.CommandLine, out var free, out _));
+        free.Dispose();
+    }
+
     // ------------------------------------------------------------------ a pending restore does not wait
 
     [Fact]
@@ -628,7 +702,7 @@ public sealed class RestoreBackupTests : IDisposable
 
     private static string Read(string path)
     {
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         return vault.Find(_entry)?.Password ?? throw new InvalidOperationException("no entry");
     }
 

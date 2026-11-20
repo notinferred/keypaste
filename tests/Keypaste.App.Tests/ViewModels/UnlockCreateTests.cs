@@ -70,7 +70,7 @@ public sealed class UnlockCreateTests : IDisposable
         Type(model, TempHome.Password, TempHome.Password);
         await model.CreateAsync();
 
-        using var reopened = Vault.Open(_home.FreeVaultPath, TempHome.Password);
+        using var reopened = ClaimedVault.Open(_home.FreeVaultPath, TempHome.Password);
         Assert.Empty(reopened.ReadEntries());
     }
 
@@ -121,7 +121,7 @@ public sealed class UnlockCreateTests : IDisposable
     [Fact]
     public async Task An_occupied_path_is_refused_and_the_file_there_is_untouched()
     {
-        using (var existing = Vault.Create(_home.FreeVaultPath, "the other password"))
+        using (var existing = ClaimedVault.Create(_home.FreeVaultPath, "the other password"))
         {
             existing.AddEntry(new VaultEntry { Title = "keep me", Password = "secret" });
             existing.Save();
@@ -139,7 +139,7 @@ public sealed class UnlockCreateTests : IDisposable
         Assert.Equal(before, _home.Snapshot());
         Assert.Empty(Remembered());
 
-        using var untouched = Vault.Open(_home.FreeVaultPath, "the other password");
+        using var untouched = ClaimedVault.Open(_home.FreeVaultPath, "the other password");
         Assert.Single(untouched.ReadEntries());
     }
 
@@ -313,8 +313,8 @@ public sealed class UnlockCreateTests : IDisposable
 
         Assert.Equal(1, _unlockedCalls);
         Assert.Equal(keyfile, Remembered().Single().KeyfilePath);
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(_home.FreeVaultPath, TempHome.Password));
-        using var reopened = Vault.Open(_home.FreeVaultPath, TempHome.Password, keyfile);
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(_home.FreeVaultPath, TempHome.Password));
+        using var reopened = ClaimedVault.Open(_home.FreeVaultPath, TempHome.Password, keyfile);
         Assert.Empty(reopened.ReadEntries());
     }
 

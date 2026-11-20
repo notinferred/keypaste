@@ -1,6 +1,5 @@
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
-using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Recent;
 using Keypaste.Core.Tests;
@@ -49,7 +48,7 @@ public sealed class WindowsHelloTests : IDisposable
         Assert.False(signer.IsAvailable());
 
         var path = Path.Combine(_directory, "vault.kdbx");
-        using (var created = Vault.Create(path, _master))
+        using (var created = ClaimedVault.Create(path, _master))
         {
             created.Save();
         }

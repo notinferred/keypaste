@@ -50,4 +50,9 @@
     <Compile Include="../Keypaste.Core.Tests/TestZones.cs" Link="TestZones.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Every vault these open or create for writing takes a claim of its own. -->
+    <Compile Include="../Keypaste.Core.Tests/ClaimedVault.cs" Link="ClaimedVault.cs" />
+  </ItemGroup>
+
 </Project>

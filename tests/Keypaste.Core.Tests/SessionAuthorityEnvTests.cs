@@ -34,7 +34,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
 
     public SessionAuthorityEnvTests()
     {
-        using (var created = Vault.Create(VaultPath, EnvStoreTests.MasterPassword))
+        using (var created = ClaimedVault.Create(VaultPath, EnvStoreTests.MasterPassword))
         {
             ProjectVariables.Set(created, "dev", "TOKEN", _token1);
             ProjectVariables.Set(created, "dev", "DATABASE_URL", _token2);
@@ -42,7 +42,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
             created.Save();
         }
 
-        _vault = Vault.Open(VaultPath, EnvStoreTests.MasterPassword);
+        _vault = ClaimedVault.Open(VaultPath, EnvStoreTests.MasterPassword);
         Assert.True(AuditLog.TryOpen(AuditPath, _fixture.Clock, out var audit, out var error), error);
         _audit = audit;
         _launches = new LaunchPasses(_fixture.Clock);

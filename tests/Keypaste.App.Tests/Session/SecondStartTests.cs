@@ -8,6 +8,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Settings;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Session;
@@ -64,7 +65,7 @@ public sealed class SecondStartTests
             lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
             var other = Path.Combine(home.Path, "other.kdbx");
 
-            using (var vault = Core.Vault.Create(other, "its password"))
+            using (var vault = ClaimedVault.Create(other, "its password"))
             {
                 vault.Save();
             }

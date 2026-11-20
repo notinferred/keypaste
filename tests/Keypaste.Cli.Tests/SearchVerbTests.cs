@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -18,7 +19,7 @@ public sealed class SearchVerbTests : IDisposable
     {
         _harness.SeedVault(_master);
 
-        using var vault = Vault.Open(_harness.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
         vault.AddEntry(new VaultEntry
         {
             GroupPath = "work",

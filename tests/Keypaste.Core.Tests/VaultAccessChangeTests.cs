@@ -163,7 +163,7 @@ public sealed class VaultAccessChangeTests : IDisposable
     {
         var path = PasswordVault("vault.kdbx");
 
-        using (var vault = Vault.Open(path, _master))
+        using (var vault = ClaimedVault.Open(path, _master))
         {
             vault.AddEntry(new VaultEntry { Title = "SECOND", Password = "value", GroupPath = "env/demo" });
             vault.Save();
@@ -198,7 +198,7 @@ public sealed class VaultAccessChangeTests : IDisposable
     {
         var path = PasswordVault("vault.kdbx");
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         vault.Modified = true;
 
         vault.ChangeAccess(new VaultAccessChange(true, AccessKeyfileChange.Keep), _next, _next);
@@ -292,7 +292,7 @@ public sealed class VaultAccessChangeTests : IDisposable
         var path = PasswordVault("vault.kdbx");
         var bytes = File.ReadAllBytes(path);
 
-        using (var vault = Vault.Open(path, _master))
+        using (var vault = ClaimedVault.Open(path, _master))
         {
             var result = vault.ChangeAccess(new VaultAccessChange(true, AccessKeyfileChange.Keep), _next, _next + "!");
             Assert.Equal(VaultAccessOutcome.PasswordsDoNotMatch, result.Outcome);
@@ -317,7 +317,7 @@ public sealed class VaultAccessChangeTests : IDisposable
         var path = PasswordVault("vault.kdbx");
         var bytes = File.ReadAllBytes(path);
 
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, "not the password"));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, "not the password"));
 
         AssertUntouched(path, bytes);
     }
@@ -327,8 +327,8 @@ public sealed class VaultAccessChangeTests : IDisposable
     {
         var path = PasswordVault("vault.kdbx");
 
-        using var vault = Vault.Open(path, _master);
-        using (var other = Vault.Open(path, _master))
+        using var vault = ClaimedVault.Open(path, _master);
+        using (var other = ClaimedVault.Open(path, _master))
         {
             other.AddEntry(new VaultEntry { Title = "THEIRS", Password = "value", GroupPath = "env/demo" });
             other.Save();
@@ -353,7 +353,7 @@ public sealed class VaultAccessChangeTests : IDisposable
         var directory = VaultBackups.DirectoryFor(path);
         File.WriteAllText(directory, "not a directory");
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         Assert.Throws<VaultBackupException>(
             () => vault.ChangeAccess(new VaultAccessChange(true, AccessKeyfileChange.Keep), _next, _next));
 
@@ -373,7 +373,7 @@ public sealed class VaultAccessChangeTests : IDisposable
         var path = PasswordVault("vault.kdbx");
         var bytes = File.ReadAllBytes(path);
 
-        using (var vault = Vault.Open(path, _master))
+        using (var vault = ClaimedVault.Open(path, _master))
         {
             var failure = Assert.Throws<VaultException>(() => vault.ChangeAccess(
                 new VaultAccessChange(true, AccessKeyfileChange.Keep), _next, _next,
@@ -394,7 +394,7 @@ public sealed class VaultAccessChangeTests : IDisposable
         var keyfile = KeyfileOf(KeyfileForm.Binary32, "key");
         var bytes = File.ReadAllBytes(path);
 
-        using (var vault = Vault.Open(path, _master))
+        using (var vault = ClaimedVault.Open(path, _master))
         {
             // The keyfile changes between being read into the key and being read again to check the
             // bytes, which is the one way the new credentials can disagree with what was written.
@@ -442,7 +442,7 @@ public sealed class VaultAccessChangeTests : IDisposable
         var path = KeyfileVault("vault.kdbx", _master, keyfile);
 
         using var fallback = VaultKeyfile.SimulateXmlFallback();
-        var refused = Assert.Throws<UnreadableKeyfileException>(() => Vault.Open(path, _master, keyfile));
+        var refused = Assert.Throws<UnreadableKeyfileException>(() => ClaimedVault.Open(path, _master, keyfile));
 
         Assert.Contains("cannot read one", refused.Message, StringComparison.Ordinal);
         Assert.Contains("The password is not the problem", refused.Message, StringComparison.Ordinal);
@@ -470,7 +470,7 @@ public sealed class VaultAccessChangeTests : IDisposable
     {
         var path = PasswordVault("vault.kdbx");
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         vault.ChangeAccess(new VaultAccessChange(true, AccessKeyfileChange.Keep), _next, _next);
         var bytes = File.ReadAllBytes(path);
 
@@ -489,7 +489,7 @@ public sealed class VaultAccessChangeTests : IDisposable
     {
         var path = PasswordVault("vault.kdbx");
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         vault.ChangeAccess(new VaultAccessChange(false, AccessKeyfileChange.Keep), [], []);
         vault.AddEntry(new VaultEntry { Title = "LATER", Password = "value", GroupPath = "env/demo" });
         vault.Save();
@@ -502,7 +502,7 @@ public sealed class VaultAccessChangeTests : IDisposable
     {
         var path = PasswordVault("vault.kdbx");
 
-        using var stale = Vault.Open(path, _master);
+        using var stale = ClaimedVault.Open(path, _master);
         Change(path, _master, null, new VaultAccessChange(true, AccessKeyfileChange.Keep), _next);
         var bytes = File.ReadAllBytes(path);
 
@@ -522,7 +522,7 @@ public sealed class VaultAccessChangeTests : IDisposable
     private static VaultAccessResult Change(
         string path, string current, string? keyfile, VaultAccessChange change, string next = "")
     {
-        using var vault = Vault.Open(path, current, keyfile);
+        using var vault = ClaimedVault.Open(path, current, keyfile);
         return vault.ChangeAccess(change, next, next);
     }
 
@@ -546,17 +546,17 @@ public sealed class VaultAccessChangeTests : IDisposable
 
     private static void AssertOpens(string path, string password, string? keyfile)
     {
-        using var vault = Vault.Open(path, password, keyfile);
+        using var vault = ClaimedVault.Open(path, password, keyfile);
         Assert.NotEmpty(vault.ReadEntries());
     }
 
     private static void AssertRefused(string path, string password, string? keyfile) =>
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, password, keyfile));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, password, keyfile));
 
     private string PasswordVault(string name)
     {
         var path = Path(name);
-        using var vault = Vault.Create(path, _master);
+        using var vault = ClaimedVault.Create(path, _master);
         vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "value", GroupPath = "env/demo" });
         vault.Save();
         return path;
@@ -565,7 +565,7 @@ public sealed class VaultAccessChangeTests : IDisposable
     private string KeyfileVault(string name, string password, string keyfile)
     {
         var path = Path(name);
-        using var vault = Vault.CreateWith(path, password, keyfile);
+        using var vault = ClaimedVault.CreateWith(path, password, keyfile);
         vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "value", GroupPath = "env/demo" });
         vault.Save();
         return path;

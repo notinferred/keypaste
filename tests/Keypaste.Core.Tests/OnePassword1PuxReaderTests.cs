@@ -245,7 +245,7 @@ public sealed class OnePassword1PuxReaderTests : IDisposable
     public OnePassword1PuxReaderTests()
     {
         _vaultPath = Path.Combine(_directory, "vault.kdbx");
-        _vault = Vault.Create(_vaultPath, _master);
+        _vault = ClaimedVault.Create(_vaultPath, _master);
     }
 
     public void Dispose()
@@ -304,7 +304,7 @@ public sealed class OnePassword1PuxReaderTests : IDisposable
     {
         Commit();
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
         var github = new EntryName("imported/Personal", "GitHub");
         var entry = reopened.Find(github)!;
 
@@ -344,7 +344,7 @@ public sealed class OnePassword1PuxReaderTests : IDisposable
     {
         Commit();
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
         var visa = new EntryName("imported/Personal", "Visa");
         var me = new EntryName("imported/Personal", "Me");
         var key = new EntryName("imported/Personal", "Server key");
@@ -386,7 +386,7 @@ public sealed class OnePassword1PuxReaderTests : IDisposable
         var scan = new EntryName("imported/Personal", "Scan");
         var recovery = new EntryName("imported/Personal", "Recovery");
 
-        using (var reopened = Vault.Open(_vaultPath, _master))
+        using (var reopened = ClaimedVault.Open(_vaultPath, _master))
         {
             Assert.Equal([new EntryAttachment("scan.pdf", _scan.Length)], reopened.Attachments(scan));
             Assert.Equal([new EntryAttachment("photo.png", _photo.Length)], reopened.Attachments(recovery));

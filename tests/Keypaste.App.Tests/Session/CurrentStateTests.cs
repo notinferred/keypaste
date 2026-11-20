@@ -36,7 +36,7 @@ public sealed class CurrentStateTests : IDisposable
 
     public CurrentStateTests()
     {
-        using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
+        using (var vault = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
         {
             vault.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "TOKEN", Password = "v1" });
             vault.AddEntry(new VaultEntry { GroupPath = "personal", Title = "KEEP", Password = "k" });
@@ -186,7 +186,7 @@ public sealed class CurrentStateTests : IDisposable
         Assert.Equal((AuditMethod.Prompt, "v1"), await agent.RequestAsync(_token));
         Assert.Equal((AuditMethod.Prompt, "v1"), await agent.RequestAsync(_token));
 
-        using (var writer = Vault.Open(_fixture.Path_, TempVault.Password))
+        using (var writer = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
         {
             writer.UpdateEntry(new VaultEntry { GroupPath = "personal", Title = "KEEP", Password = "external" });
             writer.Save();
@@ -209,7 +209,7 @@ public sealed class CurrentStateTests : IDisposable
         Assert.Equal((AuditMethod.Prompt, "x"), await agent.RequestAsync(_token));
         Assert.Equal(3, _prompt.Asked);
 
-        using var saved = Vault.Open(_fixture.Path_, TempVault.Password);
+        using var saved = ClaimedVault.Open(_fixture.Path_, TempVault.Password);
         Assert.Equal("x", saved.Find(_token)!.Password);
         Assert.Equal("external", saved.Find("personal/KEEP")!.Password);
     }
@@ -228,7 +228,7 @@ public sealed class CurrentStateTests : IDisposable
         var editing = agent.EditAsync(new SetPassword(new EntryName("personal", "KEEP"), NewSecret.Of("terminal")));
         await held.WaitAsync(_connect, Cancel);
 
-        using (var other = Vault.Open(_fixture.Path_, TempVault.Password))
+        using (var other = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
         {
             const string next = "a different horse battery staple";
             Assert.Equal(
@@ -257,7 +257,7 @@ public sealed class CurrentStateTests : IDisposable
 
         var other = Path.Combine(_fixture.Home, "other.kdbx");
 
-        using (var vault = Vault.Create(other, TempVault.Password))
+        using (var vault = ClaimedVault.Create(other, TempVault.Password))
         {
             vault.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "TOKEN", Password = "another-vault" });
             TempVault.Sees(vault, TempVault.Agent);
@@ -293,7 +293,7 @@ public sealed class CurrentStateTests : IDisposable
         var asked = agent.RequestAsync(_token);
         var withdrawal = await shown.WaitAsync(_connect, Cancel);
 
-        using (var writer = Vault.Open(_fixture.Path_, TempVault.Password))
+        using (var writer = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
         {
             writer.UpdateEntry(new VaultEntry { GroupPath = "env/dev", Title = "TOKEN", Password = "external" });
             writer.Save();

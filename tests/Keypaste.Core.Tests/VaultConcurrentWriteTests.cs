@@ -36,9 +36,9 @@ public sealed class VaultConcurrentWriteTests : IDisposable
     {
         var path = NewVault();
 
-        using var first = Vault.Open(path, MasterPassword);
+        using var first = ClaimedVault.Open(path, MasterPassword);
 
-        using (var second = Vault.Open(path, MasterPassword))
+        using (var second = ClaimedVault.Open(path, MasterPassword))
         {
             second.AddEntry(new VaultEntry { Title = "from-the-terminal", Password = "second" });
             second.Save();
@@ -49,7 +49,7 @@ public sealed class VaultConcurrentWriteTests : IDisposable
         Assert.Throws<VaultChangedOnDiskException>(first.Save);
 
         // The claim is about the data surviving, so read it.
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         Assert.NotNull(reopened.Find("from-the-terminal"));
         Assert.Null(reopened.Find("from-the-window"));
     }
@@ -64,7 +64,7 @@ public sealed class VaultConcurrentWriteTests : IDisposable
     {
         var path = NewVault();
 
-        using var vault = Vault.Open(path, MasterPassword);
+        using var vault = ClaimedVault.Open(path, MasterPassword);
 
         vault.AddEntry(new VaultEntry { Title = "first-edit", Password = "a" });
         vault.Save();
@@ -75,7 +75,7 @@ public sealed class VaultConcurrentWriteTests : IDisposable
         vault.AddEntry(new VaultEntry { Title = "third-edit", Password = "c" });
         vault.Save();
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         Assert.NotNull(reopened.Find("first-edit"));
         Assert.NotNull(reopened.Find("second-edit"));
         Assert.NotNull(reopened.Find("third-edit"));
@@ -86,7 +86,7 @@ public sealed class VaultConcurrentWriteTests : IDisposable
     {
         var path = NewVault();
 
-        using var vault = Vault.Open(path, MasterPassword);
+        using var vault = ClaimedVault.Open(path, MasterPassword);
         vault.AddEntry(new VaultEntry { Title = "quiet", Password = "p" });
 
         Assert.Null(Record.Exception(vault.Save));
@@ -98,10 +98,10 @@ public sealed class VaultConcurrentWriteTests : IDisposable
     {
         var path = NewVault();
 
-        using var first = Vault.Open(path, MasterPassword);
+        using var first = ClaimedVault.Open(path, MasterPassword);
         Assert.False(first.HasFileChangedSinceOpen());
 
-        using (var second = Vault.Open(path, MasterPassword))
+        using (var second = ClaimedVault.Open(path, MasterPassword))
         {
             second.AddEntry(new VaultEntry { Title = "elsewhere", Password = "x" });
             second.Save();
@@ -124,9 +124,9 @@ public sealed class VaultConcurrentWriteTests : IDisposable
     {
         var path = NewVault();
 
-        using var first = Vault.Open(path, MasterPassword);
+        using var first = ClaimedVault.Open(path, MasterPassword);
 
-        using (var second = Vault.Open(path, MasterPassword))
+        using (var second = ClaimedVault.Open(path, MasterPassword))
         {
             second.Save();
         }
@@ -140,9 +140,9 @@ public sealed class VaultConcurrentWriteTests : IDisposable
     {
         var path = NewVault();
 
-        using var first = Vault.Open(path, MasterPassword);
+        using var first = ClaimedVault.Open(path, MasterPassword);
 
-        using (var second = Vault.Open(path, MasterPassword))
+        using (var second = ClaimedVault.Open(path, MasterPassword))
         {
             second.AddEntry(new VaultEntry { Title = "from-the-terminal", Password = "second" });
             second.Save();
@@ -151,7 +151,7 @@ public sealed class VaultConcurrentWriteTests : IDisposable
         first.AddEntry(new VaultEntry { Title = "from-the-window", Password = "first" });
         first.SaveOverwriting();
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         Assert.NotNull(reopened.Find("from-the-window"));
 
         // Named rather than implied: overwriting discards the other write, which is the whole
@@ -167,9 +167,9 @@ public sealed class VaultConcurrentWriteTests : IDisposable
     {
         var path = NewVault();
 
-        using var first = Vault.Open(path, MasterPassword);
+        using var first = ClaimedVault.Open(path, MasterPassword);
 
-        using (var second = Vault.Open(path, MasterPassword))
+        using (var second = ClaimedVault.Open(path, MasterPassword))
         {
             second.AddEntry(new VaultEntry { Title = "elsewhere", Password = "x" });
             second.Save();
@@ -193,7 +193,7 @@ public sealed class VaultConcurrentWriteTests : IDisposable
     {
         var path = Path.Combine(Directory.CreateDirectory(Path.Combine(_directory, "fresh")).FullName, "vault.kdbx");
 
-        using var vault = Vault.Create(path, MasterPassword);
+        using var vault = ClaimedVault.Create(path, MasterPassword);
         Assert.False(vault.HasFileChangedSinceOpen());
 
         vault.AddEntry(new VaultEntry { Title = "new", Password = "p" });
@@ -215,8 +215,8 @@ public sealed class VaultConcurrentWriteTests : IDisposable
     {
         var path = NewVault();
 
-        using var first = Vault.Open(path, MasterPassword);
-        using var second = Vault.Open(path, MasterPassword);
+        using var first = ClaimedVault.Open(path, MasterPassword);
+        using var second = ClaimedVault.Open(path, MasterPassword);
 
         first.AddEntry(new VaultEntry { Title = "from-the-window", Password = "first" });
         first.SaveWaiting(null, afterReplacing: () =>
@@ -230,7 +230,7 @@ public sealed class VaultConcurrentWriteTests : IDisposable
         first.AddEntry(new VaultEntry { Title = "a-later-edit", Password = "third" });
         Assert.Throws<VaultChangedOnDiskException>(first.Save);
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         Assert.NotNull(reopened.Find("from-the-terminal"));
         Assert.Null(reopened.Find("a-later-edit"));
     }
@@ -244,7 +244,7 @@ public sealed class VaultConcurrentWriteTests : IDisposable
         var path = NewVault();
         var theirs = AnotherProgramsSave(path);
 
-        using var first = Vault.Open(path, MasterPassword);
+        using var first = ClaimedVault.Open(path, MasterPassword);
         first.AddEntry(new VaultEntry { Title = "from-the-window", Password = "first" });
         first.AfterSerializing = bytes =>
         {
@@ -266,7 +266,7 @@ public sealed class VaultConcurrentWriteTests : IDisposable
         var path = NewVault();
         var theirs = AnotherProgramsSave(path);
 
-        using var first = Vault.Open(path, MasterPassword);
+        using var first = ClaimedVault.Open(path, MasterPassword);
         first.AddEntry(new VaultEntry { Title = "from-the-window", Password = "first" });
 
         Assert.Throws<VaultChangedOnDiskException>(() =>
@@ -281,7 +281,7 @@ public sealed class VaultConcurrentWriteTests : IDisposable
         var path = NewVault();
         var theirs = AnotherProgramsSave(path);
 
-        using var first = Vault.Open(path, MasterPassword);
+        using var first = ClaimedVault.Open(path, MasterPassword);
         first.AddEntry(new VaultEntry { Title = "from-the-window", Password = "first" });
         first.AfterSerializing = bytes =>
         {
@@ -291,7 +291,7 @@ public sealed class VaultConcurrentWriteTests : IDisposable
 
         first.SaveOverwriting();
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         Assert.NotNull(reopened.Find("from-the-window"));
         Assert.Null(reopened.Find("from-the-terminal"));
         Assert.False(first.HasFileChangedSinceOpen());
@@ -304,7 +304,7 @@ public sealed class VaultConcurrentWriteTests : IDisposable
         var theirs = Path.Combine(Directory.CreateDirectory(Path.Combine(_directory, Path.GetRandomFileName())).FullName, "vault.kdbx");
         File.Copy(path, theirs);
 
-        using var other = Vault.Open(theirs, MasterPassword);
+        using var other = ClaimedVault.Open(theirs, MasterPassword);
         other.AddEntry(new VaultEntry { Title = "from-the-terminal", Password = "second" });
         other.Save();
 
@@ -313,7 +313,7 @@ public sealed class VaultConcurrentWriteTests : IDisposable
 
     private static void AssertTheirSaveKept(Vault refused, string path)
     {
-        using (var reopened = Vault.Open(path, MasterPassword))
+        using (var reopened = ClaimedVault.Open(path, MasterPassword))
         {
             Assert.NotNull(reopened.Find("from-the-terminal"));
             Assert.Null(reopened.Find("from-the-window"));
@@ -329,7 +329,7 @@ public sealed class VaultConcurrentWriteTests : IDisposable
         var home = Directory.CreateDirectory(Path.Combine(_directory, name)).FullName;
         var path = Path.Combine(home, "vault.kdbx");
 
-        using var vault = Vault.Create(path, MasterPassword);
+        using var vault = ClaimedVault.Create(path, MasterPassword);
         vault.AddEntry(new VaultEntry { Title = "seed", Password = "seed" });
         vault.Save();
 

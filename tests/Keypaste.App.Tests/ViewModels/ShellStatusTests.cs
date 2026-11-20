@@ -51,7 +51,7 @@ public sealed class ShellStatusTests
         session.Unlocked.Save();
         Assert.Equal("saved", shell.VaultSaveWords);
 
-        using (var other = Vault.Open(fixture.Path_, TempVault.Password))
+        using (var other = ClaimedVault.Open(fixture.Path_, TempVault.Password))
         {
             other.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "ELSEWHERE", Password = "y" });
             other.Save();
@@ -172,7 +172,7 @@ public sealed class ShellStatusTests
         var locked = new List<VaultLockReason>();
         session.Locked += (_, reason) => locked.Add(reason);
 
-        using (var other = Vault.Open(fixture.Path_, TempVault.Password))
+        using (var other = ClaimedVault.Open(fixture.Path_, TempVault.Password))
         {
             const string next = "a different horse battery staple";
             Assert.Equal(
@@ -464,7 +464,7 @@ public sealed class ShellStatusTests
             shell.Notice);
         Assert.DoesNotContain("secret-", shell.Notice, StringComparison.Ordinal);
 
-        using var file = Vault.Open(fixture.Path_, TempVault.Password);
+        using var file = ClaimedVault.Open(fixture.Path_, TempVault.Password);
         Assert.NotNull(file.Find("env/app/ELSEWHERE"));
         Assert.Equal("secret-mine", file.Find("env/app/MINE")!.Password);
     }
@@ -492,7 +492,7 @@ public sealed class ShellStatusTests
         detail.EditCommand.Press();
         detail.DraftNotes = "mine";
 
-        using (var other = Vault.Open(fixture.Path_, TempVault.Password))
+        using (var other = ClaimedVault.Open(fixture.Path_, TempVault.Password))
         {
             Assert.Equal(DeletionOutcome.Recycled, other.RemoveEntry(new EntryName(string.Empty, "example"), out var recycled));
             Assert.True(other.PurgeRecycled(recycled));
@@ -508,7 +508,7 @@ public sealed class ShellStatusTests
         Assert.Null(entries.Detail);
         Assert.Contains("It is in Trash with your change.", shell.Notice, StringComparison.Ordinal);
 
-        using var file = Vault.Open(fixture.Path_, TempVault.Password);
+        using var file = ClaimedVault.Open(fixture.Path_, TempVault.Password);
         Assert.Null(file.Find("example"));
         Assert.Contains(file.ReadRecycled(), item => item.Title == "example");
     }
@@ -530,7 +530,7 @@ public sealed class ShellStatusTests
         using var shell = new ShellViewModel(session, fixture.Home, authority, clock: clock);
         var name = Path.GetFileName(fixture.Path_);
 
-        using (var other = Vault.Open(fixture.Path_, TempVault.Password))
+        using (var other = ClaimedVault.Open(fixture.Path_, TempVault.Password))
         {
             Assert.True(other.UpdateEntry(other.Find("example")! with { Password = "theirs-example" }));
             other.Save();
@@ -586,7 +586,7 @@ public sealed class ShellStatusTests
 
         var other = Path.Combine(fixture.Home, "other.kdbx");
 
-        using (var vault = Vault.Create(other, TempVault.Password))
+        using (var vault = ClaimedVault.Create(other, TempVault.Password))
         {
             vault.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "OTHER", Password = "o" });
             vault.Save();
@@ -645,7 +645,7 @@ public sealed class ShellStatusTests
         detail.SaveCommand.Press();
         Assert.False(detail.IsEditing, entries.Error);
 
-        using var file = Vault.Open(fixture.Path_, TempVault.Password);
+        using var file = ClaimedVault.Open(fixture.Path_, TempVault.Password);
         Assert.Equal("typed before the merge", file.Find("example")!.Notes);
         Assert.NotNull(file.Find("env/app/ELSEWHERE"));
     }
@@ -667,7 +667,7 @@ public sealed class ShellStatusTests
         detail.History.ToggleCommand.Press();
         var revisions = detail.History.Rows.Count;
 
-        using (var other = Vault.Open(fixture.Path_, TempVault.Password))
+        using (var other = ClaimedVault.Open(fixture.Path_, TempVault.Password))
         {
             var name = new EntryName(string.Empty, "example");
             Assert.True(other.UpdateEntry(other.Find("example")! with { Username = "merged-user", Url = "https://merged.example", Notes = "merged notes", Password = "twelve-chars" }));
@@ -706,7 +706,7 @@ public sealed class ShellStatusTests
         detail.BeginAddFieldCommand.Press();
         detail.DraftFieldName = "HALF_TYPED";
 
-        using (var other = Vault.Open(fixture.Path_, TempVault.Password))
+        using (var other = ClaimedVault.Open(fixture.Path_, TempVault.Password))
         {
             Assert.True(other.UpdateEntry(other.Find("example")! with { Username = "merged-user" }));
             other.Save();
@@ -734,7 +734,7 @@ public sealed class ShellStatusTests
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
         entries.Selected = entries.Rows.Single(row => row.Title == "example");
 
-        using (var other = Vault.Open(fixture.Path_, TempVault.Password))
+        using (var other = ClaimedVault.Open(fixture.Path_, TempVault.Password))
         {
             other.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "ELSEWHERE", Password = "y" });
             Assert.Equal(OrganizeOutcome.Moved, other.MoveEntry(new EntryName(string.Empty, "example"), "env/app", out _));
@@ -763,7 +763,7 @@ public sealed class ShellStatusTests
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
         entries.Selected = entries.Rows.Single(row => row.Title == "example");
 
-        using (var other = Vault.Open(fixture.Path_, TempVault.Password))
+        using (var other = ClaimedVault.Open(fixture.Path_, TempVault.Password))
         {
             Assert.Equal(DeletionOutcome.Recycled, other.RemoveEntry(new EntryName(string.Empty, "example"), out var recycled));
             Assert.True(other.PurgeRecycled(recycled));
@@ -794,7 +794,7 @@ public sealed class ShellStatusTests
         detail.SaveCommand.Press();
 
         Assert.False(detail.IsEditing);
-        using var file = Vault.Open(fixture.Path_, TempVault.Password);
+        using var file = ClaimedVault.Open(fixture.Path_, TempVault.Password);
         Assert.Equal("theirs", file.Find("example")!.Username);
         Assert.Equal("mine", file.Find("example")!.Notes);
     }
@@ -815,7 +815,7 @@ public sealed class ShellStatusTests
         await MergedByThePoll(shell, clock);
         detail.SaveCommand.Press();
 
-        using var file = Vault.Open(fixture.Path_, TempVault.Password);
+        using var file = ClaimedVault.Open(fixture.Path_, TempVault.Password);
         Assert.Equal("mine", file.Find("example")!.Notes);
         Assert.Contains(file.ReadHistory(new EntryName(string.Empty, "example"))!, revision => revision.Fields.Notes == "theirs");
     }
@@ -842,7 +842,7 @@ public sealed class ShellStatusTests
         entries.ConfirmOrganizeCommand.Press();
 
         Assert.Null(entries.Error);
-        using var file = Vault.Open(fixture.Path_, TempVault.Password);
+        using var file = ClaimedVault.Open(fixture.Path_, TempVault.Password);
         Assert.NotNull(file.Find("env/app/renamed"));
     }
 
@@ -978,7 +978,7 @@ public sealed class ShellStatusTests
 
     private static void Elsewhere(TempVault fixture, Action<Vault> change)
     {
-        using var other = Vault.Open(fixture.Path_, TempVault.Password);
+        using var other = ClaimedVault.Open(fixture.Path_, TempVault.Password);
         change(other);
         other.Save();
     }
@@ -1174,7 +1174,7 @@ public sealed class ShellStatusTests
     private static void MintElsewhere(TempVault fixture, string name)
     {
         Assert.True(TokenScope.TryParseList("read:billing/dev/*", out var scopes, out var refused), refused);
-        using var other = Vault.Open(fixture.Path_, TempVault.Password);
+        using var other = ClaimedVault.Open(fixture.Path_, TempVault.Password);
         Assert.True(new TokenStore(other).TryCreate(name, scopes, TimeSpan.FromDays(7), false, DateTimeOffset.UtcNow, out _, out _, out var error), error);
         other.Save();
     }
@@ -1197,7 +1197,7 @@ public sealed class ShellStatusTests
 
     private static void SaveElsewhere(TempVault fixture, string title)
     {
-        using var other = Vault.Open(fixture.Path_, TempVault.Password);
+        using var other = ClaimedVault.Open(fixture.Path_, TempVault.Password);
         other.AddEntry(new VaultEntry { GroupPath = "env/app", Title = title, Password = "y" });
         other.Save();
     }

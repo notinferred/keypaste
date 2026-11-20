@@ -34,7 +34,7 @@ public sealed class AttachmentToolTests : IAsyncLifetime
     public ValueTask InitializeAsync()
     {
         _directory = Directory.CreateTempSubdirectory("keypaste-attachment-").FullName;
-        _vault = Vault.Create(Path.Combine(_directory, "vault.kdbx"), _master);
+        _vault = ClaimedVault.Create(Path.Combine(_directory, "vault.kdbx"), _master);
         var item = new EntryName("env/dev", "deploy");
         _vault.AddEntry(new VaultEntry { GroupPath = item.GroupPath, Title = item.Title, Password = "not-the-one-under-test" });
         Assert.True(_vault.AddAttachment(item, "deploy.p12", new MemoryStream(_certificate), out _));

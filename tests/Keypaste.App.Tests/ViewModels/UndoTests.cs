@@ -24,7 +24,7 @@ public sealed class UndoTests : IDisposable
         _directory = Directory.CreateTempSubdirectory("keypaste-undo-").FullName;
         _vaultPath = Path.Combine(_directory, "vault.kdbx");
 
-        using (var vault = Vault.Create(_vaultPath, _master))
+        using (var vault = ClaimedVault.Create(_vaultPath, _master))
         {
             vault.AddEntry(new VaultEntry { Title = "production", GroupPath = "servers/live", Username = "root", Password = "p1" });
             vault.AddEntry(new VaultEntry { Title = "staging", GroupPath = "servers", Password = "p2" });
@@ -127,7 +127,7 @@ public sealed class UndoTests : IDisposable
 
         _entries.UndoCommand.Press();
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
         Assert.NotNull(reopened.Find("servers/renamed"));
     }
 
@@ -177,7 +177,7 @@ public sealed class UndoTests : IDisposable
     /// <summary>Every live item's place and values and every group, read back from the file.</summary>
     private string VaultState()
     {
-        using var vault = Vault.Open(_vaultPath, _master);
+        using var vault = ClaimedVault.Open(_vaultPath, _master);
         var items = vault.ReadEntries()
             .Select(entry => $"{entry.GroupPath}|{entry.Title}|{entry.Username}|{entry.Password}")
             .Order(StringComparer.Ordinal);

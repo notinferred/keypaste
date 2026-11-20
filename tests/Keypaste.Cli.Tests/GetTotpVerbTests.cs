@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Keypaste.Core.Totp;
 using Xunit;
 
@@ -22,7 +23,7 @@ public sealed class GetTotpVerbTests : IDisposable
         _harness.SeedVault(_master);
         _harness.Clock.Now = DateTimeOffset.FromUnixTimeSeconds(59);
 
-        using var vault = Vault.Open(_harness.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
         vault.AddEntry(new VaultEntry { GroupPath = "web", Title = "Bank", Password = "bank-password" });
         vault.AddEntry(new VaultEntry { GroupPath = "web", Title = "Plain", Password = "plain-password" });
         vault.AddEntry(new VaultEntry { GroupPath = "web", Title = "Counter", Password = "counter-password" });

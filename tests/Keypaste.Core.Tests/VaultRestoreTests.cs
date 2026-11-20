@@ -60,7 +60,7 @@ public sealed class VaultRestoreTests : IDisposable
     {
         var path = SeededVault("before");
 
-        using (var vault = Vault.Open(path, _master))
+        using (var vault = ClaimedVault.Open(path, _master))
         {
             vault.AddEntry(new VaultEntry { Title = "kept", Password = "k", GroupPath = "servers" });
             vault.AddEntry(new VaultEntry { Title = "binned", Password = "b", GroupPath = "servers" });
@@ -70,7 +70,7 @@ public sealed class VaultRestoreTests : IDisposable
 
         Age(path, TimeSpan.FromHours(1));
 
-        using (var vault = Vault.Open(path, _master))
+        using (var vault = ClaimedVault.Open(path, _master))
         {
             Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry("servers/binned"));
             vault.Save();
@@ -174,13 +174,29 @@ public sealed class VaultRestoreTests : IDisposable
         var backup = Assert.Single(VaultBackups.List(path));
         var bytes = File.ReadAllBytes(backup.Path);
 
-        var report = VaultBackups.Restore(VaultBackups.Inspect(path, backup, _master));
+        var report = ClaimedVault.Restore(VaultBackups.Inspect(path, backup, _master));
 
         Assert.Equal(backup, report.Restored);
         Assert.Equal(bytes, File.ReadAllBytes(path));
         Assert.Equal(bytes, File.ReadAllBytes(backup.Path));
         Assert.Equal("before", ReadToken(path, _master));
         Assert.Empty(Staged(path));
+    }
+
+    [Fact]
+    public void ARestore_NeedsAHeldClaimOnItsVault()
+    {
+        var path = SeededVault("before");
+        Edit(path, "after");
+        var validated = VaultBackups.Inspect(path, Assert.Single(VaultBackups.List(path)), _master);
+        var live = File.ReadAllBytes(path);
+        var released = ClaimedVault.Claim(path);
+        released.Dispose();
+        using var other = ClaimedVault.Claim(Path.Combine(_directory, "other.kdbx"));
+
+        Assert.Throws<ArgumentException>(() => VaultBackups.Restore(released, validated));
+        Assert.Throws<ArgumentException>(() => VaultBackups.Restore(other, validated));
+        Assert.Equal(live, File.ReadAllBytes(path));
     }
 
     [Fact]
@@ -192,7 +208,7 @@ public sealed class VaultRestoreTests : IDisposable
         var backup = Assert.Single(VaultBackups.List(link));
         var bytes = File.ReadAllBytes(backup.Path);
 
-        VaultBackups.Restore(VaultBackups.Inspect(link, backup, _master));
+        ClaimedVault.Restore(VaultBackups.Inspect(link, backup, _master));
 
         Assert.Equal(target, new FileInfo(link).ResolveLinkTarget(returnFinalTarget: true)?.FullName);
         Assert.Equal(bytes, File.ReadAllBytes(target));
@@ -213,10 +229,10 @@ public sealed class VaultRestoreTests : IDisposable
 
         Assert.Throws<InvalidMasterPasswordException>(() => VaultBackups.Inspect(path, planted, _master));
 
-        VaultBackups.Restore(VaultBackups.Inspect(path, planted, _earlier));
+        ClaimedVault.Restore(VaultBackups.Inspect(path, planted, _earlier));
 
         Assert.Equal("earlier", ReadToken(path, _earlier));
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, _master).Dispose());
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, _master).Dispose());
 
         // What it replaced still opens with the password it was written under.
         var preserved = VaultBackups.List(path)[0];
@@ -231,7 +247,7 @@ public sealed class VaultRestoreTests : IDisposable
         DamageBody(path);
         var damaged = File.ReadAllBytes(path);
 
-        var report = VaultBackups.Restore(VaultBackups.Inspect(path, VaultBackups.List(path)[0], _master));
+        var report = ClaimedVault.Restore(VaultBackups.Inspect(path, VaultBackups.List(path)[0], _master));
 
         Assert.Equal("before", ReadToken(path, _master));
         Assert.Equal(damaged, File.ReadAllBytes(Assert.IsType<VaultBackup>(report.Preserved).Path));
@@ -244,7 +260,7 @@ public sealed class VaultRestoreTests : IDisposable
         Edit(path, "after");
         File.WriteAllText(path, "a sync tool's conflict note, where a vault was");
 
-        VaultBackups.Restore(VaultBackups.Inspect(path, VaultBackups.List(path)[0], _master));
+        ClaimedVault.Restore(VaultBackups.Inspect(path, VaultBackups.List(path)[0], _master));
 
         Assert.Equal("before", ReadToken(path, _master));
     }
@@ -256,7 +272,7 @@ public sealed class VaultRestoreTests : IDisposable
         Edit(path, "after");
         File.Delete(path);
 
-        var report = VaultBackups.Restore(VaultBackups.Inspect(path, VaultBackups.List(path)[0], _master));
+        var report = ClaimedVault.Restore(VaultBackups.Inspect(path, VaultBackups.List(path)[0], _master));
 
         Assert.Null(report.Preserved);
         Assert.Null(report.AlreadyKeptAs);
@@ -275,7 +291,7 @@ public sealed class VaultRestoreTests : IDisposable
         var path = SeededVault("before");
         Edit(path, "after");
 
-        VaultBackups.Restore(VaultBackups.Inspect(path, VaultBackups.List(path)[0], _master));
+        ClaimedVault.Restore(VaultBackups.Inspect(path, VaultBackups.List(path)[0], _master));
 
         Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(path));
     }
@@ -290,7 +306,7 @@ public sealed class VaultRestoreTests : IDisposable
         var replaced = File.ReadAllBytes(path);
 
         // No Age: the only backup is seconds old, which is inside the floor a save would respect.
-        var report = VaultBackups.Restore(VaultBackups.Inspect(path, VaultBackups.List(path)[0], _master));
+        var report = ClaimedVault.Restore(VaultBackups.Inspect(path, VaultBackups.List(path)[0], _master));
 
         var preserved = Assert.IsType<VaultBackup>(report.Preserved);
         Assert.Null(report.AlreadyKeptAs);
@@ -306,11 +322,11 @@ public sealed class VaultRestoreTests : IDisposable
         Edit(path, "after");
         var original = Assert.Single(VaultBackups.List(path));
 
-        VaultBackups.Restore(VaultBackups.Inspect(path, original, _master));
+        ClaimedVault.Restore(VaultBackups.Inspect(path, original, _master));
         var names = Names(path);
 
         // The vault is now that backup's bytes, so restoring anything over it has nothing new to keep.
-        var again = VaultBackups.Restore(VaultBackups.Inspect(path, VaultBackups.List(path)[0], _master));
+        var again = ClaimedVault.Restore(VaultBackups.Inspect(path, VaultBackups.List(path)[0], _master));
 
         Assert.Null(again.Preserved);
         Assert.Equal(original, again.AlreadyKeptAs);
@@ -332,7 +348,7 @@ public sealed class VaultRestoreTests : IDisposable
         Assert.Equal(VaultBackups.Retained, before.Count);
         var oldest = before[^1];
 
-        VaultBackups.Restore(VaultBackups.Inspect(path, oldest, _master));
+        ClaimedVault.Restore(VaultBackups.Inspect(path, oldest, _master));
 
         var after = VaultBackups.List(path);
         Assert.Equal(VaultBackups.Retained + 1, after.Count);
@@ -351,7 +367,7 @@ public sealed class VaultRestoreTests : IDisposable
             Age(path, VaultBackupTests.PastEveryDailyAndWeeklyCopy);
         }
 
-        VaultBackups.Restore(VaultBackups.Inspect(path, VaultBackups.List(path)[0], _master));
+        ClaimedVault.Restore(VaultBackups.Inspect(path, VaultBackups.List(path)[0], _master));
         Age(path, VaultBackupTests.PastEveryDailyAndWeeklyCopy);
 
         Edit(path, "after the restore");
@@ -374,7 +390,7 @@ public sealed class VaultRestoreTests : IDisposable
 
         foreach (var pick in new[] { 2, 0, 1, 2, 0 })
         {
-            VaultBackups.Restore(VaultBackups.Inspect(path, VaultBackups.List(path)[pick], _master));
+            ClaimedVault.Restore(VaultBackups.Inspect(path, VaultBackups.List(path)[pick], _master));
         }
 
         Assert.Equal(count + 1, VaultBackups.List(path).Count);
@@ -397,7 +413,7 @@ public sealed class VaultRestoreTests : IDisposable
         var live = File.ReadAllBytes(path);
         var names = Names(path);
 
-        Assert.Throws<VaultRestoreException>(() => VaultBackups.Restore(validated));
+        Assert.Throws<VaultRestoreException>(() => ClaimedVault.Restore(validated));
 
         Assert.Equal(live, File.ReadAllBytes(path));
         Assert.Equal(names, Names(path));
@@ -415,7 +431,7 @@ public sealed class VaultRestoreTests : IDisposable
         File.Move(backup.Path, Path.Combine(Path.GetDirectoryName(backup.Path)!, "renamed by hand.kdbx"));
         var live = File.ReadAllBytes(path);
 
-        Assert.Throws<VaultRestoreException>(() => VaultBackups.Restore(validated));
+        Assert.Throws<VaultRestoreException>(() => ClaimedVault.Restore(validated));
         Assert.Equal(live, File.ReadAllBytes(path));
     }
 
@@ -432,7 +448,7 @@ public sealed class VaultRestoreTests : IDisposable
         var live = File.ReadAllBytes(path);
         var waits = 0;
 
-        Assert.Throws<VaultRestoreException>(() => VaultBackups.Restore(
+        Assert.Throws<VaultRestoreException>(() => ClaimedVault.Restore(
             VaultBackups.Inspect(path, VaultBackups.List(path)[0], _master),
             beforeReplacing: File.Delete,
             waitBetweenAttempts: _ => waits++));
@@ -454,7 +470,7 @@ public sealed class VaultRestoreTests : IDisposable
         File.Delete(path);
         Directory.CreateDirectory(path);
 
-        Assert.Throws<VaultRestoreException>(() => VaultBackups.Restore(
+        Assert.Throws<VaultRestoreException>(() => ClaimedVault.Restore(
             VaultBackups.Inspect(path, VaultBackups.List(path)[0], _master),
             beforeReplacing: null,
             waitBetweenAttempts: _ => { }));
@@ -483,7 +499,7 @@ public sealed class VaultRestoreTests : IDisposable
 
         try
         {
-            Assert.Throws<VaultBackupException>(() => VaultBackups.Restore(validated));
+            Assert.Throws<VaultBackupException>(() => ClaimedVault.Restore(validated));
         }
         finally
         {
@@ -501,7 +517,7 @@ public sealed class VaultRestoreTests : IDisposable
         Edit(path, "after");
         var theirs = "another program saved here while the restore ran"u8.ToArray();
 
-        Assert.Throws<VaultChangedOnDiskException>(() => VaultBackups.Restore(
+        Assert.Throws<VaultChangedOnDiskException>(() => ClaimedVault.Restore(
             VaultBackups.Inspect(path, VaultBackups.List(path)[0], _master),
             beforeReplacing: _ => File.WriteAllBytes(path, theirs),
             waitBetweenAttempts: null));
@@ -518,7 +534,7 @@ public sealed class VaultRestoreTests : IDisposable
         File.Delete(path);
         var theirs = "somebody put a file back while the restore ran"u8.ToArray();
 
-        Assert.Throws<VaultChangedOnDiskException>(() => VaultBackups.Restore(
+        Assert.Throws<VaultChangedOnDiskException>(() => ClaimedVault.Restore(
             VaultBackups.Inspect(path, VaultBackups.List(path)[0], _master),
             beforeReplacing: _ => File.WriteAllBytes(path, theirs),
             waitBetweenAttempts: null));
@@ -542,7 +558,7 @@ public sealed class VaultRestoreTests : IDisposable
 
         using (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
         {
-            Assert.Throws<VaultRestoreException>(() => VaultBackups.Restore(
+            Assert.Throws<VaultRestoreException>(() => ClaimedVault.Restore(
                 VaultBackups.Inspect(path, VaultBackups.List(path)[0], _master),
                 beforeReplacing: null,
                 waitBetweenAttempts: _ => waits++));
@@ -555,7 +571,7 @@ public sealed class VaultRestoreTests : IDisposable
         var holder = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         try
         {
-            VaultBackups.Restore(
+            ClaimedVault.Restore(
                 VaultBackups.Inspect(path, VaultBackups.List(path)[^1], _master),
                 beforeReplacing: null,
                 waitBetweenAttempts: _ => holder.Dispose());
@@ -593,7 +609,7 @@ public sealed class VaultRestoreTests : IDisposable
         {
             // Held from the instant the vault has been kept, which is when another save landing matters:
             // before it, whatever is at the path is simply what the restore keeps and replaces.
-            Assert.Throws<VaultChangedOnDiskException>(() => VaultBackups.Restore(
+            Assert.Throws<VaultChangedOnDiskException>(() => ClaimedVault.Restore(
                 validated,
                 beforeReplacing: _ =>
                 {
@@ -672,7 +688,7 @@ public sealed class VaultRestoreTests : IDisposable
         Assert.Equal(2, kept.Count);
         Assert.Equal(live, File.ReadAllBytes(kept[0].Path));
 
-        var report = VaultBackups.Restore(VaultBackups.Inspect(path, backup, _master));
+        var report = ClaimedVault.Restore(VaultBackups.Inspect(path, backup, _master));
 
         Assert.Equal(kept[0], report.AlreadyKeptAs);
         Assert.Empty(Staged(path));
@@ -689,7 +705,7 @@ public sealed class VaultRestoreTests : IDisposable
         var destination = Path.Combine(_directory, "elsewhere", "copy.kdbx");
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
 
-        using (var vault = Vault.Open(path, _master))
+        using (var vault = ClaimedVault.Open(path, _master))
         {
             vault.ExportTo(destination);
         }
@@ -709,7 +725,7 @@ public sealed class VaultRestoreTests : IDisposable
         var path = SeededVault("before");
         var destination = Path.Combine(_directory, "after-a-save.kdbx");
 
-        using (var vault = Vault.Open(path, _master))
+        using (var vault = ClaimedVault.Open(path, _master))
         {
             Replace(vault, "after");
             vault.Save();
@@ -727,7 +743,7 @@ public sealed class VaultRestoreTests : IDisposable
         File.WriteAllText(file, "somebody's file");
         var folder = Directory.CreateDirectory(Path.Combine(_directory, "a folder.kdbx")).FullName;
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
 
         Assert.Throws<VaultException>(() => vault.ExportTo(file));
         Assert.Throws<VaultException>(() => vault.ExportTo(folder));
@@ -744,7 +760,7 @@ public sealed class VaultRestoreTests : IDisposable
         var respelled = Path.Combine(
             Path.GetDirectoryName(path)!, "..", Path.GetFileName(Path.GetDirectoryName(path)!), Path.GetFileName(path));
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
 
         Assert.Throws<VaultException>(() => vault.ExportTo(respelled));
         Assert.Equal(bytes, File.ReadAllBytes(path));
@@ -765,7 +781,7 @@ public sealed class VaultRestoreTests : IDisposable
         Edit(path, "after");
         var names = Directory.GetFileSystemEntries(VaultBackups.DirectoryFor(path));
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
 
         Assert.Throws<VaultException>(
             () => vault.ExportTo(Path.Combine(VaultBackups.DirectoryFor(path), name)));
@@ -779,7 +795,7 @@ public sealed class VaultRestoreTests : IDisposable
         // A file there would stop the directory being created, and then no save could happen.
         var path = SeededVault("never edited");
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
 
         Assert.Throws<VaultException>(() => vault.ExportTo(VaultBackups.DirectoryFor(path)));
         Assert.False(File.Exists(VaultBackups.DirectoryFor(path)));
@@ -791,7 +807,7 @@ public sealed class VaultRestoreTests : IDisposable
         var path = SeededVault("before");
         var destination = Path.Combine(_directory, "stale.kdbx");
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         Edit(path, "somebody else's edit");
 
         Assert.Throws<VaultChangedOnDiskException>(() => vault.ExportTo(destination));
@@ -805,7 +821,7 @@ public sealed class VaultRestoreTests : IDisposable
         var blocker = Path.Combine(_directory, "a file, not a folder");
         File.WriteAllText(blocker, "in the way");
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
 
         Assert.Throws<VaultException>(() => vault.ExportTo(Path.Combine(blocker, "copy.kdbx")));
         Assert.Throws<VaultException>(
@@ -821,7 +837,7 @@ public sealed class VaultRestoreTests : IDisposable
         var home = Directory.CreateDirectory(Path.Combine(_directory, Path.GetRandomFileName())).FullName;
         var destination = Path.Combine(_directory, "nothing.kdbx");
 
-        using var vault = Vault.Create(Path.Combine(home, "vault.kdbx"), _master);
+        using var vault = ClaimedVault.Create(Path.Combine(home, "vault.kdbx"), _master);
 
         Assert.Throws<VaultException>(() => vault.ExportTo(destination));
         Assert.False(File.Exists(destination));
@@ -832,7 +848,7 @@ public sealed class VaultRestoreTests : IDisposable
     {
         var path = SeededVault("before");
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         vault.ExportTo(Path.Combine(_directory, "copy.kdbx"));
 
         Assert.Empty(VaultBackups.List(path));
@@ -851,7 +867,7 @@ public sealed class VaultRestoreTests : IDisposable
         var home = Directory.CreateDirectory(Path.Combine(_directory, Path.GetRandomFileName())).FullName;
         var path = Path.Combine(home, "vault.kdbx");
 
-        using var vault = Vault.Create(path, master);
+        using var vault = ClaimedVault.Create(path, master);
         vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = token, GroupPath = "env/p" });
         vault.Save();
 
@@ -860,7 +876,7 @@ public sealed class VaultRestoreTests : IDisposable
 
     private static void Edit(string path, string token)
     {
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         Replace(vault, token);
         vault.Save();
     }
@@ -870,7 +886,7 @@ public sealed class VaultRestoreTests : IDisposable
 
     private static string ReadToken(string path, string master)
     {
-        using var vault = Vault.Open(path, master);
+        using var vault = ClaimedVault.Open(path, master);
         return vault.Find("env/p/TOKEN")?.Password ?? throw new InvalidOperationException("no entry");
     }
 

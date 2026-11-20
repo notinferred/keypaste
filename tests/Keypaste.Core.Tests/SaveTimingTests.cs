@@ -68,7 +68,7 @@ public sealed class SaveTimingTests : IDisposable
         using var inside = new ManualResetEventSlim();
         using var release = new ManualResetEventSlim();
 
-        var restoring = new Thread(() => VaultBackups.Restore(
+        var restoring = new Thread(() => ClaimedVault.Restore(
             validated,
             beforeReplacing: _ =>
             {
@@ -146,14 +146,14 @@ public sealed class SaveTimingTests : IDisposable
         var (holder, path) = SavedVault("shared");
         using (holder)
         {
-            using var waiter = Vault.Open(path, VaultSaveTests.MasterPassword);
+            using var waiter = ClaimedVault.Open(path, VaultSaveTests.MasterPassword);
             holder.AddEntry(new VaultEntry { Title = "committed-while-queued", Password = "kept" });
             waiter.AddEntry(new VaultEntry { Title = "must-not-land", Password = "no" });
 
             WhileInsideAnAttempt(
                 holder, () => Assert.Throws<VaultChangedOnDiskException>(() => waiter.SaveWaiting(null, attempts: 1)));
 
-            using var reopened = Vault.Open(path, VaultSaveTests.MasterPassword);
+            using var reopened = ClaimedVault.Open(path, VaultSaveTests.MasterPassword);
             Assert.NotNull(reopened.Find("committed-while-queued"));
             Assert.Null(reopened.Find("must-not-land"));
         }
@@ -177,8 +177,45 @@ public sealed class SaveTimingTests : IDisposable
             timing.Produce > 10 * gated.Gate,
             $"key derivation and encryption did not dominate an uncontended gate: {SaveTimings.Describe(timing)}");
         Assert.True(gated.Held >= gated.Work, $"the hold did not cover the attempt: {SaveTimings.Describe(timing)}");
-        Assert.True(gated.Held < timing.Produce, $"the gate was held across key derivation: {SaveTimings.Describe(timing)}");
         AssertComponentsFitTheTotal(timing);
+    }
+
+    /// <remarks>
+    /// The holder stays inside its attempt, with the gate taken, until the other save has produced its bytes, so derivation inside
+    /// the gate would leave both waiting until the timeout.
+    /// </remarks>
+    [Fact]
+    public void A_save_derives_its_key_while_another_save_holds_the_gate()
+    {
+        using var production = TestKeyDerivation.Production();
+        using var holder = SavedVault("holder").Vault;
+        using var waiter = SavedVault("waiter").Vault;
+        waiter.AddEntry(new VaultEntry { Title = "T", Password = "p" });
+
+        using var inside = new ManualResetEventSlim();
+        using var produced = new ManualResetEventSlim();
+        using var nothingWaits = new ManualResetEventSlim();
+        var producedWhileHeld = false;
+
+        waiter.AfterSerializing = bytes =>
+        {
+            produced.Set();
+            return bytes;
+        };
+
+        var (_, waited) = Concurrently(
+            () => holder.SaveWaiting(null, attempts: 1, duringAttempt: _ =>
+            {
+                inside.Set();
+                producedWhileHeld = produced.Wait(TimeSpan.FromSeconds(30));
+            }),
+            inside,
+            nothingWaits,
+            waiter.Save,
+            "the holder never entered its attempt");
+
+        Assert.True(producedWhileHeld, $"a save did not produce its bytes while another held the gate: {SaveTimings.Describe(waited)}");
+        Assert.True(waited.Succeeded, SaveTimings.Describe(waited));
     }
 
     /// <summary>Runs <paramref name="waiter"/> while <paramref name="holder"/> is blocked inside its only attempt.</summary>
@@ -315,7 +352,7 @@ public sealed class SaveTimingTests : IDisposable
     {
         var home = Directory.CreateDirectory(Path.Combine(_directory, name)).FullName;
         var path = Path.Combine(home, "vault.kdbx");
-        var vault = Vault.Create(path, VaultSaveTests.MasterPassword);
+        var vault = ClaimedVault.Create(path, VaultSaveTests.MasterPassword);
         vault.AddEntry(new VaultEntry { Title = "seeded", Password = "seed" });
         vault.Save();
         return (vault, path);

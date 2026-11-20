@@ -16,9 +16,9 @@ internal sealed class KeePassXcVault : IDisposable
 
     internal string Directory_ => _directory;
 
-    internal Vault Create() => Vault.Create(Path_, KeePassXcCli.Password);
+    internal Vault Create() => ClaimedVault.Create(Path_, KeePassXcCli.Password);
 
-    internal Vault Open() => Vault.Open(Path_, KeePassXcCli.Password);
+    internal Vault Open() => ClaimedVault.Open(Path_, KeePassXcCli.Password);
 
     /// <summary>The file is still KDBX 4 and KeePassXC opens it with Argon2 and AES-256, which a silent downgrade to KDBX 3.1 would lose.</summary>
     internal void AssertKdbx4()

@@ -4,34 +4,18 @@ using Xunit;
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
-/// V-N.10's rule: a verb that saves opens the vault through <c>VaultSession.OpenHeld</c>, which takes the
-/// vault's claim before its password is read, so <c>VaultSession.Open</c> and <c>OpenThen</c> are called
-/// only by verbs that never save. And what a verb hands the vault's holder in place of opening
-/// the vault reaches no master password.
+/// What a verb that edits items hands the vault's holder in place of opening the vault reaches no master password.
 /// </summary>
 /// <remarks>
-/// <para>
-/// A text scan, since the compiler cannot say what a callback does. Each call's arguments are read with
-/// strings and comments blanked out, and every method of the same file they call is followed, so a save
-/// moved into a helper is still found. A save moved into another class is not; the verbs keep their
-/// writes in their own files, and this test's controls would need a helper added if one stopped.
-/// </para>
-/// <para>
-/// A save is a call that writes the vault file: <c>Save</c>, <c>ChangeAccess</c>, and the share service's
-/// <c>CreateAsync</c> and <c>RevokeAsync</c>, which save the links' records, and a <c>HeldVault</c> made, through which <c>keypaste approve</c> saves.
-/// </para>
+/// A text scan, since the compiler cannot say what a callback does. Each route's arguments are read with strings and
+/// comments blanked out, and every method of the same file they name is followed, so a password read moved into a
+/// helper is still found. Which verbs save under the claim is not scanned: a vault opened without one refuses to save.
 /// </remarks>
 public sealed class SavingVerbSourceRulesTests
 {
-    private static readonly string[] _saves = [".Save()", ".ChangeAccess(", ".CreateAsync(", ".RevokeAsync(", "new HeldVault("];
-
-    private static readonly Regex _opens = new(@"VaultSession\.(Open|OpenThen|OpenHeld)\s*(?:<[^>()]*>)?\s*\(", RegexOptions.Compiled);
-
     private static readonly Regex _declared = new(
         @"(?m)^\s*(?:(?:private|internal|public|protected|static|async)\s+)+[\w<>\[\]?,\.() ]+?\s+(\w+)\s*(?:<[^>()]*>)?\s*\(",
         RegexOptions.Compiled);
-
-    private static readonly Regex _called = new(@"(?<![\.\w])(\w+)\s*(?:<[^>()]*>)?\s*\(", RegexOptions.Compiled);
 
     /// <summary>A local function that reads a verb's values, which takes the context alone.</summary>
     private static readonly Regex _reader = new(@"(?m)^\s*[\w<>\[\]?,\.]+\s+(\w+)\s*\(\s*CliContext\s+\w+\s*\)\s*\{", RegexOptions.Compiled);
@@ -41,45 +25,13 @@ public sealed class SavingVerbSourceRulesTests
     /// <summary>Any name, so a method passed as a value, as a route passes its reader, is followed too.</summary>
     private static readonly Regex _named = new(@"(?<![\.\w])(\w+)(?!\w)", RegexOptions.Compiled);
 
-    private static readonly string[] _unlocking = ["VaultSession.", "Vault.Open(", "ReadNewMasterPassword("];
-
-    [Fact]
-    public void Only_OpenHeld_reaches_a_save()
-    {
-        var offenders = Sources().SelectMany(source => Offenders(source.Name, source.Text)).ToList();
-
-        Assert.True(offenders.Count == 0, $"these verbs save through VaultSession.Open, which takes no claim: {string.Join("; ", offenders)}");
-    }
-
-    /// <summary>The tracer reaches the save of every verb that does take the claim, so a stale marker list or a missed helper fails here.</summary>
-    [Fact]
-    public void Every_OpenHeld_reaches_a_save()
-    {
-        var calls = Sources().SelectMany(source => Calls(source.Text).Where(call => call.Kind == "OpenHeld").Select(call => (source.Name, call.Traced))).ToList();
-
-        Assert.True(calls.Count >= 15, $"only {calls.Count} OpenHeld calls were found");
-        Assert.All(calls, call => Assert.True(_saves.Any(call.Traced.Contains), $"an OpenHeld call in {call.Name} reaches no save the scan knows"));
-    }
-
-    [Fact]
-    public void A_save_added_through_Open_is_found()
-    {
-        var add = Read("Commands/AddCommand.cs");
-        Assert.Contains("VaultSession.OpenHeld(", add, StringComparison.Ordinal);
-        Assert.NotEmpty(Offenders("AddCommand.cs", add.Replace("VaultSession.OpenHeld(", "VaultSession.Open(", StringComparison.Ordinal)));
-
-        var list = Read("Commands/ListCommand.cs");
-        var open = list.IndexOf("VaultSession.Open(", StringComparison.Ordinal);
-        var body = list.IndexOf('{', open) + 1;
-        Assert.Empty(Offenders("ListCommand.cs", list));
-        Assert.NotEmpty(Offenders("ListCommand.cs", list[..body] + " vault.Save(); " + list[body..]));
-    }
+    private static readonly string[] _unlocking = ["VaultSession.", "Vault.Open(", "Vault.OpenReadOnly(", "ReadNewMasterPassword("];
 
     /// <summary>A verb's route to the vault's holder, and every method it reaches, opens no vault and reads no master password.</summary>
     [Fact]
     public void No_route_opens_the_vault_or_reads_a_master_password()
     {
-        var routes = Sources().SelectMany(source => Traced(source.Text, _routes).Select(traced => (source.Name, traced.Traced))).ToList();
+        var routes = Sources().SelectMany(source => Traced(source.Text, _routes).Select(traced => (source.Name, Traced: traced))).ToList();
 
         // One per verb that edits items, `env tag` and `untag` sharing theirs.
         Assert.True(routes.Count >= 9, $"only {routes.Count} routes to the vault's holder were found");
@@ -101,21 +53,12 @@ public sealed class SavingVerbSourceRulesTests
         Assert.True(reading > 0, "AddCommand no longer reads its password where this control expects");
         Assert.Contains(
             Traced(add.Insert(reading, "VaultSession.ReadNewMasterPassword(asked); "), _routes),
-            route => route.Traced.Contains("VaultSession.", StringComparison.Ordinal));
+            route => route.Contains("VaultSession.", StringComparison.Ordinal));
     }
 
-    private static IEnumerable<string> Offenders(string name, string text) =>
-        Calls(text)
-            .Where(call => call.Kind is "Open" or "OpenThen" && _saves.Any(call.Traced.Contains))
-            .Select(call => $"{name}:{call.Line}");
-
-    /// <summary>Each vault-opening call, with its arguments and every same-file method they reach, strings and comments blanked.</summary>
-    private static IEnumerable<(string Kind, int Line, string Traced)> Calls(string text) => Traced(text, _opens, _called);
-
     /// <summary>Each call <paramref name="calls"/> finds, with its arguments and every same-file method they reach, strings and comments blanked.</summary>
-    private static IEnumerable<(string Kind, int Line, string Traced)> Traced(string text, Regex calls, Regex? follow = null)
+    private static IEnumerable<string> Traced(string text, Regex calls)
     {
-        follow ??= _named;
         var code = Blank(text);
         var methods = Methods(code);
 
@@ -129,7 +72,7 @@ public sealed class SavingVerbSourceRulesTests
             {
                 grew = false;
 
-                foreach (Match call in follow.Matches(traced.ToString()))
+                foreach (Match call in _named.Matches(traced.ToString()))
                 {
                     var called = call.Groups[1].Value;
 
@@ -141,7 +84,7 @@ public sealed class SavingVerbSourceRulesTests
                 }
             }
 
-            yield return (open.Groups[1].Value, code[..open.Index].Count(c => c == '\n') + 1, traced.ToString());
+            yield return traced.ToString();
         }
     }
 

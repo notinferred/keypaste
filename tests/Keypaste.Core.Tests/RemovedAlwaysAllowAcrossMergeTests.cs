@@ -24,7 +24,7 @@ public sealed class RemovedAlwaysAllowAcrossMergeTests : IDisposable
 
     public RemovedAlwaysAllowAcrossMergeTests()
     {
-        _vault = Vault.Create(VaultPath, EnvStoreTests.MasterPassword);
+        _vault = ClaimedVault.Create(VaultPath, EnvStoreTests.MasterPassword);
         _vault.AddEntry(new VaultEntry { GroupPath = "work", Title = "github", Password = _password });
         _vault.Save();
         _log = new OwnerLog(_directory);
@@ -75,7 +75,7 @@ public sealed class RemovedAlwaysAllowAcrossMergeTests : IDisposable
         var answer = await RemoveAnAlwaysAllowAfterSnapshotAsync();
         DeliverTheSnapshotHoldingTheRow(answer.Item);
 
-        using var reopened = Vault.Open(VaultPath, EnvStoreTests.MasterPassword);
+        using var reopened = ClaimedVault.Open(VaultPath, EnvStoreTests.MasterPassword);
         var rules = Rules(reopened);
         var reply = await RequestAsync(reopened, rules);
 
@@ -104,7 +104,7 @@ public sealed class RemovedAlwaysAllowAcrossMergeTests : IDisposable
 
     private void DeliverTheSnapshotHoldingTheRow(string item)
     {
-        using (var theirs = Vault.Open(SnapshotPath, EnvStoreTests.MasterPassword))
+        using (var theirs = ClaimedVault.Open(SnapshotPath, EnvStoreTests.MasterPassword))
         {
             var record = "{\"acaf\":1,\"see\":[\"**\"],\"values\":true,\"mode\":\"automatic\",\"always\":{\"items\":[\"" + item + "\"]}}";
             Assert.True(theirs.WriteRecord(new EntryName(ReservedGroups.Agents, _agent), AcafIds.Agent, "acaf", record));

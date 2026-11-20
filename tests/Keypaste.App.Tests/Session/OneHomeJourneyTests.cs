@@ -9,7 +9,6 @@ using Keypaste.App.Session;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
-using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Tests;
@@ -45,7 +44,7 @@ public sealed class OneHomeJourneyTests
             using var fixture = new TempVault();
             var vault = Path.Combine(fixture.Home, "one-home.kdbx");
 
-            using (var created = Vault.Create(vault, TempVault.Password))
+            using (var created = ClaimedVault.Create(vault, TempVault.Password))
             {
                 ProjectVariables.Set(created, "billing", "STRIPE_KEY", "sk-one-home");
                 created.Save();

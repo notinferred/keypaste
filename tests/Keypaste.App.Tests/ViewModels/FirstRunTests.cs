@@ -1,6 +1,5 @@
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
-using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Recent;
 using Keypaste.Core.Tests;
@@ -151,7 +150,7 @@ public sealed class FirstRunTests : IDisposable
     private string MakeVault(string name)
     {
         var path = Path.Combine(_files.Path, name);
-        using var vault = Vault.Create(path, TempVault.Password);
+        using var vault = ClaimedVault.Create(path, TempVault.Password);
         vault.Save();
         return path;
     }

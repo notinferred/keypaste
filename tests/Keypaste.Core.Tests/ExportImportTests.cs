@@ -34,7 +34,7 @@ public sealed class ExportImportTests : IDisposable
     {
         _exports = Directory.CreateDirectory(Path.Combine(_directory, "exports")).FullName;
         _vaultPath = Path.Combine(_directory, "vault.kdbx");
-        _vault = Vault.Create(_vaultPath, _master);
+        _vault = ClaimedVault.Create(_vaultPath, _master);
         _vault.AddEntry(new VaultEntry { GroupPath = _github.GroupPath, Title = _github.Title, Password = "vault-pw-github" });
         _vault.Save();
     }
@@ -116,7 +116,7 @@ public sealed class ExportImportTests : IDisposable
         var result = source.Commit(_vault, plan, vault => vault.Save());
 
         Assert.Equal(4, result.Entries);
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
         Assert.Equal("vault-pw-github", reopened.Find(_github)!.Password);
         Assert.Null(reopened.Find(new EntryName("imported/Work", "GitHub (2)")));
         Assert.Equal("export-pw-bank-two", reopened.Find(new EntryName("imported", "Bank (2)"))!.Password);
@@ -160,7 +160,7 @@ public sealed class ExportImportTests : IDisposable
         Assert.Equal(VaultSaveStatus.Saved, _vault.SaveState().Status);
 
         var bank = new EntryName("imported", "Bank");
-        using (var reopened = Vault.Open(_vaultPath, _master))
+        using (var reopened = ClaimedVault.Open(_vaultPath, _master))
         {
             var entry = reopened.Find(bank)!;
             Assert.Equal(("export-user-bank", "export-pw-bank", "https://bank.example/one", "export-notes-bank"), (entry.Username, entry.Password, entry.Url, entry.Notes));
@@ -235,7 +235,7 @@ public sealed class ExportImportTests : IDisposable
         using var source = Open(Items());
         var plan = source.Plan(_vault, "imported");
 
-        using (var other = Vault.Open(_vaultPath, _master))
+        using (var other = ClaimedVault.Open(_vaultPath, _master))
         {
             other.AddEntry(new VaultEntry { GroupPath = "elsewhere", Title = "Theirs", Password = "their-pw" });
             other.Save();
@@ -244,7 +244,7 @@ public sealed class ExportImportTests : IDisposable
         Assert.Throws<VaultChangedOnDiskException>(() => source.Commit(_vault, plan, vault => vault.Save()));
 
         AssertNothingImported(groups);
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
         Assert.NotNull(reopened.Find(new EntryName("elsewhere", "Theirs")));
         Assert.Null(reopened.Find(new EntryName("imported", "Bank")));
     }

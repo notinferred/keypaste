@@ -513,7 +513,7 @@ public sealed class RunToolTests : IDisposable
         {
             _answer = answer;
             Log = new OwnerLog(Path.Combine(test._directory, "home"));
-            _vault = Vault.Create(test.VaultPath, "correct horse battery staple");
+            _vault = ClaimedVault.Create(test.VaultPath, "correct horse battery staple");
             ProjectVariables.Set(_vault, "acme-api", "DATABASE_URL", _value);
 
             foreach (var (key, value) in variables)

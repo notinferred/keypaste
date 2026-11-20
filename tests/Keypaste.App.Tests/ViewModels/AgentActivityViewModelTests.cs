@@ -386,7 +386,7 @@ public sealed class AgentActivityViewModelTests
 
             if (arrange is not null)
             {
-                using var vault = Vault.Open(fixture.Path_, TempVault.Password);
+                using var vault = ClaimedVault.Open(fixture.Path_, TempVault.Password);
                 arrange(vault);
                 vault.Save();
             }

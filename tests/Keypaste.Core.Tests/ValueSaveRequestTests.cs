@@ -33,7 +33,7 @@ public sealed class ValueSaveRequestTests : IDisposable
 
     public ValueSaveRequestTests()
     {
-        _vault = Vault.Create(VaultPath, _master);
+        _vault = ClaimedVault.Create(VaultPath, _master);
         _vault.AddEntry(new VaultEntry { GroupPath = _github.GroupPath, Title = _github.Title, Password = "old-password" });
         Assert.True(_vault.SetFields(_github, [new FieldWrite("API_TOKEN", "old-token")]));
         _vault.Save();
@@ -225,7 +225,7 @@ public sealed class ValueSaveRequestTests : IDisposable
 
     private T Reopened<T>(Func<Vault, T> read)
     {
-        using var reopened = Vault.Open(VaultPath, _master);
+        using var reopened = ClaimedVault.Open(VaultPath, _master);
         return read(reopened);
     }
 

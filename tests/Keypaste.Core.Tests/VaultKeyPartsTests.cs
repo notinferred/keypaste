@@ -33,7 +33,7 @@ public sealed class VaultKeyPartsTests : IDisposable
         var path = Create("vault.kdbx", typed, key);
 
         using var parts = Export(path, typed, key);
-        using var vault = Vault.Open(path, parts, null);
+        using var vault = ClaimedVault.Open(path, parts, null);
 
         Assert.Equal("value", vault.Find("github")?.Password);
         Assert.Equal(password, vault.HasPassword);
@@ -61,7 +61,7 @@ public sealed class VaultKeyPartsTests : IDisposable
         var path = System.IO.Path.Combine(_directory, "yubikey.kdbx");
 
         using (var key = new HardwareKey(device, 2))
-        using (var created = Vault.CreateWith(path, _master, null, key))
+        using (var created = ClaimedVault.CreateWith(path, _master, null, key))
         {
             created.AddEntry(new VaultEntry { Title = "github", Password = "value" });
             created.Save();
@@ -71,7 +71,7 @@ public sealed class VaultKeyPartsTests : IDisposable
         byte[] answer;
 
         using (var key = new HardwareKey(device, 2))
-        using (var opened = Vault.Open(path, _master, null, key))
+        using (var opened = ClaimedVault.Open(path, _master, null, key))
         {
             parts = opened.ExportKeyParts();
             answer = SoftwareYubiKey.Answer(_secret, device.Challenges[^1], variableLength: true);
@@ -86,12 +86,12 @@ public sealed class VaultKeyPartsTests : IDisposable
 
             var asked = device.Challenges.Count;
             using var key = new HardwareKey(device, 2);
-            using var resumed = Vault.Open(path, parts, key);
+            using var resumed = ClaimedVault.Open(path, parts, key);
 
             Assert.Equal(asked + 1, device.Challenges.Count);
             Assert.Equal("value", resumed.Find("github")?.Password);
             Assert.Same(key, resumed.HardwareKey);
-            Assert.Throws<ArgumentException>(() => Vault.Open(path, parts, null));
+            Assert.Throws<ArgumentException>(() => ClaimedVault.Open(path, parts, null));
         }
     }
 
@@ -103,7 +103,7 @@ public sealed class VaultKeyPartsTests : IDisposable
         var path = Create("vault.kdbx", _master, first);
         using var parts = Export(path, _master, first);
 
-        using (var resumed = Vault.Open(path, parts, null))
+        using (var resumed = ClaimedVault.Open(path, parts, null))
         {
             resumed.AddEntry(new VaultEntry { Title = "added", Password = "saved" });
             resumed.Save();
@@ -113,15 +113,15 @@ public sealed class VaultKeyPartsTests : IDisposable
             Assert.Equal("saved", reloaded.Find("added")?.Password);
         }
 
-        using (var resumed = Vault.Open(path, parts, null))
+        using (var resumed = ClaimedVault.Open(path, parts, null))
         {
             var change = new VaultAccessChange(false, AccessKeyfileChange.Attach, second);
             Assert.Equal(VaultAccessOutcome.Changed, resumed.ChangeAccess(change, string.Empty, string.Empty).Outcome);
         }
 
-        using var reopened = Vault.Open(path, _master, second);
+        using var reopened = ClaimedVault.Open(path, _master, second);
         Assert.Equal("saved", reopened.Find("added")?.Password);
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, string.Empty, second));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, string.Empty, second));
     }
 
     [Fact]
@@ -131,13 +131,13 @@ public sealed class VaultKeyPartsTests : IDisposable
         var path = Create("vault.kdbx", _master, keyfile);
         using var parts = Export(path, _master, keyfile);
 
-        using (var resumed = Vault.Open(path, parts, null))
+        using (var resumed = ClaimedVault.Open(path, parts, null))
         {
             var change = new VaultAccessChange(true, AccessKeyfileChange.Keep);
             Assert.Equal(VaultAccessOutcome.Changed, resumed.ChangeAccess(change, _next, _next).Outcome);
         }
 
-        using var reopened = Vault.Open(path, _next, keyfile);
+        using var reopened = ClaimedVault.Open(path, _next, keyfile);
         Assert.Equal("value", reopened.Find("github")?.Password);
     }
 
@@ -147,12 +147,12 @@ public sealed class VaultKeyPartsTests : IDisposable
         var path = Create("vault.kdbx", _master, null);
         using var parts = Export(path, _master, null);
 
-        using (var vault = Vault.Open(path, _master))
+        using (var vault = ClaimedVault.Open(path, _master))
         {
             vault.ChangeAccess(new VaultAccessChange(true, AccessKeyfileChange.Keep), _next, _next);
         }
 
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, parts, null));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, parts, null));
     }
 
     [Fact]
@@ -185,13 +185,13 @@ public sealed class VaultKeyPartsTests : IDisposable
         parts.Dispose();
 
         Assert.Throws<ObjectDisposedException>(parts.ToBytes);
-        Assert.Throws<ObjectDisposedException>(() => Vault.Open(path, parts, null));
+        Assert.Throws<ObjectDisposedException>(() => ClaimedVault.Open(path, parts, null));
     }
 
     private string Create(string name, string password, string? keyfile)
     {
         var path = System.IO.Path.Combine(_directory, name);
-        using var vault = Vault.CreateWith(path, password, keyfile);
+        using var vault = ClaimedVault.CreateWith(path, password, keyfile);
         vault.AddEntry(new VaultEntry { Title = "github", Password = "value" });
         vault.Save();
         return path;
@@ -206,7 +206,7 @@ public sealed class VaultKeyPartsTests : IDisposable
 
     private static VaultKeyParts Export(string path, string password, string? keyfile)
     {
-        using var vault = Vault.Open(path, password, keyfile);
+        using var vault = ClaimedVault.Open(path, password, keyfile);
         return vault.ExportKeyParts();
     }
 

@@ -50,8 +50,7 @@ internal sealed partial class RestoreBackupViewModel : ObservableObject, IDispos
         "Nothing recovers a password nobody remembers.";
 
     internal const string OtherPrograms =
-        "Close anything else that has this vault open first, KeePassXC and keypaste approve in a terminal " +
-        "included: they keep their own copy and will not notice the change.";
+        "Close anything else that has this vault open first, KeePassXC included: it keeps its own copy and will not notice the change.";
 
     private const string _refused = "That password doesn't open this backup, or the backup is damaged.";
 
@@ -63,6 +62,7 @@ internal sealed partial class RestoreBackupViewModel : ObservableObject, IDispos
     private readonly TimeProvider _clock;
     private readonly Func<TimeSpan> _idleTimeout;
     private readonly Action<Action> _post;
+    private readonly Func<VaultBackupSummary, VaultRestoreReport> _restore;
     private readonly Func<VaultRestoreReport, SecretBuffer, string?, Task> _restored;
     private readonly Func<Task<string?>> _pickKeyfile;
     private readonly Func<HardwareKey>? _newHardwareKey;
@@ -78,6 +78,7 @@ internal sealed partial class RestoreBackupViewModel : ObservableObject, IDispos
         TimeProvider clock,
         Func<TimeSpan> idleTimeout,
         Action<Action> post,
+        Func<VaultBackupSummary, VaultRestoreReport> restore,
         Func<VaultRestoreReport, SecretBuffer, string?, Task> restored,
         string? keyfilePath,
         Func<Task<string?>> pickKeyfile,
@@ -88,6 +89,7 @@ internal sealed partial class RestoreBackupViewModel : ObservableObject, IDispos
         _clock = clock;
         _idleTimeout = idleTimeout;
         _post = post;
+        _restore = restore;
         _restored = restored;
         _pickKeyfile = pickKeyfile;
         _newHardwareKey = newHardwareKey;
@@ -292,7 +294,7 @@ internal sealed partial class RestoreBackupViewModel : ObservableObject, IDispos
 
         try
         {
-            var report = await Task.Run(() => VaultBackups.Restore(validated)).ConfigureAwait(true);
+            var report = await Task.Run(() => _restore(validated)).ConfigureAwait(true);
             await _restored(report, _password, KeyfilePath).ConfigureAwait(true);
             Forget(string.Empty);
         }

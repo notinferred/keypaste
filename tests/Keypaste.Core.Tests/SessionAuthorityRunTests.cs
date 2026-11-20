@@ -32,7 +32,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
 
     public SessionAuthorityRunTests()
     {
-        using (var created = Vault.Create(VaultPath, EnvStoreTests.MasterPassword))
+        using (var created = ClaimedVault.Create(VaultPath, EnvStoreTests.MasterPassword))
         {
             ProjectVariables.Set(created, "acme-api", "DATABASE_URL", _database);
             ProjectVariables.Set(created, "acme-api", "STRIPE_SECRET_KEY", _stripe);
@@ -60,7 +60,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
             created.Save();
         }
 
-        _vault = Vault.Open(VaultPath, EnvStoreTests.MasterPassword);
+        _vault = ClaimedVault.Open(VaultPath, EnvStoreTests.MasterPassword);
         _log = new OwnerLog(_directory);
         _fixture.Rules.Rules = Runs;
     }
@@ -579,7 +579,7 @@ public sealed class SessionAuthorityRunTests : IDisposable
         await using var client = await AttachedAsync(owner);
         await client.ReleaseRunAsync(Run(), Token);
 
-        using (var other = Vault.Open(VaultPath, EnvStoreTests.MasterPassword))
+        using (var other = ClaimedVault.Open(VaultPath, EnvStoreTests.MasterPassword))
         {
             ProjectVariables.Set(other, "acme-api", "NEW_KEY", "x");
             other.Save();

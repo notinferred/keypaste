@@ -41,7 +41,7 @@ public sealed class OneLinePerRequestTests : IAsyncLifetime
 
     public ValueTask InitializeAsync()
     {
-        _vault = Vault.Create(VaultPath, _master);
+        _vault = ClaimedVault.Create(VaultPath, _master);
         _vault.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "STRIPE_KEY", Password = _sentinel });
         _vault.Save();
         _log = new OwnerLog(Home);

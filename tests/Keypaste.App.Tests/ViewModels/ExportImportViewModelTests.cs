@@ -47,7 +47,7 @@ public sealed class ExportImportViewModelTests : IDisposable
 
     public ExportImportViewModelTests()
     {
-        using (var seeded = Vault.Open(_vault.Path_, TempVault.Password))
+        using (var seeded = ClaimedVault.Open(_vault.Path_, TempVault.Password))
         {
             seeded.AddEntry(new VaultEntry { GroupPath = _held.GroupPath, Title = _held.Title, Password = "vault-pw-github" });
             seeded.Save();
@@ -157,7 +157,7 @@ public sealed class ExportImportViewModelTests : IDisposable
         Assert.True(File.Exists(_path));
 
         _session.Lock(VaultLockReason.Manual);
-        using var reopened = Vault.Open(_vault.Path_, TempVault.Password);
+        using var reopened = ClaimedVault.Open(_vault.Path_, TempVault.Password);
         var kept = new EntryName("imported/Work", "GitHub (2)");
         Assert.Equal("bw-pw-github", reopened.Find(kept)!.Password);
         Assert.Equal("bw-user-github", reopened.Find(kept)!.Username);
@@ -174,7 +174,7 @@ public sealed class ExportImportViewModelTests : IDisposable
         using var import = NewImport();
         await import.ReadAsync();
 
-        using (var other = Vault.Open(_vault.Path_, TempVault.Password))
+        using (var other = ClaimedVault.Open(_vault.Path_, TempVault.Password))
         {
             other.AddEntry(new VaultEntry { GroupPath = "elsewhere", Title = "x", Password = "x" });
             other.Save();

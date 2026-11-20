@@ -38,7 +38,7 @@ public sealed class EntryTotpTests : IDisposable
     {
         _vaultPath = Path.Combine(_directory, "vault.kdbx");
 
-        using var vault = Vault.Create(_vaultPath, _master);
+        using var vault = ClaimedVault.Create(_vaultPath, _master);
 
         foreach (var name in new[] { _github, _broken, _plain, _keePassXc })
         {
@@ -235,7 +235,7 @@ public sealed class EntryTotpTests : IDisposable
         Assert.Equal(6, detail.Totp!.MaskedLength);
         Assert.Equal(_codeAt09[2..], detail.Totp.Reveal());
 
-        using var vault = Vault.Open(_vaultPath, _master);
+        using var vault = ClaimedVault.Open(_vaultPath, _master);
         Assert.Equal($"otpauth://totp/Plain?secret={_seedBase32}&period=30&digits=6&issuer=Plain", vault.ReadField(_plain, TotpSpec.OtpField));
         Assert.Single(vault.ReadHistory(_plain)!);
     }
@@ -299,7 +299,7 @@ public sealed class EntryTotpTests : IDisposable
         Assert.True(detail.CanAddTotp);
         Assert.DoesNotContain(detail.Fields, row => row.Name == TotpSpec.OtpField);
 
-        using var vault = Vault.Open(_vaultPath, _master);
+        using var vault = ClaimedVault.Open(_vaultPath, _master);
         Assert.Null(vault.ReadField(_broken, TotpSpec.OtpField));
         Assert.Contains(vault.ReadHistory(_broken)!, revision => revision.CustomFields.Any(field => field.Name == TotpSpec.OtpField));
     }

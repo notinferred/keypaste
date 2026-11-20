@@ -27,7 +27,7 @@ public sealed class BackupTests
         AssertOpens(backup.Path, "v1-first");
         AssertOpens(file.Path_, "v2-second");
 
-        var report = VaultBackups.Restore(VaultBackups.Inspect(file.Path_, backup, KeePassXcCli.Password));
+        var report = ClaimedVault.Restore(VaultBackups.Inspect(file.Path_, backup, KeePassXcCli.Password));
 
         Assert.Equal(File.ReadAllBytes(backup.Path), File.ReadAllBytes(file.Path_));
         AssertOpens(file.Path_, "v1-first");

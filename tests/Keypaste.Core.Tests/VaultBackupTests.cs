@@ -62,7 +62,7 @@ public sealed class VaultBackupTests : IDisposable
     {
         var path = SeededVault("before");
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Replace(vault, "after");
             vault.Save();
@@ -70,10 +70,10 @@ public sealed class VaultBackupTests : IDisposable
 
         var backup = Assert.Single(VaultBackups.List(path));
 
-        using var kept = Vault.Open(backup.Path, MasterPassword);
+        using var kept = ClaimedVault.Open(backup.Path, MasterPassword);
         Assert.Equal("before", Read(kept));
 
-        using var live = Vault.Open(path, MasterPassword);
+        using var live = ClaimedVault.Open(path, MasterPassword);
         Assert.Equal("after", Read(live));
     }
 
@@ -85,7 +85,7 @@ public sealed class VaultBackupTests : IDisposable
         // than a second one that could drift from it.
         var path = Path.Combine(Directory.CreateDirectory(Path.Combine(_directory, "new")).FullName, "v.kdbx");
 
-        using var vault = Vault.Create(path, MasterPassword);
+        using var vault = ClaimedVault.Create(path, MasterPassword);
         vault.AddEntry(new VaultEntry { Title = "t", Password = "before", GroupPath = "env/p" });
         vault.Save();
 
@@ -100,7 +100,7 @@ public sealed class VaultBackupTests : IDisposable
         // matches a copy to its vault by the extension it kept.
         var path = SeededVault("before", name: "personal.kdb");
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Replace(vault, "after");
             vault.Save();
@@ -130,7 +130,7 @@ public sealed class VaultBackupTests : IDisposable
     {
         var path = SeededVault("before");
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Replace(vault, "after");
             vault.Save();
@@ -156,7 +156,7 @@ public sealed class VaultBackupTests : IDisposable
 
         var path = SeededVault("before");
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Replace(vault, "after");
             vault.Save();
@@ -174,7 +174,7 @@ public sealed class VaultBackupTests : IDisposable
     {
         var path = SeededVault("before");
 
-        using var vault = Vault.Open(path, MasterPassword);
+        using var vault = ClaimedVault.Open(path, MasterPassword);
 
         Replace(vault, "second");
         vault.Save();
@@ -183,7 +183,7 @@ public sealed class VaultBackupTests : IDisposable
 
         var backup = Assert.Single(VaultBackups.List(path));
 
-        using var kept = Vault.Open(backup.Path, MasterPassword);
+        using var kept = ClaimedVault.Open(backup.Path, MasterPassword);
         Assert.Equal("before", Read(kept));
     }
 
@@ -200,7 +200,7 @@ public sealed class VaultBackupTests : IDisposable
 
         var backup = Assert.Single(VaultBackups.List(path));
 
-        using var kept = Vault.Open(backup.Path, MasterPassword);
+        using var kept = ClaimedVault.Open(backup.Path, MasterPassword);
         Assert.Equal("before", Read(kept));
     }
 
@@ -216,7 +216,7 @@ public sealed class VaultBackupTests : IDisposable
         var backups = VaultBackups.List(path);
         Assert.Equal(2, backups.Count);
 
-        using var newest = Vault.Open(backups[0].Path, MasterPassword);
+        using var newest = ClaimedVault.Open(backups[0].Path, MasterPassword);
         Assert.Equal("second", Read(newest));
     }
 
@@ -253,13 +253,13 @@ public sealed class VaultBackupTests : IDisposable
         var backups = VaultBackups.List(path);
         Assert.Equal(VaultBackups.Retained, backups.Count);
 
-        using var newest = Vault.Open(backups[0].Path, MasterPassword);
+        using var newest = ClaimedVault.Open(backups[0].Path, MasterPassword);
         Assert.Equal($"edit-{VaultBackups.Retained}", Read(newest));
 
         // The first save's copy — the one holding "before" — is the one that went.
         foreach (var backup in backups)
         {
-            using var kept = Vault.Open(backup.Path, MasterPassword);
+            using var kept = ClaimedVault.Open(backup.Path, MasterPassword);
             Assert.NotEqual("before", Read(kept));
         }
     }
@@ -306,7 +306,7 @@ public sealed class VaultBackupTests : IDisposable
         var kept = Names(path);
         Block(path);
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Replace(vault, "refused");
             Assert.Throws<VaultBackupException>(vault.Save);
@@ -326,7 +326,7 @@ public sealed class VaultBackupTests : IDisposable
 
         Block(path);
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Replace(vault, "after");
             Assert.Throws<VaultBackupException>(vault.Save);
@@ -335,7 +335,7 @@ public sealed class VaultBackupTests : IDisposable
         Assert.Equal(bytes, File.ReadAllBytes(path));
 
         Unblock(path);
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         Assert.Equal("before", Read(reopened));
     }
 
@@ -359,7 +359,7 @@ public sealed class VaultBackupTests : IDisposable
 
         try
         {
-            using var vault = Vault.Open(path, MasterPassword);
+            using var vault = ClaimedVault.Open(path, MasterPassword);
             Replace(vault, "refused");
             Assert.Throws<VaultBackupException>(vault.Save);
         }
@@ -384,7 +384,7 @@ public sealed class VaultBackupTests : IDisposable
 
         Block(path);
 
-        using var vault = Vault.Open(path, MasterPassword);
+        using var vault = ClaimedVault.Open(path, MasterPassword);
         Replace(vault, "after");
 
         Assert.Throws<VaultBackupException>(
@@ -401,10 +401,10 @@ public sealed class VaultBackupTests : IDisposable
         // there, so nothing is copied and no backup of somebody else's save is kept.
         var path = SeededVault("before");
 
-        using var vault = Vault.Open(path, MasterPassword);
+        using var vault = ClaimedVault.Open(path, MasterPassword);
         Replace(vault, "mine");
 
-        using (var other = Vault.Open(path, MasterPassword))
+        using (var other = ClaimedVault.Open(path, MasterPassword))
         {
             Replace(other, "theirs");
             other.Save();
@@ -427,7 +427,7 @@ public sealed class VaultBackupTests : IDisposable
         // the floor may suppress it. Restoring a backup is VaultRestoreTests' subject.
         var path = SeededVault("before");
 
-        using var vault = Vault.Open(path, MasterPassword);
+        using var vault = ClaimedVault.Open(path, MasterPassword);
 
         Replace(vault, "second");
         vault.Save();
@@ -438,7 +438,7 @@ public sealed class VaultBackupTests : IDisposable
         var backups = VaultBackups.List(path);
         Assert.Equal(2, backups.Count);
 
-        using var newest = Vault.Open(backups[0].Path, MasterPassword);
+        using var newest = ClaimedVault.Open(backups[0].Path, MasterPassword);
         Assert.Equal("second", Read(newest));
     }
 
@@ -447,7 +447,7 @@ public sealed class VaultBackupTests : IDisposable
     {
         var path = SeededVault("before");
 
-        using var vault = Vault.Open(path, MasterPassword);
+        using var vault = ClaimedVault.Open(path, MasterPassword);
 
         Replace(vault, "restored");
         vault.SaveOverwriting();
@@ -493,14 +493,14 @@ public sealed class VaultBackupTests : IDisposable
 
         var backup = Assert.Single(VaultBackups.List(path));
 
-        using (var kept = Vault.Open(backup.Path, MasterPassword))
+        using (var kept = ClaimedVault.Open(backup.Path, MasterPassword))
         {
             Assert.Equal("before", Read(kept));
         }
 
         Assert.Equal(bytes, File.ReadAllBytes(path));
 
-        using var live = Vault.Open(path, MasterPassword);
+        using var live = ClaimedVault.Open(path, MasterPassword);
         Assert.Equal("before", Read(live));
     }
 
@@ -577,7 +577,7 @@ public sealed class VaultBackupTests : IDisposable
     {
         var path = SeededVault("before");
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Replace(vault, "second");
             vault.Save();
@@ -588,7 +588,7 @@ public sealed class VaultBackupTests : IDisposable
             Assert.Equal(VaultBackups.Retained, report.Retained);
         }
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Replace(vault, "third");
             vault.Save();
@@ -610,7 +610,7 @@ public sealed class VaultBackupTests : IDisposable
             Path.Combine(_directory, Path.GetRandomFileName())).FullName;
         var path = Path.Combine(home, name);
 
-        using var vault = Vault.Create(path, MasterPassword);
+        using var vault = ClaimedVault.Create(path, MasterPassword);
         vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = password, GroupPath = "env/p" });
 
         // FileTransactionEx transacts only over an existing file, and the gate — and so the backup —
@@ -623,7 +623,7 @@ public sealed class VaultBackupTests : IDisposable
     /// <summary>One edit through its own unlock, the way a CLI command makes one.</summary>
     private static void Edit(string path, string password)
     {
-        using var vault = Vault.Open(path, MasterPassword);
+        using var vault = ClaimedVault.Open(path, MasterPassword);
         Replace(vault, password);
         vault.Save();
     }

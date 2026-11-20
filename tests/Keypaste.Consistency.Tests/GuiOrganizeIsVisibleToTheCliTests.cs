@@ -3,6 +3,7 @@ using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.Cli;
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Consistency.Tests;
@@ -53,7 +54,7 @@ public sealed class GuiOrganizeIsVisibleToTheCliTests
         Assert.Equal("pg-second", fixture.Cli.Out.Trim(), StringComparer.Ordinal);
         Assert.NotEqual(CliApp.ExitSuccess, fixture.Run("get", "servers/database", "--reveal"));
 
-        using var reopened = Vault.Open(fixture.VaultPath, VaultFixture.Master);
+        using var reopened = ClaimedVault.Open(fixture.VaultPath, VaultFixture.Master);
         Assert.Equal(
             new[] { "pg-secret" },
             reopened.ReadHistory(new EntryName("servers", "database-old"))!.Select(revision => revision.Fields.Password));

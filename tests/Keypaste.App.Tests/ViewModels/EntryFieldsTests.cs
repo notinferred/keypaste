@@ -356,7 +356,7 @@ public sealed class EntryFieldsTests : IDisposable
     [Fact]
     public void A_project_tag_change_names_each_joining_variable_holding_a_placeholder()
     {
-        using (var vault = Vault.Open(_vaultPath, _master))
+        using (var vault = ClaimedVault.Open(_vaultPath, _master))
         {
             Assert.True(vault.SetFields(_checking, [new FieldWrite("API_URL", "https://{USERNAME}:{S:PIN}@" + _secret)]));
             vault.Save();
@@ -403,7 +403,7 @@ public sealed class EntryFieldsTests : IDisposable
         using var context = new Context(_vaultPath);
         var detail = context.Open(_checking);
 
-        using (var elsewhere = Vault.Open(_vaultPath, _master))
+        using (var elsewhere = ClaimedVault.Open(_vaultPath, _master))
         {
             elsewhere.AddEntry(new VaultEntry { Title = "from-the-terminal", Password = "x" });
             elsewhere.Save();
@@ -481,25 +481,25 @@ public sealed class EntryFieldsTests : IDisposable
 
     private int Revisions()
     {
-        using var vault = Vault.Open(_vaultPath, _master);
+        using var vault = ClaimedVault.Open(_vaultPath, _master);
         return vault.ReadHistory(_checking)!.Count;
     }
 
     private IReadOnlyList<EntryField> Fields()
     {
-        using var vault = Vault.Open(_vaultPath, _master);
+        using var vault = ClaimedVault.Open(_vaultPath, _master);
         return vault.Fields(_checking)!;
     }
 
     private string? Read(string field)
     {
-        using var vault = Vault.Open(_vaultPath, _master);
+        using var vault = ClaimedVault.Open(_vaultPath, _master);
         return vault.ReadField(_checking, field);
     }
 
     private IReadOnlyList<string> Tags()
     {
-        using var vault = Vault.Open(_vaultPath, _master);
+        using var vault = ClaimedVault.Open(_vaultPath, _master);
         return vault.Tags(_checking)!;
     }
 

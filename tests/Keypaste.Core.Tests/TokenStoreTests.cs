@@ -22,7 +22,7 @@ public sealed class TokenStoreTests : IDisposable
 
     public TokenStoreTests()
     {
-        _vault = Vault.Create(VaultPath, EnvStoreTests.MasterPassword);
+        _vault = ClaimedVault.Create(VaultPath, EnvStoreTests.MasterPassword);
         _vault.Save();
     }
 
@@ -145,7 +145,7 @@ public sealed class TokenStoreTests : IDisposable
         Create("ci", "read:a/dev/*", out var token);
         _vault.Save();
 
-        using (var other = Vault.Open(VaultPath, EnvStoreTests.MasterPassword))
+        using (var other = ClaimedVault.Open(VaultPath, EnvStoreTests.MasterPassword))
         {
             other.AddEntry(new VaultEntry { Title = "elsewhere", Password = "x" });
             other.Save();
@@ -322,7 +322,7 @@ public sealed class TokenStoreTests : IDisposable
         _vault.Save();
         InFile(VaultPath, database => database.DeletedObjects.Add(new PwDeletedObject(Record(database, info.Id).Uuid, DateTime.UtcNow)));
 
-        using var reopened = Vault.Open(VaultPath, EnvStoreTests.MasterPassword);
+        using var reopened = ClaimedVault.Open(VaultPath, EnvStoreTests.MasterPassword);
         var store = new TokenStore(reopened);
 
         Assert.NotNull(reopened.Find(Name(info)));
@@ -358,7 +358,7 @@ public sealed class TokenStoreTests : IDisposable
         var info = Create("ci", "read:a/dev/*", out var token);
         _vault.Save();
 
-        using (var other = Vault.Open(VaultPath, EnvStoreTests.MasterPassword))
+        using (var other = ClaimedVault.Open(VaultPath, EnvStoreTests.MasterPassword))
         {
             Assert.True(new TokenStore(other).Revoke("ci", _now));
             other.Save();
@@ -435,7 +435,7 @@ public sealed class TokenStoreTests : IDisposable
         var target = intoTheFile ? VaultPath : OlderPath;
         KeePassXcMerge(target, intoTheFile ? OlderPath : VaultPath);
 
-        using var merged = Vault.Open(target, EnvStoreTests.MasterPassword);
+        using var merged = ClaimedVault.Open(target, EnvStoreTests.MasterPassword);
         Assert.Equal(string.Empty, merged.Find(Name(info))!.Password);
         Assert.Equal(TokenCheck.Unknown, new TokenStore(merged).Verify(token, _now, out _));
         Assert.Empty(new TokenStore(merged).List());
@@ -457,7 +457,7 @@ public sealed class TokenStoreTests : IDisposable
 
         KeePassXcMerge(VaultPath, OlderPath);
 
-        using (var reopened = Vault.Open(VaultPath, EnvStoreTests.MasterPassword))
+        using (var reopened = ClaimedVault.Open(VaultPath, EnvStoreTests.MasterPassword))
         {
             Assert.NotNull(reopened.Find(Name(info)));
             Assert.Equal(TokenCheck.Unknown, new TokenStore(reopened).Verify(token, _now, out _));
@@ -510,7 +510,7 @@ public sealed class TokenStoreTests : IDisposable
     /// <summary>The open copy merged into a fresh open of the vault's file, as an owner merges another program's save, and saved there.</summary>
     private Vault Merged(out VaultMergeReport report)
     {
-        var file = Vault.Open(VaultPath, EnvStoreTests.MasterPassword);
+        var file = ClaimedVault.Open(VaultPath, EnvStoreTests.MasterPassword);
 
         try
         {

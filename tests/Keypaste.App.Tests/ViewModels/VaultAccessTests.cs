@@ -16,7 +16,7 @@ namespace Keypaste.App.Tests.ViewModels;
 /// <remarks>
 /// <para>
 /// <b>Every change is made by the form and every result is read from the file.</b> A reopen goes
-/// through a separate <see cref="Vault.Open(string, ReadOnlySpan{char}, string?)"/> or through the unlock
+/// through a separate <see cref="ClaimedVault.Open(string, ReadOnlySpan{char}, string?)"/> or through the unlock
 /// screen, never through what a view model says it did.
 /// </para>
 /// <para>
@@ -47,7 +47,7 @@ public sealed class VaultAccessTests : IDisposable
         File.WriteAllBytes(_keyA, RandomNumberGenerator.GetBytes(32));
         File.WriteAllBytes(_keyB, RandomNumberGenerator.GetBytes(32));
 
-        using (var vault = Vault.Create(_vaultPath, _master))
+        using (var vault = ClaimedVault.Create(_vaultPath, _master))
         {
             vault.AddEntry(new VaultEntry { Title = "github", Password = "gh" });
             vault.Save();
@@ -411,7 +411,7 @@ public sealed class VaultAccessTests : IDisposable
         using var session = Unlocked(_master);
         using var settings = Settings(session);
 
-        using (var elsewhere = Vault.Open(_vaultPath, _master))
+        using (var elsewhere = ClaimedVault.Open(_vaultPath, _master))
         {
             elsewhere.AddEntry(new VaultEntry { Title = "from KeePassXC", Password = "x" });
             elsewhere.Save();
@@ -501,7 +501,7 @@ public sealed class VaultAccessTests : IDisposable
         VaultLockReason? reason = null;
         using var session = new AppVaultSession(_clock, home: _home)
         {
-            ReopenAfterAccessChange = (_, _, _, _) => throw new VaultException("The vault did not open again."),
+            ReopenAfterAccessChange = (_, _, _, _, _) => throw new VaultException("The vault did not open again."),
         };
         session.Locked += (_, locked) => reason = locked;
 
@@ -609,10 +609,10 @@ public sealed class VaultAccessTests : IDisposable
 
     private static void AssertOpens(string path, string password, string? keyfile)
     {
-        using var vault = Vault.Open(path, password, keyfile);
+        using var vault = ClaimedVault.Open(path, password, keyfile);
         Assert.NotNull(vault.Find("github"));
     }
 
     private static void AssertRefused(string path, string password, string? keyfile) =>
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, password, keyfile));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, password, keyfile));
 }

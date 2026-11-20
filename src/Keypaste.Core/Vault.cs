@@ -2,6 +2,7 @@ using Keypaste.Core.AutoType;
 using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Import;
 using Keypaste.Core.Internal;
+using Keypaste.Core.Ownership;
 using Keypaste.Core.Recommendations;
 using Keypaste.Core.Totp;
 using Keypaste.Infrastructure;
@@ -17,6 +18,7 @@ namespace Keypaste.Core;
 public sealed class Vault : IDisposable
 {
     private readonly KeePassInterop _interop;
+    private readonly VaultClaim? _claim;
     private readonly Lock _state = new();
     private byte[]? _stamp;
     private DateTimeOffset? _savedAt;
@@ -35,9 +37,10 @@ public sealed class Vault : IDisposable
     /// <summary>What this vault keeps of the file as it last read or wrote it, for a merge's lineage.</summary>
     private KeePassInterop.MergeBase _base;
 
-    private Vault(KeePassInterop interop, string path, byte[]? stamp)
+    private Vault(KeePassInterop interop, string path, byte[]? stamp, VaultClaim? claim)
     {
         _interop = interop;
+        _claim = claim;
         Path = path;
         _stamp = stamp;
         _savedAt = _stamp is null ? null : WrittenAt(path);
@@ -164,7 +167,7 @@ public sealed class Vault : IDisposable
         }
 
         var stamp = SourceSnapshot.Digest(Path) ?? throw new VaultException($"Could not read '{Path}'.");
-        return new Vault(KeePassInterop.Reopen(Path, key), Path, stamp);
+        return new Vault(KeePassInterop.Reopen(Path, key), Path, stamp, _claim);
     }
 
     /// <summary>Merges this open copy into <paramref name="file"/>, a fresh open of the file another program saved, leaving this copy as it was.</summary>
@@ -227,10 +230,15 @@ public sealed class Vault : IDisposable
             key = _interop.CopyKey();
         }
 
+        if (save)
+        {
+            ThrowUnlessHeld();
+        }
+
         try
         {
-            using var copy = Reread(copyPath, key);
-            using var file = Reread(Path, key);
+            using var copy = Reread(copyPath, key, claim: null);
+            using var file = Reread(Path, key, _claim);
             var merged = copy.MergeInto(file, out var report);
 
             if (merged != VaultMergeOutcome.Merged)
@@ -271,7 +279,7 @@ public sealed class Vault : IDisposable
         }
     }
 
-    private static Vault Reread(string path, KeePassInterop.KeyCopy key)
+    private static Vault Reread(string path, KeePassInterop.KeyCopy key, VaultClaim? claim)
     {
         var bytes = File.ReadAllBytes(path);
 
@@ -280,7 +288,7 @@ public sealed class Vault : IDisposable
             throw new VaultException($"'{path}' is not a KeePass database keypaste can merge.");
         }
 
-        return new Vault(KeePassInterop.Reopen(path, bytes, key), path, SHA256.HashData(bytes));
+        return new Vault(KeePassInterop.Reopen(path, bytes, key), path, SHA256.HashData(bytes), claim);
     }
 
     /// <summary>How many times one detection of another program's save starts its merge again for a save that landed before the merged copy's.</summary>
@@ -361,7 +369,7 @@ public sealed class Vault : IDisposable
             {
                 // Disposed below unless it leaves as the result's copy, a lifetime CA2000 cannot follow.
 #pragma warning disable CA2000
-                file = new Vault(KeePassInterop.Reopen(Path, bytes, key), Path, digest);
+                file = new Vault(KeePassInterop.Reopen(Path, bytes, key), Path, digest, _claim);
 #pragma warning restore CA2000
             }
             catch (InvalidMasterPasswordException ex)
@@ -493,9 +501,14 @@ public sealed class Vault : IDisposable
 
     /// <summary>Creates a new, empty vault protected by <paramref name="masterPassword"/>. Nothing
     /// is written to disk until <see cref="Save"/>.</summary>
-    public static Vault Create(string path, ReadOnlySpan<char> masterPassword)
+    /// <param name="claim">This process's claim on <paramref name="path"/>, which every save of the vault needs.</param>
+    /// <param name="path">Where the vault goes.</param>
+    /// <param name="masterPassword">The master password.</param>
+    /// <exception cref="ArgumentException"><paramref name="claim"/> names another vault or was released.</exception>
+    public static Vault Create(VaultClaim claim, string path, ReadOnlySpan<char> masterPassword)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
+        CheckClaim(claim, path);
 
         // No stamp: there is no file yet, and a Create aimed at an occupied path is a caller
         // saying "make a new vault here" rather than a stale copy of one. `VaultCreation` is what
@@ -503,7 +516,8 @@ public sealed class Vault : IDisposable
         return new Vault(
             WithUtf8Password(masterPassword, utf8 => KeePassInterop.Create(path, utf8)),
             path,
-            stamp: null);
+            stamp: null,
+            claim);
     }
 
     /// <summary>Creates a new vault protected by a password and a keyfile.</summary>
@@ -521,21 +535,28 @@ public sealed class Vault : IDisposable
     /// </para>
     /// </remarks>
     internal static Vault CreateWith(
-        string path, ReadOnlySpan<char> masterPassword, string? keyfilePath, HardwareKey? hardwareKey = null)
+        VaultClaim claim, string path, ReadOnlySpan<char> masterPassword, string? keyfilePath, HardwareKey? hardwareKey = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
+        CheckClaim(claim, path);
 
         return new Vault(
             WithUtf8Password(masterPassword, utf8 => KeePassInterop.Create(path, utf8, keyfilePath, hardwareKey)),
             path,
-            stamp: null);
+            stamp: null,
+            claim);
     }
 
-    /// <summary>Opens an existing vault.</summary>
-    public static Vault Open(string path, ReadOnlySpan<char> masterPassword) =>
-        Open(path, masterPassword, keyfilePath: null);
+    /// <summary>Opens an existing vault for writing under this process's claim on it.</summary>
+    /// <param name="claim">This process's claim on <paramref name="path"/>, which every save of the vault needs.</param>
+    /// <param name="path">The vault file.</param>
+    /// <param name="masterPassword">The master password.</param>
+    /// <exception cref="ArgumentException"><paramref name="claim"/> names another vault or was released.</exception>
+    public static Vault Open(VaultClaim claim, string path, ReadOnlySpan<char> masterPassword) =>
+        Open(claim, path, masterPassword, keyfilePath: null);
 
-    /// <summary>Opens an existing vault, optionally protected by a keyfile as well.</summary>
+    /// <summary>Opens an existing vault for writing, optionally protected by a keyfile as well.</summary>
+    /// <param name="claim">This process's claim on <paramref name="path"/>, which every save of the vault needs.</param>
     /// <param name="path">The vault file.</param>
     /// <param name="masterPassword">
     /// The master password. Empty is a passwordless vault when <paramref name="keyfilePath"/> is
@@ -547,10 +568,12 @@ public sealed class Vault : IDisposable
     /// an unreadable one reaching here is an <see cref="InvalidMasterPasswordException"/> like any
     /// other factor that does not open the vault.
     /// </param>
-    public static Vault Open(string path, ReadOnlySpan<char> masterPassword, string? keyfilePath) =>
-        Open(path, masterPassword, keyfilePath, hardwareKey: null);
+    /// <exception cref="ArgumentException"><paramref name="claim"/> names another vault or was released.</exception>
+    public static Vault Open(VaultClaim claim, string path, ReadOnlySpan<char> masterPassword, string? keyfilePath) =>
+        Open(claim, path, masterPassword, keyfilePath, hardwareKey: null);
 
-    /// <summary>Opens an existing vault that may also need a hardware key.</summary>
+    /// <summary>Opens an existing vault for writing that may also need a hardware key.</summary>
+    /// <param name="claim">This process's claim on <paramref name="path"/>, which every save of the vault needs.</param>
     /// <param name="path">The vault file.</param>
     /// <param name="masterPassword">
     /// The master password. Empty is no password when a keyfile or hardware key is given, as it is
@@ -562,12 +585,33 @@ public sealed class Vault : IDisposable
     /// now, and again on every save of the returned vault, which keeps using it; the caller disposes
     /// it after the vault.
     /// </param>
+    /// <exception cref="ArgumentException"><paramref name="claim"/> names another vault or was released.</exception>
     /// <exception cref="InvalidMasterPasswordException">The factors do not open the vault, which is also what a wrong hardware key or slot gives.</exception>
     /// <exception cref="HardwareKeyException">The hardware key did not answer, so nothing was opened.</exception>
-    public static Vault Open(string path, ReadOnlySpan<char> masterPassword, string? keyfilePath, HardwareKey? hardwareKey)
+    public static Vault Open(VaultClaim claim, string path, ReadOnlySpan<char> masterPassword, string? keyfilePath, HardwareKey? hardwareKey)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
+        CheckClaim(claim, path);
+        return OpenWith(claim, path, masterPassword, keyfilePath, hardwareKey);
+    }
 
+    /// <summary>Opens an existing vault to read, which never saves, so it needs no claim.</summary>
+    /// <param name="path">The vault file.</param>
+    /// <param name="masterPassword">The master password, as <see cref="Open(VaultClaim, string, ReadOnlySpan{char}, string?, HardwareKey?)"/> takes it.</param>
+    /// <param name="keyfilePath">The keyfile, or <see langword="null"/> for a vault that has none.</param>
+    /// <param name="hardwareKey">The hardware key, or <see langword="null"/> for a vault that needs none.</param>
+    /// <exception cref="InvalidMasterPasswordException">The factors do not open the vault.</exception>
+    /// <exception cref="HardwareKeyException">The hardware key did not answer, so nothing was opened.</exception>
+    public static Vault OpenReadOnly(
+        string path, ReadOnlySpan<char> masterPassword, string? keyfilePath = null, HardwareKey? hardwareKey = null)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+        return OpenWith(claim: null, path, masterPassword, keyfilePath, hardwareKey);
+    }
+
+    private static Vault OpenWith(
+        VaultClaim? claim, string path, ReadOnlySpan<char> masterPassword, string? keyfilePath, HardwareKey? hardwareKey)
+    {
         if (keyfilePath is not null && VaultKeyfile.Inspect(keyfilePath).Outcome == KeyfileOutcome.XmlUnreadable)
         {
             throw new UnreadableKeyfileException(keyfilePath);
@@ -577,23 +621,27 @@ public sealed class Vault : IDisposable
         // leaves this vault changed on disk rather than stamped with what it never read.
         var stamp = SourceSnapshot.Digest(path);
         var interop = WithUtf8Password(masterPassword, utf8 => KeePassInterop.Open(path, utf8, keyfilePath, hardwareKey));
-        return new Vault(interop, path, stamp ?? SourceSnapshot.Digest(path));
+        return new Vault(interop, path, stamp ?? SourceSnapshot.Digest(path), claim);
     }
 
-    /// <summary>Opens an existing vault with the parts of the key another open of it exported, as the desktop's quick unlock does.</summary>
+    /// <summary>Opens an existing vault for writing with the parts of the key another open of it exported, as the desktop's quick unlock does.</summary>
+    /// <param name="claim">This process's claim on <paramref name="path"/>, which every save of the vault needs.</param>
     /// <param name="path">The vault file.</param>
     /// <param name="parts">The parts, which stay the caller's; no keyfile is read.</param>
     /// <param name="hardwareKey">
     /// The hardware key in the slot <paramref name="parts"/> names, asked now and on every save of the returned vault,
     /// or <see langword="null"/> when they name none.
     /// </param>
-    /// <exception cref="ArgumentException"><paramref name="hardwareKey"/> is not in the slot <paramref name="parts"/> names.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="claim"/> names another vault or was released, or <paramref name="hardwareKey"/> is not in the slot <paramref name="parts"/> names.
+    /// </exception>
     /// <exception cref="InvalidMasterPasswordException">The parts no longer open the vault: its key was changed.</exception>
     /// <exception cref="HardwareKeyException">The hardware key did not answer, so nothing was opened.</exception>
-    public static Vault Open(string path, VaultKeyParts parts, HardwareKey? hardwareKey)
+    public static Vault Open(VaultClaim claim, string path, VaultKeyParts parts, HardwareKey? hardwareKey)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
         ArgumentNullException.ThrowIfNull(parts);
+        CheckClaim(claim, path);
 
         if (hardwareKey?.Slot != parts.HardwareKeySlot)
         {
@@ -602,10 +650,16 @@ public sealed class Vault : IDisposable
 
         var stamp = SourceSnapshot.Digest(path);
         var interop = KeePassInterop.Open(path, parts, hardwareKey);
-        return new Vault(interop, path, stamp ?? SourceSnapshot.Digest(path));
+        return new Vault(interop, path, stamp ?? SourceSnapshot.Digest(path), claim);
     }
 
-    /// <summary>The parts this vault's key is made of, for <see cref="Open(string, VaultKeyParts, HardwareKey?)"/>.</summary>
+    private static void CheckClaim(VaultClaim claim, string path)
+    {
+        ArgumentNullException.ThrowIfNull(claim);
+        claim.CheckHolds(path, nameof(claim));
+    }
+
+    /// <summary>The parts this vault's key is made of, for <see cref="Open(VaultClaim, string, VaultKeyParts, HardwareKey?)"/>.</summary>
     /// <returns>A copy, which the caller disposes, zeroing it.</returns>
     /// <exception cref="VaultException">This vault's access was changed, so its key is no longer the one it opened with.</exception>
     public VaultKeyParts ExportKeyParts()
@@ -3269,6 +3323,8 @@ public sealed class Vault : IDisposable
         Action? afterReplacing = null,
         CancellationToken cancellationToken = default)
     {
+        ThrowUnlessHeld();
+
         var clock = new SaveClock();
         var succeeded = false;
 
@@ -3319,6 +3375,19 @@ public sealed class Vault : IDisposable
         }
 
         Saved?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void ThrowUnlessHeld()
+    {
+        if (_claim is null)
+        {
+            throw new InvalidOperationException("This vault was opened read-only, so keypaste never saves it.");
+        }
+
+        if (!_claim.IsHeld)
+        {
+            throw new VaultException("This process no longer holds the vault, so nothing was saved.");
+        }
     }
 
     private static DateTimeOffset? WrittenAt(string path)

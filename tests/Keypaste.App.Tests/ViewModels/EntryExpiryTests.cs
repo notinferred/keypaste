@@ -29,7 +29,7 @@ public sealed class EntryExpiryTests : IDisposable
 
     public EntryExpiryTests()
     {
-        using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
+        using (var vault = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
         {
             vault.AddEntry(new VaultEntry { GroupPath = "api", Title = "renewing", Password = "renewing-pw" });
             vault.AddEntry(new VaultEntry { GroupPath = "api", Title = "lapsed", Password = "lapsed-pw" });

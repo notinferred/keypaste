@@ -58,7 +58,7 @@ internal sealed class RenderedShell : IDisposable
         _directory = Directory.CreateTempSubdirectory(directoryPrefix).FullName;
         var path = Path.Combine(_directory, fileName);
 
-        using (var vault = Vault.Create(path, Master))
+        using (var vault = ClaimedVault.Create(path, Master))
         {
             vault.AddEntry(new VaultEntry { Title = "github", Username = "me", Password = Superseded, Url = "https://github.com/login" });
             vault.SetFields(new EntryName(string.Empty, "github"), [new FieldWrite("API_TOKEN", FieldValue), new FieldWrite("Region", PlainFieldValue, Protect: false)]);
@@ -104,7 +104,7 @@ internal sealed class RenderedShell : IDisposable
     {
         var path = Path.Combine(_directory, title + ".kdbx");
 
-        using (var vault = Vault.Create(path, Master))
+        using (var vault = ClaimedVault.Create(path, Master))
         {
             vault.AddEntry(new VaultEntry { Title = "example", Username = "ops", Password = "example-password" });
             vault.Save();

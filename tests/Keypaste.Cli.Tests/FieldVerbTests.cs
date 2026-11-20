@@ -1,4 +1,5 @@
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -29,26 +30,26 @@ public sealed class FieldVerbTests : IDisposable
 
     private void Seed(params FieldWrite[] writes)
     {
-        using var vault = Vault.Open(_harness.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
         vault.SetFields(_stripe, writes);
         vault.Save();
     }
 
     private IReadOnlyList<EntryField> Fields()
     {
-        using var vault = Vault.Open(_harness.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
         return vault.Fields(_stripe)!;
     }
 
     private string? Value(string field)
     {
-        using var vault = Vault.Open(_harness.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
         return vault.ReadField(_stripe, field);
     }
 
     private int Revisions()
     {
-        using var vault = Vault.Open(_harness.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
         return vault.ReadHistory(_stripe)!.Count;
     }
 

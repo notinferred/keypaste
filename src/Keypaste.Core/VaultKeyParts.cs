@@ -6,7 +6,7 @@ namespace Keypaste.Core;
 /// </summary>
 /// <remarks>
 /// The desktop's quick unlock keeps these sealed in memory and opens the vault from them again with
-/// <see cref="Vault.Open(string, VaultKeyParts, HardwareKeys.HardwareKey?)"/>, which derives the key afresh and asks the
+/// <see cref="Vault.Open(Ownership.VaultClaim, string, VaultKeyParts, HardwareKeys.HardwareKey?)"/>, which derives the key afresh and asks the
 /// hardware key again. Disposing zeroes them.
 /// </remarks>
 public sealed class VaultKeyParts : IDisposable

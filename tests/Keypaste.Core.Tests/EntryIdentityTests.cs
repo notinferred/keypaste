@@ -49,7 +49,7 @@ public sealed class EntryIdentityTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         Assert.Equal(
             new[] { ("env/dev", "KEEP", "keep"), ("env/dev/nested", "TOKEN", "nested") },
             Shape(reopened));
@@ -68,7 +68,7 @@ public sealed class EntryIdentityTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         Assert.Equal(
             new[] { ("env/dev", "KEEP", "keep"), ("env/dev", "nested/TOKEN", "slashed") },
             Shape(reopened));
@@ -129,7 +129,7 @@ public sealed class EntryIdentityTests : IDisposable
     [Fact]
     public void Removing_ATitleTwoEntriesInOneGroupShare_IsRefused()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
         vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "first", GroupPath = "env/dev" });
         vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "second", GroupPath = "env/dev" });
 
@@ -214,7 +214,7 @@ public sealed class EntryIdentityTests : IDisposable
     /// </summary>
     private static Vault Collision(string path)
     {
-        var vault = Vault.Create(path, MasterPassword);
+        var vault = ClaimedVault.Create(path, MasterPassword);
         vault.AddEntry(new VaultEntry { Title = "nested/TOKEN", Password = "slashed", GroupPath = "env/dev" });
         vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "nested", GroupPath = "env/dev/nested" });
         vault.AddEntry(new VaultEntry { Title = "KEEP", Password = "keep", GroupPath = "env/dev" });

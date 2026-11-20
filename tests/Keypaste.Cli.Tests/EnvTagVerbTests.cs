@@ -1,4 +1,5 @@
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -19,7 +20,7 @@ public sealed class EnvTagVerbTests : IDisposable
     {
         _harness.SeedVault(_master, ("services/Stripe", "stripe-login"), ("services/Database", "database-password"), ("services/Odd", "odd"));
 
-        using var vault = Vault.Open(_harness.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
         vault.SetFields(_stripe, [new FieldWrite("STRIPE_SECRET_KEY", "sk_test_tag"), new FieldWrite("Region", "eu", Protect: false)]);
         vault.AddTag(new EntryName("services", "Database"), "env:billing:prod");
         vault.AddTag(new EntryName("services", "Odd"), "env:billing:Prod");
@@ -38,7 +39,7 @@ public sealed class EnvTagVerbTests : IDisposable
 
     private IReadOnlyList<string> Tags(EntryName name)
     {
-        using var vault = Vault.Open(_harness.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
         return vault.Tags(name)!;
     }
 
@@ -103,7 +104,7 @@ public sealed class EnvTagVerbTests : IDisposable
     [Fact]
     public void Untag_removes_every_tag_that_puts_the_entry_in_that_environment_in_one_revision()
     {
-        using (var vault = Vault.Open(_harness.VaultPath, _master))
+        using (var vault = ClaimedVault.Open(_harness.VaultPath, _master))
         {
             vault.AddTag(_stripe, "env:billing");
             vault.AddTag(_stripe, "env:billing:dev");
@@ -113,7 +114,7 @@ public sealed class EnvTagVerbTests : IDisposable
 
         int Revisions()
         {
-            using var vault = Vault.Open(_harness.VaultPath, _master);
+            using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
             return vault.ReadHistory(_stripe)!.Count;
         }
 

@@ -38,7 +38,7 @@ public sealed class RecommendationsTests : IDisposable
 
     public RecommendationsTests()
     {
-        using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
+        using (var vault = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
         {
             vault.AddEntry(new VaultEntry { GroupPath = _stripe.GroupPath, Title = _stripe.Title, Password = _stripeLogin, Notes = _notes });
             vault.AddEntry(new VaultEntry { GroupPath = _plain.GroupPath, Title = _plain.Title, Password = _plainLogin, Notes = "Recovery codes are in the safe." });

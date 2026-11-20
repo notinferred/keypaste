@@ -24,7 +24,7 @@ public sealed class EntryTagSuggestionsTests : IDisposable
 
     public EntryTagSuggestionsTests()
     {
-        using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
+        using (var vault = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
         {
             vault.AddEntry(new VaultEntry { GroupPath = "api", Title = "token", Password = "token-pw" });
             Tagged(vault, "Stripe", "env:billing", "finance");

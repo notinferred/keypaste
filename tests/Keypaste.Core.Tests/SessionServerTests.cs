@@ -58,7 +58,7 @@ public sealed class SessionServerTests : IDisposable
     public async Task The_owner_signs_what_it_recorded_when_its_session_ends()
     {
         using var lifetime = new SessionLifetime();
-        using var vault = Vault.Create(VaultPath, EnvStoreTests.MasterPassword);
+        using var vault = ClaimedVault.Create(VaultPath, EnvStoreTests.MasterPassword);
         var path = Path.Combine(_directory, "audit.jsonl");
         Assert.True(AuditLog.TryOpen(path, TimeProvider.System, out var audit, out var error), error);
 

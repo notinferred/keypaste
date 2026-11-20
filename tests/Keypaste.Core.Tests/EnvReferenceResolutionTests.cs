@@ -17,7 +17,7 @@ public sealed class EnvReferenceResolutionTests : IDisposable
 
     public EnvReferenceResolutionTests()
     {
-        using (var created = Vault.Create(VaultPath, EnvStoreTests.MasterPassword))
+        using (var created = ClaimedVault.Create(VaultPath, EnvStoreTests.MasterPassword))
         {
             ProjectVariables.Set(created, "acme-api", "DATABASE_URL", _devDb);
             ProjectVariables.Set(created, "acme-api", "staging", "DATABASE_URL", _stagingDb);
@@ -27,7 +27,7 @@ public sealed class EnvReferenceResolutionTests : IDisposable
             created.Save();
         }
 
-        _vault = Vault.Open(VaultPath, EnvStoreTests.MasterPassword);
+        _vault = ClaimedVault.Open(VaultPath, EnvStoreTests.MasterPassword);
     }
 
     private string VaultPath => Path.Combine(_directory, "vault.kdbx");
@@ -87,7 +87,7 @@ public sealed class EnvReferenceResolutionTests : IDisposable
     [Fact]
     public void ChangedOnDisk_Refuses()
     {
-        using (var other = Vault.Open(VaultPath, EnvStoreTests.MasterPassword))
+        using (var other = ClaimedVault.Open(VaultPath, EnvStoreTests.MasterPassword))
         {
             ProjectVariables.Set(other, "acme-api", "staging", "DATABASE_URL", "elsewhere");
             other.Save();

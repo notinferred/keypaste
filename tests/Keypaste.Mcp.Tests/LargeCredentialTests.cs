@@ -57,7 +57,7 @@ public sealed class LargeCredentialTests : IAsyncLifetime
     public ValueTask InitializeAsync()
     {
         _directory = Directory.CreateTempSubdirectory("keypaste-huge-").FullName;
-        _vault = Vault.Create(Path.Combine(_directory, "vault.kdbx"), _master);
+        _vault = ClaimedVault.Create(Path.Combine(_directory, "vault.kdbx"), _master);
 
         _vault.AddEntry(new VaultEntry
         {

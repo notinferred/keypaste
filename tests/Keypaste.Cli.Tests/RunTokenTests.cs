@@ -31,7 +31,7 @@ public sealed class RunTokenTests : IDisposable
         _harness.Environment[ApproverEndpoint.EnvironmentVariable] = _pipe;
         _harness.SeedVault(_master);
 
-        using (var vault = Vault.Open(_harness.VaultPath, _master))
+        using (var vault = ClaimedVault.Open(_harness.VaultPath, _master))
         {
             ProjectVariables.Set(vault, "acme-api", "staging", "DATABASE_URL", TokenVerbTests.Value);
             ProjectVariables.Set(vault, "acme-api", "prod", "DATABASE_URL", TokenVerbTests.ProdValue);
@@ -127,7 +127,7 @@ public sealed class RunTokenTests : IDisposable
     [Fact]
     public void Bundle_ProjectOption_PicksThatSet_EvenOneStartingWithADash()
     {
-        using (var vault = Vault.Open(_harness.VaultPath, _master))
+        using (var vault = ClaimedVault.Open(_harness.VaultPath, _master))
         {
             ProjectVariables.Set(vault, "-web", "staging", "KEY", "dash-web-key");
             vault.Save();
@@ -175,7 +175,7 @@ public sealed class RunTokenTests : IDisposable
     public async Task Session_ASetOf200KiB_ReachesTheChildWhole()
     {
         var large = Enumerable.Range(0, 7).Select(i => new EnvVariable($"BLOB_{i}", new string((char)('a' + i), 30_000))).ToList();
-        using (var vault = Vault.Open(_harness.VaultPath, _master))
+        using (var vault = ClaimedVault.Open(_harness.VaultPath, _master))
         {
             foreach (var variable in large)
             {
@@ -325,7 +325,7 @@ public sealed class RunTokenTests : IDisposable
 
         private Owner(RunTokenTests test, bool audited)
         {
-            _vault = Vault.Open(test._harness.VaultPath, _master);
+            _vault = ClaimedVault.Open(test._harness.VaultPath, _master);
             _gate = new ApprovalGate(Channel, TimeProvider.System, ApprovalLimits.Default);
             _auditPath = Path.Combine(test._harness.Directory, "owner-audit.jsonl");
 

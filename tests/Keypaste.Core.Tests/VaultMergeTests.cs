@@ -45,7 +45,7 @@ public sealed class VaultMergeTests : IDisposable
     public void AnEntryRenamedAndMovedInTheFile_IsMatchedByItsUuid()
     {
         Seed("stripe");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         var uuid = open.EntryUuid(_stripe);
         Update(open, "stripe", "mine");
         InFile(FilePath, database =>
@@ -71,7 +71,7 @@ public sealed class VaultMergeTests : IDisposable
     public void AnEntryOnlyTheFileChanged_IsTheFilesVersion_EvenWhenStampedEarlier()
     {
         Seed("stripe");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         InFile(FilePath, database => Edit(database, "stripe", _seeded.AddHours(-1), entry => SetPassword(entry, "theirs")));
 
         using var merged = MergeKeeping(open, out var report);
@@ -85,7 +85,7 @@ public sealed class VaultMergeTests : IDisposable
     public void AnEntryOnlyThisCopyChanged_IsThisCopysVersion()
     {
         Seed("stripe", "github");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, "stripe", "mine");
         InFile(FilePath, database => Edit(database, "github", _later, entry => SetPassword(entry, "theirs")));
 
@@ -107,7 +107,7 @@ public sealed class VaultMergeTests : IDisposable
     public void AnEntryBothChanged_KeepsTheNewerCurrent_AndTheOtherInItsHistory(bool fileNewer)
     {
         Seed("stripe");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, "stripe", "mine");
         InFile(FilePath, database => Edit(database, "stripe", fileNewer ? _later : _seeded.AddHours(1), entry => SetPassword(entry, "theirs")));
 
@@ -127,7 +127,7 @@ public sealed class VaultMergeTests : IDisposable
     public void AnEntryBothChangedInOneSecond_KeepsBoth_EachInASecondOfItsOwn()
     {
         Seed("stripe");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, "stripe", "mine");
         var second = Whole(open.ReadTimes(_stripe)!.Modified.UtcDateTime);
         InFile(FilePath, database => Edit(database, "stripe", second, entry => SetPassword(entry, "theirs")));
@@ -149,7 +149,7 @@ public sealed class VaultMergeTests : IDisposable
     public void AFileFromAnOlderFork_KeepsAChangeThisCopySaved()
     {
         Seed("stripe");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, "stripe", "mine");
         open.AddEntry(new VaultEntry { Title = "github", GroupPath = _work, Password = "added" });
         open.Save();
@@ -170,7 +170,7 @@ public sealed class VaultMergeTests : IDisposable
     public void NothingUnsaved_AndAFileThatDescends_MergesToExactlyTheFile()
     {
         Seed(database => Revise(database, "stripe", 10), "stripe", "github", "aws");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         InFile(FilePath, database =>
         {
             Edit(database, "stripe", _later, entry => SetPassword(entry, "theirs"));
@@ -179,7 +179,7 @@ public sealed class VaultMergeTests : IDisposable
         });
 
         using var merged = MergeKeeping(open, out var report);
-        using var file = Vault.Open(FilePath, _password);
+        using var file = ClaimedVault.Open(FilePath, _password);
 
         Assert.False(report.TookFromOpenCopy);
         Assert.Empty(report.Conflicts);
@@ -194,7 +194,7 @@ public sealed class VaultMergeTests : IDisposable
     public void HistoryVersionsSharingASecond_AreAllKept()
     {
         Seed("stripe");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, "stripe", "mine");
         InFile(FilePath, database =>
         {
@@ -221,7 +221,7 @@ public sealed class VaultMergeTests : IDisposable
     public void TheDisplacedVersion_IsKeptPastTheHistoryLimit_ThroughASaveAndAReopen()
     {
         Seed(database => database.HistoryMaxItems = 0, "stripe");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, "stripe", "mine");
         InFile(FilePath, database => Edit(database, "stripe", _later, entry => SetPassword(entry, "theirs")));
 
@@ -233,7 +233,7 @@ public sealed class VaultMergeTests : IDisposable
 
         Read(FilePath, database => Assert.Equal(["mine"], HistoryPasswords(Entry(database, "stripe"))));
 
-        using (var reopened = Vault.Open(FilePath, _password))
+        using (var reopened = ClaimedVault.Open(FilePath, _password))
         {
             Assert.Equal("mine", Assert.Single(reopened.ReadHistory(_stripe)!).Fields.Password);
             Update(reopened, "stripe", "next");
@@ -248,7 +248,7 @@ public sealed class VaultMergeTests : IDisposable
     public void EntriesTheMergeDidNotTouch_KeepTheirHistory()
     {
         Seed("stripe", "github");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, "stripe", "mine");
         InFile(FilePath, database =>
         {
@@ -277,7 +277,7 @@ public sealed class VaultMergeTests : IDisposable
             "theirs-moves",
             "both-theirs-later",
             "both-mine-later");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Move(open, "mine-moves", "home");
         Move(open, "both-theirs-later", "home");
         Move(open, "both-mine-later", "home");
@@ -309,7 +309,7 @@ public sealed class VaultMergeTests : IDisposable
             AddGroup(database, "alpha");
             AddGroup(database, "beta");
         });
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Assert.Equal(GroupOutcome.Moved, open.MoveGroup("alpha", "beta", out _));
         InFile(FilePath, database =>
         {
@@ -332,7 +332,7 @@ public sealed class VaultMergeTests : IDisposable
     public void APurgeInTheFile_RemovesAnEntryThisCopyDidNotChange()
     {
         Seed("stripe", "github");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, "github", "mine");
         var purged = PwUuid.Zero;
         InFile(FilePath, database => purged = Purge(database, "stripe", _later));
@@ -352,7 +352,7 @@ public sealed class VaultMergeTests : IDisposable
     public void APurgeInTheFile_OfAnEntryChangedHere_KeepsItInTheBin_StampedAfterTheDeletion()
     {
         Seed("stripe");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, "stripe", "mine");
         InFile(FilePath, database => Purge(database, "stripe", _later));
 
@@ -380,7 +380,7 @@ public sealed class VaultMergeTests : IDisposable
     public void APurgeHere_OfAnEntryTheFileChanged_KeepsTheFilesVersion()
     {
         Seed("stripe");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Purge(open, "stripe");
         InFile(FilePath, database => Edit(database, "stripe", _later, entry => SetPassword(entry, "theirs")));
 
@@ -402,7 +402,7 @@ public sealed class VaultMergeTests : IDisposable
     {
         Seed("stripe", "github");
         InFile(FilePath, database => Edit(database, "github", _later, entry => SetPassword(entry, "theirs")));
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Purge(open, "stripe");
         Purge(open, "github");
         open.Save();
@@ -427,7 +427,7 @@ public sealed class VaultMergeTests : IDisposable
     public void AnItemOnlyTheFileChanged_WithoutKeepingAVersion_IsTheFilesWhole()
     {
         Seed(database => Recycle(database, AddEntry(Group(database, _work), "binned", _seeded)), "stripe");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         InFile(FilePath, database =>
         {
             var entry = Entry(database, "stripe");
@@ -454,7 +454,7 @@ public sealed class VaultMergeTests : IDisposable
     public void AStampKeePassXcRewrote_IsNotAChangeToTheItem()
     {
         Seed(database => Entry(database, "stripe").CustomData.Set(_keePassXcStamp, "first save"), "stripe", "other");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         InFile(FilePath, database =>
         {
             Entry(database, "stripe").CustomData.Set(_keePassXcStamp, "next save");
@@ -477,7 +477,7 @@ public sealed class VaultMergeTests : IDisposable
     public void ChangesToDifferentFields_AreBothKept()
     {
         Seed("stripe");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, "stripe", "mine");
         InFile(FilePath, database => Edit(database, "stripe", _later, entry => entry.Strings.Set(PwDefs.UrlField, new ProtectedString(false, "https://theirs.test"))));
 
@@ -501,7 +501,7 @@ public sealed class VaultMergeTests : IDisposable
     public void ABothChangedField_IsTheNewers_WhileAFieldOnlyTheOlderChangedJoinsIt()
     {
         Seed("stripe");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Assert.True(open.UpdateEntry(new VaultEntry { Title = "stripe", GroupPath = _work, Username = "older-user", Password = "mine" }));
         InFile(FilePath, database => Edit(database, "stripe", _later, entry => entry.Strings.Set(PwDefs.PasswordField, new ProtectedString(true, "theirs"))));
 
@@ -521,7 +521,7 @@ public sealed class VaultMergeTests : IDisposable
     public void WithNoVersionBothKeep_TheNewerWinsAndTheOlderIsInHistory()
     {
         Seed("stripe");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, "stripe", "mine");
         InFile(FilePath, database =>
         {
@@ -546,7 +546,7 @@ public sealed class VaultMergeTests : IDisposable
     public void AVersionKeePassXcKeptWithoutCustomData_IsStillTheBase()
     {
         Seed(database => Entry(database, "stripe").CustomData.Set("KeePassXC-Browser Settings", "{}"), "stripe");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         InFile(FilePath, database =>
         {
             Edit(database, "stripe", _later, entry => entry.Strings.Set(PwDefs.UserNameField, new ProtectedString(false, "theirs")));
@@ -570,7 +570,7 @@ public sealed class VaultMergeTests : IDisposable
                 Entry(database, "stripe").CustomData.Set(_keePassXcStamp, "first save");
             },
             "stripe");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         InFile(FilePath, database =>
         {
             var entry = Entry(database, "stripe");
@@ -595,7 +595,7 @@ public sealed class VaultMergeTests : IDisposable
         Seed("stripe");
         var fork = Path.Combine(_directory, "fork.kdbx");
         File.Copy(VaultPath, fork);
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, "stripe", "mine");
         open.Save();
         InFile(fork, database => Edit(database, "stripe", _later, entry => SetPassword(entry, "theirs")));
@@ -617,7 +617,7 @@ public sealed class VaultMergeTests : IDisposable
     public void ARecycledEntry_KeepsTheOtherCopysEdit()
     {
         Seed("stripe");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Assert.Equal(DeletionOutcome.Recycled, open.RemoveEntry(_stripe, out _));
         InFile(FilePath, database => Edit(database, "stripe", _later, entry => SetPassword(entry, "theirs")));
 
@@ -638,7 +638,7 @@ public sealed class VaultMergeTests : IDisposable
     public void ARestore_SurvivesAPurgeThatDidNotSeeIt()
     {
         Seed(database => Recycle(database, Entry(database, "stripe")), "stripe");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Assert.Equal(RestoreOutcome.Restored, open.RestoreRecycled(Assert.Single(open.ReadRecycled()).Id));
         InFile(FilePath, database => Purge(database, "stripe", _later));
 
@@ -657,7 +657,7 @@ public sealed class VaultMergeTests : IDisposable
     public void AGroupDeletedInTheFile_StaysWhileTheMergePutsAnEntryInIt()
     {
         Seed(database => AddEntry(AddGroup(database, "old"), "legacy", _seeded));
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         open.AddEntry(new VaultEntry { Title = "fresh", GroupPath = "old", Password = "added" });
         var legacy = PwUuid.Zero;
         InFile(FilePath, database =>
@@ -682,7 +682,7 @@ public sealed class VaultMergeTests : IDisposable
     public void TwoRecycleBins_BecomeTheFilesBin_AndNothingInEitherIsListed()
     {
         Seed("stripe", "github");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Assert.Equal(DeletionOutcome.Recycled, open.RemoveEntry(_stripe, out _));
         var theirBin = PwUuid.Zero;
         InFile(FilePath, database =>
@@ -716,7 +716,7 @@ public sealed class VaultMergeTests : IDisposable
         var statement = RandomNumberGenerator.GetBytes(3000);
         var key = RandomNumberGenerator.GetBytes(300);
         Seed("stripe", "github");
-        using (var vault = Vault.Open(VaultPath, _password))
+        using (var vault = ClaimedVault.Open(VaultPath, _password))
         {
             using MemoryStream content = new(statement);
             Assert.True(vault.AddAttachment(_stripe, "statement.pdf", content, out _));
@@ -725,7 +725,7 @@ public sealed class VaultMergeTests : IDisposable
         }
 
         File.Copy(VaultPath, FilePath, overwrite: true);
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, "stripe", "mine");
         using (MemoryStream content = new(key))
         {
@@ -750,7 +750,7 @@ public sealed class VaultMergeTests : IDisposable
     public void EntryCustomData_TravelsWithItsVersion()
     {
         Seed(database => Entry(database, "stripe").CustomData.Set("KPXC_note", "base"), "stripe");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, "stripe", "mine");
         InFile(FilePath, database => Edit(database, "stripe", _later, entry => entry.CustomData.Set("KPXC_note", "theirs")));
 
@@ -769,7 +769,7 @@ public sealed class VaultMergeTests : IDisposable
     public void TheFilesMetaAndHeader_AreKept()
     {
         Seed("stripe", "github");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, "stripe", "mine");
         InFile(FilePath, database =>
         {
@@ -798,7 +798,7 @@ public sealed class VaultMergeTests : IDisposable
     {
         Seed("stripe", "github");
 
-        using (var open = Vault.Open(VaultPath, _password))
+        using (var open = ClaimedVault.Open(VaultPath, _password))
         {
             Update(open, "stripe", "mine");
             InFile(FilePath, database => Edit(database, "github", _later, entry => SetPassword(entry, "theirs")));
@@ -808,7 +808,7 @@ public sealed class VaultMergeTests : IDisposable
         Assert.Equal("KeePass database 4.0", KeePassInterop.Probe(FilePath, out _)!.Version);
 
         // An item kept in the bin carries where it came from, which only KDBX 4.1 writes.
-        using (var open = Vault.Open(VaultPath, _password))
+        using (var open = ClaimedVault.Open(VaultPath, _password))
         {
             Update(open, "github", "mine");
             InFile(FilePath, database => Purge(database, "github", _later.AddMinutes(1)));
@@ -832,7 +832,7 @@ public sealed class VaultMergeTests : IDisposable
                 autoType.Add(new AutoTypeAssociation("*Firefox*", "{PASSWORD}{ENTER}"));
             },
             "stripe");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, "stripe", "mine");
         InFile(FilePath, database => Edit(database, "stripe", fileNewer ? _later : _seeded.AddHours(1), entry =>
         {
@@ -871,7 +871,7 @@ public sealed class VaultMergeTests : IDisposable
     public void AGroupChangedInBoth_IsTheNewerWhole_AndTheNameItLostIsNamed(bool fileNewer)
     {
         Seed("stripe");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Assert.Equal(GroupOutcome.Renamed, open.RenameGroup(_work, "billing", out _));
         InFile(FilePath, database =>
         {
@@ -920,7 +920,7 @@ public sealed class VaultMergeTests : IDisposable
         const string pairing = "Chrome on desk";
         var record = new EntryName(ReservedGroups.Browsers, pairing);
         Seed("stripe");
-        using (var vault = Vault.Open(VaultPath, _password))
+        using (var vault = ClaimedVault.Open(VaultPath, _password))
         {
             vault.SetRecyclesDeletedEntries(recycles);
             vault.AddEntry(new VaultEntry { GroupPath = ReservedGroups.Browsers, Title = pairing, Password = new string('a', 64) });
@@ -928,7 +928,7 @@ public sealed class VaultMergeTests : IDisposable
         }
 
         File.Copy(VaultPath, FilePath, overwrite: true);
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
 
         if (removedHere)
         {
@@ -947,7 +947,7 @@ public sealed class VaultMergeTests : IDisposable
 
         var report = Merge(open);
 
-        using var merged = Vault.Open(FilePath, _password);
+        using var merged = ClaimedVault.Open(FilePath, _password);
         Assert.Null(merged.Find(record));
         Assert.Empty(merged.ReadRecycled());
         Assert.Empty(report.Kept);
@@ -959,15 +959,15 @@ public sealed class VaultMergeTests : IDisposable
     {
         Seed("stripe");
         var other = Path.Combine(_directory, "other.kdbx");
-        using (var vault = Vault.Create(other, _password))
+        using (var vault = ClaimedVault.Create(other, _password))
         {
             vault.AddEntry(new VaultEntry { Title = "stripe", GroupPath = _work, Password = "other" });
             vault.Save();
         }
 
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, "stripe", "mine");
-        using var file = Vault.Open(other, _password);
+        using var file = ClaimedVault.Open(other, _password);
 
         Assert.Equal(VaultMergeOutcome.AnotherVault, open.MergeInto(file, out var report));
 
@@ -980,14 +980,14 @@ public sealed class VaultMergeTests : IDisposable
     public void AFileHoldingTwoObjectsUnderOneUuid_IsNotMerged()
     {
         Seed("stripe");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         InFile(FilePath, database =>
         {
             var twin = Entry(database, "stripe").CloneDeep();
             twin.Strings.Set(PwDefs.TitleField, new ProtectedString(false, "twin"));
             Group(database, _work).AddEntry(twin, true);
         });
-        using var file = Vault.Open(FilePath, _password);
+        using var file = ClaimedVault.Open(FilePath, _password);
 
         Assert.Equal(VaultMergeOutcome.DuplicateUuids, open.MergeInto(file, out var report));
 
@@ -1000,7 +1000,7 @@ public sealed class VaultMergeTests : IDisposable
     public void TheOpenCopy_IsLeftAsItWas()
     {
         Seed("stripe", "github");
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, "stripe", "mine");
         Purge(open, "github");
         var entries = open.ReadEntries(includeReserved: true);
@@ -1046,7 +1046,7 @@ public sealed class VaultMergeTests : IDisposable
             "scrap");
         var oracle = Path.Combine(_directory, "oracle.kdbx");
 
-        using (var open = Vault.Open(VaultPath, _password))
+        using (var open = ClaimedVault.Open(VaultPath, _password))
         {
             Update(open, "mine-only", "mine");
             Update(open, "both-mine-later", "mine");
@@ -1098,7 +1098,7 @@ public sealed class VaultMergeTests : IDisposable
             "moved-both");
         var theirs = Path.Combine(_directory, "theirs.kdbx");
 
-        using (var open = Vault.Open(VaultPath, _password))
+        using (var open = ClaimedVault.Open(VaultPath, _password))
         {
             Update(open, "tie", "mine");
             var tie = Whole(open.ReadTimes(new EntryName(_work, "tie"))!.Modified.UtcDateTime);
@@ -1140,7 +1140,7 @@ public sealed class VaultMergeTests : IDisposable
 
     private void Seed(Action<PwDatabase> shape, params string[] titles)
     {
-        using (var vault = Vault.Create(VaultPath, _password))
+        using (var vault = ClaimedVault.Create(VaultPath, _password))
         {
             foreach (var title in titles)
             {
@@ -1171,7 +1171,7 @@ public sealed class VaultMergeTests : IDisposable
     /// <summary>Merges the open copy into a fresh open of the file the other program saved, which the caller disposes; nothing is saved.</summary>
     private Vault MergeKeeping(Vault open, out VaultMergeReport report)
     {
-        var file = Vault.Open(FilePath, _password);
+        var file = ClaimedVault.Open(FilePath, _password);
 
         try
         {

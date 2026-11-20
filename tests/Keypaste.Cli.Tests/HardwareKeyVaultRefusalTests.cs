@@ -1,7 +1,7 @@
-using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Recent;
+using Keypaste.Core.Tests;
 using Keypaste.Core.Tests.HardwareKeys;
 using Xunit;
 
@@ -67,7 +67,7 @@ public sealed class HardwareKeyVaultRefusalTests : IDisposable
     private void HardwareKeyVault()
     {
         using var key = new HardwareKey(new SoftwareYubiKey(_secret), 2);
-        using var vault = Vault.CreateWith(_harness.VaultPath, _master, null, key);
+        using var vault = ClaimedVault.CreateWith(_harness.VaultPath, _master, null, key);
         vault.Save();
     }
 

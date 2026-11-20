@@ -1,5 +1,6 @@
 using Keypaste.Core;
 using Keypaste.Core.Agents;
+using Keypaste.Core.Tests;
 
 namespace Keypaste.App.Tests;
 
@@ -27,7 +28,7 @@ internal sealed class TempVault : IDisposable
 
         Path_ = Path.Combine(_directory, "test.kdbx");
 
-        using var vault = Vault.Create(Path_, Password);
+        using var vault = ClaimedVault.Create(Path_, Password);
         vault.AddEntry(new VaultEntry { Title = "example", Password = ExamplePassword });
         vault.Save();
     }
@@ -71,7 +72,7 @@ internal sealed class TempVault : IDisposable
     /// <param name="agents">The agents' names; none gives <see cref="Agent"/>.</param>
     internal void Sees(params string[] agents)
     {
-        using var vault = Vault.Open(Path_, Password);
+        using var vault = ClaimedVault.Open(Path_, Password);
         Sees(vault, agents.Length == 0 ? [Agent] : agents);
     }
 

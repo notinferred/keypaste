@@ -67,6 +67,17 @@ public sealed class VaultClaimTests : IDisposable
     }
 
     [Fact]
+    public void AReleasedClaim_IsNoLongerHeld()
+    {
+        Assert.True(VaultClaim.TryAcquire(_home, Vault(), OwnerKind.CommandLine, out var claim, out _));
+        Assert.True(claim.IsHeld);
+
+        claim.Dispose();
+
+        Assert.False(claim.IsHeld);
+    }
+
+    [Fact]
     public void TwoSpellingsOfOneVault_MeetAtOneClaim()
     {
         var respelled = Path.Combine(_home, ".", OperatingSystem.IsLinux() ? "vault.kdbx" : "VAULT.KDBX");

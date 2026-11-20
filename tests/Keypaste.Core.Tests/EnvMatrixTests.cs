@@ -23,7 +23,7 @@ public sealed class EnvMatrixTests : IDisposable
     /// </summary>
     internal static Vault Seeded(string directory)
     {
-        var vault = Vault.Create(Path.Combine(directory, "vault.kdbx"), EnvStoreTests.MasterPassword);
+        var vault = ClaimedVault.Create(Path.Combine(directory, "vault.kdbx"), EnvStoreTests.MasterPassword);
 
         ProjectVariables.Set(vault, "acme-api", "DATABASE_URL", "dev-db");
         ProjectVariables.Set(vault, "acme-api", "STRIPE_KEY", Shared);

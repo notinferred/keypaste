@@ -25,7 +25,7 @@ public sealed class VaultTotpTests : IDisposable
         KdbxImportTests.WriteForeign(path, _master);
         string before;
 
-        using (var vault = Vault.Open(path, _master))
+        using (var vault = ClaimedVault.Open(path, _master))
         {
             using var spec = vault.ReadTotp(_checking, out var refusal);
 
@@ -39,7 +39,7 @@ public sealed class VaultTotpTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, _master);
+        using var reopened = ClaimedVault.Open(path, _master);
         using var after = reopened.ReadTotp(_checking, out var again);
 
         Assert.Null(again);
@@ -58,7 +58,7 @@ public sealed class VaultTotpTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, _master);
+        using var reopened = ClaimedVault.Open(path, _master);
         using var spec = reopened.ReadTotp(_github, out var refusal);
 
         Assert.Null(refusal);
@@ -88,7 +88,7 @@ public sealed class VaultTotpTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, _master);
+        using var reopened = ClaimedVault.Open(path, _master);
         using var spec = reopened.ReadTotp(_github, out var refusal);
 
         Assert.Null(refusal);
@@ -130,7 +130,7 @@ public sealed class VaultTotpTests : IDisposable
 
     private static Vault Seeded(string path)
     {
-        var vault = Vault.Create(path, _master);
+        var vault = ClaimedVault.Create(path, _master);
         vault.AddEntry(new VaultEntry { Title = _github.Title, GroupPath = _github.GroupPath, Username = "alice", Password = "login-password" });
         vault.Save();
         return vault;

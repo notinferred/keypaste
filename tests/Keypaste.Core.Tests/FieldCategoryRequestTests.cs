@@ -37,7 +37,7 @@ public sealed class FieldCategoryRequestTests : IDisposable
 
     public FieldCategoryRequestTests()
     {
-        using (var created = Vault.Create(VaultPath, EnvStoreTests.MasterPassword))
+        using (var created = ClaimedVault.Create(VaultPath, EnvStoreTests.MasterPassword))
         {
             created.AddEntry(new VaultEntry { GroupPath = _github.GroupPath, Title = _github.Title, Username = "octocat", Url = "https://github.com", Password = _password, Notes = _notes });
             Assert.True(created.SetFields(_github,
@@ -73,7 +73,7 @@ public sealed class FieldCategoryRequestTests : IDisposable
             created.Save();
         }
 
-        _vault = Vault.Open(VaultPath, EnvStoreTests.MasterPassword);
+        _vault = ClaimedVault.Open(VaultPath, EnvStoreTests.MasterPassword);
         _log = new OwnerLog(_directory);
         _gate = new ApprovalGate(_channel, _clock, ApprovalLimits.Default);
         _authority = Authority(_vault);
@@ -409,7 +409,7 @@ public sealed class FieldCategoryRequestTests : IDisposable
         Assert.True(_vault.WriteRecord(new EntryName(ReservedGroups.Agents, _agent), AcafIds.Agent, "acaf", record));
         _vault.Save();
 
-        using var reopened = Vault.Open(VaultPath, EnvStoreTests.MasterPassword);
+        using var reopened = ClaimedVault.Open(VaultPath, EnvStoreTests.MasterPassword);
         var authority = Authority(reopened);
         _channel.Answer = ApprovalAnswer.Denied;
 

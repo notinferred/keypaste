@@ -591,7 +591,7 @@ public sealed class SessionAuthorityTests : IDisposable
     /// <summary>The test's vault, saved, holding the one entry requests name.</summary>
     private Vault SavedVault(string password)
     {
-        var vault = Vault.Create(VaultPath, VaultCredentialSourceTests.MasterPassword);
+        var vault = ClaimedVault.Create(VaultPath, VaultCredentialSourceTests.MasterPassword);
         vault.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "STRIPE_KEY", Password = password });
         vault.Save();
         return vault;
@@ -600,7 +600,7 @@ public sealed class SessionAuthorityTests : IDisposable
     /// <summary>Another program saving the test's vault; returns the bytes it wrote.</summary>
     private byte[] SaveElsewhere(string password)
     {
-        using (var writer = Vault.Open(VaultPath, VaultCredentialSourceTests.MasterPassword))
+        using (var writer = ClaimedVault.Open(VaultPath, VaultCredentialSourceTests.MasterPassword))
         {
             writer.UpdateEntry(new VaultEntry { GroupPath = "env/dev", Title = "STRIPE_KEY", Password = password });
             writer.Save();

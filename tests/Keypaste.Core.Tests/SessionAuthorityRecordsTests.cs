@@ -31,14 +31,14 @@ public sealed class SessionAuthorityRecordsTests : IDisposable
 
     public SessionAuthorityRecordsTests()
     {
-        using (var created = Vault.Create(VaultPath, EnvStoreTests.MasterPassword))
+        using (var created = ClaimedVault.Create(VaultPath, EnvStoreTests.MasterPassword))
         {
             created.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "STRIPE_KEY", Password = _stripe });
             ProjectVariables.Set(created, "acme-api", "DATABASE_URL", _database);
             created.Save();
         }
 
-        _vault = Vault.Open(VaultPath, EnvStoreTests.MasterPassword);
+        _vault = ClaimedVault.Open(VaultPath, EnvStoreTests.MasterPassword);
         _log = new OwnerLog(_directory);
         _fixture.Rules.Rules = Sees;
     }

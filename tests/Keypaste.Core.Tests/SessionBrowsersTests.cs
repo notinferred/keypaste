@@ -35,7 +35,7 @@ public sealed class SessionBrowsersTests : IDisposable
     public SessionBrowsersTests()
     {
         _log = new OwnerLog(_directory);
-        _vault = Vault.Create(VaultPath, _master);
+        _vault = ClaimedVault.Create(VaultPath, _master);
         _vault.Save();
     }
 
@@ -259,7 +259,7 @@ public sealed class SessionBrowsersTests : IDisposable
     [Fact]
     public async Task One_pairing_serves_every_vault_unlocked_beside_it_and_a_check_seals_it_into_one_that_was_not()
     {
-        using var other = Vault.Create(Path.Combine(_directory, "other.kdbx"), _master);
+        using var other = ClaimedVault.Create(Path.Combine(_directory, "other.kdbx"), _master);
         other.Save();
         List<PairingVault> besides = [];
         await using var owner = Owner.Start(this, () => besides);
@@ -780,7 +780,7 @@ public sealed class SessionBrowsersTests : IDisposable
     /// <summary>The pairing records an earlier version kept inside the vault, as its file holds them.</summary>
     private List<VaultEntry> VaultPairings()
     {
-        using var reopened = Vault.Open(VaultPath, _master);
+        using var reopened = ClaimedVault.Open(VaultPath, _master);
         return [.. reopened.ReadEntries(includeReserved: true).Where(entry => entry.GroupPath == ReservedGroups.Browsers)];
     }
 
@@ -899,7 +899,7 @@ public sealed class SessionBrowsersTests : IDisposable
         {
             _test = test;
             _path = Path.Combine(test._directory, name + ".kdbx");
-            _vault = Vault.Create(_path, _master);
+            _vault = ClaimedVault.Create(_path, _master);
             _vault.Save();
             Pairing = new PairingVault(_vault, edit => Saving(_vault, edit));
         }

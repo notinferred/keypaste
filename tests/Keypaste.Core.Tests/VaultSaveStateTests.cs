@@ -11,7 +11,7 @@ public sealed class VaultSaveStateTests : IDisposable
 
     public VaultSaveStateTests()
     {
-        using var created = Vault.Create(VaultPath, VaultHistoryTests.MasterPassword);
+        using var created = ClaimedVault.Create(VaultPath, VaultHistoryTests.MasterPassword);
         created.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "KEY", Password = "value" });
         created.Save();
     }
@@ -21,7 +21,7 @@ public sealed class VaultSaveStateTests : IDisposable
     [Fact]
     public void AfterOpen_Saved_WithTheFilesTime()
     {
-        using var vault = Vault.Open(VaultPath, VaultHistoryTests.MasterPassword);
+        using var vault = ClaimedVault.Open(VaultPath, VaultHistoryTests.MasterPassword);
 
         var state = vault.SaveState();
 
@@ -32,7 +32,7 @@ public sealed class VaultSaveStateTests : IDisposable
     [Fact]
     public void AnEdit_Unsaved()
     {
-        using var vault = Vault.Open(VaultPath, VaultHistoryTests.MasterPassword);
+        using var vault = ClaimedVault.Open(VaultPath, VaultHistoryTests.MasterPassword);
 
         vault.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "OTHER", Password = "x" });
 
@@ -42,7 +42,7 @@ public sealed class VaultSaveStateTests : IDisposable
     [Fact]
     public void ASave_Saved_AndRaisesSaved()
     {
-        using var vault = Vault.Open(VaultPath, VaultHistoryTests.MasterPassword);
+        using var vault = ClaimedVault.Open(VaultPath, VaultHistoryTests.MasterPassword);
         var raised = 0;
         vault.Saved += (_, _) => raised++;
 
@@ -56,9 +56,9 @@ public sealed class VaultSaveStateTests : IDisposable
     [Fact]
     public void AnotherWriter_ChangedOnDisk()
     {
-        using var vault = Vault.Open(VaultPath, VaultHistoryTests.MasterPassword);
+        using var vault = ClaimedVault.Open(VaultPath, VaultHistoryTests.MasterPassword);
 
-        using (var other = Vault.Open(VaultPath, VaultHistoryTests.MasterPassword))
+        using (var other = ClaimedVault.Open(VaultPath, VaultHistoryTests.MasterPassword))
         {
             other.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "ELSEWHERE", Password = "x" });
             other.Save();
@@ -72,9 +72,9 @@ public sealed class VaultSaveStateTests : IDisposable
     [Fact]
     public void AnEditAfterAnotherWriter_ChangedOnDisk_WithTheChangeUnwritten_UntilASaveSucceeds()
     {
-        using var vault = Vault.Open(VaultPath, VaultHistoryTests.MasterPassword);
+        using var vault = ClaimedVault.Open(VaultPath, VaultHistoryTests.MasterPassword);
 
-        using (var other = Vault.Open(VaultPath, VaultHistoryTests.MasterPassword))
+        using (var other = ClaimedVault.Open(VaultPath, VaultHistoryTests.MasterPassword))
         {
             other.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "ELSEWHERE", Password = "x" });
             other.Save();
@@ -98,7 +98,7 @@ public sealed class VaultSaveStateTests : IDisposable
     [Fact]
     public void ADeletedFile_Unreadable()
     {
-        using var vault = Vault.Open(VaultPath, VaultHistoryTests.MasterPassword);
+        using var vault = ClaimedVault.Open(VaultPath, VaultHistoryTests.MasterPassword);
 
         File.Delete(VaultPath);
 

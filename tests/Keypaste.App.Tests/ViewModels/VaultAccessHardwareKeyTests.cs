@@ -33,7 +33,7 @@ public sealed class VaultAccessHardwareKeyTests : IDisposable
         _home = Directory.CreateDirectory(Path.Combine(_directory, "home")).FullName;
         _vaultPath = Path.Combine(_directory, "vault.kdbx");
 
-        using var vault = Vault.Create(_vaultPath, _master);
+        using var vault = ClaimedVault.Create(_vaultPath, _master);
         vault.AddEntry(new VaultEntry { Title = "github", Password = "gh" });
         vault.Save();
     }
@@ -80,9 +80,9 @@ public sealed class VaultAccessHardwareKeyTests : IDisposable
         Assert.Equal(2, _device.Challenges.Count);
         session.Lock(VaultLockReason.Manual);
 
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(_vaultPath, _master));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(_vaultPath, _master));
         using var key = new HardwareKey(new SoftwareYubiKey(_secret), 1);
-        using var reopened = Vault.Open(_vaultPath, _master, null, key);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master, null, key);
         Assert.Equal("saved", reopened.Find("after")?.Password);
     }
 
@@ -116,7 +116,7 @@ public sealed class VaultAccessHardwareKeyTests : IDisposable
         Assert.Null(RecentVaults.Load(KeypasteHome.RecentPath(_home)).Single().HardwareKeySlot);
         session.Lock(VaultLockReason.Manual);
 
-        using var opened = Vault.Open(_vaultPath, _master);
+        using var opened = ClaimedVault.Open(_vaultPath, _master);
         Assert.Null(opened.HardwareKey);
     }
 

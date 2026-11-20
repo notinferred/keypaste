@@ -1,4 +1,5 @@
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -25,7 +26,7 @@ public sealed class AccessCommandTests
             ["Master password: ", "New master password: ", "Confirm master password: "],
             harness.Prompt.PromptsSeen);
         AssertOpens(harness.VaultPath, _next, null);
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(harness.VaultPath, _master));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(harness.VaultPath, _master));
     }
 
     [Fact]
@@ -58,7 +59,7 @@ public sealed class AccessCommandTests
 
         harness.AssertExit(CliApp.ExitSuccess, exit);
         AssertOpens(harness.VaultPath, _master, next);
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(harness.VaultPath, _master, current));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(harness.VaultPath, _master, current));
     }
 
     [Fact]
@@ -151,7 +152,7 @@ public sealed class AccessCommandTests
         {
             if (prompt == "New master password: ")
             {
-                using var other = Vault.Open(harness.VaultPath, _master);
+                using var other = ClaimedVault.Open(harness.VaultPath, _master);
                 other.AddEntry(new VaultEntry { Title = "THEIRS", Password = "value", GroupPath = "env/demo" });
                 other.Save();
             }
@@ -257,7 +258,7 @@ public sealed class AccessCommandTests
 
     private static void AssertOpens(string path, string password, string? keyfile)
     {
-        using var vault = Vault.Open(path, password, keyfile);
+        using var vault = ClaimedVault.Open(path, password, keyfile);
         Assert.NotEmpty(vault.ReadEntries());
     }
 }

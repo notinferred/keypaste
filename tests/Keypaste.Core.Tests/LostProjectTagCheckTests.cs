@@ -36,7 +36,7 @@ public sealed class LostProjectTagCheckTests : IDisposable
             entry.Strings.Set(PwDefs.PasswordField, new ProtectedString(true, _newValue));
         });
 
-        using var vault = Vault.Open(VaultPath, _master);
+        using var vault = ClaimedVault.Open(VaultPath, _master);
         var lost = Assert.Single(LostProjectTagCheck.Scan(vault));
 
         Assert.Equal(_stripe, lost.Entry);
@@ -52,7 +52,7 @@ public sealed class LostProjectTagCheckTests : IDisposable
     {
         Seed("env:billing", "env:web");
 
-        using (var vault = Vault.Open(VaultPath, _master))
+        using (var vault = ClaimedVault.Open(VaultPath, _master))
         {
             Assert.True(vault.RemoveTags(_stripe, ["env:billing"]));
             vault.Save();
@@ -60,7 +60,7 @@ public sealed class LostProjectTagCheckTests : IDisposable
 
         EditElsewhere("Stripe", _first, entry => entry.Tags = []);
 
-        using var reopened = Vault.Open(VaultPath, _master);
+        using var reopened = ClaimedVault.Open(VaultPath, _master);
 
         Assert.Equal(4, reopened.ReadHistory(_stripe)!.Count);
         Assert.Empty(LostProjectTagCheck.Scan(reopened));
@@ -76,7 +76,7 @@ public sealed class LostProjectTagCheckTests : IDisposable
             entry.Strings.Set(PwDefs.PasswordField, new ProtectedString(true, _newValue));
         });
 
-        using var vault = Vault.Open(VaultPath, _master);
+        using var vault = ClaimedVault.Open(VaultPath, _master);
 
         Assert.Empty(LostProjectTagCheck.Scan(vault));
     }
@@ -91,7 +91,7 @@ public sealed class LostProjectTagCheckTests : IDisposable
             entry.Strings.Set(PwDefs.NotesField, new ProtectedString(false, "rotated"));
         });
 
-        using var vault = Vault.Open(VaultPath, _master);
+        using var vault = ClaimedVault.Open(VaultPath, _master);
 
         Assert.Equal(["env:billing:prod"], LostProjectTagCheck.Scan(vault).Select(lost => lost.Tag));
     }
@@ -108,7 +108,7 @@ public sealed class LostProjectTagCheckTests : IDisposable
 
         string firstKey;
 
-        using (var vault = Vault.Open(VaultPath, _master))
+        using (var vault = ClaimedVault.Open(VaultPath, _master))
         {
             firstKey = Assert.Single(LostProjectTagCheck.Scan(vault)).Key;
             Assert.True(vault.AddTag(_stripe, "env:billing"));
@@ -123,7 +123,7 @@ public sealed class LostProjectTagCheckTests : IDisposable
             entry.Strings.Set(PwDefs.UserNameField, new ProtectedString(false, "billing-bot"));
         });
 
-        using var reopened = Vault.Open(VaultPath, _master);
+        using var reopened = ClaimedVault.Open(VaultPath, _master);
         var lost = Assert.Single(LostProjectTagCheck.Scan(reopened));
 
         Assert.Equal(again, lost.LostUtc);
@@ -133,7 +133,7 @@ public sealed class LostProjectTagCheckTests : IDisposable
     [Fact]
     public void Entries_in_the_recycle_bin_or_keypastes_own_groups_are_not_read()
     {
-        using (var vault = Vault.Create(VaultPath, _master))
+        using (var vault = ClaimedVault.Create(VaultPath, _master))
         {
             vault.AddEntry(new VaultEntry { GroupPath = ".keypaste/tokens", Title = "planted", Password = _oldValue });
             vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Deleted", Password = _oldValue });
@@ -150,14 +150,14 @@ public sealed class LostProjectTagCheckTests : IDisposable
             });
         }
 
-        using (var vault = Vault.Open(VaultPath, _master))
+        using (var vault = ClaimedVault.Open(VaultPath, _master))
         {
             Assert.Single(LostProjectTagCheck.Scan(vault));
             vault.RemoveEntry(new EntryName("services", "Deleted"), out _);
             vault.Save();
         }
 
-        using var reopened = Vault.Open(VaultPath, _master);
+        using var reopened = ClaimedVault.Open(VaultPath, _master);
 
         Assert.Empty(LostProjectTagCheck.Scan(reopened));
     }
@@ -172,7 +172,7 @@ public sealed class LostProjectTagCheckTests : IDisposable
             entry.Strings.Set(PwDefs.PasswordField, new ProtectedString(true, _newValue));
         });
 
-        using var vault = Vault.Open(VaultPath, _master);
+        using var vault = ClaimedVault.Open(VaultPath, _master);
         var lost = Assert.Single(LostProjectTagCheck.Scan(vault));
         var shown = string.Join("\n", typeof(LostProjectTag).GetProperties()
             .Select(property => Convert.ToString(property.GetValue(lost), System.Globalization.CultureInfo.InvariantCulture))
@@ -186,7 +186,7 @@ public sealed class LostProjectTagCheckTests : IDisposable
 
     private void Seed(params string[] tags)
     {
-        using var vault = Vault.Create(VaultPath, _master);
+        using var vault = ClaimedVault.Create(VaultPath, _master);
         vault.AddEntry(new VaultEntry { GroupPath = _stripe.GroupPath, Title = _stripe.Title, Password = _oldValue });
 
         foreach (var tag in tags)

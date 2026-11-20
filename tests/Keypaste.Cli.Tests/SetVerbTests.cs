@@ -1,6 +1,7 @@
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ownership;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -29,7 +30,7 @@ public sealed class SetVerbTests : IDisposable
 
     private VaultEntry? Read(string group, string title)
     {
-        using var vault = Vault.Open(_harness.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
         return vault.Find(new EntryName(group, title));
     }
 
@@ -64,7 +65,7 @@ public sealed class SetVerbTests : IDisposable
         Assert.Equal("n", entry.Notes);
         Assert.Contains("  ✓ updated Banking/Chase · the old value stays in history" + Environment.NewLine, _harness.Err, StringComparison.Ordinal);
 
-        using var vault = Vault.Open(_harness.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
         Assert.Contains(vault.ReadHistory(new EntryName("Banking", "Chase"))!, revision => revision.Fields.Password == "old-value");
     }
 
@@ -140,7 +141,7 @@ public sealed class SetVerbTests : IDisposable
         _harness.AssertExit(CliApp.ExitSuccess, Set(path));
 
         Assert.Contains("  ✓ updated Banking/Chase", _harness.Err, StringComparison.Ordinal);
-        using var vault = Vault.Open(_harness.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
         Assert.Equal(_value, vault.Find(new EntryName("Banking", "Chase"))?.Password);
         Assert.Single(vault.ReadEntries(), entry => entry.Title == "Chase");
     }

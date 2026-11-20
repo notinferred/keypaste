@@ -55,7 +55,7 @@ public sealed class KeyDerivationCostTests : IDisposable
     {
         var path = Path.Combine(_directory, Path.GetRandomFileName() + ".kdbx");
         using (scope())
-        using (var vault = Vault.Create(path, _master))
+        using (var vault = ClaimedVault.Create(path, _master))
         {
             vault.Save();
         }

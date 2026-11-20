@@ -16,7 +16,7 @@ public sealed class EntryRotationTests : IDisposable
 
     public EntryRotationTests()
     {
-        _vault = Vault.Create(Path.Combine(_directory, "vault.kdbx"), VaultHistoryTests.MasterPassword);
+        _vault = ClaimedVault.Create(Path.Combine(_directory, "vault.kdbx"), VaultHistoryTests.MasterPassword);
         _vault.AddEntry(new VaultEntry { GroupPath = _name.GroupPath, Title = _name.Title, Username = "billing", Password = _old });
         _vault.AddEntry(new VaultEntry { GroupPath = ".keypaste/tokens", Title = "t1", Password = "verifier" });
         _vault.Save();

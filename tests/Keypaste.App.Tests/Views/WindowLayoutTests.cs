@@ -11,6 +11,7 @@ using Keypaste.App.Views;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Settings;
+using Keypaste.Core.Tests;
 using Xunit;
 using static Keypaste.App.Tests.Session.JourneyDriver;
 
@@ -301,7 +302,7 @@ public sealed class WindowLayoutTests
         using var fixture = new TempVault();
         var vault = Path.Combine(fixture.Home, "layout.kdbx");
 
-        using (var created = Vault.Create(vault, TempVault.Password))
+        using (var created = ClaimedVault.Create(vault, TempVault.Password))
         {
             created.AddEntry(new VaultEntry { GroupPath = "Work", Title = "github", Username = "me", Password = "layout-secret" });
             created.Save();
@@ -409,7 +410,7 @@ public sealed class WindowLayoutTests
         using var fixture = new TempVault();
         var vault = Path.Combine(fixture.Home, "tables.kdbx");
 
-        using (var created = Vault.Create(vault, TempVault.Password))
+        using (var created = ClaimedVault.Create(vault, TempVault.Password))
         {
             created.AddEntry(new VaultEntry { Title = "zeta", Password = "tables-secret" });
             created.AddEntry(new VaultEntry { Title = "alpha", Password = "tables-secret" });
@@ -514,7 +515,7 @@ public sealed class WindowLayoutTests
         using var fixture = new TempVault();
         var vault = Path.Combine(fixture.Home, "unreadable.kdbx");
 
-        using (var created = Vault.Create(vault, TempVault.Password))
+        using (var created = ClaimedVault.Create(vault, TempVault.Password))
         {
             created.Save();
         }

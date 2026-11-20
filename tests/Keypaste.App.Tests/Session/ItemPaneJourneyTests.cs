@@ -16,6 +16,7 @@ using Keypaste.App.Views;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Session;
@@ -40,7 +41,7 @@ public sealed class ItemPaneJourneyTests
             using var fixture = new TempVault();
             var vault = Path.Combine(fixture.Home, "pane.kdbx");
 
-            using (var created = Vault.Create(vault, TempVault.Password))
+            using (var created = ClaimedVault.Create(vault, TempVault.Password))
             {
                 created.AddEntry(new VaultEntry { GroupPath = "Work", Title = "pane-login", Username = "me", Password = "gh-pane", Url = "https://github.com/login" });
                 created.AddEntry(new VaultEntry { GroupPath = "Work", Title = "bookmarklet", Password = "bm-pane", Url = "javascript:alert(document.cookie)" });

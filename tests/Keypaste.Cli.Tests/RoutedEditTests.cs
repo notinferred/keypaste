@@ -26,7 +26,7 @@ public sealed class RoutedEditTests : IDisposable
     {
         _harness.SeedVault(_master, ("Work/github", "gh-before"));
 
-        using (var vault = Vault.Open(_harness.VaultPath, _master))
+        using (var vault = ClaimedVault.Open(_harness.VaultPath, _master))
         {
             vault.SetFields(new EntryName("Work", "github"), [new FieldWrite("KEY", "field-before")]);
             ProjectVariables.Set(vault, "ci", "DEPLOY_KEY", "deploy-before");
@@ -124,7 +124,7 @@ public sealed class RoutedEditTests : IDisposable
             Assert.DoesNotContain("gh-after", owner.Channel.LastEdit!.Changes.Concat([owner.Channel.LastEdit.Item]), StringComparer.Ordinal);
         }
 
-        using var vault = Vault.Open(_harness.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
         Assert.Equal("gh-after", vault.Find(new EntryName("Work", "github"))!.Password);
         Assert.Contains("updated Work/github", _harness.Err, StringComparison.Ordinal);
     }
@@ -184,7 +184,7 @@ public sealed class RoutedEditTests : IDisposable
     public async Task Access_and_import_are_refused_even_with_a_holder_listening(string verb)
     {
         var source = Path.Combine(_harness.Directory, "source.kdbx");
-        using (var created = Vault.Create(source, "source-pw"))
+        using (var created = ClaimedVault.Create(source, "source-pw"))
         {
             created.Save();
         }

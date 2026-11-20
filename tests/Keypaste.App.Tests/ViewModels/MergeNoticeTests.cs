@@ -2,6 +2,7 @@ using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Agents;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -17,11 +18,11 @@ public sealed class MergeNoticeTests
     {
         using var fixture = new TempVault();
         var retired = new EntryName(ReservedGroups.Agents, _agent);
-        using var open = Vault.Open(fixture.Path_, TempVault.Password);
+        using var open = ClaimedVault.Open(fixture.Path_, TempVault.Password);
         Assert.True(open.WriteRecord(retired, AcafIds.Agent, "acaf", """{"acaf":1,"mode":"automatic"}"""));
         open.Save();
 
-        using (var other = Vault.Open(fixture.Path_, TempVault.Password))
+        using (var other = ClaimedVault.Open(fixture.Path_, TempVault.Password))
         {
             Assert.True(other.WriteRecord(retired, AcafIds.Agent, "acaf", _changed));
             other.Save();

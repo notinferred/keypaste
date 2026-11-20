@@ -229,7 +229,7 @@ public sealed class SecretCopyParityTests
             _directory = Directory.CreateTempSubdirectory("keypaste-copy-parity-").FullName;
             var path = Path.Combine(_directory, "vault.kdbx");
 
-            using (var vault = Vault.Create(path, _master))
+            using (var vault = ClaimedVault.Create(path, _master))
             {
                 vault.AddEntry(new VaultEntry { Title = "github", Username = "me", Password = _superseded });
                 vault.SetFields(new EntryName(string.Empty, "github"), [new FieldWrite("API_TOKEN", _fieldValue), new FieldWrite("Region", _plainFieldValue, Protect: false)]);

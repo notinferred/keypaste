@@ -19,7 +19,7 @@ public sealed class VaultCheckpointTests : IDisposable
 
     public VaultCheckpointTests()
     {
-        _vault = Vault.Create(Path.Combine(_directory, "vault.kdbx"), _master);
+        _vault = ClaimedVault.Create(Path.Combine(_directory, "vault.kdbx"), _master);
         _vault.AddEntry(new VaultEntry { GroupPath = _github.GroupPath, Title = _github.Title, Password = "old", Notes = "kept" });
         _vault.Save();
         _scene = new EditScene(DateTimeOffset.UnixEpoch);
@@ -78,7 +78,7 @@ public sealed class VaultCheckpointTests : IDisposable
 
         Assert.Equal("old", _vault.Find(_github)!.Password);
         _vault.Save();
-        using var reopened = Vault.Open(_vault.Path, _master);
+        using var reopened = ClaimedVault.Open(_vault.Path, _master);
         Assert.NotNull(reopened.Find(_github));
     }
 
@@ -96,7 +96,7 @@ public sealed class VaultCheckpointTests : IDisposable
     [Fact]
     public void Another_vaults_checkpoint_is_refused()
     {
-        using var other = Vault.Create(Path.Combine(_directory, "other.kdbx"), _master);
+        using var other = ClaimedVault.Create(Path.Combine(_directory, "other.kdbx"), _master);
 
         Assert.Throws<ArgumentException>(() => _vault.Restore(other.Checkpoint()));
     }

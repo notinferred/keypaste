@@ -46,13 +46,13 @@ public sealed class VaultRoundTripTests : IDisposable
             GroupPath = "servers/production",
         };
 
-        using (var created = Vault.Create(path, MasterPassword))
+        using (var created = ClaimedVault.Create(path, MasterPassword))
         {
             created.AddEntry(expected);
             created.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         var actual = reopened.Find("servers/production/Example Site");
 
         Assert.NotNull(actual);
@@ -106,7 +106,7 @@ public sealed class VaultRoundTripTests : IDisposable
         CreateVaultWithOneEntry(path);
 
         Assert.Throws<InvalidMasterPasswordException>(
-            () => Vault.Open(path, "not the master password"));
+            () => ClaimedVault.Open(path, "not the master password"));
     }
 
     /// <summary>
@@ -126,8 +126,8 @@ public sealed class VaultRoundTripTests : IDisposable
 
         Assert.NotEqual(File.ReadAllBytes(first), File.ReadAllBytes(second));
 
-        using var a = Vault.Open(first, MasterPassword);
-        using var b = Vault.Open(second, MasterPassword);
+        using var a = ClaimedVault.Open(first, MasterPassword);
+        using var b = ClaimedVault.Open(second, MasterPassword);
 
         Assert.Equal(
             a.Find("only")?.Password,
@@ -145,7 +145,7 @@ public sealed class VaultRoundTripTests : IDisposable
         var path = VaultPath("disposed.kdbx");
         CreateVaultWithOneEntry(path);
 
-        var vault = Vault.Open(path, MasterPassword);
+        var vault = ClaimedVault.Open(path, MasterPassword);
         vault.Dispose();
 
         Assert.Throws<ObjectDisposedException>(() => vault.ReadEntries());
@@ -158,7 +158,7 @@ public sealed class VaultRoundTripTests : IDisposable
 
     private static void CreateVaultWithOneEntry(string path)
     {
-        using var vault = Vault.Create(path, MasterPassword);
+        using var vault = ClaimedVault.Create(path, MasterPassword);
         vault.AddEntry(new VaultEntry { Title = "only", Password = "only-secret" });
         vault.Save();
     }

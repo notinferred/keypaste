@@ -1,6 +1,7 @@
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ownership;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -67,6 +68,29 @@ public sealed class HeldVaultRefusalTests : IDisposable
     }
 
     [Fact]
+    public void Init_is_refused_a_path_another_process_holds_before_its_password()
+    {
+        var home = KeypasteHome.Resolve(_harness.Environment[KeypasteHome.EnvironmentVariable]);
+        var path = Path.Combine(Path.GetDirectoryName(_harness.VaultPath)!, "new.kdbx");
+        _harness.Prompt.PromptsSeen.Clear();
+
+        Assert.True(VaultClaim.TryAcquire(home, path, OwnerKind.DesktopApp, out var claim, out var refusal), refusal);
+
+        using (claim)
+        {
+            _harness.Prompt.Enqueue(_master, _master);
+            _harness.AssertExit(CliApp.ExitInternalError, _harness.Run("init", path));
+        }
+
+        Assert.Empty(_harness.Prompt.PromptsSeen);
+        Assert.False(File.Exists(path));
+        Assert.Contains(
+            $"keypaste: this vault is already unlocked in {new VaultOwner(OwnerKind.DesktopApp, Environment.ProcessId, path).Describe()}.",
+            _harness.Err,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void A_dry_run_import_reads_a_held_vault_without_the_claim()
     {
         var home = KeypasteHome.Resolve(_harness.Environment[KeypasteHome.EnvironmentVariable]);
@@ -128,7 +152,7 @@ public sealed class HeldVaultRefusalTests : IDisposable
 
         if (!File.Exists(path))
         {
-            using var source = Vault.Create(path, "source-held");
+            using var source = ClaimedVault.Create(path, "source-held");
             source.AddEntry(new VaultEntry { GroupPath = "Imported", Title = "old", Password = "old-held" });
             source.Save();
         }

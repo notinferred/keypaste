@@ -41,45 +41,49 @@ internal static class InitCommand
             return CliApp.ExitUsageError;
         }
 
-        using var master = VaultSession.ReadNewMasterPassword(context);
-        if (master is null)
+        return VaultSession.Held(path, context, claim =>
         {
-            return CliApp.ExitAuthFailed;
-        }
-
-        var outcome = VaultCreation.TryCreate(
-            path,
-            master.Password.Value,
-            master.Confirmation.Value,
-            out var created,
-            out var failure);
-
-        using (created)
-        {
-            switch (outcome)
+            using var master = VaultSession.ReadNewMasterPassword(context);
+            if (master is null)
             {
-                case VaultCreationOutcome.Created:
-                    break;
-
-                case VaultCreationOutcome.PathAlreadyExists:
-                    context.Stderr.WriteLine($"keypaste init: '{path}' already exists");
-                    return CliApp.ExitUsageError;
-
-                case VaultCreationOutcome.EmptyPassword:
-                    context.Stderr.WriteLine("keypaste: the master password cannot be empty");
-                    return CliApp.ExitAuthFailed;
-
-                case VaultCreationOutcome.PasswordsDoNotMatch:
-                    context.Stderr.WriteLine("keypaste: the passwords do not match");
-                    return CliApp.ExitAuthFailed;
-
-                default:
-                    context.Stderr.WriteLine($"keypaste init: {failure}");
-                    return CliApp.ExitInternalError;
+                return CliApp.ExitAuthFailed;
             }
-        }
 
-        context.Stderr.WriteLine($"Created {path}");
-        return CliApp.ExitSuccess;
+            var outcome = VaultCreation.TryCreate(
+                claim,
+                path,
+                master.Password.Value,
+                master.Confirmation.Value,
+                out var created,
+                out var failure);
+
+            using (created)
+            {
+                switch (outcome)
+                {
+                    case VaultCreationOutcome.Created:
+                        break;
+
+                    case VaultCreationOutcome.PathAlreadyExists:
+                        context.Stderr.WriteLine($"keypaste init: '{path}' already exists");
+                        return CliApp.ExitUsageError;
+
+                    case VaultCreationOutcome.EmptyPassword:
+                        context.Stderr.WriteLine("keypaste: the master password cannot be empty");
+                        return CliApp.ExitAuthFailed;
+
+                    case VaultCreationOutcome.PasswordsDoNotMatch:
+                        context.Stderr.WriteLine("keypaste: the passwords do not match");
+                        return CliApp.ExitAuthFailed;
+
+                    default:
+                        context.Stderr.WriteLine($"keypaste init: {failure}");
+                        return CliApp.ExitInternalError;
+                }
+            }
+
+            context.Stderr.WriteLine($"Created {path}");
+            return CliApp.ExitSuccess;
+        });
     }
 }

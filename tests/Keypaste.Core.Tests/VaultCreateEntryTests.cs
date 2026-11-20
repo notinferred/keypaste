@@ -35,7 +35,7 @@ public sealed class VaultCreateEntryTests : IDisposable
         var edit = Assert.Single(edits);
         Assert.Equal(_openAi, Assert.Single(edit.Entries));
 
-        using var reopened = Vault.Open(path, _master);
+        using var reopened = ClaimedVault.Open(path, _master);
         var entry = reopened.Find(_openAi)!;
         Assert.Equal("billing account", entry.Notes);
         Assert.Equal([new EntryField("Host", false, false), new EntryField("OPENAI_API_KEY", true, false)], reopened.Fields(_openAi));
@@ -55,7 +55,7 @@ public sealed class VaultCreateEntryTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, _master);
+        using var reopened = ClaimedVault.Open(path, _master);
         var github = reopened.Find(new EntryName("Work", "github"))!;
         Assert.Equal(("me", "pw-1", "https://github.com"), (github.Username, github.Password, github.Url));
         Assert.Empty(reopened.ReadHistory(new EntryName("Work", "github"))!);
@@ -75,7 +75,7 @@ public sealed class VaultCreateEntryTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, _master);
+        using var reopened = ClaimedVault.Open(path, _master);
         Assert.Equal("sk-proj-1", reopened.Find(token)?.Password);
         Assert.Empty(ProjectCatalog.Read(reopened).Projects);
     }
@@ -153,7 +153,7 @@ public sealed class VaultCreateEntryTests : IDisposable
 
     private static Vault Seeded(string path)
     {
-        var vault = Vault.Create(path, _master);
+        var vault = ClaimedVault.Create(path, _master);
         vault.AddEntry(new VaultEntry { Title = "Stripe", GroupPath = "Work", Password = "login-password" });
         vault.Save();
         return vault;

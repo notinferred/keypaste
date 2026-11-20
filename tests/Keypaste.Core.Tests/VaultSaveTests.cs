@@ -57,10 +57,58 @@ public sealed class VaultSaveTests : IDisposable
     private (Vault Vault, string Home) NewVaultInItsOwnDirectory(string name)
     {
         var home = Directory.CreateDirectory(Path.Combine(_directory, name)).FullName;
-        var vault = Vault.Create(Path.Combine(home, "vault.kdbx"), MasterPassword);
+        var vault = ClaimedVault.Create(Path.Combine(home, "vault.kdbx"), MasterPassword);
         vault.AddEntry(new VaultEntry { Title = "T", Password = "p", GroupPath = "env/dev" });
         vault.Save();
         return (vault, home);
+    }
+
+    [Fact]
+    public void A_vault_whose_claim_was_released_saves_nothing()
+    {
+        var path = Path.Combine(_directory, "released.kdbx");
+        var claim = ClaimedVault.Claim(path);
+        using var vault = Vault.Create(claim, path, MasterPassword);
+        vault.Save();
+        var saved = File.ReadAllBytes(path);
+
+        claim.Dispose();
+        vault.AddEntry(new VaultEntry { Title = "after", Password = "p" });
+
+        Assert.Throws<VaultException>(vault.Save);
+        Assert.Throws<VaultException>(vault.SaveOverwriting);
+        Assert.Equal(saved, File.ReadAllBytes(path));
+    }
+
+    [Fact]
+    public void A_vault_opens_for_writing_only_under_a_held_claim_on_it()
+    {
+        var (created, home) = NewVaultInItsOwnDirectory("claims");
+        created.Dispose();
+        var path = Path.Combine(home, "vault.kdbx");
+        using var other = ClaimedVault.Claim(Path.Combine(home, "other.kdbx"));
+        var released = ClaimedVault.Claim(path);
+        released.Dispose();
+
+        Assert.Throws<ArgumentException>(() => Vault.Open(other, path, MasterPassword));
+        Assert.Throws<ArgumentException>(() => Vault.Open(released, path, MasterPassword));
+        Assert.Throws<ArgumentException>(() => Vault.Create(other, Path.Combine(home, "new.kdbx"), MasterPassword));
+    }
+
+    [Fact]
+    public void A_vault_opened_read_only_saves_nothing()
+    {
+        var (created, home) = NewVaultInItsOwnDirectory("read-only");
+        created.Dispose();
+        var path = Path.Combine(home, "vault.kdbx");
+        var saved = File.ReadAllBytes(path);
+
+        using var vault = Vault.OpenReadOnly(path, MasterPassword);
+        vault.AddEntry(new VaultEntry { Title = "after", Password = "p" });
+
+        Assert.Throws<InvalidOperationException>(vault.Save);
+        Assert.Throws<InvalidOperationException>(() => vault.MergeConflictedCopy(path, save: true));
+        Assert.Equal(saved, File.ReadAllBytes(path));
     }
 
     /// <summary>
@@ -126,7 +174,7 @@ public sealed class VaultSaveTests : IDisposable
         });
 
         Assert.Equal(1, produced);
-        using var reopened = Vault.Open(Path.Combine(home, "vault.kdbx"), MasterPassword);
+        using var reopened = ClaimedVault.Open(Path.Combine(home, "vault.kdbx"), MasterPassword);
         Assert.Contains(reopened.ReadEntries(), entry => entry.Title == "New");
     }
 
@@ -329,7 +377,7 @@ public sealed class VaultSaveTests : IDisposable
         var target = Path.Combine(home, "vault.kdbx");
         var link = Link(Path.Combine(_directory, "linked.kdbx"), target);
 
-        using (var vault = Vault.Open(link, MasterPassword))
+        using (var vault = ClaimedVault.Open(link, MasterPassword))
         {
             vault.AddEntry(new VaultEntry { Title = "New", Password = "p" });
             vault.Save();
@@ -337,7 +385,7 @@ public sealed class VaultSaveTests : IDisposable
 
         Assert.Equal(target, new FileInfo(link).ResolveLinkTarget(returnFinalTarget: true)?.FullName);
         Assert.Empty(Directory.GetFiles(home, "*.tmp"));
-        using var reopened = Vault.Open(target, MasterPassword);
+        using var reopened = ClaimedVault.Open(target, MasterPassword);
         Assert.Contains(reopened.ReadEntries(), entry => entry.Title == "New");
     }
 
@@ -349,7 +397,7 @@ public sealed class VaultSaveTests : IDisposable
         var target = Path.Combine(home, "vault.kdbx");
         var link = Link(Path.Combine(_directory, "linked-refused.kdbx"), target);
         var before = File.ReadAllBytes(target);
-        using var vault = Vault.Open(link, MasterPassword);
+        using var vault = ClaimedVault.Open(link, MasterPassword);
         vault.AddEntry(new VaultEntry { Title = "New", Password = "p" });
         vault.AfterSerializing = bytes =>
         {
@@ -417,7 +465,7 @@ public sealed class VaultSaveTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         Assert.Empty(reopened.ReadEntries());
     }
 
@@ -487,7 +535,7 @@ public sealed class VaultSaveTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(Path.Combine(home, "vault.kdbx"), MasterPassword);
+        using var reopened = ClaimedVault.Open(Path.Combine(home, "vault.kdbx"), MasterPassword);
         Assert.Equal("p", reopened.Find("env/dev/T")?.Password, StringComparer.Ordinal);
     }
 }

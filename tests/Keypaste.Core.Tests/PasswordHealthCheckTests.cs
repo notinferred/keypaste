@@ -48,7 +48,7 @@ public sealed class PasswordHealthCheckTests : IDisposable
             Add(created, new EntryName("services", "Blank"), string.Empty);
         });
 
-        using var vault = Vault.Open(VaultPath, _master);
+        using var vault = ClaimedVault.Open(VaultPath, _master);
         var findings = PasswordHealthCheck.Scan(vault, _now);
 
         Assert.Equal(
@@ -75,7 +75,7 @@ public sealed class PasswordHealthCheckTests : IDisposable
             Add(created, _mail, new string('b', 257));
         });
 
-        using var vault = Vault.Open(VaultPath, _master);
+        using var vault = ClaimedVault.Open(VaultPath, _master);
 
         Assert.Equal(
             [(_forum, PasswordProblem.Reused), (_shop, PasswordProblem.Reused)],
@@ -100,7 +100,7 @@ public sealed class PasswordHealthCheckTests : IDisposable
             Add(created, _shop, "qzvkx+wpt+jhrmybnd");
         });
 
-        using var vault = Vault.Open(VaultPath, _master);
+        using var vault = ClaimedVault.Open(VaultPath, _master);
 
         Assert.Equal(
             [(_mail, PasswordProblem.Weak), (_forum, PasswordProblem.Weak)],
@@ -118,7 +118,7 @@ public sealed class PasswordHealthCheckTests : IDisposable
             created.SetExpiryUnchecked(_bank, _now.AddSeconds(1));
         });
 
-        using var vault = Vault.Open(VaultPath, _master);
+        using var vault = ClaimedVault.Open(VaultPath, _master);
 
         var expired = Assert.Single(PasswordHealthCheck.Scan(vault, _now));
         Assert.Equal((_cloud, PasswordProblem.Expired), (expired.Entry, expired.Problem));
@@ -138,7 +138,7 @@ public sealed class PasswordHealthCheckTests : IDisposable
             created.RemoveEntry(new EntryName("services", "Old"), out _);
         });
 
-        using var vault = Vault.Open(VaultPath, _master);
+        using var vault = ClaimedVault.Open(VaultPath, _master);
 
         Assert.Empty(PasswordHealthCheck.Scan(vault, _now));
     }
@@ -157,7 +157,7 @@ public sealed class PasswordHealthCheckTests : IDisposable
             Add(created, _bank, @"\{ab\}");
         });
 
-        using var vault = Vault.Open(VaultPath, _master);
+        using var vault = ClaimedVault.Open(VaultPath, _master);
 
         var findings = PasswordHealthCheck.Scan(vault, _now);
         Assert.Equal([_wiki, _bank], findings.Select(finding => finding.Entry));
@@ -182,7 +182,7 @@ public sealed class PasswordHealthCheckTests : IDisposable
         EditElsewhere(_cloud.Title, entry => entry.QualityCheck = false);
         EditElsewhere(_wiki.Title, entry => entry.CustomData.Set("KnownBad", "true"));
 
-        using var vault = Vault.Open(VaultPath, _master);
+        using var vault = ClaimedVault.Open(VaultPath, _master);
 
         var reused = Assert.Single(PasswordHealthCheck.Scan(vault, _now));
         Assert.Equal((_shop, PasswordProblem.Reused), (reused.Entry, reused.Problem));
@@ -201,7 +201,7 @@ public sealed class PasswordHealthCheckTests : IDisposable
             }
         });
 
-        using var vault = Vault.Open(VaultPath, _master);
+        using var vault = ClaimedVault.Open(VaultPath, _master);
 
         Assert.Empty(PasswordHealthCheck.Scan(vault, _now));
     }
@@ -215,7 +215,7 @@ public sealed class PasswordHealthCheckTests : IDisposable
             Add(created, _shop, _shared);
         });
 
-        using var vault = Vault.Open(VaultPath, _master);
+        using var vault = ClaimedVault.Open(VaultPath, _master);
         var first = vault.ReadPasswordHealth();
         var second = vault.ReadPasswordHealth();
 
@@ -237,7 +237,7 @@ public sealed class PasswordHealthCheckTests : IDisposable
             created.SetExpiryUnchecked(_cloud, _now.AddDays(-1));
         });
 
-        using var vault = Vault.Open(VaultPath, _master);
+        using var vault = ClaimedVault.Open(VaultPath, _master);
         var findings = PasswordHealthCheck.Scan(vault, _now);
         string[] values = [_weak, _shared, _strong];
 
@@ -257,7 +257,7 @@ public sealed class PasswordHealthCheckTests : IDisposable
 
     private void Seed(Action<Vault> fill)
     {
-        using var vault = Vault.Create(VaultPath, _master);
+        using var vault = ClaimedVault.Create(VaultPath, _master);
         fill(vault);
         vault.Save();
     }

@@ -24,4 +24,9 @@
     <Compile Include="../Keypaste.Core.Tests/ManualClock.cs" Link="ManualClock.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Every vault these open or create for writing takes a claim of its own. -->
+    <Compile Include="../Keypaste.Core.Tests/ClaimedVault.cs" Link="ClaimedVault.cs" />
+  </ItemGroup>
+
 </Project>

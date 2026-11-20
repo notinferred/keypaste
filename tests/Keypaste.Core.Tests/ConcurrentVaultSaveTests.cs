@@ -57,7 +57,7 @@ public sealed class ConcurrentVaultSaveTests : IDisposable
             $"the save was refused at one attempt.{Environment.NewLine}{saver.Output}"
             + AliasesIn(contended, held.Holding));
 
-        using var reopened = Vault.Open(vault, VaultRoundTripTests.MasterPassword);
+        using var reopened = ClaimedVault.Open(vault, VaultRoundTripTests.MasterPassword);
         Assert.Contains(reopened.ReadEntries(), entry => entry.Title == "written under contention");
     }
 
@@ -215,7 +215,7 @@ public sealed class ConcurrentVaultSaveTests : IDisposable
         var path = Path.Combine(
             Directory.CreateDirectory(Path.Combine(_directory, "vault")).FullName, "vault.kdbx");
 
-        using var vault = Vault.Create(path, VaultRoundTripTests.MasterPassword);
+        using var vault = ClaimedVault.Create(path, VaultRoundTripTests.MasterPassword);
         vault.AddEntry(new VaultEntry { Title = "seeded", Password = "seed" });
 
         // FileTransactionEx uses a transacted save only after the destination file exists.

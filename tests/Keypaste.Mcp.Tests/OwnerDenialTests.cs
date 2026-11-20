@@ -156,7 +156,7 @@ public sealed class OwnerDenialTests : IDisposable
         private Owner(OwnerDenialTests test, string holds, bool relockOnFirstRequest)
         {
             Log = new OwnerLog(Path.Combine(test._directory, "home"));
-            _vault = Vault.Create(test.VaultPath, Master);
+            _vault = ClaimedVault.Create(test.VaultPath, Master);
             _vault.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "STRIPE_KEY", Password = Sentinel });
             _vault.Save();
 

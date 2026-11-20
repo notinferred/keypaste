@@ -111,7 +111,7 @@ public sealed class VaultRecycleBinTests : IDisposable
     [Fact]
     public void AFreshVault_HasNothingToRecover()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
 
         Assert.Empty(vault.ReadRecycled());
         Assert.Equal(0, vault.EmptyRecycleBin());
@@ -145,7 +145,7 @@ public sealed class VaultRecycleBinTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         var recycled = Assert.Single(reopened.ReadRecycled());
 
         Assert.Equal("env/billing", recycled.OriginalGroupPath, StringComparer.Ordinal);
@@ -182,7 +182,7 @@ public sealed class VaultRecycleBinTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
 
         Assert.Equal(3, reopened.ReadRecycled().Count);
         Assert.Equal(RestoreOutcome.Restored, reopened.RestoreRecycled(id));
@@ -385,7 +385,7 @@ public sealed class VaultRecycleBinTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         var back = _token with { Uuid = uuid };
 
         Assert.Equal(2, reopened.ReadEntries().Count(entry => entry.GroupPath == "env/billing" && entry.Title == "TOKEN"));
@@ -429,7 +429,7 @@ public sealed class VaultRecycleBinTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
 
         Assert.Empty(reopened.ReadRecycled());
         Assert.Null(reopened.Find(_token));
@@ -488,7 +488,7 @@ public sealed class VaultRecycleBinTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
 
         Assert.False(reopened.RecyclesDeletedEntries);
         Assert.Null(reopened.Find(_token));
@@ -515,7 +515,7 @@ public sealed class VaultRecycleBinTests : IDisposable
     [Fact]
     public void AFreshVault_Recycles()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
 
         Assert.True(vault.RecyclesDeletedEntries);
     }
@@ -554,7 +554,7 @@ public sealed class VaultRecycleBinTests : IDisposable
             vault.Save();
         }
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             foreach (var row in vault.ReadRecycled().OrderBy(row => row.Title, StringComparer.Ordinal).Reverse())
             {
@@ -564,7 +564,7 @@ public sealed class VaultRecycleBinTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
 
         Assert.Equal(["servers", "servers/db", "servers/web"], reopened.ReadGroupPaths().Order(StringComparer.Ordinal));
         Assert.Equal("a-value", reopened.Find(new EntryName("servers/web", "A"))?.Password, StringComparer.Ordinal);
@@ -648,7 +648,7 @@ public sealed class VaultRecycleBinTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
 
         Assert.DoesNotContain("empty", reopened.ReadGroupPaths());
         Assert.Equal(1, reopened.TombstoneCount);
@@ -672,9 +672,9 @@ public sealed class VaultRecycleBinTests : IDisposable
 
         var bytes = File.ReadAllBytes(path);
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
-            using (var other = Vault.Open(path, MasterPassword))
+            using (var other = ClaimedVault.Open(path, MasterPassword))
             {
                 other.AddEntry(new VaultEntry { Title = "ELSEWHERE", Password = "x", GroupPath = "env/dev" });
                 other.Save();
@@ -686,7 +686,7 @@ public sealed class VaultRecycleBinTests : IDisposable
 
         Assert.NotEqual(bytes, File.ReadAllBytes(path));
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
 
         Assert.Equal("v3", reopened.Find(_token)?.Password, StringComparer.Ordinal);
         Assert.Empty(reopened.ReadRecycled());
@@ -705,13 +705,13 @@ public sealed class VaultRecycleBinTests : IDisposable
 
         var bytes = File.ReadAllBytes(path);
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(_token));
             Assert.Equal(bytes, File.ReadAllBytes(path));
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
 
         Assert.NotNull(reopened.Find(_token));
         Assert.Empty(reopened.ReadRecycled());
@@ -738,7 +738,7 @@ public sealed class VaultRecycleBinTests : IDisposable
     {
         path = at ?? NewVaultPath();
 
-        var vault = Vault.Create(path, MasterPassword);
+        var vault = ClaimedVault.Create(path, MasterPassword);
         vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "v0", GroupPath = "env/billing" });
 
         for (var revision = 1; revision <= 3; revision++)
@@ -759,7 +759,7 @@ public sealed class VaultRecycleBinTests : IDisposable
     {
         path = at ?? NewVaultPath();
 
-        var vault = Vault.Create(path, MasterPassword);
+        var vault = ClaimedVault.Create(path, MasterPassword);
         vault.AddEntry(new VaultEntry { Title = "A", Password = "a-value", GroupPath = "servers/web" });
         vault.AddEntry(new VaultEntry { Title = "B", Password = "b-value", GroupPath = "servers/db" });
         vault.Save();
@@ -775,7 +775,7 @@ public sealed class VaultRecycleBinTests : IDisposable
         var bytes = File.ReadAllBytes(path);
         var before = Recycled(path);
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             refused(vault);
 
@@ -788,7 +788,7 @@ public sealed class VaultRecycleBinTests : IDisposable
 
     private static List<string> Recycled(string path)
     {
-        using var vault = Vault.Open(path, MasterPassword);
+        using var vault = ClaimedVault.Open(path, MasterPassword);
 
         return [.. vault.ReadRecycled().Select(row => $"{row.OriginalGroupPath}/{row.Title}").Order(StringComparer.Ordinal)];
     }

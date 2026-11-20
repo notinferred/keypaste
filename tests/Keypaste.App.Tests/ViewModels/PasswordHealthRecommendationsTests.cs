@@ -34,7 +34,7 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
 
     public PasswordHealthRecommendationsTests()
     {
-        using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
+        using (var vault = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
         {
             Add(vault, _mail, _weak);
             Add(vault, _forum, _shared);

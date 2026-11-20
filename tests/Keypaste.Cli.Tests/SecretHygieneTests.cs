@@ -445,7 +445,7 @@ public sealed class SecretHygieneTests
         using var harness = new CliHarness();
         Seed(harness);
 
-        using (var vault = Vault.Open(harness.VaultPath, Master))
+        using (var vault = ClaimedVault.Open(harness.VaultPath, Master))
         {
             ProjectVariables.Set(vault, "hygiene", "prod", "API_KEY", SentinelPassword);
             ExpiredHolder(vault, "Other", "env:hygiene:prod", "OTHER");
@@ -470,7 +470,7 @@ public sealed class SecretHygieneTests
         Seed(harness);
         harness.ConsoleStyle.Terminal = true;
 
-        using (var vault = Vault.Open(harness.VaultPath, Master))
+        using (var vault = ClaimedVault.Open(harness.VaultPath, Master))
         {
             ExpiredHolder(vault, "Stale", "env:hygiene", "STALE_KEY");
             vault.Save();

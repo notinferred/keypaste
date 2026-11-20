@@ -80,7 +80,7 @@ public sealed class UnlockOpenShortcutTests
     {
         using var fixture = new TempVault();
 
-        using (var vault = Vault.Open(fixture.Path_, TempVault.Password))
+        using (var vault = ClaimedVault.Open(fixture.Path_, TempVault.Password))
         {
             vault.AddEntry(new VaultEntry { Title = "second", Password = "another-secret" });
             vault.Save();

@@ -124,7 +124,7 @@ public sealed class EnvResolutionTests : IDisposable
         vault.Save();
         Assert.Equal("v2-unsaved", EnvResolution.Resolve(vault, "dev", _clock).Variables.Single().Value);
 
-        using (var other = Vault.Open(path, EnvStoreTests.MasterPassword))
+        using (var other = ClaimedVault.Open(path, EnvStoreTests.MasterPassword))
         {
             Add(other, "dev", "TOKEN", "v3-elsewhere");
             other.Save();
@@ -147,7 +147,7 @@ public sealed class EnvResolutionTests : IDisposable
             vault.Save();
         }
 
-        using (var vault = Vault.Open(path, EnvStoreTests.MasterPassword))
+        using (var vault = ClaimedVault.Open(path, EnvStoreTests.MasterPassword))
         {
             var entry = vault.Find("services/TOKEN")!;
             Assert.Equal(at, entry.Expires);
@@ -155,7 +155,7 @@ public sealed class EnvResolutionTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, EnvStoreTests.MasterPassword);
+        using var reopened = ClaimedVault.Open(path, EnvStoreTests.MasterPassword);
         var updated = reopened.Find("services/TOKEN")!;
         Assert.Equal("v2", updated.Password);
         Assert.Equal(at, updated.Expires);
@@ -256,13 +256,13 @@ public sealed class EnvResolutionTests : IDisposable
     {
         path ??= Path.Combine(_directory, Guid.NewGuid().ToString("N") + ".kdbx");
 
-        using (var created = Vault.Create(path, EnvStoreTests.MasterPassword))
+        using (var created = ClaimedVault.Create(path, EnvStoreTests.MasterPassword))
         {
             build(created);
             created.Save();
         }
 
-        return Vault.Open(path, EnvStoreTests.MasterPassword);
+        return ClaimedVault.Open(path, EnvStoreTests.MasterPassword);
     }
 
     private static void Add(Vault vault, string project, string key, string value) =>

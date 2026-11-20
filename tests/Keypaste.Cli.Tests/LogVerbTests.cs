@@ -3,6 +3,7 @@ using Keypaste.Core;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ownership;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -330,7 +331,7 @@ public sealed class LogVerbTests : IDisposable
         _cli.SeedVault(_master);
         var held = RandomNumberGenerator.GetBytes(32);
 
-        using (var vault = Vault.Open(_cli.VaultPath, _master))
+        using (var vault = ClaimedVault.Open(_cli.VaultPath, _master))
         {
             Assert.True(vault.WriteRecord(new EntryName(ReservedGroups.Keys, AuditCheckpoint.KeyTitle), AcafIds.Agent, AuditCheckpoint.KeyField, Convert.ToBase64String(held)));
             vault.Save();

@@ -27,7 +27,7 @@ public sealed class CustomFieldReleaseTests : IDisposable
 
     public CustomFieldReleaseTests()
     {
-        _vault = Vault.Create(Path.Combine(_directory, "vault.kdbx"), _master);
+        _vault = ClaimedVault.Create(Path.Combine(_directory, "vault.kdbx"), _master);
         _vault.AddEntry(new VaultEntry { GroupPath = _openAi.GroupPath, Title = _openAi.Title, Password = _password });
         Assert.True(_vault.SetFields(_openAi, [new FieldWrite("OPENAI_API_KEY", _apiKey), new FieldWrite("Recovery codes", _recovery)]));
         _vault.Save();
@@ -360,7 +360,7 @@ public sealed class CustomFieldReleaseTests : IDisposable
             return;
         }
 
-        using var writer = Vault.Open(_vault.Path, _master);
+        using var writer = ClaimedVault.Open(_vault.Path, _master);
         Assert.True(writer.SetFields(_openAi, [new FieldWrite("OPENAI_API_KEY", "external-value")]));
         writer.Save();
     }

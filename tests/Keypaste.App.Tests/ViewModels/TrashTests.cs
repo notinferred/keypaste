@@ -22,7 +22,7 @@ namespace Keypaste.App.Tests.ViewModels;
 /// <para>
 /// <b>What the file holds is asserted by opening it again.</b> A restore that only changed the
 /// vault in memory would satisfy every screen in this file, so each recovery is read back through
-/// a separate <see cref="Vault.Open(string, ReadOnlySpan{char})"/> after the session has gone.
+/// a separate <see cref="ClaimedVault.Open(string, ReadOnlySpan{char})"/> after the session has gone.
 /// </para>
 /// <para>
 /// There is no automation test beside this one, the way <c>HistoryRevealAutomationTests</c> sits
@@ -43,7 +43,7 @@ public sealed class TrashTests : IDisposable
         _directory = Directory.CreateTempSubdirectory("keypaste-trash-tests-").FullName;
         _vaultPath = Path.Combine(_directory, "vault.kdbx");
 
-        using var vault = Vault.Create(_vaultPath, _master);
+        using var vault = ClaimedVault.Create(_vaultPath, _master);
 
         vault.AddEntry(new VaultEntry
         {
@@ -126,7 +126,7 @@ public sealed class TrashTests : IDisposable
             Assert.True(trash.IsEmpty);
         }
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
         var entry = reopened.Find(new EntryName("servers", "production"));
 
         Assert.NotNull(entry);
@@ -164,7 +164,7 @@ public sealed class TrashTests : IDisposable
             Assert.True(trash.IsEmpty);
         }
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
         var name = new EntryName("servers", "production");
 
         Assert.Equal("v1", reopened.Find(name)?.Password, StringComparer.Ordinal);
@@ -193,7 +193,7 @@ public sealed class TrashTests : IDisposable
             Assert.Equal("env/billing", Assert.Single(trash.Rows).Where, StringComparer.Ordinal);
         }
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
 
         Assert.Equal(
             "sk-test",
@@ -352,7 +352,7 @@ public sealed class TrashTests : IDisposable
             Assert.True(trash.IsEmpty);
         }
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
         var back = new EntryName("servers", "production") { Uuid = restoredUuid };
 
         Assert.Equal(2, reopened.ReadEntries().Count(entry => entry.GroupPath == "servers" && entry.Title == "production"));
@@ -437,7 +437,7 @@ public sealed class TrashTests : IDisposable
             Assert.False(trash.EmptyCommand.CanExecute(null));
         }
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
 
         Assert.Empty(reopened.ReadRecycled());
         Assert.Null(reopened.Find(new EntryName("servers", "production")));
@@ -516,7 +516,7 @@ public sealed class TrashTests : IDisposable
     {
         var path = Path.Combine(_directory, "no-bin.kdbx");
 
-        using (var vault = Vault.Create(path, _master))
+        using (var vault = ClaimedVault.Create(path, _master))
         {
             vault.SetRecyclesDeletedEntries(false);
             vault.AddEntry(new VaultEntry { Title = "github", Password = "gh" });
@@ -593,7 +593,7 @@ public sealed class TrashTests : IDisposable
             Assert.Empty(context.NewTrash().Rows);
         }
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
 
         Assert.Equal(
             "v1",
@@ -606,7 +606,7 @@ public sealed class TrashTests : IDisposable
     {
         var path = Path.Combine(_directory, "no-bin.kdbx");
 
-        using (var vault = Vault.Create(path, _master))
+        using (var vault = ClaimedVault.Create(path, _master))
         {
             vault.SetRecyclesDeletedEntries(false);
             vault.AddEntry(new VaultEntry { Title = "github", Password = "gh" });
@@ -671,7 +671,7 @@ public sealed class TrashTests : IDisposable
         Assert.Empty(trash.SelectedRows);
         Assert.True(trash.IsEmpty);
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
         Assert.NotNull(reopened.Find("servers/production"));
         Assert.Equal(2, reopened.ReadEntries().Count(entry => entry.GroupPath == "servers" && entry.Title == "staging"));
     }

@@ -38,7 +38,7 @@ public sealed class EntryHistoryTests : IDisposable
         _directory = Directory.CreateTempSubdirectory("keypaste-entry-history-tests-").FullName;
         _vaultPath = Path.Combine(_directory, "vault.kdbx");
 
-        using var vault = Vault.Create(_vaultPath, _master);
+        using var vault = ClaimedVault.Create(_vaultPath, _master);
         vault.AddEntry(new VaultEntry
         {
             Title = "production",
@@ -106,7 +106,7 @@ public sealed class EntryHistoryTests : IDisposable
         using var context = New();
         var history = Opened("servers/production", context);
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
         var revisions = reopened.ReadHistory(_production);
 
         Assert.NotNull(revisions);
@@ -124,7 +124,7 @@ public sealed class EntryHistoryTests : IDisposable
         using var context = New();
         var history = Opened("servers/production", context);
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
         var revisions = reopened.ReadHistory(_production);
 
         Assert.NotNull(revisions);
@@ -251,7 +251,7 @@ public sealed class EntryHistoryTests : IDisposable
             history.RestoreCommand.Press();
         }
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
 
         Assert.Equal("v0", reopened.Find(_production)?.Password);
         Assert.Equal(
@@ -266,7 +266,7 @@ public sealed class EntryHistoryTests : IDisposable
         var history = Opened("servers/production", context);
         history.Selected = history.Rows[^1];
 
-        using (var elsewhere = Vault.Open(_vaultPath, _master))
+        using (var elsewhere = ClaimedVault.Open(_vaultPath, _master))
         {
             elsewhere.AddEntry(new VaultEntry { Title = "from-the-terminal", Password = "x" });
             elsewhere.Save();
@@ -279,7 +279,7 @@ public sealed class EntryHistoryTests : IDisposable
         Assert.Contains("changed this vault", context.Entries.Error, StringComparison.Ordinal);
         Assert.Equal(before, Digest(_vaultPath));
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
         Assert.Equal("v3", reopened.Find(_production)?.Password);
     }
 
@@ -319,7 +319,7 @@ public sealed class EntryHistoryTests : IDisposable
 
         string reopenedPassword()
         {
-            using var reopened = Vault.Open(_vaultPath, _master);
+            using var reopened = ClaimedVault.Open(_vaultPath, _master);
             return reopened.Find(_production)?.Password ?? string.Empty;
         }
     }
@@ -503,7 +503,7 @@ public sealed class EntryHistoryTests : IDisposable
     {
         var path = Path.Combine(_directory, "capped.kdbx");
 
-        using (var vault = Vault.Create(path, _master))
+        using (var vault = ClaimedVault.Create(path, _master))
         {
             vault.AddEntry(new VaultEntry { Title = "long-lived", Password = "p0" });
 
@@ -523,7 +523,7 @@ public sealed class EntryHistoryTests : IDisposable
         history.Selected = history.Rows[9];
         history.RestoreCommand.Press();
 
-        using var reopened = Vault.Open(path, _master);
+        using var reopened = ClaimedVault.Open(path, _master);
         var revisions = reopened.ReadHistory(new EntryName(string.Empty, "long-lived"));
 
         Assert.NotNull(revisions);
@@ -546,7 +546,7 @@ public sealed class EntryHistoryTests : IDisposable
         const string token = "SENTINEL-HISTORY-FIELD-5c2e91";
         var github = new EntryName(string.Empty, "github");
 
-        using (var vault = Vault.Open(_vaultPath, _master))
+        using (var vault = ClaimedVault.Open(_vaultPath, _master))
         {
             Assert.True(vault.SetFields(github, [new FieldWrite("API_TOKEN", token), new FieldWrite("Region", "eu", Protect: false)]));
             Assert.True(vault.AddTag(github, "work"));
@@ -610,7 +610,7 @@ public sealed class EntryHistoryTests : IDisposable
         history.ConfirmRestoreCommand.Press();
 
         Assert.Null(context.Entries.Error);
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
         Assert.Equal(["env:billing"], reopened.Tags(_production)!);
     }
 
@@ -631,7 +631,7 @@ public sealed class EntryHistoryTests : IDisposable
 
         Assert.False(history.IsConfirmingRestore);
         Assert.Null(context.Entries.Error);
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
         Assert.Empty(reopened.Tags(_production)!);
         Assert.Equal(revisions + 1, reopened.ReadHistory(_production)!.Count);
     }
@@ -639,7 +639,7 @@ public sealed class EntryHistoryTests : IDisposable
     /// <summary>Gives servers/production a variable holding <c>{PASSWORD}</c> and tags it into billing/dev and out again, so its newest revision carries the tag and the item does not.</summary>
     private void TagAndUntag()
     {
-        using var vault = Vault.Open(_vaultPath, _master);
+        using var vault = ClaimedVault.Open(_vaultPath, _master);
         Assert.True(vault.SetFields(_production, [new FieldWrite("API_KEY", "{PASSWORD}")]));
         Assert.True(vault.AddTag(_production, "env:billing"));
         Assert.True(vault.RemoveTags(_production, ["env:billing"]));

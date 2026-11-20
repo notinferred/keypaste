@@ -65,7 +65,7 @@ public sealed class FilesByDragTests
     private static string AnotherVault(string directory, string name)
     {
         var path = Path.Combine(directory, name);
-        using var vault = Vault.Create(path, "another password");
+        using var vault = ClaimedVault.Create(path, "another password");
         vault.Save();
         return path;
     }
@@ -74,7 +74,7 @@ public sealed class FilesByDragTests
     {
         var kept = Directory.CreateDirectory(VaultBackups.DirectoryFor(vaultPath)).FullName;
         var backup = Path.Combine(kept, $"{Path.GetFileNameWithoutExtension(vaultPath)}.20260101T000000Z.kdbx");
-        using var vault = Vault.Create(backup, "another password");
+        using var vault = ClaimedVault.Create(backup, "another password");
         vault.Save();
     }
 

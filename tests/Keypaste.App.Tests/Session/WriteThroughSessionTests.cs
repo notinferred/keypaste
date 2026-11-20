@@ -253,14 +253,14 @@ public sealed class WriteThroughSessionTests
 
     private static void SaveElsewhere(TempVault fixture, string title)
     {
-        using var other = Vault.Open(fixture.Path_, TempVault.Password);
+        using var other = ClaimedVault.Open(fixture.Path_, TempVault.Password);
         other.AddEntry(new VaultEntry { Title = title, Password = "y" });
         other.Save();
     }
 
     private static List<string> TitlesOnDisk(TempVault fixture)
     {
-        using var reopened = Vault.Open(fixture.Path_, TempVault.Password);
+        using var reopened = ClaimedVault.Open(fixture.Path_, TempVault.Password);
         return [.. reopened.ReadEntries().Select(entry => entry.Title)];
     }
 }

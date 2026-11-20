@@ -31,7 +31,7 @@ public sealed class VaultTagTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, _master);
+        using var reopened = ClaimedVault.Open(path, _master);
         Assert.Equal(["env:billing:prod"], reopened.Tags(_stripe));
     }
 
@@ -111,7 +111,7 @@ public sealed class VaultTagTests : IDisposable
 
         Assert.Equal(KdbxVersion(path), (4, 0));
 
-        using var reopened = Vault.Open(path, _master);
+        using var reopened = ClaimedVault.Open(path, _master);
         Assert.Empty(reopened.Tags(_database)!);
     }
 
@@ -133,7 +133,7 @@ public sealed class VaultTagTests : IDisposable
         KdbxImportTests.WriteForeign(path, _master);
         var checking = new EntryName("Banking", "Checking");
 
-        using (var vault = Vault.Open(path, _master))
+        using (var vault = ClaimedVault.Open(path, _master))
         {
             Assert.True(vault.AddTag(checking, "env:billing"));
             vault.Save();
@@ -199,7 +199,7 @@ public sealed class VaultTagTests : IDisposable
 
     private static Vault Seeded(string path)
     {
-        var vault = Vault.Create(path, _master);
+        var vault = ClaimedVault.Create(path, _master);
         vault.AddEntry(new VaultEntry { Title = _stripe.Title, GroupPath = _stripe.GroupPath, Password = "s" });
         vault.AddEntry(new VaultEntry { Title = _database.Title, GroupPath = _database.GroupPath, Password = "d" });
         vault.Save();

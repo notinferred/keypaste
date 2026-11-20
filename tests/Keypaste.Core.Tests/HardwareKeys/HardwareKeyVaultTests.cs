@@ -27,7 +27,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
         var path = HardwareKeyVault("vault.kdbx", new SoftwareYubiKey(_secret));
 
         using var key = new HardwareKey(new SoftwareYubiKey(_secret), 2);
-        using var vault = Vault.Open(path, _master, null, key);
+        using var vault = ClaimedVault.Open(path, _master, null, key);
 
         Assert.Equal("value", Assert.Single(vault.ReadEntries()).Password);
         Assert.Same(key, vault.HardwareKey);
@@ -39,10 +39,10 @@ public sealed class HardwareKeyVaultTests : IDisposable
         var device = new SoftwareYubiKey(_secret);
         var path = HardwareKeyVault("vault.kdbx", device);
         using var key = new HardwareKey(device, 2);
-        using var vault = Vault.Open(path, _master, null, key);
+        using var vault = ClaimedVault.Open(path, _master, null, key);
 
         using (var writerKey = new HardwareKey(device, 2))
-        using (var writer = Vault.Open(path, _master, null, writerKey))
+        using (var writer = ClaimedVault.Open(path, _master, null, writerKey))
         {
             writer.UpdateEntry(new VaultEntry { Title = "TOKEN", Password = "external", GroupPath = "env/demo" });
             writer.Save();
@@ -63,11 +63,11 @@ public sealed class HardwareKeyVaultTests : IDisposable
         var device = new SoftwareYubiKey(_secret);
         var path = HardwareKeyVault("vault.kdbx", device);
         using var key = new HardwareKey(device, 2);
-        using var vault = Vault.Open(path, _master, null, key);
+        using var vault = ClaimedVault.Open(path, _master, null, key);
         vault.AddEntry(new VaultEntry { Title = "MINE", Password = "mine", GroupPath = "env/demo" });
 
         using (var writerKey = new HardwareKey(device, 2))
-        using (var writer = Vault.Open(path, _master, null, writerKey))
+        using (var writer = ClaimedVault.Open(path, _master, null, writerKey))
         {
             writer.UpdateEntry(new VaultEntry { Title = "TOKEN", Password = "external", GroupPath = "env/demo" });
             writer.Save();
@@ -82,7 +82,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
         Assert.True(device.Challenges.Count >= asked + 2, $"asked {device.Challenges.Count - asked} time(s) to read and save the merge");
 
         using var readerKey = new HardwareKey(new SoftwareYubiKey(_secret), 2);
-        using var reopened = Vault.Open(path, _master, null, readerKey);
+        using var reopened = ClaimedVault.Open(path, _master, null, readerKey);
         Assert.Equal(
             [("MINE", "mine"), ("TOKEN", "external")],
             reopened.ReadEntries().Select(entry => (entry.Title, entry.Password)).Order());
@@ -95,11 +95,11 @@ public sealed class HardwareKeyVaultTests : IDisposable
         var device = new SoftwareYubiKey(_secret);
         var path = HardwareKeyVault("vault.kdbx", device);
         using var key = new HardwareKey(device, 2);
-        using var vault = Vault.Open(path, _master, null, key);
+        using var vault = ClaimedVault.Open(path, _master, null, key);
         vault.AddEntry(new VaultEntry { Title = "MINE", Password = "mine", GroupPath = "env/demo" });
 
         using (var writerKey = new HardwareKey(device, 2))
-        using (var writer = Vault.Open(path, _master, null, writerKey))
+        using (var writer = ClaimedVault.Open(path, _master, null, writerKey))
         {
             writer.UpdateEntry(new VaultEntry { Title = "TOKEN", Password = "external", GroupPath = "env/demo" });
             writer.Save();
@@ -124,7 +124,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
 
         using var key = new HardwareKey(new SoftwareYubiKey(_otherSecret), 2);
 
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, _master, null, key));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, _master, null, key));
     }
 
     [Fact]
@@ -134,7 +134,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
 
         using var key = new HardwareKey(new SoftwareYubiKey(_secret, variableLength: false), 2);
 
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, _master, null, key));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, _master, null, key));
     }
 
     [Fact]
@@ -142,7 +142,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
     {
         var path = HardwareKeyVault("vault.kdbx", new SoftwareYubiKey(_secret));
 
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, _master));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, _master));
     }
 
     [Fact]
@@ -152,7 +152,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
 
         using var key = new HardwareKey(new SoftwareYubiKey(_secret), 2);
 
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, "not the password", null, key));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, "not the password", null, key));
     }
 
     [Fact]
@@ -162,7 +162,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
 
         using var key = new HardwareKey(new SoftwareYubiKey(_secret) { Connected = false }, 2);
 
-        var refused = Assert.Throws<HardwareKeyException>(() => Vault.Open(path, _master, null, key));
+        var refused = Assert.Throws<HardwareKeyException>(() => ClaimedVault.Open(path, _master, null, key));
         Assert.Equal(HardwareKeyFailure.NotFound, refused.Failure);
     }
 
@@ -173,7 +173,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
         var path = HardwareKeyVault("vault.kdbx", device);
 
         using (var key = new HardwareKey(device, 2))
-        using (var vault = Vault.Open(path, _master, null, key))
+        using (var vault = ClaimedVault.Open(path, _master, null, key))
         {
             var asked = device.Challenges.Count;
             vault.AddEntry(new VaultEntry { Title = "SECOND", Password = "two", GroupPath = "env/demo" });
@@ -184,7 +184,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
         }
 
         using var again = new HardwareKey(new SoftwareYubiKey(_secret), 2);
-        using var reopened = Vault.Open(path, _master, null, again);
+        using var reopened = ClaimedVault.Open(path, _master, null, again);
         Assert.Equal(2, reopened.ReadEntries().Count);
     }
 
@@ -195,7 +195,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
         var path = HardwareKeyVault("vault.kdbx", device);
 
         using (var key = new HardwareKey(device, 2))
-        using (var vault = Vault.Open(path, _master, null, key))
+        using (var vault = ClaimedVault.Open(path, _master, null, key))
         {
             vault.AddEntry(new VaultEntry { Title = "SECOND", Password = "two", GroupPath = "env/demo" });
             vault.AfterSerializing = bytes =>
@@ -208,7 +208,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
         }
 
         using var again = new HardwareKey(new SoftwareYubiKey(_secret), 2);
-        using var reopened = Vault.Open(path, _master, null, again);
+        using var reopened = ClaimedVault.Open(path, _master, null, again);
         Assert.Equal(2, reopened.ReadEntries().Count);
     }
 
@@ -219,7 +219,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
         var path = HardwareKeyVault("vault.kdbx", device);
 
         using var key = new HardwareKey(device, 2);
-        using var vault = Vault.Open(path, _master, null, key);
+        using var vault = ClaimedVault.Open(path, _master, null, key);
         var bytes = File.ReadAllBytes(path);
         vault.AddEntry(new VaultEntry { Title = "SECOND", Password = "two", GroupPath = "env/demo" });
         vault.AfterSerializing = written =>
@@ -239,7 +239,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
         var path = HardwareKeyVault("vault.kdbx", device);
 
         using var key = new HardwareKey(device, 2);
-        using var vault = Vault.Open(path, _master, null, key);
+        using var vault = ClaimedVault.Open(path, _master, null, key);
         var bytes = File.ReadAllBytes(path);
 
         device.Connected = false;
@@ -263,21 +263,21 @@ public sealed class HardwareKeyVaultTests : IDisposable
         var attempts = 0;
 
         VaultAccessResult result;
-        using (var vault = Vault.Open(path, _master))
+        using (var vault = ClaimedVault.Open(path, _master))
         {
             result = vault.ChangeAccess(Attach(key), [], [], _ => attempts++);
         }
 
         Assert.Equal(VaultAccessOutcome.Changed, result.Outcome);
         Assert.Equal(attempts, device.Challenges.Count);
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, _master));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, _master));
 
         using var fresh = new HardwareKey(new SoftwareYubiKey(_secret), 2);
-        using var opened = Vault.Open(path, _master, null, fresh);
+        using var opened = ClaimedVault.Open(path, _master, null, fresh);
         Assert.Single(opened.ReadEntries());
 
         // The copy the change kept is the vault as it was, under the password alone.
-        using var kept = Vault.Open(result.Kept!.Path, _master);
+        using var kept = ClaimedVault.Open(result.Kept!.Path, _master);
         Assert.Single(kept.ReadEntries());
     }
 
@@ -294,7 +294,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
         var askedBefore = new List<int>();
 
         VaultAccessResult result;
-        using (var vault = Vault.Open(path, _master))
+        using (var vault = ClaimedVault.Open(path, _master))
         using (var refused = RefusedWrite.Stage(path))
         {
             if (refused is null)
@@ -316,10 +316,10 @@ public sealed class HardwareKeyVaultTests : IDisposable
         Assert.Equal(VaultAccessOutcome.Changed, result.Outcome);
         Assert.Equal([1, 1], askedBefore);
         Assert.Single(device.Challenges);
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, _master));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, _master));
 
         using var fresh = new HardwareKey(new SoftwareYubiKey(_secret), 2);
-        using var opened = Vault.Open(path, _master, null, fresh);
+        using var opened = ClaimedVault.Open(path, _master, null, fresh);
         Assert.Single(opened.ReadEntries());
     }
 
@@ -345,7 +345,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
         var path = HardwareKeyVault("vault.kdbx", new SoftwareYubiKey(_secret));
 
         using (var key = new HardwareKey(new SoftwareYubiKey(_secret), 2))
-        using (var vault = Vault.Open(path, _master, null, key))
+        using (var vault = ClaimedVault.Open(path, _master, null, key))
         {
             var result = vault.ChangeAccess(
                 new VaultAccessChange(false, AccessKeyfileChange.Keep) { HardwareKeyChange = AccessHardwareKeyChange.Remove }, [], []);
@@ -353,7 +353,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
             Assert.Equal(VaultAccessOutcome.Changed, result.Outcome);
         }
 
-        using var opened = Vault.Open(path, _master);
+        using var opened = ClaimedVault.Open(path, _master);
         Assert.Null(opened.HardwareKey);
         Assert.Single(opened.ReadEntries());
     }
@@ -365,7 +365,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
         var bytes = File.ReadAllBytes(path);
         using var key = new HardwareKey(new SoftwareYubiKey(_secret) { Connected = false }, 2);
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         var result = vault.ChangeAccess(Attach(key), [], []);
 
         Assert.Equal(VaultAccessOutcome.HardwareKeyNotFound, result.Outcome);
@@ -379,7 +379,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
         var path = PasswordVault("vault.kdbx");
         using var key = new HardwareKey(new SoftwareYubiKey(_secret) { Slots = [1] }, 2);
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
 
         Assert.Equal(VaultAccessOutcome.HardwareKeyNotFound, vault.ChangeAccess(Attach(key), [], []).Outcome);
     }
@@ -388,7 +388,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
     public void A_vault_with_no_hardware_key_has_none_to_remove()
     {
         var path = PasswordVault("vault.kdbx");
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
 
         var result = vault.ChangeAccess(
             new VaultAccessChange(false, AccessKeyfileChange.Keep) { HardwareKeyChange = AccessHardwareKeyChange.Remove }, [], []);
@@ -403,13 +403,13 @@ public sealed class HardwareKeyVaultTests : IDisposable
         File.WriteAllBytes(keyfile, [.. Enumerable.Range(1, 32).Select(i => (byte)i)]);
         var path = Path.Combine(_directory, "vault.kdbx");
         using (var key = new HardwareKey(new SoftwareYubiKey(_secret), 2))
-        using (var created = Vault.CreateWith(path, string.Empty, keyfile, key))
+        using (var created = ClaimedVault.CreateWith(path, string.Empty, keyfile, key))
         {
             created.Save();
         }
 
         using var again = new HardwareKey(new SoftwareYubiKey(_secret), 2);
-        using var vault = Vault.Open(path, string.Empty, keyfile, again);
+        using var vault = ClaimedVault.Open(path, string.Empty, keyfile, again);
         var result = vault.ChangeAccess(new VaultAccessChange(false, AccessKeyfileChange.Remove), [], []);
 
         Assert.Equal(VaultAccessOutcome.WouldLeaveNoPassword, result.Outcome);
@@ -421,7 +421,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
         var device = new SoftwareYubiKey(_secret);
         var path = HardwareKeyVault("vault.kdbx", device);
         using (var key = new HardwareKey(device, 2))
-        using (var vault = Vault.Open(path, _master, null, key))
+        using (var vault = ClaimedVault.Open(path, _master, null, key))
         {
             vault.AddEntry(new VaultEntry { Title = "SECOND", Password = "two", GroupPath = "env/demo" });
             vault.Save();
@@ -440,7 +440,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
     private string PasswordVault(string name)
     {
         var path = Path.Combine(_directory, name);
-        using var vault = Vault.Create(path, _master);
+        using var vault = ClaimedVault.Create(path, _master);
         vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "value", GroupPath = "env/demo" });
         vault.Save();
         return path;
@@ -468,7 +468,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
         var before = File.ReadAllBytes(path);
 
         using (var writerKey = new HardwareKey(device, 2))
-        using (var writer = Vault.Open(path, _master, null, writerKey))
+        using (var writer = ClaimedVault.Open(path, _master, null, writerKey))
         {
             writer.UpdateEntry(new VaultEntry { Title = "TOKEN", Password = "external", GroupPath = "env/demo" });
             writer.Save();
@@ -479,14 +479,14 @@ public sealed class HardwareKeyVaultTests : IDisposable
         File.WriteAllBytes(path, before);
 
         using var key = new HardwareKey(new Landing(device, () => File.Move(landed, path, overwrite: true)), 2);
-        using var vault = Vault.Open(path, _master, null, key);
+        using var vault = ClaimedVault.Open(path, _master, null, key);
 
         Assert.Equal("value", Assert.Single(vault.ReadEntries()).Password);
         Assert.True(vault.HasFileChangedSinceOpen());
         Assert.Throws<VaultChangedOnDiskException>(vault.Save);
 
         using var readerKey = new HardwareKey(device, 2);
-        using var reopened = Vault.Open(path, _master, null, readerKey);
+        using var reopened = ClaimedVault.Open(path, _master, null, readerKey);
         Assert.Equal("external", Assert.Single(reopened.ReadEntries()).Password);
     }
 
@@ -494,7 +494,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
     {
         var path = Path.Combine(_directory, name);
         using var key = new HardwareKey(device, 2);
-        using var vault = Vault.CreateWith(path, _master, null, key);
+        using var vault = ClaimedVault.CreateWith(path, _master, null, key);
         vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "value", GroupPath = "env/demo" });
         vault.Save();
         return path;

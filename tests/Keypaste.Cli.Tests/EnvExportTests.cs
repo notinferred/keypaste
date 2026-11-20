@@ -21,7 +21,7 @@ public sealed class EnvExportTests
 
         if (variables.Length > 0)
         {
-            using var vault = Vault.Open(harness.VaultPath, Master);
+            using var vault = ClaimedVault.Open(harness.VaultPath, Master);
             foreach (var (key, value) in variables)
             {
                 ProjectVariables.Set(vault, "billing", key, value);
@@ -65,7 +65,7 @@ public sealed class EnvExportTests
         harness.AssertExit(CliApp.ExitSuccess, harness.Run(
             "env", "pull", "roundtrip", path, "--yes", "--keep", "--vault", harness.VaultPath));
 
-        using var vault = Vault.Open(harness.VaultPath, Master);
+        using var vault = ClaimedVault.Open(harness.VaultPath, Master);
 
         Assert.Equal(EnvResolution.List(vault, "billing", "dev").Variables, EnvResolution.List(vault, "roundtrip", "dev").Variables);
     }
@@ -94,7 +94,7 @@ public sealed class EnvExportTests
         using var harness = new CliHarness();
         harness.SeedVault(Master);
 
-        using (var vault = Vault.Open(harness.VaultPath, Master))
+        using (var vault = ClaimedVault.Open(harness.VaultPath, Master))
         {
             ProjectVariables.Set(vault, "empty", "PLACEHOLDER", "x");
             Assert.Equal(
@@ -510,7 +510,7 @@ public sealed class EnvExportTests
         using var harness = SeededWithTwo();
         var old = new EntryName("services", "Old");
 
-        using (var vault = Vault.Open(harness.VaultPath, Master))
+        using (var vault = ClaimedVault.Open(harness.VaultPath, Master))
         {
             vault.AddEntry(new VaultEntry { GroupPath = old.GroupPath, Title = old.Title, Password = "login" });
             Assert.True(vault.SetFields(old, [new FieldWrite("OLD_TOKEN", "old-token-secret")]));
@@ -543,7 +543,7 @@ public sealed class EnvExportTests
     public void Dotenv_WithProfile()
     {
         using var harness = SeededWithTwo();
-        using (var vault = Vault.Open(harness.VaultPath, Master))
+        using (var vault = ClaimedVault.Open(harness.VaultPath, Master))
         {
             ProjectVariables.Set(vault, "billing", "staging", "API_KEY", "sk_staging_secret");
             vault.Save();

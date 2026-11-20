@@ -197,12 +197,12 @@ public sealed class UnlockKeyfileTests : IDisposable
         Assert.Equal(_keyfile, Assert.Single(Remembered()).KeyfilePath);
         _session.Lock(VaultLockReason.Manual);
 
-        using (var reopened = Vault.Open(_home.FreeVaultPath, _master, _keyfile))
+        using (var reopened = ClaimedVault.Open(_home.FreeVaultPath, _master, _keyfile))
         {
             Assert.Empty(reopened.ReadEntries());
         }
 
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(_home.FreeVaultPath, _master));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(_home.FreeVaultPath, _master));
     }
 
     [Fact]
@@ -250,7 +250,7 @@ public sealed class UnlockKeyfileTests : IDisposable
     {
         var path = Path.Combine(_home.Path, $"{Guid.NewGuid():n}.kdbx");
 
-        using var vault = Vault.CreateWith(path, password, keyfile);
+        using var vault = ClaimedVault.CreateWith(path, password, keyfile);
         vault.Save();
 
         return path;

@@ -559,7 +559,7 @@ public sealed class MaskedInputAutomationTests
         /// <summary>Saves once so the vault has a backup, then opens the restore panel on it.</summary>
         internal void BeginRestore()
         {
-            using (var vault = Keypaste.Core.Vault.Open(_fixture.Path_, TempVault.Password))
+            using (var vault = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
             {
                 vault.AddEntry(new Keypaste.Core.VaultEntry { Title = "saved-again", Password = "p" });
                 vault.Save();

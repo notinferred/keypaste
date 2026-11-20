@@ -36,4 +36,9 @@
     <Compile Include="../Keypaste.Core.Tests/HardwareKeys/SoftwareYubiKey.cs" Link="HardwareKeys/SoftwareYubiKey.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Every vault these open or create for writing takes a claim of its own. -->
+    <Compile Include="../Keypaste.Core.Tests/ClaimedVault.cs" Link="ClaimedVault.cs" />
+  </ItemGroup>
+
 </Project>

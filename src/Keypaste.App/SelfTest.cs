@@ -2,6 +2,7 @@ using Keypaste.App.Globalization;
 using Keypaste.App.Notifications;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
+using Keypaste.Core.Ownership;
 
 namespace Keypaste.App;
 
@@ -41,6 +42,15 @@ internal static class SelfTest
             scratch = Directory.CreateTempSubdirectory("keypaste-selftest-");
             var path = Path.Combine(scratch.FullName, "selftest.kdbx");
 
+            // A home of its own, so the claim never meets the person's.
+            if (!VaultClaim.TryAcquire(Path.Combine(scratch.FullName, "home"), path, OwnerKind.DesktopApp, out var taken, out var refusal))
+            {
+                stderr.WriteLine($"keypaste-app: selftest failed: {refusal}");
+                return 1;
+            }
+
+            using var claim = taken;
+
             // Through VaultCreation, like every other vault this app makes. It is the one creation
             // path in the whole binary, which is what lets the app's banned-symbol list forbid
             // Vault.Create here outright rather than exempt this file from the rule.
@@ -48,7 +58,7 @@ internal static class SelfTest
             // a lifetime that crosses an out parameter.
 #pragma warning disable CA2000
             var outcome = VaultCreation.TryCreate(
-                path, _masterPassword, _masterPassword, out var created, out var failure);
+                claim, path, _masterPassword, _masterPassword, out var created, out var failure);
 #pragma warning restore CA2000
 
             if (outcome != VaultCreationOutcome.Created || created is null)
@@ -63,7 +73,7 @@ internal static class SelfTest
                 created.Save();
             }
 
-            using (var vault = Vault.Open(path, _masterPassword))
+            using (var vault = Vault.OpenReadOnly(path, _masterPassword))
             {
                 var entry = vault.Find(new EntryName(_groupPath, _title));
 
@@ -77,7 +87,7 @@ internal static class SelfTest
             stdout.WriteLine(
                 $"keypaste-app: selftest ok on {Environment.OSVersion.Platform}: " +
                 "a vault was created through Keypaste.Core, saved, reopened, and an entry read back");
-            // The packaging jobs hold each package to the library its platform derives with (D-0523).
+            // The packaging jobs hold each package to the library its platform derives with.
             stdout.WriteLine(CoreInfo.NativeArgon2 is { } library
                 ? $"keypaste-app: Argon2 derived natively by {library}"
                 : "keypaste-app: Argon2 derived by managed code, as no native libargon2 loaded");

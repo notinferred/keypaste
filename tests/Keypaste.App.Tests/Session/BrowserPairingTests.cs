@@ -10,6 +10,7 @@ using Keypaste.App.Views;
 using Keypaste.Core;
 using Keypaste.Core.Browser;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Tests;
 using Xunit;
 using static Keypaste.App.Tests.Session.DesktopApprovalTests;
 
@@ -142,7 +143,7 @@ public sealed partial class BrowserPairingTests
         var pairing = link.PairAsync(Pair(app), Token).AsTask();
         var window = Assert.IsType<PairingWindow>(await app.PromptAsync());
 
-        using (var other = Core.Vault.Open(app.Vault, TempVault.Password))
+        using (var other = ClaimedVault.Open(app.Vault, TempVault.Password))
         {
             other.AddEntry(new VaultEntry { GroupPath = "services", Title = "Fly", Password = "external" });
             other.Save();

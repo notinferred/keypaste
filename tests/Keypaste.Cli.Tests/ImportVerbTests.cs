@@ -5,6 +5,7 @@ using Keypaste.Core.Audit;
 using Keypaste.Core.Internal;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Recent;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -45,7 +46,7 @@ public sealed class ImportVerbTests : IDisposable
         Assert.Contains("  ✓ 2 items · 0 projects · copied into acme", _cli.Err, StringComparison.Ordinal);
         Assert.Empty(_cli.Out);
 
-        using var vault = Vault.Open(_cli.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_cli.VaultPath, _master);
         Assert.Equal("bank-pw", vault.Find(new EntryName("acme/Banking", "Bank"))!.Password);
         Assert.Equal("api-pw", vault.Find(new EntryName("acme/env/acme-api", "API_KEY"))!.Password);
         Assert.Empty(ProjectCatalog.Read(vault).Projects);
@@ -70,7 +71,6 @@ public sealed class ImportVerbTests : IDisposable
         Assert.Matches(@"\.keypaste +1  skipped", _cli.Out);
         Assert.Contains("  nothing was written (--dry-run)", _cli.Out, StringComparison.Ordinal);
         Assert.Equal(before, File.ReadAllBytes(_cli.VaultPath));
-        Assert.False(Directory.Exists(Path.Combine(Home, VaultClaim.DirectoryName)), "a dry run took the vault's claim");
     }
 
     [Fact]
@@ -185,7 +185,7 @@ public sealed class ImportVerbTests : IDisposable
     private string Source(string name, Action<Vault>? more = null)
     {
         var path = Path.Combine(_cli.Directory, name);
-        using var vault = Vault.Create(path, _sourcePassword);
+        using var vault = ClaimedVault.Create(path, _sourcePassword);
         vault.AddEntry(new VaultEntry { Title = "Bank", GroupPath = "Banking", Password = "bank-pw" });
         vault.AddEntry(new VaultEntry { Title = "API_KEY", GroupPath = "env/acme-api", Password = "api-pw" });
         more?.Invoke(vault);

@@ -26,7 +26,7 @@ public sealed class SecretsScreenTests : IDisposable
         _directory = Directory.CreateTempSubdirectory("keypaste-secrets-screen-").FullName;
         _vaultPath = Path.Combine(_directory, "acme.kdbx");
 
-        using var vault = Vault.Create(_vaultPath, _master);
+        using var vault = ClaimedVault.Create(_vaultPath, _master);
         vault.AddEntry(new VaultEntry { Title = "github", Username = "me", Password = _value, Url = "https://github.com", GroupPath = "Work" });
         vault.AddEntry(new VaultEntry { Title = "wifi", Password = _value, GroupPath = "Home" });
         vault.AddEntry(new VaultEntry { Title = "recovery", Notes = "in the safe", GroupPath = "Home" });

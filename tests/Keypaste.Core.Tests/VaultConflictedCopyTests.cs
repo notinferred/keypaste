@@ -16,7 +16,7 @@ public sealed class VaultConflictedCopyTests : IDisposable
 
     public VaultConflictedCopyTests()
     {
-        using var vault = Vault.Create(VaultPath, _password);
+        using var vault = ClaimedVault.Create(VaultPath, _password);
         vault.AddEntry(new VaultEntry { Title = "stripe", GroupPath = _work, Username = "user", Password = "stripe-0" });
         vault.AddEntry(new VaultEntry { Title = "github", GroupPath = _work, Username = "user", Password = "github-0" });
         vault.Save();
@@ -45,7 +45,7 @@ public sealed class VaultConflictedCopyTests : IDisposable
     {
         Edit(CopyPath, "stripe", "phone");
         var before = File.ReadAllBytes(VaultPath);
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
 
         var review = open.MergeConflictedCopy(CopyPath, save: false);
 
@@ -59,12 +59,12 @@ public sealed class VaultConflictedCopyTests : IDisposable
     {
         Edit(CopyPath, "stripe", "phone");
         Edit(VaultPath, "github", "pc");
-        using (var open = Vault.Open(VaultPath, _password))
+        using (var open = ClaimedVault.Open(VaultPath, _password))
         {
             Assert.Equal(VaultMergeSaveOutcome.Saved, open.MergeConflictedCopy(CopyPath, save: true).Outcome);
         }
 
-        using var merged = Vault.Open(VaultPath, _password);
+        using var merged = ClaimedVault.Open(VaultPath, _password);
         Assert.Equal("phone", merged.Find(new EntryName(_work, "stripe"))!.Password);
         Assert.Equal("pc", merged.Find(new EntryName(_work, "github"))!.Password);
         Assert.False(File.Exists(CopyPath));
@@ -74,7 +74,7 @@ public sealed class VaultConflictedCopyTests : IDisposable
     [Fact]
     public void An_entry_each_device_changed_in_a_different_field_keeps_both()
     {
-        using (var phone = Vault.Open(CopyPath, _password))
+        using (var phone = ClaimedVault.Open(CopyPath, _password))
         {
             Assert.True(phone.UpdateEntry(new VaultEntry { Title = "stripe", GroupPath = _work, Username = "phone-user", Password = "stripe-0" }));
             phone.Save();
@@ -82,12 +82,12 @@ public sealed class VaultConflictedCopyTests : IDisposable
 
         Edit(VaultPath, "stripe", "pc");
 
-        using (var open = Vault.Open(VaultPath, _password))
+        using (var open = ClaimedVault.Open(VaultPath, _password))
         {
             Assert.Equal(VaultMergeSaveOutcome.Saved, open.MergeConflictedCopy(CopyPath, save: true).Outcome);
         }
 
-        using var merged = Vault.Open(VaultPath, _password);
+        using var merged = ClaimedVault.Open(VaultPath, _password);
         var entry = merged.Find(new EntryName(_work, "stripe"))!;
         Assert.Equal(("phone-user", "pc"), (entry.Username, entry.Password));
     }
@@ -95,13 +95,13 @@ public sealed class VaultConflictedCopyTests : IDisposable
     [Fact]
     public void A_copy_that_opens_with_other_credentials_is_refused_and_left_alone()
     {
-        using (var phone = Vault.Open(CopyPath, _password))
+        using (var phone = ClaimedVault.Open(CopyPath, _password))
         {
             Assert.Equal(VaultAccessOutcome.Changed, phone.ChangeAccess(new VaultAccessChange(true, AccessKeyfileChange.Keep), "another password", "another password").Outcome);
         }
 
         var before = File.ReadAllBytes(VaultPath);
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
 
         Assert.Equal(VaultMergeSaveOutcome.KeyRefused, open.MergeConflictedCopy(CopyPath, save: true).Outcome);
         Assert.Equal(before, File.ReadAllBytes(VaultPath));
@@ -111,7 +111,7 @@ public sealed class VaultConflictedCopyTests : IDisposable
     [Fact]
     public void A_group_holding_two_items_of_one_name_can_be_moved_and_renamed()
     {
-        using var vault = Vault.Open(VaultPath, _password);
+        using var vault = ClaimedVault.Open(VaultPath, _password);
         vault.AddEntry(new VaultEntry { Title = "stripe", GroupPath = _work, Password = "second" });
         vault.AddEntry(new VaultEntry { Title = "elsewhere", GroupPath = "dest", Password = "p" });
 
@@ -121,7 +121,7 @@ public sealed class VaultConflictedCopyTests : IDisposable
 
     private static void Edit(string path, string title, string password)
     {
-        using var vault = Vault.Open(path, _password);
+        using var vault = ClaimedVault.Open(path, _password);
         Assert.True(vault.UpdateEntry(new VaultEntry { Title = title, GroupPath = _work, Username = "user", Password = password }));
         vault.Save();
     }

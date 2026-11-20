@@ -31,7 +31,7 @@ public sealed class SessionAuthorityTokenTests : IDisposable
 
     public SessionAuthorityTokenTests()
     {
-        _vault = Vault.Create(VaultPath, EnvStoreTests.MasterPassword);
+        _vault = ClaimedVault.Create(VaultPath, EnvStoreTests.MasterPassword);
         ProjectVariables.Set(_vault, "acme-api", "staging", "DATABASE_URL", _database);
         ProjectVariables.Set(_vault, "acme-api", "staging", "API_KEY", _apiKey);
         ProjectVariables.Set(_vault, "acme-api", "prod", "DATABASE_URL", _prod);
@@ -304,7 +304,7 @@ public sealed class SessionAuthorityTokenTests : IDisposable
     public async Task AChangedOnDiskVault_SaysSo_NotInvalid()
     {
         var token = Mint("ci", "read:acme-api/staging/*");
-        using (var other = Vault.Open(VaultPath, EnvStoreTests.MasterPassword))
+        using (var other = ClaimedVault.Open(VaultPath, EnvStoreTests.MasterPassword))
         {
             other.AddEntry(new VaultEntry { Title = "elsewhere", Password = "x" });
             other.Save();

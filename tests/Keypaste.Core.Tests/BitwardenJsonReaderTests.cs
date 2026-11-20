@@ -138,7 +138,7 @@ public sealed class BitwardenJsonReaderTests : IDisposable
     public BitwardenJsonReaderTests()
     {
         _vaultPath = Path.Combine(_directory, "vault.kdbx");
-        _vault = Vault.Create(_vaultPath, _master);
+        _vault = ClaimedVault.Create(_vaultPath, _master);
     }
 
     public void Dispose()
@@ -196,7 +196,7 @@ public sealed class BitwardenJsonReaderTests : IDisposable
         using var source = Open("bitwarden_export.json", _personal);
         source.Commit(_vault, source.Plan(_vault, "imported"), vault => vault.Save());
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
         var github = new EntryName("imported/Work/Projects", "GitHub");
         var entry = reopened.Find(github)!;
 
@@ -233,7 +233,7 @@ public sealed class BitwardenJsonReaderTests : IDisposable
         using var source = Open("bitwarden_export.json", _personal);
         source.Commit(_vault, source.Plan(_vault, "imported"), vault => vault.Save());
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
         var github = new EntryName("imported/Work/Projects", "GitHub");
         var signIn = new EntryName("imported", "Sign-in");
 
@@ -262,7 +262,7 @@ public sealed class BitwardenJsonReaderTests : IDisposable
         using var source = Open("bitwarden_export.json", _personal);
         source.Commit(_vault, source.Plan(_vault, "imported"), vault => vault.Save());
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
         using var totp = reopened.ReadTotp(new EntryName(group, title), out var refusal);
 
         Assert.Null(refusal);
@@ -276,7 +276,7 @@ public sealed class BitwardenJsonReaderTests : IDisposable
         using var source = Open("bitwarden_export.json", _personal);
         source.Commit(_vault, source.Plan(_vault, "imported"), vault => vault.Save());
 
-        using var reopened = Vault.Open(_vaultPath, _master);
+        using var reopened = ClaimedVault.Open(_vaultPath, _master);
 
         Assert.Equal("bw-notes-recovery", reopened.Find(new EntryName("imported", "Recovery"))!.Notes);
         Assert.Empty(reopened.Fields(new EntryName("imported", "Recovery"))!);

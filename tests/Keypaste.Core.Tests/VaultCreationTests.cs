@@ -37,7 +37,7 @@ public sealed class VaultCreationTests : IDisposable
     {
         var path = Path.Combine(_directory, "new.kdbx");
 
-        var outcome = VaultCreation.TryCreate(path, _password, _password, out var created, out var failure);
+        var outcome = ClaimedVault.TryCreate(path, _password, _password, out var created, out var failure);
 
         using (created)
         {
@@ -47,8 +47,21 @@ public sealed class VaultCreationTests : IDisposable
             Assert.True(File.Exists(path), "TryCreate reported Created without saving the file");
         }
 
-        using var reopened = Vault.Open(path, _password);
+        using var reopened = ClaimedVault.Open(path, _password);
         Assert.Empty(reopened.ReadEntries());
+    }
+
+    [Fact]
+    public void A_vault_is_created_only_under_a_held_claim_on_its_path()
+    {
+        var path = Path.Combine(_directory, "new.kdbx");
+        using var other = ClaimedVault.Claim(Path.Combine(_directory, "other.kdbx"));
+        var released = ClaimedVault.Claim(path);
+        released.Dispose();
+
+        Assert.Throws<ArgumentException>(() => VaultCreation.TryCreate(other, path, _password, _password, out _, out _));
+        Assert.Throws<ArgumentException>(() => VaultCreation.TryCreate(released, path, _password, _password, out _, out _));
+        Assert.False(File.Exists(path));
     }
 
     [Fact]
@@ -56,7 +69,7 @@ public sealed class VaultCreationTests : IDisposable
     {
         var path = Path.Combine(_directory, "already.kdbx");
 
-        using (var existing = Vault.Create(path, "the other password"))
+        using (var existing = ClaimedVault.Create(path, "the other password"))
         {
             existing.AddEntry(new VaultEntry { Title = "keep me", Password = "secret" });
             existing.Save();
@@ -66,7 +79,7 @@ public sealed class VaultCreationTests : IDisposable
         // unchanged digest proves no save happened rather than that two saves agreed.
         var before = Digest(path);
 
-        var outcome = VaultCreation.TryCreate(path, _password, _password, out var created, out _);
+        var outcome = ClaimedVault.TryCreate(path, _password, _password, out var created, out _);
 
         using (created)
         {
@@ -75,7 +88,7 @@ public sealed class VaultCreationTests : IDisposable
             Assert.Equal(before, Digest(path));
         }
 
-        using var untouched = Vault.Open(path, "the other password");
+        using var untouched = ClaimedVault.Open(path, "the other password");
         Assert.Single(untouched.ReadEntries());
     }
 
@@ -85,7 +98,7 @@ public sealed class VaultCreationTests : IDisposable
         var path = Path.Combine(_directory, "imposter.kdbx");
         File.WriteAllText(path, "a text file wearing the extension");
 
-        var outcome = VaultCreation.TryCreate(path, _password, _password, out var created, out _);
+        var outcome = ClaimedVault.TryCreate(path, _password, _password, out var created, out _);
 
         using (created)
         {
@@ -101,7 +114,7 @@ public sealed class VaultCreationTests : IDisposable
         var parent = Path.Combine(_directory, "not-created-yet");
         var path = Path.Combine(parent, "new.kdbx");
 
-        var outcome = VaultCreation.TryCreate(path, string.Empty, string.Empty, out var created, out _);
+        var outcome = ClaimedVault.TryCreate(path, string.Empty, string.Empty, out var created, out _);
 
         using (created)
         {
@@ -121,7 +134,7 @@ public sealed class VaultCreationTests : IDisposable
         var parent = Path.Combine(_directory, "not-created-either");
         var path = Path.Combine(parent, "new.kdbx");
 
-        var outcome = VaultCreation.TryCreate(path, _password, "something else", out var created, out _);
+        var outcome = ClaimedVault.TryCreate(path, _password, "something else", out var created, out _);
 
         using (created)
         {
@@ -137,7 +150,7 @@ public sealed class VaultCreationTests : IDisposable
     {
         var path = Path.Combine(_directory, "unconfirmed.kdbx");
 
-        var outcome = VaultCreation.TryCreate(path, _password, default, out var created, out _);
+        var outcome = ClaimedVault.TryCreate(path, _password, default, out var created, out _);
 
         using (created)
         {
@@ -159,18 +172,18 @@ public sealed class VaultCreationTests : IDisposable
     public void The_occupied_path_is_answered_before_the_password_rules()
     {
         var path = Path.Combine(_directory, "occupied.kdbx");
-        using (var existing = Vault.Create(path, "the other password"))
+        using (var existing = ClaimedVault.Create(path, "the other password"))
         {
             existing.Save();
         }
 
         Assert.Equal(
             VaultCreationOutcome.PathAlreadyExists,
-            VaultCreation.TryCreate(path, string.Empty, string.Empty, out _, out _));
+            ClaimedVault.TryCreate(path, string.Empty, string.Empty, out _, out _));
 
         Assert.Equal(
             VaultCreationOutcome.PathAlreadyExists,
-            VaultCreation.TryCreate(path, _password, "mismatched", out _, out _));
+            ClaimedVault.TryCreate(path, _password, "mismatched", out _, out _));
     }
 
     /// <summary>
@@ -187,11 +200,11 @@ public sealed class VaultCreationTests : IDisposable
 
         Assert.Equal(
             VaultCreationOutcome.EmptyPassword,
-            VaultCreation.TryCreate(path, string.Empty, "not empty", out _, out _));
+            ClaimedVault.TryCreate(path, string.Empty, "not empty", out _, out _));
 
         Assert.Equal(
             VaultCreationOutcome.EmptyPassword,
-            VaultCreation.TryCreate(path, string.Empty, string.Empty, out _, out _));
+            ClaimedVault.TryCreate(path, string.Empty, string.Empty, out _, out _));
     }
 
     [Fact]
@@ -199,7 +212,7 @@ public sealed class VaultCreationTests : IDisposable
     {
         var path = Path.Combine(_directory, "a", "b", "deep.kdbx");
 
-        var outcome = VaultCreation.TryCreate(path, _password, _password, out var created, out _);
+        var outcome = ClaimedVault.TryCreate(path, _password, _password, out var created, out _);
 
         using (created)
         {
@@ -228,7 +241,7 @@ public sealed class VaultCreationTests : IDisposable
         var keyfile = Path.Combine(_directory, "vault.key");
         File.WriteAllBytes(keyfile, RandomNumberGenerator.GetBytes(32));
 
-        var outcome = VaultCreation.TryCreate(path, _password, _password, keyfile, out var created, out _);
+        var outcome = ClaimedVault.TryCreate(path, _password, _password, keyfile, out var created, out _);
 
         using (created)
         {
@@ -237,13 +250,13 @@ public sealed class VaultCreationTests : IDisposable
             Assert.True(created.HasPassword);
         }
 
-        using (var reopened = Vault.Open(path, _password, keyfile))
+        using (var reopened = ClaimedVault.Open(path, _password, keyfile))
         {
             Assert.Empty(reopened.ReadEntries());
         }
 
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, _password));
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, string.Empty, keyfile));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, _password));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, string.Empty, keyfile));
     }
 
     [Theory]
@@ -271,7 +284,7 @@ public sealed class VaultCreationTests : IDisposable
             File.WriteAllText(keyfile, "an ordinary document someone might edit");
         }
 
-        var outcome = VaultCreation.TryCreate(path, _password, _password, keyfile, out var created, out _);
+        var outcome = ClaimedVault.TryCreate(path, _password, _password, keyfile, out var created, out _);
 
         using (created)
         {
@@ -289,7 +302,7 @@ public sealed class VaultCreationTests : IDisposable
         var device = new SoftwareYubiKey(_keySecret);
         using var key = new HardwareKey(device, 2);
 
-        var outcome = VaultCreation.TryCreate(path, _password, _password, null, key, out var created, out _);
+        var outcome = ClaimedVault.TryCreate(path, _password, _password, null, key, out var created, out _);
 
         using (created)
         {
@@ -300,17 +313,17 @@ public sealed class VaultCreationTests : IDisposable
         }
 
         using (var again = new HardwareKey(new SoftwareYubiKey(_keySecret), 2))
-        using (var reopened = Vault.Open(path, _password, null, again))
+        using (var reopened = ClaimedVault.Open(path, _password, null, again))
         {
             Assert.Empty(reopened.ReadEntries());
         }
 
         using (var another = new HardwareKey(new SoftwareYubiKey(new byte[20]), 2))
         {
-            Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, _password, null, another));
+            Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, _password, null, another));
         }
 
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, _password));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, _password));
     }
 
     [Fact]
@@ -324,7 +337,7 @@ public sealed class VaultCreationTests : IDisposable
 
         foreach (var key in new[] { unplugged, unprogrammed })
         {
-            var outcome = VaultCreation.TryCreate(path, _password, _password, null, key, out var created, out _);
+            var outcome = ClaimedVault.TryCreate(path, _password, _password, null, key, out var created, out _);
 
             using (created)
             {
@@ -344,13 +357,13 @@ public sealed class VaultCreationTests : IDisposable
         using var silent = new HardwareKey(new UntouchedKey(), 2);
 
         var refused = Assert.Throws<HardwareKeyException>(
-            () => VaultCreation.TryCreate(path, _password, _password, null, silent, out _, out _));
+            () => ClaimedVault.TryCreate(path, _password, _password, null, silent, out _, out _));
 
         Assert.Equal(HardwareKeyFailure.TimedOut, refused.Failure);
         Assert.Empty(Directory.EnumerateFileSystemEntries(parent));
 
         using var touched = new HardwareKey(new SoftwareYubiKey(_keySecret), 2);
-        var outcome = VaultCreation.TryCreate(path, _password, _password, null, touched, out var created, out _);
+        var outcome = ClaimedVault.TryCreate(path, _password, _password, null, touched, out var created, out _);
 
         using (created)
         {

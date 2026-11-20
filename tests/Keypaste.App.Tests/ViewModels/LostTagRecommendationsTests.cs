@@ -32,7 +32,7 @@ public sealed class LostTagRecommendationsTests : IDisposable
 
     public LostTagRecommendationsTests()
     {
-        using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
+        using (var vault = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
         {
             vault.AddEntry(new VaultEntry { GroupPath = _billing.GroupPath, Title = _billing.Title, Password = _oldValue });
             Assert.True(vault.SetFields(_billing, [new FieldWrite("STRIPE_SECRET_KEY", _oldValue)]));

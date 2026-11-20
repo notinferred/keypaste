@@ -1,5 +1,6 @@
 using Keypaste.Cli.Clipboard;
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -27,7 +28,7 @@ public sealed class VerbTests
         Assert.True(File.Exists(harness.VaultPath));
         Assert.Empty(harness.Out);
 
-        using var vault = Vault.Open(harness.VaultPath, Master);
+        using var vault = ClaimedVault.Open(harness.VaultPath, Master);
         Assert.Empty(vault.ReadEntries());
     }
 
@@ -120,7 +121,7 @@ public sealed class VerbTests
         Assert.Equal(CliApp.ExitSuccess, exit);
         Assert.Empty(harness.Out);
 
-        using var vault = Vault.Open(harness.VaultPath, Master);
+        using var vault = ClaimedVault.Open(harness.VaultPath, Master);
         var entry = vault.Find("compat/ascii");
 
         Assert.NotNull(entry);
@@ -160,7 +161,7 @@ public sealed class VerbTests
         harness.AssertExit(CliApp.ExitSuccess, exit);
         Assert.Contains("names two items", harness.Err, StringComparison.Ordinal);
 
-        using var vault = Vault.Open(harness.VaultPath, Master);
+        using var vault = ClaimedVault.Open(harness.VaultPath, Master);
         Assert.Equal("fresh", vault.Find(new EntryName("a/b", "c"))?.Password);
         Assert.Equal("slashed", vault.Find(new EntryName("a", "b/c"))?.Password);
     }
@@ -397,7 +398,7 @@ public sealed class VerbTests
         Assert.Equal(CliApp.ExitSuccess, exit);
         Assert.Contains("Trash", harness.Err, StringComparison.Ordinal);
 
-        using var vault = Vault.Open(harness.VaultPath, Master);
+        using var vault = ClaimedVault.Open(harness.VaultPath, Master);
         Assert.Null(vault.Find("solo"));
         Assert.NotNull(vault.Find("keep"));
 
@@ -461,7 +462,7 @@ public sealed class VerbTests
         Assert.Equal(CliApp.ExitUsageError, exit);
         Assert.Contains("--yes", harness.Err, StringComparison.Ordinal);
 
-        using var vault = Vault.Open(harness.VaultPath, Master);
+        using var vault = ClaimedVault.Open(harness.VaultPath, Master);
         Assert.NotNull(vault.Find("solo"));
     }
 
@@ -502,7 +503,7 @@ public sealed class VerbTests
     /// </summary>
     private static void Author(CliHarness harness, string groupPath, string title, string password)
     {
-        using var vault = Vault.Open(harness.VaultPath, Master);
+        using var vault = ClaimedVault.Open(harness.VaultPath, Master);
         vault.AddEntry(new VaultEntry { Title = title, Password = password, GroupPath = groupPath });
         vault.Save();
     }
@@ -511,7 +512,7 @@ public sealed class VerbTests
     private static void PlantDatabase(CliHarness harness, string password)
     {
         var name = new EntryName("web", "db");
-        using var vault = Vault.Open(harness.VaultPath, Master);
+        using var vault = ClaimedVault.Open(harness.VaultPath, Master);
         vault.AddEntry(new VaultEntry { GroupPath = name.GroupPath, Title = name.Title, Username = "dbuser-5d1e", Password = password });
         Assert.True(vault.SetFields(
             name,

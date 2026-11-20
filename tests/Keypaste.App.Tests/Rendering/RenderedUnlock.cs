@@ -71,7 +71,7 @@ internal sealed class RenderedUnlock : IDisposable
     /// <summary>Saves once so the vault has a backup, then opens the restore panel on it.</summary>
     private void BeginRestore()
     {
-        using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
+        using (var vault = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
         {
             vault.AddEntry(new VaultEntry { Title = "saved-again", Password = "p" });
             vault.Save();

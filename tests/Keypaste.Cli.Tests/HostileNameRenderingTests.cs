@@ -1,5 +1,6 @@
 using Keypaste.Core;
 using Keypaste.Core.Clients;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -105,7 +106,7 @@ public sealed class HostileNameRenderingTests : IDisposable
         var path = $"personal/{Spoofed("token")}";
         _cli.SeedVault(_master, (path, "value"));
 
-        using (var vault = Vault.Open(_cli.VaultPath, _master))
+        using (var vault = ClaimedVault.Open(_cli.VaultPath, _master))
         {
             Assert.True(vault.SetFields(EntryName.Parse(path), [new FieldWrite(Spoofed("KEY"), "field-value")]));
             vault.Save();
@@ -126,7 +127,7 @@ public sealed class HostileNameRenderingTests : IDisposable
     {
         _cli.SeedVault(_master, ("services/Api", "value"));
 
-        using (var vault = Vault.Open(_cli.VaultPath, _master))
+        using (var vault = ClaimedVault.Open(_cli.VaultPath, _master))
         {
             Assert.True(vault.AddTag(new EntryName("services", "Api"), "env:" + Spoofed("staging")));
             vault.Save();
@@ -145,7 +146,7 @@ public sealed class HostileNameRenderingTests : IDisposable
         const string project = "demo";
         _cli.SeedVault(_master);
 
-        using (var vault = Vault.Open(_cli.VaultPath, _master))
+        using (var vault = ClaimedVault.Open(_cli.VaultPath, _master))
         {
             var spoofed = new EntryName($"env/{project}", Spoofed("KEY"));
             vault.AddEntry(new VaultEntry { GroupPath = spoofed.GroupPath, Title = spoofed.Title, Password = "value" });

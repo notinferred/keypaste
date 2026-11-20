@@ -31,7 +31,7 @@ public sealed class EnvReferenceExportTests : IDisposable
     {
         using var vault = Seeded();
         var other = Path.Combine(_directory, "other.kdbx");
-        using (var created = Vault.Create(other, _master))
+        using (var created = ClaimedVault.Create(other, _master))
         {
             created.Save();
         }
@@ -59,7 +59,7 @@ public sealed class EnvReferenceExportTests : IDisposable
 
     private Vault Seeded()
     {
-        var vault = Vault.Create(Path.Combine(_directory, "vault.kdbx"), _master);
+        var vault = ClaimedVault.Create(Path.Combine(_directory, "vault.kdbx"), _master);
         Assert.Null(new EnvStore(vault).Set("billing", "dev", "API_KEY", "sk_live_secret").Refusal);
         vault.Save();
         return vault;

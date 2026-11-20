@@ -44,7 +44,7 @@ public sealed class EnvStoreTests : IDisposable
     {
         var path = NewVaultPath();
 
-        using (var vault = Vault.Create(path, MasterPassword))
+        using (var vault = ClaimedVault.Create(path, MasterPassword))
         {
             var plan = new EnvStore(vault).Set("billing", "dev", "DATABASE_URL", "postgres://x");
 
@@ -54,7 +54,7 @@ public sealed class EnvStoreTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
 
         Assert.Equal(["env:billing"], reopened.Tags(_home));
         Assert.Equal([new EntryField("DATABASE_URL", IsProtected: true, IsReadOnly: false)], reopened.Fields(_home));
@@ -70,7 +70,7 @@ public sealed class EnvStoreTests : IDisposable
     [Fact]
     public void Set_ANewKeyInAnotherEnvironment_GoesOnThatEnvironmentsOwnHomeEntry()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
         var plan = new EnvStore(vault).Set("billing", "staging", "DATABASE_URL", "staging-db");
 
         var home = new EntryName("env/billing", ".env.staging");
@@ -84,7 +84,7 @@ public sealed class EnvStoreTests : IDisposable
     [Fact]
     public void Set_ASecondNewKey_GoesOnTheExistingHomeEntry_AsOneRevision()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
         var store = new EnvStore(vault);
         store.Set("billing", "dev", "FIRST", "1");
 
@@ -98,7 +98,7 @@ public sealed class EnvStoreTests : IDisposable
     [Fact]
     public void Set_AKeyATaggedEntryHolds_UpdatesItThere_Protected_AsOneRevision()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
         Tagged(vault, _stripe, ["env:billing"], ("STRIPE_KEY", "first", false));
         var before = HistoryCount(vault, _stripe);
 
@@ -118,7 +118,7 @@ public sealed class EnvStoreTests : IDisposable
     [Fact]
     public void Set_AKeyAnUntaggedEntryUnderEnvIsTitled_GoesOnTheHomeEntry_AndLeavesThatEntryAlone()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
         var token = new EntryName("env/billing", "TOKEN");
         vault.AddEntry(new VaultEntry { GroupPath = token.GroupPath, Title = token.Title, Password = "first" });
 
@@ -137,7 +137,7 @@ public sealed class EnvStoreTests : IDisposable
     [Fact]
     public void Set_WithTheValueItAlreadyHas_WritesNothing()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
         var store = new EnvStore(vault);
         store.Set("billing", "dev", "TOKEN", "same");
         vault.Save();
@@ -153,7 +153,7 @@ public sealed class EnvStoreTests : IDisposable
     [Fact]
     public void Set_WithAnEntry_PutsANewKeyOnThatTaggedEntry()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
         Tagged(vault, _stripe, ["env:billing"]);
 
         var plan = new EnvStore(vault).Set("billing", "dev", "WEBHOOK_SECRET", "whsec", _stripe);
@@ -166,7 +166,7 @@ public sealed class EnvStoreTests : IDisposable
     [Fact]
     public void Set_WithAnEntryNotInTheEnvironment_IsRefused_AndWritesNothing()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
         Tagged(vault, _stripe, ["env:billing:prod"]);
         vault.Save();
 
@@ -181,7 +181,7 @@ public sealed class EnvStoreTests : IDisposable
     [Fact]
     public void Set_AKeyOnTwoEntries_IsRefusedNamingBoth_UnlessTheEntryIsNamed()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
         var twin = new EntryName("services", "Twin");
         Tagged(vault, _stripe, ["env:billing"], ("STRIPE_KEY", "one", true));
         Tagged(vault, twin, ["env:billing"], ("STRIPE_KEY", "two", true));
@@ -199,7 +199,7 @@ public sealed class EnvStoreTests : IDisposable
     [Fact]
     public void Set_WithAnEntry_StillUpdatesAKeyOneOtherEntryHoldsWhereItLives()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
         var other = new EntryName("services", "Other");
         Tagged(vault, _stripe, ["env:billing"], ("STRIPE_KEY", "one", true));
         Tagged(vault, other, ["env:billing"]);
@@ -231,7 +231,7 @@ public sealed class EnvStoreTests : IDisposable
     [InlineData("billing", "Staging", "TOKEN")]
     public void Set_RefusesWhatNoProjectCouldRelease(string project, string environment, string key)
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
 
         var plan = new EnvStore(vault).Set(project, environment, key, "value");
 
@@ -246,7 +246,7 @@ public sealed class EnvStoreTests : IDisposable
     [Fact]
     public void Set_RefusesAKeyDifferingOnlyInCaseFromOneTheEnvironmentHas()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
         ProjectVariables.Set(vault, "billing", "TOKEN", "first");
 
         var plan = new EnvStore(vault).Set("billing", "dev", "Token", "second");
@@ -258,7 +258,7 @@ public sealed class EnvStoreTests : IDisposable
     [Fact]
     public void CaseCollision_IsCheckedWithinTheEnvironment()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
         var store = new EnvStore(vault);
         store.Set("acme-api", "dev", "TOKEN", "dev");
 
@@ -269,7 +269,7 @@ public sealed class EnvStoreTests : IDisposable
     [Fact]
     public void Set_AHomeEntryNotTaggedIntoTheEnvironment_IsRefusedNamingIt()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
         vault.AddEntry(new VaultEntry { GroupPath = "env/billing", Title = ".env", Password = "kept" });
         vault.AddEntry(new VaultEntry { GroupPath = "env/billing", Title = ".env.staging" });
         Assert.True(vault.AddTag(new EntryName("env/billing", ".env.staging"), "env:other:staging"));
@@ -291,7 +291,7 @@ public sealed class EnvStoreTests : IDisposable
     [Fact]
     public void Set_UpdatesTheProjectsOwnEntry_NotAnEntryWhosePathCollidesWithIt()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
         ProjectVariables.Set(vault, "billing", "TOKEN", "mine");
         vault.AddEntry(new VaultEntry { Title = "billing/.env", Password = "foreign", GroupPath = "env" });
 
@@ -306,7 +306,7 @@ public sealed class EnvStoreTests : IDisposable
     [Fact]
     public void Set_AllowsAnEmptyValue()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
 
         Assert.Null(new EnvStore(vault).Set("billing", "dev", "OPTIONAL", string.Empty).Refusal);
         Assert.Equal(string.Empty, vault.ReadField(_home, "OPTIONAL"), StringComparer.Ordinal);
@@ -316,7 +316,7 @@ public sealed class EnvStoreTests : IDisposable
     [Fact]
     public void TryApply_WritesEachEntryOnce()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
         var database = new EntryName("services", "Database");
         Tagged(vault, _stripe, ["env:billing"], ("STRIPE_KEY", "s1", true), ("STRIPE_WEBHOOK", "w1", true));
         Tagged(vault, database, ["env:billing"], ("DATABASE_URL", "d1", true));
@@ -343,7 +343,7 @@ public sealed class EnvStoreTests : IDisposable
     [Fact]
     public void Remove_AField_TakesItOffItsEntry_AndHistoryKeepsIt()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
         var store = new EnvStore(vault);
         store.Set("billing", "dev", "TOKEN", "first");
         store.Set("billing", "dev", "OTHER", "kept");
@@ -361,7 +361,7 @@ public sealed class EnvStoreTests : IDisposable
     [Fact]
     public void Remove_AKeyOnlyAnUntaggedEntryUnderEnvIsTitled_MatchesNothing_AndLeavesThatEntry()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
         var token = new EntryName("env/billing", "TOKEN");
         ProjectVariables.Set(vault, "billing", "OTHER", "kept");
         vault.AddEntry(new VaultEntry { GroupPath = token.GroupPath, Title = token.Title, Password = "untouched" });
@@ -376,7 +376,7 @@ public sealed class EnvStoreTests : IDisposable
     [Fact]
     public void Remove_AKeyOnTwoEntries_TakesItOnlyFromTheEntryNamed()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
         var twin = new EntryName("services", "Twin");
         Tagged(vault, _stripe, ["env:billing"], ("STRIPE_KEY", "one", true));
         Tagged(vault, twin, ["env:billing"], ("STRIPE_KEY", "two", true));
@@ -391,7 +391,7 @@ public sealed class EnvStoreTests : IDisposable
     [Fact]
     public void Remove_MatchesNothing_WhenTheKeyProjectOrEnvironmentIsAbsent()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
         var store = new EnvStore(vault);
         store.Set("billing", "dev", "TOKEN", "first");
 
@@ -409,7 +409,7 @@ public sealed class EnvStoreTests : IDisposable
     [Fact]
     public void Remove_TheLastKey_LeavesTheProjectWithAnEmptyEnvironment()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
         var store = new EnvStore(vault);
         store.Set("billing", "dev", "TOKEN", "v");
 

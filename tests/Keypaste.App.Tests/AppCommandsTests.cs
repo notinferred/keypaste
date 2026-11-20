@@ -425,7 +425,7 @@ public sealed class AppCommandsTests : IDisposable
         var commands = Commands(shell);
         var other = Path.Combine(_vault.Home, "other.kdbx");
 
-        using (var made = Vault.Create(other, "another password"))
+        using (var made = ClaimedVault.Create(other, "another password"))
         {
             made.Save();
         }

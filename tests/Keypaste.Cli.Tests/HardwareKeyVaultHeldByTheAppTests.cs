@@ -35,7 +35,7 @@ public sealed class HardwareKeyVaultHeldByTheAppTests : IDisposable
     public HardwareKeyVaultHeldByTheAppTests()
     {
         using (var key = new HardwareKey(new SoftwareYubiKey(_secret), 2))
-        using (var vault = Vault.CreateWith(_harness.VaultPath, _master, null, key))
+        using (var vault = ClaimedVault.CreateWith(_harness.VaultPath, _master, null, key))
         {
             vault.AddEntry(new VaultEntry { GroupPath = "Work", Title = "github", Password = "gh-before" });
             ProjectVariables.Set(vault, "dev", "TOKEN", _value);
@@ -77,9 +77,9 @@ public sealed class HardwareKeyVaultHeldByTheAppTests : IDisposable
         Assert.Contains("holds this vault; it will ask you to allow this change", _harness.Err, StringComparison.Ordinal);
         Assert.DoesNotContain(VaultSession.HardwareKeyRefusal, _harness.Err, StringComparison.Ordinal);
 
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(_harness.VaultPath, _master));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(_harness.VaultPath, _master));
         using var reader = new HardwareKey(new SoftwareYubiKey(_secret), 2);
-        using var saved = Vault.Open(_harness.VaultPath, _master, null, reader);
+        using var saved = ClaimedVault.Open(_harness.VaultPath, _master, null, reader);
         Assert.Equal("gh-after", saved.Find(new EntryName("Work", "github"))!.Password);
     }
 

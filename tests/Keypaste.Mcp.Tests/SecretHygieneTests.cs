@@ -126,7 +126,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     public ValueTask InitializeAsync()
     {
         _directory = Directory.CreateTempSubdirectory("keypaste-hygiene-").FullName;
-        _vault = Vault.Create(Path.Combine(_directory, "vault.kdbx"), Master);
+        _vault = ClaimedVault.Create(Path.Combine(_directory, "vault.kdbx"), Master);
 
         _vault.AddEntry(new VaultEntry
         {

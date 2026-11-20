@@ -20,7 +20,7 @@ public sealed class EntryRotateTests : IDisposable
 
     public EntryRotateTests()
     {
-        using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
+        using (var vault = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
         {
             vault.AddEntry(new VaultEntry { GroupPath = "api", Title = "token", Password = _old });
             vault.Save();
@@ -82,7 +82,7 @@ public sealed class EntryRotateTests : IDisposable
     [Fact]
     public void Rotate_ChangedOnDisk_Reports()
     {
-        using (var other = Vault.Open(_fixture.Path_, TempVault.Password))
+        using (var other = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
         {
             other.AddEntry(new VaultEntry { Title = "elsewhere", Password = "x" });
             other.Save();

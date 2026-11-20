@@ -29,7 +29,7 @@ public sealed class OpenVaultsTests : IDisposable
 
     public OpenVaultsTests()
     {
-        using (var acme = Vault.Create(AcmePath, TempVault.Password))
+        using (var acme = ClaimedVault.Create(AcmePath, TempVault.Password))
         {
             acme.AddEntry(new VaultEntry { Title = "example", Password = "acme-secret-5Rt8Lw2" });
             acme.Save();
@@ -109,7 +109,7 @@ public sealed class OpenVaultsTests : IDisposable
         var personalSaved = _personal.Session.Unlocked!.SaveState().SavedAt;
         Assert.True(_acme.Session.Merges);
 
-        using (var other = Vault.Open(AcmePath, TempVault.Password))
+        using (var other = ClaimedVault.Open(AcmePath, TempVault.Password))
         {
             other.AddEntry(new VaultEntry { Title = "synced", Password = "from-another-device" });
             other.Save();
@@ -142,7 +142,7 @@ public sealed class OpenVaultsTests : IDisposable
         UnlockBoth();
         using var shell = new ShellViewModel(_personal.Session, _fixture.Home, _personal.Authority, clock: _clock) { Vaults = _vaults };
 
-        using (var other = Vault.Open(AcmePath, TempVault.Password))
+        using (var other = ClaimedVault.Open(AcmePath, TempVault.Password))
         {
             Assert.True(other.UpdateEntry(other.Find("example")! with { Password = "theirs-example" }));
             other.Save();

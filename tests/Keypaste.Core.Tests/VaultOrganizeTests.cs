@@ -56,7 +56,7 @@ public sealed class VaultOrganizeTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         var renamedName = new EntryName("env/billing", "API_TOKEN");
 
         Assert.Equal(before, reopened.EntryUuid(renamedName));
@@ -107,7 +107,7 @@ public sealed class VaultOrganizeTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         var movedName = new EntryName("keys", "TOKEN");
 
         Assert.Equal(before, reopened.EntryUuid(movedName));
@@ -160,7 +160,7 @@ public sealed class VaultOrganizeTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         var name = new EntryName("keys", "API_TOKEN");
 
         Assert.Equal(before, reopened.EntryUuid(name));
@@ -215,7 +215,7 @@ public sealed class VaultOrganizeTests : IDisposable
         // KeePassXC lets two items share a title, which Relocate throws for: a question asked with every pointer move must not.
         ForeignEdit.Apply(path, MasterPassword, "KEPT", DateTime.UtcNow, entry => entry.Strings.Set(KeePassLib.PwDefs.TitleField, new KeePassLib.Security.ProtectedString(false, "TOKEN")));
 
-        using var twins = Vault.Open(path, MasterPassword);
+        using var twins = ClaimedVault.Open(path, MasterPassword);
         Assert.Equal(OrganizeOutcome.DestinationAmbiguous, twins.RelocationRefusal(_token, new EntryName("keys", "API_TOKEN")));
     }
 
@@ -254,7 +254,7 @@ public sealed class VaultOrganizeTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
 
         Assert.Contains("keys/personal", reopened.ReadGroupPaths());
         Assert.DoesNotContain(reopened.ReadEntries(), entry => entry.GroupPath == "keys/personal");
@@ -286,7 +286,7 @@ public sealed class VaultOrganizeTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         var movedName = new EntryName("env/invoicing", "TOKEN");
 
         Assert.Equal(before, reopened.EntryUuid(movedName));
@@ -328,7 +328,7 @@ public sealed class VaultOrganizeTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         var movedName = new EntryName("keys/billing", "TOKEN");
 
         Assert.Equal(before, reopened.EntryUuid(movedName));
@@ -389,7 +389,7 @@ public sealed class VaultOrganizeTests : IDisposable
 
         Assert.Equal(1, MinorVersion(path));
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
 
         Assert.DoesNotContain("env/billing", reopened.ReadGroupPaths());
         Assert.Null(reopened.Find(_token));
@@ -425,7 +425,7 @@ public sealed class VaultOrganizeTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
 
         Assert.NotEqual(reopened.EntryUuid(_token), reopened.EntryUuid(copyName));
 
@@ -503,7 +503,7 @@ public sealed class VaultOrganizeTests : IDisposable
 
         Assert.Equal(0, MinorVersion(path));
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(new EntryName("archive", "API_TOKEN")));
             vault.Save();
@@ -527,7 +527,7 @@ public sealed class VaultOrganizeTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
 
         Assert.Equal(["billing"], ProjectCatalog.Read(reopened).Projects.Select(project => project.Name));
         Assert.Equal(
@@ -588,7 +588,7 @@ public sealed class VaultOrganizeTests : IDisposable
     /// </summary>
     private static Vault Seeded(string path)
     {
-        var vault = Vault.Create(path, MasterPassword);
+        var vault = ClaimedVault.Create(path, MasterPassword);
 
         vault.AddEntry(new VaultEntry { Title = "TOKEN", GroupPath = "env/billing" });
         vault.AddEntry(new VaultEntry { Title = "KEPT", Password = "kept", GroupPath = "env/billing" });

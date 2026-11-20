@@ -13,7 +13,7 @@ public sealed class SameNameItemsTests : IDisposable
 
     public SameNameItemsTests()
     {
-        using var vault = Vault.Create(VaultPath, _master);
+        using var vault = ClaimedVault.Create(VaultPath, _master);
         vault.AddEntry(new VaultEntry { Title = _mail.Title, Username = "alice", Password = "alice-password", GroupPath = _mail.GroupPath });
         vault.AddEntry(new VaultEntry { Title = _mail.Title, Username = "bob", Password = "bob-password", GroupPath = _mail.GroupPath });
         vault.Save();
@@ -176,7 +176,7 @@ public sealed class SameNameItemsTests : IDisposable
         Assert.False(vault.NameIsShared(new EntryName("services", "Forum")));
     }
 
-    private Vault Open() => Vault.Open(VaultPath, _master);
+    private Vault Open() => ClaimedVault.Open(VaultPath, _master);
 
     private static EntryName Item(Vault vault, string username)
     {

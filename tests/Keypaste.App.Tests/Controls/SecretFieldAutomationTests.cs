@@ -318,7 +318,7 @@ public sealed class SecretFieldAutomationTests
             _directory = Directory.CreateTempSubdirectory("keypaste-secret-field-").FullName;
             var path = Path.Combine(_directory, "vault.kdbx");
 
-            using (var vault = Vault.Create(path, _master))
+            using (var vault = ClaimedVault.Create(path, _master))
             {
                 vault.AddEntry(new VaultEntry { Title = "github", Username = "me", Password = "gh" });
                 vault.SetFields(new EntryName(string.Empty, "github"), [new FieldWrite("API_TOKEN", "tok")]);

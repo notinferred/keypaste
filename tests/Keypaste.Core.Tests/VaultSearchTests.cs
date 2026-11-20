@@ -148,7 +148,7 @@ public sealed class VaultSearchTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
 
         Assert.NotEmpty(reopened.Search("PROD_DB"));
         Assert.Empty(reopened.Search("custom-field-secret"));
@@ -235,7 +235,7 @@ public sealed class VaultSearchTests : IDisposable
 
     private static Vault Seeded(string path)
     {
-        var vault = Vault.Create(path, MasterPassword);
+        var vault = ClaimedVault.Create(path, MasterPassword);
 
         vault.AddEntry(new VaultEntry
         {

@@ -28,13 +28,13 @@ public sealed class VaultRemoveTests : IDisposable
     {
         var path = Seed();
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry("servers/production"));
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         Assert.Null(reopened.Find("servers/production"));
         Assert.NotNull(reopened.Find("solo"));
     }
@@ -44,7 +44,7 @@ public sealed class VaultRemoveTests : IDisposable
     {
         var path = Seed();
 
-        using var vault = Vault.Open(path, MasterPassword);
+        using var vault = ClaimedVault.Open(path, MasterPassword);
 
         Assert.Equal(DeletionOutcome.NothingMatched, vault.RemoveEntry("servers/does-not-exist"));
         Assert.Equal(DeletionOutcome.NothingMatched, vault.RemoveEntry("no-such-group/entry"));
@@ -60,13 +60,13 @@ public sealed class VaultRemoveTests : IDisposable
     {
         var path = Seed();
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             vault.RemoveEntry("servers/production");
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
 
         Assert.Contains("servers", reopened.ReadGroupPaths(), StringComparer.Ordinal);
         Assert.DoesNotContain("servers/production", reopened.ReadGroupPaths(), StringComparer.Ordinal);
@@ -87,7 +87,7 @@ public sealed class VaultRemoveTests : IDisposable
     {
         var path = Seed();
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Assert.True(
                 vault.UsesFileTransactions,
@@ -103,7 +103,7 @@ public sealed class VaultRemoveTests : IDisposable
 
         Assert.Empty(leftovers);
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         Assert.NotNull(reopened.Find("another"));
     }
 
@@ -117,7 +117,7 @@ public sealed class VaultRemoveTests : IDisposable
     {
         var path = Seed();
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             vault.AddEntry(new VaultEntry { Title = "third", Password = "third-secret" });
             vault.Save();
@@ -126,7 +126,7 @@ public sealed class VaultRemoveTests : IDisposable
         var header = KdbxHeader.Read(path);
         Assert.Equal(4, header.FormatMajorVersion);
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         Assert.Equal("third-secret", reopened.Find("third")?.Password, StringComparer.Ordinal);
     }
 
@@ -134,7 +134,7 @@ public sealed class VaultRemoveTests : IDisposable
     {
         var path = System.IO.Path.Combine(_directory, "vault.kdbx");
 
-        using var vault = Vault.Create(path, MasterPassword);
+        using var vault = ClaimedVault.Create(path, MasterPassword);
         vault.AddEntry(new VaultEntry { Title = "solo", Password = "solo-secret" });
         vault.AddEntry(new VaultEntry
         {

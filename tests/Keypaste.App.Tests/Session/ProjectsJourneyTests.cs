@@ -17,6 +17,7 @@ using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Launch;
 using Keypaste.Core.Projects;
+using Keypaste.Core.Tests;
 using Xunit;
 using static Keypaste.App.Tests.Session.JourneyDriver;
 
@@ -59,7 +60,7 @@ public sealed class ProjectsJourneyTests
             var queue = new EntryName("services", "Queue");
             var home = EnvStore.HomeEntry("billing", EnvProfileNames.Default);
 
-            using (var created = Vault.Create(vault, TempVault.Password))
+            using (var created = ClaimedVault.Create(vault, TempVault.Password))
             {
                 Seed(created, "apps", "Web", "WEB_KEY", _webKey, "env:web");
                 Seed(created, "services", "Stripe", "STRIPE_KEY", _stripeKey, "env:billing", "env:billing:staging");
@@ -381,7 +382,7 @@ public sealed class ProjectsJourneyTests
     /// <summary>The tags the saved file holds for an entry, read by a second open as another program would.</summary>
     private static IReadOnlyList<string> Saved(string vault, EntryName entry)
     {
-        using var reopened = Vault.Open(vault, TempVault.Password);
+        using var reopened = ClaimedVault.Open(vault, TempVault.Password);
         return reopened.Tags(entry) ?? [];
     }
 

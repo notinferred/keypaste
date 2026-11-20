@@ -55,7 +55,7 @@ public sealed class FourPlacesJourneyTests
             using var fixture = new TempVault();
             var vault = Path.Combine(fixture.Home, "journey.kdbx");
 
-            using (var created = Vault.Create(vault, TempVault.Password))
+            using (var created = ClaimedVault.Create(vault, TempVault.Password))
             {
                 created.AddEntry(new VaultEntry { GroupPath = "Work", Title = "github", Username = "me", Password = "gh-journey" });
                 ProjectVariables.Set(created, "billing", "STRIPE_KEY", "sk-journey");

@@ -154,7 +154,7 @@ public sealed class EntryAttachmentsTests : IDisposable
         Assert.Empty(attachments.Rows);
         Assert.Equal(revisions + 1, Revisions());
 
-        using var vault = Vault.Open(_vaultPath, _master);
+        using var vault = ClaimedVault.Open(_vaultPath, _master);
         Assert.Empty(vault.Attachments(_checking)!);
     }
 
@@ -201,7 +201,7 @@ public sealed class EntryAttachmentsTests : IDisposable
     [Fact]
     public void An_edit_history_cannot_keep_says_what_is_gone()
     {
-        using (var vault = Vault.Open(_vaultPath, _master))
+        using (var vault = ClaimedVault.Open(_vaultPath, _master))
         {
             using var large = new MemoryStream(new byte[EntryAttachment.MaximumSize]);
             using var smaller = new MemoryStream(new byte[2 * 1024 * 1024]);
@@ -293,7 +293,7 @@ public sealed class EntryAttachmentsTests : IDisposable
     private byte[] Saved(EntryName item, string attachment)
     {
         var path = Path.Combine(_directory, Guid.NewGuid().ToString("n"));
-        using var vault = Vault.Open(_vaultPath, _master);
+        using var vault = ClaimedVault.Open(_vaultPath, _master);
         Assert.Equal(AttachmentSaveOutcome.Saved, vault.SaveAttachment(item, attachment, path, out _));
         var bytes = File.ReadAllBytes(path);
         File.Delete(path);
@@ -302,7 +302,7 @@ public sealed class EntryAttachmentsTests : IDisposable
 
     private int Revisions()
     {
-        using var vault = Vault.Open(_vaultPath, _master);
+        using var vault = ClaimedVault.Open(_vaultPath, _master);
         return vault.ReadHistory(_checking)!.Count;
     }
 

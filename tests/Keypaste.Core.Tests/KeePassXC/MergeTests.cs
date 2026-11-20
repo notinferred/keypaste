@@ -179,7 +179,7 @@ public sealed class MergeTests
         var (target, source) = intoTheFile ? (file.Path_, older) : (older, file.Path_);
         Assert.Equal(0, KeePassXcCli.Try(KeePassXcCli.Password, ["merge", "-q", "-s", target, source]).Exit);
 
-        using var merged = Vault.Open(target, KeePassXcCli.Password);
+        using var merged = ClaimedVault.Open(target, KeePassXcCli.Password);
         Assert.Equal(TokenCheck.Unknown, new TokenStore(merged).Verify(token!, now, out _));
         Assert.Empty(new TokenStore(merged).List());
     }

@@ -1,4 +1,5 @@
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -42,7 +43,7 @@ public sealed class AttachmentVerbTests : IDisposable
 
         try
         {
-            using var vault = Vault.Open(_harness.VaultPath, _master);
+            using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
 
             return vault.Attachments(_stripe)!.ToDictionary(
                 attachment => attachment.Name,
@@ -62,7 +63,7 @@ public sealed class AttachmentVerbTests : IDisposable
 
     private int Revisions()
     {
-        using var vault = Vault.Open(_harness.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
         return vault.ReadHistory(_stripe)!.Count;
     }
 

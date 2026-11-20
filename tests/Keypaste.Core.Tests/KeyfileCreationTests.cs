@@ -51,20 +51,20 @@ public sealed class KeyfileCreationTests : IDisposable
         Assert.Equal(KeyfileCreationOutcome.Created, VaultKeyfile.Create(keyfile, out _));
         Assert.Equal(KeyfileCreationOutcome.Created, VaultKeyfile.Create(other, out _));
 
-        var outcome = VaultCreation.TryCreate(path, _password, _password, keyfile, out var created, out _);
+        var outcome = ClaimedVault.TryCreate(path, _password, _password, keyfile, out var created, out _);
 
         using (created)
         {
             Assert.Equal(VaultCreationOutcome.Created, outcome);
         }
 
-        using (var reopened = Vault.Open(path, _password, keyfile))
+        using (var reopened = ClaimedVault.Open(path, _password, keyfile))
         {
             Assert.Empty(reopened.ReadEntries());
         }
 
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, _password, other));
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, _password));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, _password, other));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, _password));
     }
 
     [Fact]

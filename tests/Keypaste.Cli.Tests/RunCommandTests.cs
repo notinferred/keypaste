@@ -25,7 +25,7 @@ public sealed class RunCommandTests
         var harness = new CliHarness();
         harness.SeedVault(Master);
 
-        using (var vault = Core.Vault.Open(harness.VaultPath, Master))
+        using (var vault = ClaimedVault.Open(harness.VaultPath, Master))
         {
             foreach (var (key, value) in variables)
             {
@@ -523,7 +523,7 @@ public sealed class RunCommandTests
     {
         using var harness = Profiled();
 
-        using (var vault = Core.Vault.Open(harness.VaultPath, Master))
+        using (var vault = ClaimedVault.Open(harness.VaultPath, Master))
         {
             ProjectVariables.Set(vault, project, "PROJECT_KEY", $"{project}-value");
             vault.Save();
@@ -586,7 +586,7 @@ public sealed class RunCommandTests
         harness.WorkingDirectory = harness.Directory;
         harness.Environment[Core.Audit.KeypasteHome.EnvironmentVariable] = Path.Combine(harness.Directory, "home");
 
-        using (var vault = Core.Vault.Open(harness.VaultPath, Master))
+        using (var vault = ClaimedVault.Open(harness.VaultPath, Master))
         {
             ProjectVariables.Set(vault, "acme-api", "DATABASE_URL", "dev-db");
             ProjectVariables.Set(vault, "acme-api", "STRIPE_KEY", "sk_dev");

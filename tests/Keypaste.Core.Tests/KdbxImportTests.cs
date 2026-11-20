@@ -92,7 +92,7 @@ public sealed class KdbxImportTests : IDisposable
         Assert.Equal(new DateTime(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc), facts.Expires);
         Assert.Equal(["v1"], facts.HistoryPasswords);
 
-        using var reopened = Vault.Open(target, TargetPassword);
+        using var reopened = ClaimedVault.Open(target, TargetPassword);
         Assert.NotNull(reopened.Find(new EntryName("foreign/Banking/Cards", "Visa")));
         Assert.NotNull(reopened.Find(new EntryName("foreign", "Loose")));
     }
@@ -125,7 +125,7 @@ public sealed class KdbxImportTests : IDisposable
         var first = $"{{REF:P@I:{shared}}}";
         var second = $"{{ref:u@i:{shared.ToLowerInvariant()}}}";
         var outside = $"{{REF:P@I:{dropped}}}";
-        using (var vault = Vault.Open(source, SourcePassword))
+        using (var vault = ClaimedVault.Open(source, SourcePassword))
         {
             vault.AddEntry(new VaultEntry { Title = "User", GroupPath = "Team", Password = first });
             vault.UpdateEntry(new VaultEntry { Title = "User", GroupPath = "Team", Password = first + second, Notes = outside });
@@ -446,7 +446,7 @@ public sealed class KdbxImportTests : IDisposable
     {
         var target = ImportForeignAndSave(out var source);
 
-        using (var reopened = Vault.Open(target, TargetPassword))
+        using (var reopened = ClaimedVault.Open(target, TargetPassword))
         {
             Assert.Equal(4, reopened.ReadEntries().Count);
             Assert.Equal("v2", reopened.Find(new EntryName("foreign/Banking", "Checking"))!.Password);
@@ -464,7 +464,7 @@ public sealed class KdbxImportTests : IDisposable
         var path = Path.Combine(_directory, name);
         WriteForeign(path, SourcePassword);
 
-        using var vault = Vault.Open(path, SourcePassword);
+        using var vault = ClaimedVault.Open(path, SourcePassword);
         vault.AddEntry(new VaultEntry { Title = "API_KEY", GroupPath = "env/acme-api", Password = "a" });
         vault.Save();
         return path;
@@ -473,7 +473,7 @@ public sealed class KdbxImportTests : IDisposable
     private string Source(string name, Action<Vault> fill)
     {
         var path = Path.Combine(_directory, name);
-        using var vault = Vault.Create(path, SourcePassword);
+        using var vault = ClaimedVault.Create(path, SourcePassword);
         fill(vault);
         vault.Save();
         return path;
@@ -482,7 +482,7 @@ public sealed class KdbxImportTests : IDisposable
     private Vault Target(string? path = null)
     {
         path ??= Path.Combine(_directory, $"target-{Guid.NewGuid():n}.kdbx");
-        var vault = Vault.Create(path, TargetPassword);
+        var vault = ClaimedVault.Create(path, TargetPassword);
         vault.Save();
         return vault;
     }

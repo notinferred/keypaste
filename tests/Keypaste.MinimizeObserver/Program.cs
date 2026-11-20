@@ -14,6 +14,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Ownership;
 using Keypaste.Core.Settings;
 using DesktopApp = Keypaste.App.App;
 
@@ -213,7 +214,16 @@ internal static class Program
 
         private async Task<ShellViewModel?> UnlockAsync(MainWindow window, AppVaultSession session)
         {
-            using (var vault = Vault.Create(vaultPath, _password))
+            var home = Path.GetDirectoryName(vaultPath)!;
+
+            if (!VaultClaim.TryAcquire(home, vaultPath, OwnerKind.CommandLine, out var claim, out var refusal))
+            {
+                throw new InvalidOperationException(refusal);
+            }
+
+            // Released before the app unlocks the vault under the same home, as keypaste init's is.
+            using (claim)
+            using (var vault = Vault.Create(claim, vaultPath, _password))
             {
                 vault.AddEntry(new VaultEntry { Title = "observer", Password = _marker });
                 vault.Save();

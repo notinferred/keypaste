@@ -4,6 +4,7 @@ using KeePassLib.Keys;
 using KeePassLib.Security;
 using KeePassLib.Serialization;
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -23,7 +24,7 @@ public sealed class TaggedProjectRunTests : IDisposable
     {
         _harness.SeedVault(_master, ("services/Stripe", "stripe-login-c1b"), ("services/Database", "database-login-c1b"));
 
-        using var vault = Vault.Open(_harness.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
         vault.AddEntry(new VaultEntry { GroupPath = "env/billing", Title = "OLD_KEY", Password = "old-value-c1b" });
         vault.SetFields(new EntryName("services", "Stripe"), [new FieldWrite("STRIPE_SECRET_KEY", "stripe-value-c1b"), new FieldWrite("Region", "eu", Protect: false)]);
         vault.SetFields(new EntryName("services", "Database"), [new FieldWrite("DATABASE_URL", "dev-db-c1b")]);
@@ -50,7 +51,7 @@ public sealed class TaggedProjectRunTests : IDisposable
 
     private void Edit(Action<Vault> change)
     {
-        using var vault = Vault.Open(_harness.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
         change(vault);
         vault.Save();
     }

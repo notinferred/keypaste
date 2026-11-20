@@ -29,7 +29,7 @@ public sealed class SealedAgentRulesTests : IDisposable
 
     public SealedAgentRulesTests()
     {
-        _vault = Vault.Create(VaultPath, EnvStoreTests.MasterPassword);
+        _vault = ClaimedVault.Create(VaultPath, EnvStoreTests.MasterPassword);
         _vault.AddEntry(new VaultEntry { GroupPath = "work", Title = "github", Password = _password });
         _vault.Save();
         _log = new OwnerLog(_directory);
@@ -161,7 +161,7 @@ public sealed class SealedAgentRulesTests : IDisposable
     {
         Assert.True(_rules.TryChange(rules => rules.WithRun(_agent, run: true), out var problem), problem);
         var otherFile = RulesIn(Path.Combine(_directory, "other-home"));
-        using var theirs = Vault.Open(VaultPath, EnvStoreTests.MasterPassword);
+        using var theirs = ClaimedVault.Open(VaultPath, EnvStoreTests.MasterPassword);
         Assert.True(Sealer(otherFile, theirs).TryChange(rules => rules.Allowing(FieldCategory.Notes, confirmed: true), out problem), problem);
 
         Vault? merged = null;
@@ -212,7 +212,7 @@ public sealed class SealedAgentRulesTests : IDisposable
     [Fact]
     public async Task A_vault_without_the_key_ignores_the_file()
     {
-        using var another = Vault.Create(Path.Combine(_directory, "another.kdbx"), EnvStoreTests.MasterPassword);
+        using var another = ClaimedVault.Create(Path.Combine(_directory, "another.kdbx"), EnvStoreTests.MasterPassword);
         Assert.True(Sealer(_file, another).TryChange(rules => rules.Allowing(FieldCategory.Password, confirmed: true), out var problem), problem);
 
         var reply = await RequestAsync();
@@ -298,7 +298,7 @@ public sealed class SealedAgentRulesTests : IDisposable
     public void Two_vaults_in_one_home_each_keep_their_own_rules()
     {
         var acmePath = Path.Combine(_directory, "acme.kdbx");
-        using var acme = Vault.Create(acmePath, EnvStoreTests.MasterPassword);
+        using var acme = ClaimedVault.Create(acmePath, EnvStoreTests.MasterPassword);
         var acmeRules = Sealer(AgentRulesFile.For(_directory, VaultIdentity.Of(_directory, acmePath)), acme);
 
         Assert.True(_rules.TryChange(rules => rules.Allowing(FieldCategory.Password, confirmed: true), out var problem), problem);
@@ -323,7 +323,7 @@ public sealed class SealedAgentRulesTests : IDisposable
         Assert.True(Sealer(shared, _vault).TryChange(rules => rules.Allowing(FieldCategory.Password, confirmed: true), out var problem), problem);
 
         var acmePath = Path.Combine(_directory, "acme.kdbx");
-        using var acme = Vault.Create(acmePath, EnvStoreTests.MasterPassword);
+        using var acme = ClaimedVault.Create(acmePath, EnvStoreTests.MasterPassword);
         var acmeFile = AgentRulesFile.For(_directory, VaultIdentity.Of(_directory, acmePath));
         var acmeRules = new SealedAgentRules(acmeFile, () => acme, _ => AgentSave.Saved, shared);
 

@@ -112,7 +112,7 @@ Saving keeps the file it replaces: the first save after each unlock, no more oft
 
 ### Restoring a backup
 
-With the vault selected on the unlock screen, choose File › Restore a backup…, or Restore a backup… under a refused unlock. Choose a copy by when it was taken; a damaged one is marked. Type the master password that copy was made under and choose its key file, and Check this backup shows when it was taken and how many items and projects it holds, never names or values. Restore replaces the vault with that copy byte for byte, keeping the file it replaces as a backup. A damaged or missing vault can still be selected for restoring when backups sit beside it. Close KeePassXC and stop `keypaste approve` first: each keeps its own copy and does not notice a restore. A backup cannot recover a forgotten master password or a lost key file.
+With the vault selected on the unlock screen, choose File › Restore a backup…, or Restore a backup… under a refused unlock. Choose a copy by when it was taken; a damaged one is marked. Type the master password that copy was made under and choose its key file, and Check this backup shows when it was taken and how many items and projects it holds, never names or values. Restore replaces the vault with that copy byte for byte, keeping the file it replaces as a backup. A damaged or missing vault can still be selected for restoring when backups sit beside it. Close KeePassXC first: it keeps its own copy and does not notice a restore. While `keypaste approve` or another keypaste process holds the vault, the restore is refused and names it. A backup cannot recover a forgotten master password or a lost key file.
 
 ### Changing what unlocks the vault
 

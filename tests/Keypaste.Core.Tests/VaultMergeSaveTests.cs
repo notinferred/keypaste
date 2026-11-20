@@ -35,7 +35,7 @@ public sealed class VaultMergeSaveTests : IDisposable
     public void AnotherProgramsSave_IsMergedWithTheChangeThisCopyHeld_AndTheFileItReplacedIsKept()
     {
         Seed();
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, _stripe, "first");
         open.Save();
         Assert.Single(VaultBackups.List(VaultPath));
@@ -66,7 +66,7 @@ public sealed class VaultMergeSaveTests : IDisposable
     public void ASaveLandingBeforeTheMergedCopysSave_IsMergedOnTheNextAttempt()
     {
         Seed();
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, _stripe, "mine");
         InFile(database => Edit(database, _github, "theirs"));
         var held = 0;
@@ -93,7 +93,7 @@ public sealed class VaultMergeSaveTests : IDisposable
         Assert.Equal(1, landed);
         Assert.Equal(2, held);
         Assert.Equal(("mine", "theirs"), Passwords(VaultPath));
-        using var reopened = Vault.Open(VaultPath, _password);
+        using var reopened = ClaimedVault.Open(VaultPath, _password);
         Assert.Equal("theirs-again", reopened.Find(_gitlab)!.Password);
         Assert.Equal(VaultSaveStatus.Saved, copy!.SaveState().Status);
     }
@@ -103,7 +103,7 @@ public sealed class VaultMergeSaveTests : IDisposable
     public void ASaveLandingBeforeEveryAttempt_LeavesTheMergeToTheNextChange()
     {
         Seed();
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, _stripe, "mine");
         InFile(database => Edit(database, _github, "theirs-0"));
         var saves = 0;
@@ -130,7 +130,7 @@ public sealed class VaultMergeSaveTests : IDisposable
     public void AMergeThatFails_LeavesTheOpenCopyAndTheFileAsTheyWere()
     {
         Seed();
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, _stripe, "mine");
         InFile(database =>
         {
@@ -150,7 +150,7 @@ public sealed class VaultMergeSaveTests : IDisposable
     public void AMergedCopyWhoseSaveFails_LeavesTheOpenCopyAndTheFileAsTheyWere()
     {
         Seed();
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, _stripe, "mine");
         InFile(database => Edit(database, _github, "theirs"));
         var before = File.ReadAllBytes(VaultPath);
@@ -166,7 +166,7 @@ public sealed class VaultMergeSaveTests : IDisposable
     public void AKeyThatNoLongerOpensTheFile_IsRefused_AndChangesNothing()
     {
         Seed();
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, _stripe, "mine");
         InFile(database =>
         {
@@ -187,10 +187,10 @@ public sealed class VaultMergeSaveTests : IDisposable
     public void AnotherVaultsFile_IsRefused()
     {
         Seed();
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, _stripe, "mine");
         var other = Path.Combine(_directory, "other.kdbx");
-        using (var vault = Vault.Create(other, _password))
+        using (var vault = ClaimedVault.Create(other, _password))
         {
             vault.AddEntry(new VaultEntry { GroupPath = _stripe.GroupPath, Title = _stripe.Title, Password = "other" });
             vault.Save();
@@ -210,7 +210,7 @@ public sealed class VaultMergeSaveTests : IDisposable
     public void TheSameVaultSavedAsKdbx31_IsRefusedFromItsBytes()
     {
         Seed();
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, _stripe, "mine");
         SaveAsKdbx31(database => Edit(database, _github, "theirs"));
         var before = File.ReadAllBytes(VaultPath);
@@ -229,7 +229,7 @@ public sealed class VaultMergeSaveTests : IDisposable
     public void ATruncatedFile_IsRefused_AndMergedOnceComplete()
     {
         Seed();
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         Update(open, _stripe, "mine");
         InFile(database => Edit(database, _github, "theirs"));
         var whole = File.ReadAllBytes(VaultPath);
@@ -254,7 +254,7 @@ public sealed class VaultMergeSaveTests : IDisposable
     public void AFileThatHoldsEverythingThisCopyDoes_IsTakenAsItIs_AndNothingIsWritten()
     {
         Seed();
-        using var open = Vault.Open(VaultPath, _password);
+        using var open = ClaimedVault.Open(VaultPath, _password);
         InFile(database => Edit(database, _github, "theirs"));
         var before = File.ReadAllBytes(VaultPath);
 
@@ -284,7 +284,7 @@ public sealed class VaultMergeSaveTests : IDisposable
     /// <summary>Writes the vault every test starts from: <c>work/stripe</c> and <c>work/github</c>, each holding its first value.</summary>
     private void Seed()
     {
-        using var vault = Vault.Create(VaultPath, _password);
+        using var vault = ClaimedVault.Create(VaultPath, _password);
         vault.AddEntry(new VaultEntry { GroupPath = _stripe.GroupPath, Title = _stripe.Title, Username = "user", Password = "stripe-0" });
         vault.AddEntry(new VaultEntry { GroupPath = _github.GroupPath, Title = _github.Title, Username = "user", Password = "github-0" });
         vault.Save();
@@ -296,7 +296,7 @@ public sealed class VaultMergeSaveTests : IDisposable
     /// <summary>The passwords of <c>work/stripe</c> and <c>work/github</c> as the file at <paramref name="path"/> holds them.</summary>
     private static (string? Stripe, string? GitHub) Passwords(string path)
     {
-        using var vault = Vault.Open(path, _password);
+        using var vault = ClaimedVault.Open(path, _password);
         return (vault.Find(_stripe)?.Password, vault.Find(_github)?.Password);
     }
 

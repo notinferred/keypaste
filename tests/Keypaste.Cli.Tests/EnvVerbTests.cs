@@ -49,7 +49,7 @@ public sealed class EnvVerbTests
 
         Assert.Equal(CliApp.ExitSuccess, exit);
 
-        using var vault = Vault.Open(harness.VaultPath, Master);
+        using var vault = ClaimedVault.Open(harness.VaultPath, Master);
         Assert.Equal("inline-value", vault.ReadField(_home, "TOKEN"), StringComparer.Ordinal);
     }
 
@@ -88,7 +88,7 @@ public sealed class EnvVerbTests
         harness.Prompt.Enqueue(Master);
         harness.Run("env", "set", "billing", "CONN=Server=db;Pwd=a=b", "--vault", harness.VaultPath);
 
-        using var vault = Vault.Open(harness.VaultPath, Master);
+        using var vault = ClaimedVault.Open(harness.VaultPath, Master);
         Assert.Equal("Server=db;Pwd=a=b", vault.ReadField(_home, "CONN"), StringComparer.Ordinal);
     }
 
@@ -101,7 +101,7 @@ public sealed class EnvVerbTests
         harness.Prompt.Enqueue(Master);
         Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "set", "billing", "OPTIONAL=", "--vault", harness.VaultPath));
 
-        using var vault = Vault.Open(harness.VaultPath, Master);
+        using var vault = ClaimedVault.Open(harness.VaultPath, Master);
         Assert.Equal(string.Empty, vault.ReadField(_home, "OPTIONAL"), StringComparer.Ordinal);
     }
 
@@ -127,7 +127,7 @@ public sealed class EnvVerbTests
         harness.Run("env", "set", "billing", "TOKEN", "--vault", harness.VaultPath);
         Assert.Contains("env/billing/.env already holds that value for TOKEN; nothing was written", harness.Err, StringComparison.Ordinal);
 
-        using var opened = Vault.Open(harness.VaultPath, Master);
+        using var opened = ClaimedVault.Open(harness.VaultPath, Master);
         Assert.Equal("second", opened.ReadField(_home, "TOKEN"), StringComparer.Ordinal);
         Assert.Single(opened.ReadHistory(_home)!);
     }
@@ -138,7 +138,7 @@ public sealed class EnvVerbTests
         using var harness = new CliHarness();
         SeedVault(harness);
         var stripe = new EntryName("services", "Stripe");
-        using (var vault = Vault.Open(harness.VaultPath, Master))
+        using (var vault = ClaimedVault.Open(harness.VaultPath, Master))
         {
             vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Stripe", Password = "login" });
             vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Other", Password = "login" });
@@ -158,7 +158,7 @@ public sealed class EnvVerbTests
         Assert.Equal(CliApp.ExitNotFound, harness.Run("env", "set", "billing", "OTHER_KEY=v", "--entry", "services/Absent", "--vault", harness.VaultPath));
         Assert.Contains("no item 'services/Absent'", harness.Err, StringComparison.Ordinal);
 
-        using var opened = Vault.Open(harness.VaultPath, Master);
+        using var opened = ClaimedVault.Open(harness.VaultPath, Master);
         Assert.Equal("whsec", opened.ReadField(stripe, "WEBHOOK"), StringComparer.Ordinal);
         Assert.Null(opened.ReadField(new EntryName("services", "Other"), "OTHER_KEY"));
         Assert.Null(opened.Find(_home));
@@ -182,7 +182,7 @@ public sealed class EnvVerbTests
         Assert.Equal(CliApp.ExitSuccess, exit);
         Assert.Contains("Removed A from env/billing/.env (its value stays in the item's history)", harness.Err, StringComparison.Ordinal);
 
-        using var vault = Vault.Open(harness.VaultPath, Master);
+        using var vault = ClaimedVault.Open(harness.VaultPath, Master);
         Assert.Equal(["B"], vault.Fields(_home)!.Select(field => field.Name));
         Assert.Empty(vault.ReadRecycled());
         Assert.True(vault.RestoreRevision(_home, 0));
@@ -204,7 +204,7 @@ public sealed class EnvVerbTests
         Assert.Equal(CliApp.ExitUsageError, exit);
         Assert.Contains("--yes", harness.Err, StringComparison.Ordinal);
 
-        using var vault = Vault.Open(harness.VaultPath, Master);
+        using var vault = ClaimedVault.Open(harness.VaultPath, Master);
         Assert.Equal("1", vault.ReadField(_home, "A"), StringComparer.Ordinal);
     }
 
@@ -334,7 +334,7 @@ public sealed class EnvVerbTests
         harness.Prompt.Enqueue(Master);
         Assert.Equal(CliApp.ExitSuccess, harness.Run("env", "rm", "acme-api", "DATABASE_URL", "-p", "staging", "--yes", "--vault", harness.VaultPath));
 
-        using (var vault = Vault.Open(harness.VaultPath, Master))
+        using (var vault = ClaimedVault.Open(harness.VaultPath, Master))
         {
             Assert.Equal("dev-db", vault.ReadField(dev, "DATABASE_URL"));
             Assert.Null(vault.ReadField(staging, "DATABASE_URL"));
@@ -473,7 +473,7 @@ public sealed class EnvVerbTests
     {
         SeedVault(harness);
 
-        using var vault = Vault.Open(harness.VaultPath, Master);
+        using var vault = ClaimedVault.Open(harness.VaultPath, Master);
         ProjectVariables.Set(vault, "acme-api", "DATABASE_URL", "dev-db");
         ProjectVariables.Set(vault, "acme-api", "STRIPE_KEY", "shared-stripe");
         ProjectVariables.Set(vault, "acme-api", "staging", "DATABASE_URL", "staging-db");
@@ -497,7 +497,7 @@ public sealed class EnvVerbTests
     /// <summary>Writes untagged entries through the core directly, the way KeePassXC would.</summary>
     private static void Author(CliHarness harness, params (string GroupPath, string Title, string Password)[] entries)
     {
-        using var vault = Vault.Open(harness.VaultPath, Master);
+        using var vault = ClaimedVault.Open(harness.VaultPath, Master);
 
         foreach (var entry in entries)
         {

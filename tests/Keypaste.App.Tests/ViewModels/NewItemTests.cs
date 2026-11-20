@@ -27,7 +27,7 @@ public sealed class NewItemTests : IDisposable
     {
         _vaultPath = Path.Combine(_directory, "vault.kdbx");
 
-        using (var vault = Vault.Create(_vaultPath, _master))
+        using (var vault = ClaimedVault.Create(_vaultPath, _master))
         {
             vault.AddEntry(new VaultEntry { Title = "github", GroupPath = "Work", Password = "gh" });
             vault.AddEntry(new VaultEntry { Title = "github", Password = "top" });
@@ -466,7 +466,7 @@ public sealed class NewItemTests : IDisposable
     {
         var otherPath = Path.Combine(_directory, "work.kdbx");
 
-        using (var vault = Vault.Create(otherPath, _master))
+        using (var vault = ClaimedVault.Create(otherPath, _master))
         {
             vault.AddEntry(new VaultEntry { Title = "aws", GroupPath = "Cloud", Password = "a" });
             vault.Save();
@@ -498,7 +498,7 @@ public sealed class NewItemTests : IDisposable
         Assert.False(entries.IsAdding);
         Assert.Equal(["Saved gcp in work."], toasts);
         Assert.Equal(before, File.ReadAllBytes(_vaultPath));
-        using var reopened = Vault.Open(otherPath, _master);
+        using var reopened = ClaimedVault.Open(otherPath, _master);
         Assert.Equal(ItemKind.Login, reopened.Find(new EntryName(string.Empty, "gcp"))?.Kind);
     }
 
@@ -613,7 +613,7 @@ public sealed class NewItemTests : IDisposable
 
     private Item Reopened(EntryName name)
     {
-        using var vault = Vault.Open(_vaultPath, _master);
+        using var vault = ClaimedVault.Open(_vaultPath, _master);
         var entry = vault.Find(name) ?? throw new Xunit.Sdk.XunitException($"no '{name}' in the file");
         var fields = vault.Fields(name)!;
         return new Item(

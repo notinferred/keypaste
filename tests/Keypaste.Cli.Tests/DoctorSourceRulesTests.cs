@@ -18,7 +18,7 @@ public sealed partial class DoctorSourceRulesTests
 {
     private static readonly string[] _forbidden =
     [
-        "VaultSession.", "Vault.Open(", "ReadNewMasterPassword(", "ReadSecret(", ".Prompt.", "TryAcquire(", "AskToShow(",
+        "VaultSession.", "Vault.Open(", "Vault.OpenReadOnly(", "ReadNewMasterPassword(", "ReadSecret(", ".Prompt.", "TryAcquire(", "AskToShow(",
         "AuditLog.TryOpen(", "LockedAppEndpoint", "McpConnectionCheck", "McpToolSurvey", "McpClientSetup.Detect(", ".Apply(",
         ".TryConnect(", "AttachClient",
         ".Save(", "AtomicFile.", "File.Write", "File.Create", "File.Delete", "File.Move", "File.Copy", "Directory.Create",

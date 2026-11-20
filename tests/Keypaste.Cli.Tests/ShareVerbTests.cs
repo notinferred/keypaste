@@ -84,7 +84,7 @@ public sealed class ShareVerbTests : IDisposable
     public void A_share_and_its_revoke_name_the_items_uuid_on_their_lines_and_its_listing()
     {
         string uuid;
-        using (var vault = Vault.Open(_cli.VaultPath, _master))
+        using (var vault = ClaimedVault.Open(_cli.VaultPath, _master))
         {
             uuid = vault.Find(new EntryName("env/acme-api", "STRIPE_KEY"))!.Uuid!;
         }
@@ -349,7 +349,7 @@ public sealed class ShareVerbTests : IDisposable
     [InlineData("kp:///env/acme-api/STRIPE_KEY")]
     public void Share_AReference_SharesTheValueItNames(string reference)
     {
-        using (var vault = Keypaste.Core.Vault.Open(_cli.VaultPath, _master))
+        using (var vault = ClaimedVault.Open(_cli.VaultPath, _master))
         {
             ProjectVariables.Set(vault, "acme-api", "STRIPE_KEY", _stripeValue);
             vault.Save();
@@ -377,7 +377,7 @@ public sealed class ShareVerbTests : IDisposable
 
     private void SeedCustomFields()
     {
-        using var vault = Keypaste.Core.Vault.Open(_cli.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_cli.VaultPath, _master);
         Assert.True(vault.SetFields(
             new Keypaste.Core.EntryName("Banking", "Chase"),
             [new Keypaste.Core.FieldWrite("OPENAI_API_KEY", "sk-proj-SHARED-FIELD-SENTINEL"), new Keypaste.Core.FieldWrite("Recovery codes", "RECOVERY-SENTINEL")]));
@@ -547,7 +547,7 @@ public sealed class ShareVerbTests : IDisposable
     public void ShareRevoke_Expired_WritesOneLinePerLinkRemoved_NamingItsItem_AndNoSecret()
     {
         string uuid;
-        using (var vault = Vault.Open(_cli.VaultPath, _master))
+        using (var vault = ClaimedVault.Open(_cli.VaultPath, _master))
         {
             uuid = vault.Find(new EntryName("env/acme-api", "STRIPE_KEY"))!.Uuid!;
         }

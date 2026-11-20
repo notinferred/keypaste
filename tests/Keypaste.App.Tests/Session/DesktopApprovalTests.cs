@@ -1139,7 +1139,7 @@ public sealed class DesktopApprovalTests
             var fixture = new TempVault();
             var vault = Path.Combine(fixture.Home, "agents.kdbx");
 
-            using (var created = Core.Vault.Create(vault, TempVault.Password))
+            using (var created = ClaimedVault.Create(vault, TempVault.Password))
             {
                 created.AddEntry(new VaultEntry { GroupPath = "env/ci", Title = "DEPLOY_KEY", Password = Sentinel });
                 Assert.True(created.SetFields(new EntryName("env/ci", "DEPLOY_KEY"), [new FieldWrite("DEPLOY_KEY", Sentinel)]));

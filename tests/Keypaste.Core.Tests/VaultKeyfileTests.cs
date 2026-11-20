@@ -64,7 +64,7 @@ public sealed class VaultKeyfileTests : IDisposable
     private string Vault(string name, string password)
     {
         var path = Path(name);
-        using var vault = Core.Vault.Create(path, password);
+        using var vault = ClaimedVault.Create(path, password);
         vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "value", GroupPath = "env/demo" });
         vault.Save();
         return path;
@@ -194,19 +194,19 @@ public sealed class VaultKeyfileTests : IDisposable
 
         var path = CreateWith(form + ".kdbx", _master, keyfile);
 
-        using (var opened = Core.Vault.Open(path, _master, keyfile))
+        using (var opened = ClaimedVault.Open(path, _master, keyfile))
         {
             opened.AddEntry(new VaultEntry { Title = "SECOND", Password = "another", GroupPath = "env/demo" });
             opened.Save();
         }
 
-        using (var reopened = Core.Vault.Open(path, _master, keyfile))
+        using (var reopened = ClaimedVault.Open(path, _master, keyfile))
         {
             Assert.Equal(2, reopened.ReadEntries().Count);
         }
 
         // A save must not quietly re-key the file from the password alone.
-        Assert.Throws<InvalidMasterPasswordException>(() => Core.Vault.Open(path, _master));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, _master));
     }
 
     [Fact]
@@ -218,7 +218,7 @@ public sealed class VaultKeyfileTests : IDisposable
 
         var other = Bytes("other.key", new byte[32]);
 
-        Assert.Throws<InvalidMasterPasswordException>(() => Core.Vault.Open(path, _master, other));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, _master, other));
         Assert.Equal(before, File.ReadAllBytes(path));
     }
 
@@ -228,7 +228,7 @@ public sealed class VaultKeyfileTests : IDisposable
         var keyfile = XmlKeyfile();
         var path = CreateWith("wrongpw.kdbx", _master, keyfile);
 
-        Assert.Throws<InvalidMasterPasswordException>(() => Core.Vault.Open(path, "not it", keyfile));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, "not it", keyfile));
     }
 
     /// <summary>
@@ -255,17 +255,17 @@ public sealed class VaultKeyfileTests : IDisposable
         var keyfile = XmlKeyfile();
         var path = PasswordlessVault("passwordless.kdbx", keyfile);
 
-        using (var opened = Core.Vault.Open(path, string.Empty, keyfile))
+        using (var opened = ClaimedVault.Open(path, string.Empty, keyfile))
         {
             Assert.Empty(opened.ReadEntries());
         }
 
         // Not merely "some password fails": the empty-password key is a different key, and the
         // vault must not answer to a typed one either.
-        Assert.Throws<InvalidMasterPasswordException>(() => Core.Vault.Open(path, "anything", keyfile));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, "anything", keyfile));
 
         // And with no keyfile there is nothing left, so an empty password stays a wrong one.
-        Assert.Throws<InvalidMasterPasswordException>(() => Core.Vault.Open(path, string.Empty));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, string.Empty));
     }
 
     /// <summary>
@@ -296,7 +296,7 @@ public sealed class VaultKeyfileTests : IDisposable
     {
         var path = Vault("plain.kdbx", _master);
 
-        using var opened = Core.Vault.Open(path, _master);
+        using var opened = ClaimedVault.Open(path, _master);
 
         Assert.Single(opened.ReadEntries());
     }
@@ -308,7 +308,7 @@ public sealed class VaultKeyfileTests : IDisposable
         var keyfile = XmlKeyfile();
         var path = CreateWith("backed.kdbx", _master, keyfile);
 
-        using (var opened = Core.Vault.Open(path, _master, keyfile))
+        using (var opened = ClaimedVault.Open(path, _master, keyfile))
         {
             opened.AddEntry(new VaultEntry { Title = "SECOND", Password = "another", GroupPath = "env/demo" });
             opened.Save();
@@ -377,7 +377,7 @@ public sealed class VaultKeyfileTests : IDisposable
     private string CreateWith(string name, string password, string keyfile)
     {
         var path = Path(name);
-        using var vault = Core.Vault.CreateWith(path, password, keyfile);
+        using var vault = ClaimedVault.CreateWith(path, password, keyfile);
         vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "value", GroupPath = "env/demo" });
         vault.Save();
         return path;

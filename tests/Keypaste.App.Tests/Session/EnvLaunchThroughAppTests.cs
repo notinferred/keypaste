@@ -66,7 +66,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
     public EnvLaunchThroughAppTests()
     {
-        using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
+        using (var vault = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
         {
             ProjectVariables.Set(vault, "dev", "API_KEY", _apiKey);
             ProjectVariables.Set(vault, "dev", "DB_URL", _dbUrl);
@@ -772,7 +772,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
     [Fact]
     public async Task A_set_E1a_refuses_is_named_before_anyone_is_asked_and_starts_nothing()
     {
-        using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
+        using (var vault = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
         {
             vault.SetExpiryUnchecked(ProjectVariables.Home("dev"), _session.Clock.GetUtcNow().AddDays(-1));
             vault.Save();
@@ -823,7 +823,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.Equal(3, screen.OpenProject.Count);
         Assert.True(File.Exists(file));
 
-        using var reread = Vault.Open(_fixture.Path_, TempVault.Password);
+        using var reread = ClaimedVault.Open(_fixture.Path_, TempVault.Password);
         Assert.Equal(
             [new EnvVariable("API_KEY", _apiKey), new EnvVariable("DB_URL", "replaced_" + _dbUrl), new EnvVariable("FRESH", _imported)],
             EnvResolution.List(reread, "dev", "dev").Variables);
@@ -845,7 +845,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         import.CancelCommand.Press();
 
         Assert.False(import.IsPreviewing);
-        using var reread = Vault.Open(_fixture.Path_, TempVault.Password);
+        using var reread = ClaimedVault.Open(_fixture.Path_, TempVault.Password);
         Assert.Equal(["API_KEY", "DB_URL"], EnvResolution.List(reread, "dev", "dev").Variables.Select(variable => variable.Key));
     }
 
@@ -865,7 +865,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.Contains("line 2", screen.Error, StringComparison.Ordinal);
         Assert.DoesNotContain(_imported, screen.Error, StringComparison.Ordinal);
 
-        using var reread = Vault.Open(_fixture.Path_, TempVault.Password);
+        using var reread = ClaimedVault.Open(_fixture.Path_, TempVault.Password);
         Assert.DoesNotContain(EnvResolution.List(reread, "dev", "dev").Variables, variable => variable.Key == "FRESH");
     }
 
@@ -1147,7 +1147,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
     /// <summary>Changes the vault's file as another program would, then unlocks it again so the session reads the change.</summary>
     private void Reopened(Action<Vault> change)
     {
-        using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
+        using (var vault = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
         {
             change(vault);
             vault.Save();

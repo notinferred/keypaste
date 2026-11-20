@@ -6,7 +6,6 @@ using Keypaste.App.Tests.Rendering;
 using Keypaste.App.Tests.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
-using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Recent;
 using Keypaste.Core.Tests;
@@ -27,7 +26,7 @@ public sealed class LockScreenTreeTests
         using var home = new TempHome();
         using var files = new TempHome();
         var vault = Path.Combine(files.Path, "work.kdbx");
-        using (var created = Vault.Create(vault, TempVault.Password))
+        using (var created = ClaimedVault.Create(vault, TempVault.Password))
         {
             created.Save();
         }

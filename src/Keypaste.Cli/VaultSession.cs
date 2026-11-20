@@ -22,7 +22,7 @@ internal static class VaultSession
         "keypaste: a vault that also needs a YubiKey opens only in the desktop app; the CLI cannot ask a hardware key. "
         + "While the app holds the vault, `keypaste run --session` and edits such as `keypaste set` reach it there.";
 
-    /// <summary>Opens the vault at <paramref name="path"/> and runs <paramref name="body"/>.</summary>
+    /// <summary>Opens the vault at <paramref name="path"/> to read, and runs <paramref name="body"/>, which cannot save it.</summary>
     /// <param name="path">The vault, already resolved by <see cref="VaultLocator.TryResolve"/>.</param>
     /// <param name="line">
     /// The parsed command line, for <c>--keyfile</c>. Taken whole rather than as a resolved path so
@@ -38,7 +38,11 @@ internal static class VaultSession
     /// app opening with a hardware key.
     /// </param>
     internal static int Open(
-        string path, ParseResult line, CliContext context, Func<Vault, int> body, bool namesHardwareKeys = false)
+        string path, ParseResult line, CliContext context, Func<Vault, int> body, bool namesHardwareKeys = false) =>
+        OpenUnder(path, line, context, claim: null, body, namesHardwareKeys);
+
+    private static int OpenUnder(
+        string path, ParseResult line, CliContext context, VaultClaim? claim, Func<Vault, int> body, bool namesHardwareKeys = false)
     {
         if (!File.Exists(path))
         {
@@ -60,7 +64,9 @@ internal static class VaultSession
 
         try
         {
-            using var vault = Vault.Open(path, master.Value, keyfile);
+            using var vault = claim is null
+                ? Vault.OpenReadOnly(path, master.Value, keyfile)
+                : Vault.Open(claim, path, master.Value, keyfile);
             var exit = body(vault);
             Announce(vault, context);
             return exit;
@@ -105,8 +111,6 @@ internal static class VaultSession
     /// <remarks>
     /// The claim is taken before the password is read, as <c>keypaste approve</c> takes it, so a
     /// command never saves under a running owner and leaves that owner's copy changed on disk.
-    /// Every verb that saves opens the vault here; <see cref="Open"/> is for verbs that never save
-    ///, which <c>SavingVerbSourceRulesTests</c> holds.
     /// </remarks>
     /// <param name="path">The vault, already resolved by <see cref="VaultLocator.TryResolve"/>.</param>
     /// <param name="line">The parsed command line, for <c>--keyfile</c>.</param>
@@ -115,7 +119,7 @@ internal static class VaultSession
     /// <param name="namesHardwareKeys">As for <see cref="Open"/>.</param>
     internal static int OpenHeld(
         string path, ParseResult line, CliContext context, Func<Vault, int> body, bool namesHardwareKeys = false) =>
-        Held(path, context, () => Open(path, line, context, body, namesHardwareKeys));
+        Held(path, context, claim => OpenUnder(path, line, context, claim, body, namesHardwareKeys));
 
     /// <summary>
     /// Takes the vault's claim, then opens the vault and runs <paramref name="body"/>, for a verb that edits
@@ -131,7 +135,7 @@ internal static class VaultSession
     /// <param name="route">How the verb reads its values and says what was done, for the holder's path.</param>
     /// <param name="body">What to do with the open vault.</param>
     internal static int OpenHeld(string path, ParseResult line, CliContext context, OwnerRoute route, Func<Vault, int> body) =>
-        Held(path, context, () => Open(path, line, context, body), (holder, refusal) => OwnerEdit.Ask(path, line, context, holder, route, refusal));
+        Held(path, context, claim => OpenUnder(path, line, context, claim, body), (holder, refusal) => OwnerEdit.Ask(path, line, context, holder, route, refusal));
 
     /// <summary>
     /// Takes the vault's claim, runs <paramref name="first"/> for what the verb needs before the vault's
@@ -148,7 +152,7 @@ internal static class VaultSession
     /// <param name="body">What to do with the value and the open vault.</param>
     internal static int OpenHeld<T>(
         string path, ParseResult line, CliContext context, Func<Func<T, int>, int> first, Func<T, Vault, int> body) =>
-        Held(path, context, () => first(value => Open(path, line, context, vault => body(value, vault))));
+        Held(path, context, claim => first(value => OpenUnder(path, line, context, claim, vault => body(value, vault))));
 
     /// <summary>
     /// Takes the vault's claim as an owner of <paramref name="kind"/>, then opens it and runs
@@ -174,7 +178,7 @@ internal static class VaultSession
 
         using (claim)
         {
-            return Open(path, line, context, vault => body(claim, vault));
+            return OpenUnder(path, line, context, claim, vault => body(claim, vault));
         }
     }
 
@@ -194,7 +198,12 @@ internal static class VaultSession
         _ => refusal,
     };
 
-    private static int Held(string path, CliContext context, Func<int> body, Func<VaultOwner, string, int>? routed = null)
+    /// <summary>Takes the vault's claim as a command and runs <paramref name="body"/> under it, or says who holds the vault.</summary>
+    /// <param name="path">The vault, which need not exist yet.</param>
+    /// <param name="context">Where the refusal goes.</param>
+    /// <param name="body">What to do under the claim.</param>
+    /// <param name="routed">What to do instead while the app or <c>keypaste approve</c> holds the vault, or null to refuse.</param>
+    internal static int Held(string path, CliContext context, Func<VaultClaim, int> body, Func<VaultOwner, string, int>? routed = null)
     {
         var home = KeypasteHome.Resolve(context.Environment.Get(KeypasteHome.EnvironmentVariable));
 
@@ -213,7 +222,7 @@ internal static class VaultSession
 
         using (claim)
         {
-            return body();
+            return body(claim);
         }
     }
 

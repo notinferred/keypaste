@@ -24,7 +24,7 @@ public sealed class ItemPickerTests : IDisposable
 
     public ItemPickerTests()
     {
-        using (var created = Vault.Create(VaultPath, EnvStoreTests.MasterPassword))
+        using (var created = ClaimedVault.Create(VaultPath, EnvStoreTests.MasterPassword))
         {
             created.AddEntry(new VaultEntry { GroupPath = "services", Title = "Mail", Username = "alice", Url = "https://mail.example.com", Password = "alice-password" });
             created.AddEntry(new VaultEntry { GroupPath = "services", Title = "Mail", Username = "bob", Password = "bob-password" });
@@ -32,7 +32,7 @@ public sealed class ItemPickerTests : IDisposable
             created.Save();
         }
 
-        _vault = Vault.Open(VaultPath, EnvStoreTests.MasterPassword);
+        _vault = ClaimedVault.Open(VaultPath, EnvStoreTests.MasterPassword);
         _log = new OwnerLog(_directory);
 
         var handler = new ApproverHandler(

@@ -91,7 +91,7 @@ public sealed class ProcessTemporaryDirectoryTests
         var directory = Directory.CreateTempSubdirectory("keypaste-private-temp-").FullName;
         path = Path.Combine(directory, "vault.kdbx");
 
-        var vault = Vault.Create(path, VaultRoundTripTests.MasterPassword);
+        var vault = ClaimedVault.Create(path, VaultRoundTripTests.MasterPassword);
         vault.AddEntry(new VaultEntry { Title = "seeded", Password = "seed" });
 
         // Saved once here so the file exists: FileTransactionEx writes in place when the base file

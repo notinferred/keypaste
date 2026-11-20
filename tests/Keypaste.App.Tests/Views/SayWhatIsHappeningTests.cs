@@ -174,7 +174,7 @@ public sealed class SayWhatIsHappeningTests
     public Task Making_a_link_and_checking_status_move_and_say_so() => HeadlessSession.On(async () =>
     {
         using var fixture = new TempVault();
-        using (var vault = Vault.Open(fixture.Path_, TempVault.Password))
+        using (var vault = ClaimedVault.Open(fixture.Path_, TempVault.Password))
         {
             vault.AddEntry(new VaultEntry { GroupPath = "Work", Title = "github", Password = "a-value" });
             vault.Save();

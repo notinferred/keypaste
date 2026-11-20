@@ -151,12 +151,12 @@ public sealed class EnvImportTests : IDisposable
     {
         var path = Path.Combine(_directory, Guid.NewGuid().ToString("N") + ".kdbx");
 
-        using (var created = Vault.Create(path, EnvStoreTests.MasterPassword))
+        using (var created = ClaimedVault.Create(path, EnvStoreTests.MasterPassword))
         {
             build(created);
             created.Save();
         }
 
-        return Vault.Open(path, EnvStoreTests.MasterPassword);
+        return ClaimedVault.Open(path, EnvStoreTests.MasterPassword);
     }
 }

@@ -85,6 +85,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
     private HardwareKey? _hardwareKey;
     private HardwareKey? _waitingKey;
     private VaultClaim? _claim;
+    private VaultClaim? _restoring;
     private SessionLifetime? _lifetime;
     private OwnerMerge? _ownerMerge;
     private MergeResult? _refusal;
@@ -129,10 +130,10 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
     /// <summary>What a refused quick unlock came to, when <see cref="TryResume"/> answered <see cref="UnlockOutcome.QuickUnlockRefused"/>.</summary>
     internal QuickUnlockOutcome? LastQuickUnlock { get; private set; }
 
-    /// <summary>Opens a vault with a password, keyfile and hardware key, as <see cref="Vault.Open(string, ReadOnlySpan{char}, string?, HardwareKey?)"/> does.</summary>
-    internal delegate Vault VaultOpener(string path, ReadOnlySpan<char> password, string? keyfilePath, HardwareKey? hardwareKey);
+    /// <summary>Opens a vault under a claim with a password, keyfile and hardware key, as <see cref="Vault.Open(VaultClaim, string, ReadOnlySpan{char}, string?, HardwareKey?)"/> does.</summary>
+    internal delegate Vault VaultOpener(VaultClaim claim, string path, ReadOnlySpan<char> password, string? keyfilePath, HardwareKey? hardwareKey);
 
-    /// <summary>What opens the vault again under its new factors after an access change; <see cref="Vault.Open(string, ReadOnlySpan{char}, string?, HardwareKey?)"/> unless a test gives another.</summary>
+    /// <summary>What opens the vault again under its new factors after an access change; <see cref="Vault.Open(VaultClaim, string, ReadOnlySpan{char}, string?, HardwareKey?)"/> unless a test gives another.</summary>
     internal VaultOpener ReopenAfterAccessChange { get; init; } = Vault.Open;
 
     /// <summary>Whether a lock for <paramref name="reason"/> leaves the vault's quick unlock copy, so it can be resumed without its password.</summary>
@@ -547,7 +548,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
     /// <returns>What happened.</returns>
     /// <remarks>
     /// <para>
-    /// <b>A span, exactly as <see cref="Vault.Open(string, ReadOnlySpan{char})"/> takes.</b> The buffer stays the caller's, in
+    /// <b>A span, exactly as <see cref="Vault.Open(VaultClaim, string, ReadOnlySpan{char})"/> takes.</b> The buffer stays the caller's, in
     /// a <c>using</c>, which zeroes it on every path out — including the wrong-password path, which
     /// is the one that happens most and the one people forget. Taking ownership of a
     /// <see cref="SecretBuffer"/> here instead would have been defensible, but it makes CA2000
@@ -562,6 +563,18 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
     /// </remarks>
     internal UnlockOutcome TryUnlock(
         string path, ReadOnlySpan<char> master, string? keyfilePath = null, int? hardwareKeySlot = null)
+    {
+        try
+        {
+            return Unlock(path, master, keyfilePath, hardwareKeySlot);
+        }
+        finally
+        {
+            ReleaseRestoring();
+        }
+    }
+
+    private UnlockOutcome Unlock(string path, ReadOnlySpan<char> master, string? keyfilePath, int? hardwareKeySlot)
     {
         ArgumentNullException.ThrowIfNull(path);
 
@@ -596,7 +609,10 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
             return UnlockOutcome.HardwareKeyFailed;
         }
 
+        // Ownership passes to Adopt, or back through Release on every refusal after this.
+#pragma warning disable CA2000
         if (!TryClaim(path, out var claim))
+#pragma warning restore CA2000
         {
             return UnlockOutcome.HeldElsewhere;
         }
@@ -618,7 +634,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
             // Dispose, and a second TryUnlock replacing it — disposes it. CA2000 cannot see a
             // lifetime that leaves the method.
 #pragma warning disable CA2000
-            opened = Vault.Open(path, master, keyfilePath, hardwareKey);
+            opened = Vault.Open(claim, path, master, keyfilePath, hardwareKey);
 #pragma warning restore CA2000
         }
         catch (VaultException ex)
@@ -690,7 +706,10 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
             return UnlockOutcome.QuickUnlockRefused;
         }
 
+        // Ownership passes to Adopt, or back through Release on every refusal after this.
+#pragma warning disable CA2000
         if (!TryClaim(path, out var claim))
+#pragma warning restore CA2000
         {
             return UnlockOutcome.HeldElsewhere;
         }
@@ -724,7 +743,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
 
         try
         {
-            opened = Vault.Open(path, parts, hardwareKey);
+            opened = Vault.Open(claim, path, parts, hardwareKey);
         }
         catch (VaultException ex)
         {
@@ -799,13 +818,80 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
         }
     }
 
-    /// <summary>Takes the claim on a vault, or reuses the one this session already holds on it.</summary>
+    /// <summary>
+    /// Puts a checked backup in the vault's place under this session's claim on the vault, which the next unlock takes up.
+    /// </summary>
+    /// <param name="validated">What <see cref="VaultBackups.Inspect"/> returned for the backup.</param>
+    /// <returns>Which copy was restored, and what became of the file it replaced.</returns>
+    /// <exception cref="VaultRestoreException">Another process holds the vault, so nothing was replaced; or as <see cref="VaultBackups.Restore(VaultClaim, VaultBackupSummary)"/> throws.</exception>
+    /// <remarks>Taken before the file is replaced, so no other keypaste process holds the vault while it changes or slips in before the unlock.</remarks>
+    internal VaultRestoreReport RestoreBackup(VaultBackupSummary validated)
+    {
+        ArgumentNullException.ThrowIfNull(validated);
+
+        // Kept for the next unlock, or given back through Release when the restore fails.
+#pragma warning disable CA2000
+        if (!TryClaim(validated.VaultPath, out var claim))
+#pragma warning restore CA2000
+        {
+            var refusal = HeldElsewhere ?? "another keypaste process holds this vault.";
+            throw new VaultRestoreException(char.ToUpperInvariant(refusal[0]) + refusal[1..]);
+        }
+
+        VaultRestoreReport report;
+
+        try
+        {
+            report = VaultBackups.Restore(claim, validated);
+        }
+        catch
+        {
+            Release(claim);
+            throw;
+        }
+
+        lock (_gate)
+        {
+            if (!ReferenceEquals(claim, _claim))
+            {
+                _restoring?.Dispose();
+                _restoring = claim;
+            }
+        }
+
+        return report;
+    }
+
+    /// <summary>Gives back a restore's claim no unlock took up.</summary>
+    private void ReleaseRestoring()
+    {
+        VaultClaim? restoring;
+
+        lock (_gate)
+        {
+            restoring = _restoring;
+            _restoring = null;
+        }
+
+        restoring?.Dispose();
+    }
+
+    /// <summary>Takes the claim on a vault, or reuses the one this session already holds on it or a restore kept for it.</summary>
     private bool TryClaim(string path, [NotNullWhen(true)] out VaultClaim? claim)
     {
         lock (_gate)
         {
-            if (_claim is { } held && held.Vault.Names(path))
+            var held = _claim is { } own && own.Vault.Names(path) ? own
+                : _restoring is { } restored && restored.Vault.Names(path) ? restored
+                : null;
+
+            if (held is not null)
             {
+                if (ReferenceEquals(held, _restoring))
+                {
+                    _restoring = null;
+                }
+
                 claim = held;
                 HeldElsewhere = null;
                 HeldBy = null;
@@ -1021,7 +1107,10 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
             return VaultCreationOutcome.Failed;
         }
 
+        // Ownership passes to Adopt, or back through Release on every refusal after this.
+#pragma warning disable CA2000
         if (!TryClaim(path, out var claim))
+#pragma warning restore CA2000
         {
             return VaultCreationOutcome.Failed;
         }
@@ -1036,7 +1125,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
 
         try
         {
-            outcome = VaultCreation.TryCreate(path, password, confirmation, keyfilePath, hardwareKey, out created, out _);
+            outcome = VaultCreation.TryCreate(claim, path, password, confirmation, keyfilePath, hardwareKey, out created, out _);
         }
         catch (HardwareKeyException failed)
         {
@@ -1152,7 +1241,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
 
         try
         {
-            using var check = Vault.Open(vault.Path, current, keyfile, hardwareKey);
+            using var check = Vault.OpenReadOnly(vault.Path, current, keyfile, hardwareKey);
         }
         catch (InvalidMasterPasswordException)
         {
@@ -1182,12 +1271,25 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
             _ => hardwareKey,
         };
 
+        VaultClaim? claim;
+
+        lock (_gate)
+        {
+            claim = _claim;
+        }
+
+        if (claim is null)
+        {
+            lockNow = true;
+            return new AccessChangeResult(AccessChangeOutcome.ChangedAndLocked, result);
+        }
+
         Vault reopened;
         try
         {
             // Owned by the session once swapped in; Swap disposes it when it is not.
 #pragma warning disable CA2000
-            reopened = ReopenAfterAccessChange(vault.Path, change.SetPassword ? newPassword : current, keyfileAfter, hardwareKeyAfter);
+            reopened = ReopenAfterAccessChange(claim, vault.Path, change.SetPassword ? newPassword : current, keyfileAfter, hardwareKeyAfter);
 #pragma warning restore CA2000
         }
         catch (VaultException)
@@ -1767,6 +1869,8 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
 
             _claim?.Dispose();
             _claim = null;
+            _restoring?.Dispose();
+            _restoring = null;
             _warned = false;
         }
 

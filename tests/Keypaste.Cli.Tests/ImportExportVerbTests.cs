@@ -4,6 +4,7 @@ using Keypaste.Core.Audit;
 using Keypaste.Core.Import;
 using Keypaste.Core.Internal;
 using Keypaste.Core.Ownership;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -86,7 +87,7 @@ public sealed class ImportExportVerbTests : IDisposable
         Assert.Empty(_cli.Out);
         AssertNoValue();
 
-        using var vault = Vault.Open(_cli.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_cli.VaultPath, _master);
         Assert.Equal("vault-pw-github", vault.Find(new EntryName("imported/Work", "GitHub"))!.Password);
         Assert.Null(vault.Find(new EntryName("imported/Work", "GitHub (2)")));
         Assert.Equal("export-pw-bank", vault.Find(new EntryName("imported", "Bank"))!.Password);

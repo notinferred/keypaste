@@ -280,7 +280,7 @@ public sealed class AuditCompactionTests : IDisposable
         OldLog();
         var before = File.ReadAllBytes(LogPath);
         var vaultPath = Path.Combine(_directory, "vault.kdbx");
-        using var vault = Vault.Create(vaultPath, EnvStoreTests.MasterPassword);
+        using var vault = ClaimedVault.Create(vaultPath, EnvStoreTests.MasterPassword);
         vault.Save();
         using var compactions = new AuditCompactions(LogPath, () => vault, VaultIdentity.Of(_directory, vaultPath), "session", () => 365, new ManualClock(_today));
 
@@ -298,7 +298,7 @@ public sealed class AuditCompactionTests : IDisposable
     public void An_unlock_whose_vault_holds_a_key_creates_no_log_when_there_is_none()
     {
         var vaultPath = Path.Combine(_directory, "vault.kdbx");
-        using var vault = Vault.Create(vaultPath, EnvStoreTests.MasterPassword);
+        using var vault = ClaimedVault.Create(vaultPath, EnvStoreTests.MasterPassword);
         Assert.True(AuditCheckpoint.WriteNewKey(vault));
         vault.Save();
         using var compactions = new AuditCompactions(LogPath, () => vault, VaultIdentity.Of(_directory, vaultPath), "session", () => 365, new ManualClock(_today));

@@ -47,7 +47,7 @@ public sealed class VaultHistoryTests : IDisposable
     {
         var path = Seed(out var beforeSaving);
 
-        using var vault = Vault.Open(path, MasterPassword);
+        using var vault = ClaimedVault.Open(path, MasterPassword);
         var revisions = vault.ReadHistory(_production);
 
         Assert.NotNull(revisions);
@@ -83,7 +83,7 @@ public sealed class VaultHistoryTests : IDisposable
         var path = NewVaultPath();
         WriteInOneSecond(path, DateTime.UtcNow);
 
-        using var vault = Vault.Open(path, MasterPassword);
+        using var vault = ClaimedVault.Open(path, MasterPassword);
         var revisions = vault.ReadHistory(_production);
 
         Assert.NotNull(revisions);
@@ -102,7 +102,7 @@ public sealed class VaultHistoryTests : IDisposable
     {
         var path = Seed(out _);
 
-        using var vault = Vault.Open(path, MasterPassword);
+        using var vault = ClaimedVault.Open(path, MasterPassword);
 
         Assert.Equal(["v3", "v2", "v1", "v0"], Versions(vault).Select(version => version.Password));
         Assert.True(EachInASecondOfItsOwn(vault));
@@ -132,7 +132,7 @@ public sealed class VaultHistoryTests : IDisposable
         WriteInOneSecond(path, ahead);
         EntryName edited;
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Assert.False(EachInASecondOfItsOwn(vault));
 
@@ -140,7 +140,7 @@ public sealed class VaultHistoryTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         var versions = Versions(reopened, edited);
 
         Assert.Equal(WholeSecond(ahead).AddSeconds(1), versions[0].ModifiedUtc);
@@ -157,7 +157,7 @@ public sealed class VaultHistoryTests : IDisposable
         var path = Seed(out _);
         string? uuid;
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             uuid = vault.EntryUuid(_production);
             Assert.NotNull(uuid);
@@ -166,7 +166,7 @@ public sealed class VaultHistoryTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         var current = reopened.Find(_production);
 
         Assert.Equal("v0", current?.Password, StringComparer.Ordinal);
@@ -189,7 +189,7 @@ public sealed class VaultHistoryTests : IDisposable
     [Fact]
     public void RestoreRevision_StampsTheEntryWithTheMomentOfTheRestore()
     {
-        using var vault = Vault.Open(Seed(out _), MasterPassword);
+        using var vault = ClaimedVault.Open(Seed(out _), MasterPassword);
 
         Assert.True(vault.RestoreRevision(_production, 2));
         vault.UpdateEntry(new VaultEntry { Title = "production", Password = "v4", GroupPath = "servers" });
@@ -211,13 +211,13 @@ public sealed class VaultHistoryTests : IDisposable
         var path = Seed(out _);
         var bytes = File.ReadAllBytes(path);
 
-        using var vault = Vault.Open(path, MasterPassword);
+        using var vault = ClaimedVault.Open(path, MasterPassword);
         Assert.True(vault.RestoreRevision(_production, 2));
         Assert.Equal("v0", vault.Find(_production)?.Password, StringComparer.Ordinal);
 
         Assert.Equal(bytes, File.ReadAllBytes(path));
 
-        using var other = Vault.Open(path, MasterPassword);
+        using var other = ClaimedVault.Open(path, MasterPassword);
         Assert.Equal("v3", other.Find(_production)?.Password, StringComparer.Ordinal);
         Assert.Equal(3, other.ReadHistory(_production)?.Count);
     }
@@ -234,7 +234,7 @@ public sealed class VaultHistoryTests : IDisposable
 
         // One session throughout: in-memory times differ by ticks, so "the oldest" is unambiguous to
         // the eviction rule, which a reopened file's one-second resolution would not be.
-        using (var vault = Vault.Create(path, MasterPassword))
+        using (var vault = ClaimedVault.Create(path, MasterPassword))
         {
             vault.AddEntry(new VaultEntry { Title = "production", Password = "v0", GroupPath = "servers" });
 
@@ -262,7 +262,7 @@ public sealed class VaultHistoryTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         Assert.Equal(10, reopened.ReadHistory(_production)?.Count);
     }
 
@@ -283,7 +283,7 @@ public sealed class VaultHistoryTests : IDisposable
     [Fact]
     public void RestoreRevision_OnAnEntryWithNoHistory_IsRefused()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
         vault.AddEntry(new VaultEntry { Title = "production", Password = "v0", GroupPath = "servers" });
 
         Assert.Throws<ArgumentOutOfRangeException>(() => vault.RestoreRevision(_production, 0));
@@ -316,7 +316,7 @@ public sealed class VaultHistoryTests : IDisposable
         var path = NewVaultPath();
         var token = new EntryName("env/dev", "TOKEN");
 
-        using (var vault = Vault.Create(path, MasterPassword))
+        using (var vault = ClaimedVault.Create(path, MasterPassword))
         {
             vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "first", GroupPath = "env/dev" });
             vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "second", GroupPath = "env/dev" });
@@ -325,7 +325,7 @@ public sealed class VaultHistoryTests : IDisposable
 
         var bytes = File.ReadAllBytes(path);
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Assert.Throws<VaultException>(() => vault.ReadHistory(token));
             Assert.Throws<VaultException>(() => vault.RestoreRevision(token, 0));
@@ -334,7 +334,7 @@ public sealed class VaultHistoryTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         Assert.Equal(["first", "second"], reopened.ReadEntries().Select(entry => entry.Password));
     }
 
@@ -349,7 +349,7 @@ public sealed class VaultHistoryTests : IDisposable
     [InlineData(2)]
     public void RestoreRevision_PutsBackTheRevisionTheReadShowedAtThatIndex(int index)
     {
-        using var vault = Vault.Open(Seed(out _), MasterPassword);
+        using var vault = ClaimedVault.Open(Seed(out _), MasterPassword);
         var shown = vault.ReadHistory(_production)?[index].Fields;
 
         Assert.NotNull(shown);
@@ -364,7 +364,7 @@ public sealed class VaultHistoryTests : IDisposable
     [Fact]
     public void ReadHistory_OnAnEntryWithNoHistory_IsEmptyRatherThanMissing()
     {
-        using var vault = Vault.Create(NewVaultPath(), MasterPassword);
+        using var vault = ClaimedVault.Create(NewVaultPath(), MasterPassword);
         vault.AddEntry(new VaultEntry { Title = "production", Password = "v0", GroupPath = "servers" });
 
         Assert.Empty(vault.ReadHistory(_production)!);
@@ -387,7 +387,7 @@ public sealed class VaultHistoryTests : IDisposable
         var path = Seed(out _);
         var renamed = new EntryName("servers", "prod");
 
-        using var vault = Vault.Open(path, MasterPassword);
+        using var vault = ClaimedVault.Open(path, MasterPassword);
 
         Assert.Equal(OrganizeOutcome.Renamed, vault.RenameEntry(_production, "prod", out _));
         Assert.True(vault.RestoreRevision(renamed, 0));
@@ -410,7 +410,7 @@ public sealed class VaultHistoryTests : IDisposable
         var path = Seed(out _);
         var renamed = new EntryName("servers", "prod");
 
-        using var vault = Vault.Open(path, MasterPassword);
+        using var vault = ClaimedVault.Open(path, MasterPassword);
 
         Assert.Equal(OrganizeOutcome.Renamed, vault.RenameEntry(_production, "prod", out _));
         Assert.True(vault.RestoreRevision(renamed, 0));
@@ -433,7 +433,7 @@ public sealed class VaultHistoryTests : IDisposable
         var path = Seed(out _);
         var renamed = new EntryName("servers", "prod");
 
-        using var vault = Vault.Open(path, MasterPassword);
+        using var vault = ClaimedVault.Open(path, MasterPassword);
 
         Assert.Equal(OrganizeOutcome.Renamed, vault.RenameEntry(_production, "prod", out _));
 
@@ -451,7 +451,7 @@ public sealed class VaultHistoryTests : IDisposable
     {
         var path = Seed(out _);
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Assert.True(vault.SetFields(_production, [new FieldWrite("API_KEY", "key-value"), new FieldWrite("Region", "eu", Protect: false)]));
             Assert.True(vault.AddTag(_production, "env:billing:prod"));
@@ -459,7 +459,7 @@ public sealed class VaultHistoryTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         var revisions = reopened.ReadHistory(_production)!;
 
         // Newest first: before the rename, before the tag, before the fields.
@@ -476,7 +476,7 @@ public sealed class VaultHistoryTests : IDisposable
     private string Seed(out IReadOnlyList<EntryRevision> beforeSaving)
     {
         var path = NewVaultPath();
-        using var vault = Vault.Create(path, MasterPassword);
+        using var vault = ClaimedVault.Create(path, MasterPassword);
 
         vault.AddEntry(new VaultEntry
         {
@@ -511,7 +511,7 @@ public sealed class VaultHistoryTests : IDisposable
     {
         var bytes = File.ReadAllBytes(path);
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             refused(vault);
 
@@ -521,7 +521,7 @@ public sealed class VaultHistoryTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         AssertUntouched(reopened);
     }
 

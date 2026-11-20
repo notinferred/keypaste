@@ -14,7 +14,7 @@ public sealed class ProjectCatalogTests : IDisposable
     [Fact]
     public void Tagged_entries_make_a_project_with_its_environments_and_exactly_its_members()
     {
-        using var vault = Vault.Create(Path.Combine(_directory, "v.kdbx"), _master);
+        using var vault = ClaimedVault.Create(Path.Combine(_directory, "v.kdbx"), _master);
         Add(vault, "services", "Stripe", "env:billing", "finance");
         Add(vault, "services", "Database", "env:billing:prod");
         Add(vault, "services", "Odd", "env:billing:Prod");
@@ -40,7 +40,7 @@ public sealed class ProjectCatalogTests : IDisposable
     [Fact]
     public void Untagged_entries_under_env_make_no_project_and_no_environment()
     {
-        using var vault = Vault.Create(Path.Combine(_directory, "v.kdbx"), _master);
+        using var vault = ClaimedVault.Create(Path.Combine(_directory, "v.kdbx"), _master);
         vault.AddEntry(new VaultEntry { GroupPath = "env/acme", Title = "OLD_KEY", Password = "o" });
         vault.AddEntry(new VaultEntry { GroupPath = "env/acme/prod", Title = "DB", Password = "d" });
         vault.AddEntry(new VaultEntry { GroupPath = "env/billing/staging", Title = "KEY", Password = "k" });
@@ -58,7 +58,7 @@ public sealed class ProjectCatalogTests : IDisposable
     [Fact]
     public void Home_entries_make_their_environments_and_an_untagged_entry_or_a_subgroup_beside_them_adds_none()
     {
-        using var vault = Vault.Create(Path.Combine(_directory, "v.kdbx"), _master);
+        using var vault = ClaimedVault.Create(Path.Combine(_directory, "v.kdbx"), _master);
         ProjectVariables.Set(vault, "home", "TOKEN", "t");
         ProjectVariables.Set(vault, "home", "staging", "TOKEN", "s");
         vault.AddEntry(new VaultEntry { GroupPath = "env/home", Title = "OLD", Password = "o" });
@@ -79,7 +79,7 @@ public sealed class ProjectCatalogTests : IDisposable
     [Fact]
     public void Environments_come_dev_first_then_by_name_and_protected_last()
     {
-        using var vault = Vault.Create(Path.Combine(_directory, "v.kdbx"), _master);
+        using var vault = ClaimedVault.Create(Path.Combine(_directory, "v.kdbx"), _master);
 
         foreach (var environment in new[] { "prod", "staging", "production-eu", "alpha", "dev" })
         {
@@ -94,7 +94,7 @@ public sealed class ProjectCatalogTests : IDisposable
     [Fact]
     public void Entries_in_the_recycle_bin_or_keypastes_own_groups_belong_to_no_project()
     {
-        using var vault = Vault.Create(Path.Combine(_directory, "v.kdbx"), _master);
+        using var vault = ClaimedVault.Create(Path.Combine(_directory, "v.kdbx"), _master);
         Add(vault, ".keypaste/tokens", "planted", "env:billing");
         Add(vault, "services", "Deleted", "env:billing:prod");
         vault.RemoveEntry(new EntryName("services", "Deleted"), out _);
@@ -105,7 +105,7 @@ public sealed class ProjectCatalogTests : IDisposable
     [Fact]
     public void An_entry_names_every_environment_its_own_tags_put_it_in_and_nothing_else()
     {
-        using var vault = Vault.Create(Path.Combine(_directory, "v.kdbx"), _master);
+        using var vault = ClaimedVault.Create(Path.Combine(_directory, "v.kdbx"), _master);
         Add(vault, "services", "Stripe", "env:billing", "env:billing:staging", "env:payments:prod", "env:billing:Prod", "finance");
         Add(vault, "services", "Mail", "env:billing", "env:billing:dev");
         Add(vault, "services", "Odd", "env:billing:Prod");

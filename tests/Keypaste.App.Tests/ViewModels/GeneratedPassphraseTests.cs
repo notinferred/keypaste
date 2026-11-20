@@ -35,7 +35,7 @@ public sealed class GeneratedPassphraseTests : IDisposable
         _directory = Directory.CreateTempSubdirectory("keypaste-passphrase-tests-").FullName;
         _vaultPath = Path.Combine(_directory, "vault.kdbx");
 
-        using var vault = Vault.Create(_vaultPath, Master);
+        using var vault = ClaimedVault.Create(_vaultPath, Master);
         vault.AddEntry(new VaultEntry { Title = "github", Username = "me", Password = "gh" });
         ProjectVariables.Set(vault, "billing", "STRIPE_KEY", "sk");
         vault.Save();
@@ -126,7 +126,7 @@ public sealed class GeneratedPassphraseTests : IDisposable
             Assert.True(context.Entries.IsAdding);
         }
 
-        using var reopened = Vault.Open(_vaultPath, Master);
+        using var reopened = ClaimedVault.Open(_vaultPath, Master);
         Assert.Null(reopened.Find("database"));
     }
 
@@ -151,7 +151,7 @@ public sealed class GeneratedPassphraseTests : IDisposable
     /// <summary>A new key the screen added, from billing's home entry (D-0413).</summary>
     private string RereadHomeField(string key)
     {
-        using var vault = Vault.Open(_vaultPath, Master);
+        using var vault = ClaimedVault.Open(_vaultPath, Master);
         var value = vault.ReadField(new EntryName("env/billing", ".env"), key);
 
         Assert.NotNull(value);
@@ -160,7 +160,7 @@ public sealed class GeneratedPassphraseTests : IDisposable
 
     private string Reread(string path)
     {
-        using var vault = Vault.Open(_vaultPath, Master);
+        using var vault = ClaimedVault.Open(_vaultPath, Master);
         var found = vault.Find(path);
 
         Assert.NotNull(found);

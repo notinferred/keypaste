@@ -15,7 +15,7 @@ public sealed class AuditCheckpointTests : IDisposable
 
     public AuditCheckpointTests()
     {
-        _vault = Vault.Create(VaultPath, EnvStoreTests.MasterPassword);
+        _vault = ClaimedVault.Create(VaultPath, EnvStoreTests.MasterPassword);
         Assert.True(AuditCheckpoint.WriteNewKey(_vault));
         _vault.Save();
         _log = new OwnerLog(_directory);
@@ -52,7 +52,7 @@ public sealed class AuditCheckpointTests : IDisposable
     {
         var path = Path.Combine(_directory, "fresh.kdbx");
         var identity = VaultIdentity.Of(_directory, path);
-        using var fresh = Vault.Create(path, EnvStoreTests.MasterPassword);
+        using var fresh = ClaimedVault.Create(path, EnvStoreTests.MasterPassword);
         fresh.Save();
         var written = File.ReadAllBytes(path);
         var checkpoints = new AuditCheckpoints(() => _log.Log, () => fresh, identity, "session-one");
@@ -68,7 +68,7 @@ public sealed class AuditCheckpointTests : IDisposable
 
         Assert.Equal(new[] { AuditCheckpoint.Every + 2 }, CheckpointLines());
 
-        using var reopened = Vault.Open(path, EnvStoreTests.MasterPassword);
+        using var reopened = ClaimedVault.Open(path, EnvStoreTests.MasterPassword);
         var later = new AuditCheckpoints(() => _log.Log, () => reopened, identity, "session-two");
         Append(later, 1);
         later.Seal();
@@ -83,7 +83,7 @@ public sealed class AuditCheckpointTests : IDisposable
     {
         var path = Path.Combine(_directory, "fresh.kdbx");
         var identity = VaultIdentity.Of(_directory, path);
-        using var fresh = Vault.Create(path, EnvStoreTests.MasterPassword);
+        using var fresh = ClaimedVault.Create(path, EnvStoreTests.MasterPassword);
         fresh.Save();
         Append(new AuditCheckpoints(() => _log.Log, () => fresh, identity, "session-one"), 1);
 
@@ -102,7 +102,7 @@ public sealed class AuditCheckpointTests : IDisposable
         using var saved = merged.Copy;
 
         Assert.Equal(VaultMergeSaveOutcome.Saved, merged.Outcome);
-        using var file = Vault.Open(path, EnvStoreTests.MasterPassword);
+        using var file = ClaimedVault.Open(path, EnvStoreTests.MasterPassword);
         Assert.NotNull(AuditCheckpointKey.Read(file, identity));
     }
 
@@ -237,7 +237,7 @@ public sealed class AuditCheckpointTests : IDisposable
 
     private static void SaveElsewhere(string path, string title)
     {
-        using var other = Vault.Open(path, EnvStoreTests.MasterPassword);
+        using var other = ClaimedVault.Open(path, EnvStoreTests.MasterPassword);
         other.AddEntry(new VaultEntry { GroupPath = "env/app", Title = title, Password = "secret-theirs" });
         other.Save();
     }

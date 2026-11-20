@@ -34,7 +34,7 @@ public sealed class SharingViewModelTests : IDisposable
 
     public SharingViewModelTests()
     {
-        using (var vault = Vault.Open(_vault.Path_, TempVault.Password))
+        using (var vault = ClaimedVault.Open(_vault.Path_, TempVault.Password))
         {
             vault.AddEntry(new VaultEntry { GroupPath = "env/acme-api", Title = "STRIPE_KEY", Password = _stripeValue });
             vault.AddEntry(new VaultEntry { GroupPath = "Work", Title = "no-password", Username = "sam" });

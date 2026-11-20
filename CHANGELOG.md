@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+`keypaste init` and restoring a backup from the desktop app's unlock screen are refused while another keypaste process holds the vault, naming it, as the commands that save already were, and both are refused while file locking is turned off (`DOTNET_SYSTEM_IO_DISABLEFILELOCKING`). (F.134)
+
 The macOS app and CLI are signed with keypaste's Developer ID under the hardened runtime, and a release's macOS files are notarized and stapled before they publish. (3.5b)
 
 A save no longer overwrites another program's save that lands while keypaste derives the vault's keys or writes the file: it is refused as a save over an earlier change is, and an overwrite you chose still replaces it. (F.133)

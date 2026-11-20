@@ -1,6 +1,7 @@
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ownership;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -20,7 +21,7 @@ public sealed class RotateVerbTests : IDisposable
     {
         _harness.SeedVault(_master);
 
-        using var vault = Vault.Open(_harness.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
         vault.AddEntry(new VaultEntry { GroupPath = "Banking", Title = "Chase", Username = "dan", Password = _old });
         vault.AddEntry(new VaultEntry { GroupPath = ".keypaste/tokens", Title = "t1", Password = "verifier" });
         vault.Save();
@@ -33,7 +34,7 @@ public sealed class RotateVerbTests : IDisposable
 
     private VaultEntry Read()
     {
-        using var vault = Vault.Open(_harness.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
         return vault.Find(new EntryName("Banking", "Chase"))!;
     }
 
@@ -53,7 +54,7 @@ public sealed class RotateVerbTests : IDisposable
         Assert.DoesNotContain(_old, _harness.Out + _harness.Err, StringComparison.Ordinal);
         Assert.Empty(_harness.Out);
 
-        using var vault = Vault.Open(_harness.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
         Assert.Contains(vault.ReadHistory(new EntryName("Banking", "Chase"))!, revision => revision.Fields.Password == _old);
     }
 

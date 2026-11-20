@@ -1,4 +1,5 @@
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -37,7 +38,7 @@ public sealed class VaultChangedOnDiskTests
 
             harness.Prompt.OnPrompt = null;
 
-            using var elsewhere = Vault.Open(harness.VaultPath, Master);
+            using var elsewhere = ClaimedVault.Open(harness.VaultPath, Master);
             elsewhere.AddEntry(new VaultEntry { Title = "from-the-terminal", Password = "second" });
             elsewhere.Save();
         };
@@ -50,7 +51,7 @@ public sealed class VaultChangedOnDiskTests
         Assert.Contains("Nothing was saved", harness.Err, StringComparison.Ordinal);
 
         // The sentence is only worth anything if it is true, so check the file rather than the text.
-        using var reopened = Vault.Open(harness.VaultPath, Master);
+        using var reopened = ClaimedVault.Open(harness.VaultPath, Master);
         Assert.NotNull(reopened.Find("from-the-terminal"));
         Assert.Null(reopened.Find("from-the-window"));
     }
@@ -71,7 +72,7 @@ public sealed class VaultChangedOnDiskTests
 
         Assert.Equal(CliApp.ExitSuccess, harness.Run("add", "from-the-window", "--vault", harness.VaultPath));
 
-        using var reopened = Vault.Open(harness.VaultPath, Master);
+        using var reopened = ClaimedVault.Open(harness.VaultPath, Master);
         Assert.NotNull(reopened.Find("from-the-window"));
     }
 

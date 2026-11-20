@@ -26,7 +26,7 @@ public sealed class TotpReleaseTests : IDisposable
 
     public TotpReleaseTests()
     {
-        _vault = Vault.Create(Path.Combine(_directory, "vault.kdbx"), _master);
+        _vault = ClaimedVault.Create(Path.Combine(_directory, "vault.kdbx"), _master);
         _vault.AddEntry(new VaultEntry { GroupPath = _github.GroupPath, Title = _github.Title, Password = _password });
         _vault.AddEntry(new VaultEntry { GroupPath = _plain.GroupPath, Title = _plain.Title, Password = _password });
         Assert.True(_vault.SetFields(_github, [new FieldWrite("TimeOtp-Secret", _seed), new FieldWrite("TimeOtp-Length", "8")]));

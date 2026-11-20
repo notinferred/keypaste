@@ -33,7 +33,7 @@ public sealed class NoteKeyCheckTests : IDisposable
     {
         var path = Saved(("services", "Stripe", FixtureNotes), ("services", "Plain", "Recovery codes are in the safe."));
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         using var check = new NoteKeyCheck();
         var findings = check.Scan(vault);
 
@@ -79,7 +79,7 @@ public sealed class NoteKeyCheckTests : IDisposable
 
         var path = Saved([.. cases.Select(c => ("rules", c.Title, c.Notes))]);
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         using var check = new NoteKeyCheck();
         var found = check.Scan(vault).ToLookup(finding => finding.Entry.Title, finding => finding.Field);
 
@@ -91,7 +91,7 @@ public sealed class NoteKeyCheckTests : IDisposable
     {
         var path = Saved(("rules", "twice", "KEY=a\nKEY=b\nOTHER=c"));
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         using var check = new NoteKeyCheck();
         var findings = check.Scan(vault);
 
@@ -103,7 +103,7 @@ public sealed class NoteKeyCheckTests : IDisposable
     {
         var path = Path.Combine(_directory, "bin.kdbx");
 
-        using (var vault = Vault.Create(path, _master))
+        using (var vault = ClaimedVault.Create(path, _master))
         {
             vault.AddEntry(new VaultEntry { GroupPath = ".keypaste/tokens", Title = "planted", Notes = "KEY=planted" });
             vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Deleted", Notes = "KEY=deleted" });
@@ -111,7 +111,7 @@ public sealed class NoteKeyCheckTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, _master);
+        using var reopened = ClaimedVault.Open(path, _master);
         using var check = new NoteKeyCheck();
 
         Assert.Empty(check.Scan(reopened));
@@ -122,7 +122,7 @@ public sealed class NoteKeyCheckTests : IDisposable
     {
         var path = Saved(("services", "Stripe", FixtureNotes));
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         using var check = new NoteKeyCheck();
         var findings = check.Scan(vault);
         string[] values = ["sk_test_1", "sk-proj-2", GitHubToken];
@@ -143,7 +143,7 @@ public sealed class NoteKeyCheckTests : IDisposable
     {
         var path = Saved(("services", "Stripe", FixtureNotes));
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
 
         Assert.Empty(vault.Search("sk_test_1"));
         Assert.Empty(vault.Search("STRIPE_SECRET_KEY"));
@@ -153,7 +153,7 @@ public sealed class NoteKeyCheckTests : IDisposable
     {
         var path = Path.Combine(_directory, Guid.NewGuid().ToString("N") + ".kdbx");
 
-        using var vault = Vault.Create(path, _master);
+        using var vault = ClaimedVault.Create(path, _master);
 
         foreach (var (group, title, notes) in entries)
         {

@@ -27,7 +27,7 @@ public sealed class ReleaseVaultFixtureTests : IDisposable
     [MemberData(nameof(Releases))]
     public void AReleaseVault_OpensWithEveryItemItWrote(string release)
     {
-        using var vault = Vault.Open(FixturePath(release), _fixturePassword);
+        using var vault = ClaimedVault.Open(FixturePath(release), _fixturePassword);
 
         AssertWrittenBy(release, vault);
     }
@@ -39,13 +39,13 @@ public sealed class ReleaseVaultFixtureTests : IDisposable
         var copy = Path.Combine(_directory, "vault.kdbx");
         File.Copy(FixturePath(release), copy);
 
-        using (var vault = Vault.Open(copy, _fixturePassword))
+        using (var vault = ClaimedVault.Open(copy, _fixturePassword))
         {
             vault.AddEntry(new VaultEntry { Title = "Saved today", Password = "saved-today" });
             vault.Save();
         }
 
-        using var reopened = Vault.Open(copy, _fixturePassword);
+        using var reopened = ClaimedVault.Open(copy, _fixturePassword);
         AssertWrittenBy(release, reopened, "Saved today|||saved-today||");
     }
 

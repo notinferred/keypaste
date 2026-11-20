@@ -91,14 +91,14 @@ public sealed class TaggedEnvResolutionTests : IDisposable
     {
         var path = Path.Combine(_directory, "custom-password.kdbx");
 
-        using (var created = Vault.Create(path, EnvStoreTests.MasterPassword))
+        using (var created = ClaimedVault.Create(path, EnvStoreTests.MasterPassword))
         {
             Tagged(created, "services", "Stripe", ["env:billing"], ("STRIPE_KEY", "stripe-value"));
             created.Save();
         }
 
         AddCustomString(path, "Stripe", "PASSWORD", "custom-password-value");
-        using var vault = Vault.Open(path, EnvStoreTests.MasterPassword);
+        using var vault = ClaimedVault.Open(path, EnvStoreTests.MasterPassword);
 
         var resolved = EnvResolution.Resolve(vault, "billing", _clock);
 
@@ -321,13 +321,13 @@ public sealed class TaggedEnvResolutionTests : IDisposable
     {
         var path = Path.Combine(_directory, Guid.NewGuid().ToString("N") + ".kdbx");
 
-        using (var created = Vault.Create(path, EnvStoreTests.MasterPassword))
+        using (var created = ClaimedVault.Create(path, EnvStoreTests.MasterPassword))
         {
             build(created);
             created.Save();
         }
 
-        return Vault.Open(path, EnvStoreTests.MasterPassword);
+        return ClaimedVault.Open(path, EnvStoreTests.MasterPassword);
     }
 
     private static EntryName Tagged(Vault vault, string group, string title, string[] tags, params (string Name, string Value)[] fields)

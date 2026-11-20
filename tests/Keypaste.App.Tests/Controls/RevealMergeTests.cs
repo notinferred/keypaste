@@ -89,7 +89,7 @@ public sealed class RevealMergeTests
         using var fixture = new TempVault();
         var clock = new ManualClock(AppClock.Start);
 
-        using (var seeded = Vault.Open(fixture.Path_, TempVault.Password))
+        using (var seeded = ClaimedVault.Open(fixture.Path_, TempVault.Password))
         {
             Assert.True(seeded.SetFields(new EntryName(string.Empty, "example"), [new FieldWrite("TimeOtp-Secret", "12345678901234567890"), new FieldWrite("TimeOtp-Length", "8")]));
             seeded.Save();
@@ -247,7 +247,7 @@ public sealed class RevealMergeTests
 
     private static void Elsewhere(TempVault fixture, string what)
     {
-        using var other = Vault.Open(fixture.Path_, TempVault.Password);
+        using var other = ClaimedVault.Open(fixture.Path_, TempVault.Password);
 
         switch (what)
         {

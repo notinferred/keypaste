@@ -28,7 +28,7 @@ public sealed class EntriesViewModelTests : IDisposable
         _directory = Directory.CreateTempSubdirectory("keypaste-entries-tests-").FullName;
         _vaultPath = Path.Combine(_directory, "vault.kdbx");
 
-        using var vault = Vault.Create(_vaultPath, Master);
+        using var vault = ClaimedVault.Create(_vaultPath, Master);
         vault.AddEntry(new VaultEntry { Title = "github", Username = "me", Password = "gh" });
         vault.AddEntry(new VaultEntry { Title = "production", Password = "p", GroupPath = "servers" });
         vault.AddEntry(new VaultEntry { Title = "staging", Password = "s", GroupPath = "servers" });
@@ -60,7 +60,7 @@ public sealed class EntriesViewModelTests : IDisposable
     [Fact]
     public void Each_row_shows_its_username_and_web_address()
     {
-        using (var vault = Vault.Open(_vaultPath, Master))
+        using (var vault = ClaimedVault.Open(_vaultPath, Master))
         {
             vault.UpdateEntry(new VaultEntry { Title = "github", Username = "me", Password = "gh", Url = "https://github.com/login" });
             vault.Save();
@@ -108,7 +108,7 @@ public sealed class EntriesViewModelTests : IDisposable
         Assert.Null(context.Entries.Error);
         Assert.Contains(context.Entries.Rows, row => row.Path == "database");
 
-        using var reopened = Vault.Open(_vaultPath, Master);
+        using var reopened = ClaimedVault.Open(_vaultPath, Master);
         var written = reopened.Find("database");
 
         Assert.NotNull(written);
@@ -124,7 +124,7 @@ public sealed class EntriesViewModelTests : IDisposable
         form.GeneratePassword = false;
         context.Entries.ConfirmAddCommand.Press();
 
-        using var reopened = Vault.Open(_vaultPath, Master);
+        using var reopened = ClaimedVault.Open(_vaultPath, Master);
         Assert.Equal(string.Empty, reopened.Find("blank")?.Password);
     }
 
@@ -169,7 +169,7 @@ public sealed class EntriesViewModelTests : IDisposable
         Assert.DoesNotContain("servers/", context.Entries.DeletePrompt, StringComparison.Ordinal);
 
         // Still there: asking is not doing.
-        using (var untouched = Vault.Open(_vaultPath, Master))
+        using (var untouched = ClaimedVault.Open(_vaultPath, Master))
         {
             Assert.NotNull(untouched.Find("servers/staging"));
         }
@@ -178,7 +178,7 @@ public sealed class EntriesViewModelTests : IDisposable
 
         Assert.DoesNotContain(context.Entries.Rows, row => row.Title == "staging");
 
-        using var reopened = Vault.Open(_vaultPath, Master);
+        using var reopened = ClaimedVault.Open(_vaultPath, Master);
         Assert.Null(reopened.Find("servers/staging"));
     }
 
@@ -198,7 +198,7 @@ public sealed class EntriesViewModelTests : IDisposable
 
         Assert.Null(context.Entries.Error);
 
-        using var reopened = Vault.Open(path, Master);
+        using var reopened = ClaimedVault.Open(path, Master);
         var survivors = reopened.ReadEntries()
             .Select(entry => (entry.GroupPath, entry.Title))
             .Order();
@@ -218,13 +218,13 @@ public sealed class EntriesViewModelTests : IDisposable
 
         Assert.False(context.Entries.IsConfirmingDelete);
 
-        using var reopened = Vault.Open(_vaultPath, Master);
+        using var reopened = ClaimedVault.Open(_vaultPath, Master);
         Assert.NotNull(reopened.Find("servers/staging"));
     }
 
     private void WithoutRecycleBin()
     {
-        using var vault = Vault.Open(_vaultPath, Master);
+        using var vault = ClaimedVault.Open(_vaultPath, Master);
         vault.SetRecyclesDeletedEntries(false);
         vault.Save();
     }
@@ -245,7 +245,7 @@ public sealed class EntriesViewModelTests : IDisposable
         Assert.False(detail.IsEditing);
         Assert.Equal("someone-else", detail.Username);
 
-        using var reopened = Vault.Open(_vaultPath, Master);
+        using var reopened = ClaimedVault.Open(_vaultPath, Master);
         var written = reopened.Find("github");
 
         Assert.Equal("someone-else", written?.Username);
@@ -276,7 +276,7 @@ public sealed class EntriesViewModelTests : IDisposable
 
         Assert.Null(context.Entries.Error);
 
-        using var reopened = Vault.Open(path, Master);
+        using var reopened = ClaimedVault.Open(path, Master);
         Assert.Equal("chosen", reopened.Find(new EntryName("env/dev/nested", "TOKEN"))?.Username);
         Assert.Equal(string.Empty, reopened.Find(new EntryName("env/dev", "nested/TOKEN"))?.Username);
     }
@@ -313,7 +313,7 @@ public sealed class EntriesViewModelTests : IDisposable
 
         Assert.Equal("me", detail.Username);
 
-        using var reopened = Vault.Open(_vaultPath, Master);
+        using var reopened = ClaimedVault.Open(_vaultPath, Master);
         Assert.Equal("me", reopened.Find("github")?.Username);
     }
 
@@ -333,7 +333,7 @@ public sealed class EntriesViewModelTests : IDisposable
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "github");
         var detail = context.Entries.Detail!;
 
-        using (var elsewhere = Vault.Open(_vaultPath, Master))
+        using (var elsewhere = ClaimedVault.Open(_vaultPath, Master))
         {
             elsewhere.AddEntry(new VaultEntry { Title = "from-the-terminal", Password = "x" });
             elsewhere.Save();
@@ -346,7 +346,7 @@ public sealed class EntriesViewModelTests : IDisposable
         Assert.NotNull(context.Entries.Error);
         Assert.Contains("changed this vault", context.Entries.Error, StringComparison.Ordinal);
 
-        using var reopened = Vault.Open(_vaultPath, Master);
+        using var reopened = ClaimedVault.Open(_vaultPath, Master);
         Assert.NotNull(reopened.Find("from-the-terminal"));
         Assert.Equal("me", reopened.Find("github")?.Username);
     }
@@ -373,7 +373,7 @@ public sealed class EntriesViewModelTests : IDisposable
     {
         var path = Path.Combine(_directory, "colliding.kdbx");
 
-        using var vault = Vault.Create(path, Master);
+        using var vault = ClaimedVault.Create(path, Master);
         vault.AddEntry(new VaultEntry { Title = "nested/TOKEN", Password = "slashed", GroupPath = "env/dev" });
         vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "nested", GroupPath = "env/dev/nested" });
         vault.AddEntry(new VaultEntry { Title = "KEEP", Password = "keep", GroupPath = "env/dev" });

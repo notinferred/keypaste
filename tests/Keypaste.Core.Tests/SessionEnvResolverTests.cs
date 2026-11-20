@@ -18,13 +18,13 @@ public sealed class SessionEnvResolverTests : IDisposable
     {
         _path = Path.Combine(_directory, "vault.kdbx");
 
-        using (var created = Vault.Create(_path, EnvStoreTests.MasterPassword))
+        using (var created = ClaimedVault.Create(_path, EnvStoreTests.MasterPassword))
         {
             ProjectVariables.Set(created, "dev", "TOKEN", "v1");
             created.Save();
         }
 
-        _vault = Vault.Open(_path, EnvStoreTests.MasterPassword);
+        _vault = ClaimedVault.Open(_path, EnvStoreTests.MasterPassword);
     }
 
     private static CancellationToken Cancel => TestContext.Current.CancellationToken;
@@ -142,7 +142,7 @@ public sealed class SessionEnvResolverTests : IDisposable
             "dev",
             (_, _) =>
             {
-                using var other = Vault.Open(_path, EnvStoreTests.MasterPassword);
+                using var other = ClaimedVault.Open(_path, EnvStoreTests.MasterPassword);
                 ProjectVariables.Set(other, "dev", "TOKEN", "elsewhere");
                 other.Save();
                 return ValueTask.FromResult(true);

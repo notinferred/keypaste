@@ -43,7 +43,7 @@ public sealed class KeePassXcChallengeResponseTests : IDisposable
         var path = WriteFixture();
 
         using var key = new HardwareKey(new SoftwareYubiKey(SoftwareYubiKey.KeePassXcTestSecret), 2);
-        using var vault = Vault.Open(path, "a", null, key);
+        using var vault = ClaimedVault.Open(path, "a", null, key);
 
         Assert.Equal(["entry1", "entry2"], vault.ReadEntries().Select(entry => entry.Title).Order(StringComparer.Ordinal));
     }
@@ -55,8 +55,8 @@ public sealed class KeePassXcChallengeResponseTests : IDisposable
 
         using var fixedLength = new HardwareKey(new SoftwareYubiKey(SoftwareYubiKey.KeePassXcTestSecret, variableLength: false), 2);
 
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, "a"));
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, "a", null, fixedLength));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, "a"));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, "a", null, fixedLength));
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public sealed class KeePassXcChallengeResponseTests : IDisposable
         var device = new SoftwareYubiKey(SoftwareYubiKey.KeePassXcTestSecret);
         var path = Path.Combine(_directory, "four.kdbx");
         using (var key = new HardwareKey(device, 2))
-        using (var vault = Vault.CreateWith(path, _master, null, key))
+        using (var vault = ClaimedVault.CreateWith(path, _master, null, key))
         {
             vault.Save();
         }
@@ -111,17 +111,17 @@ public sealed class KeePassXcChallengeResponseTests : IDisposable
         Assert.Equal(header.StreamStartBytes, start);
 
         using var key = new HardwareKey(new SoftwareYubiKey(SoftwareYubiKey.KeePassXcTestSecret), 2);
-        using (var vault = Vault.Open(path, _master, null, key))
+        using (var vault = ClaimedVault.Open(path, _master, null, key))
         {
             Assert.Equal("value", Assert.Single(vault.ReadEntries()).Password);
             vault.Save();
         }
 
         Assert.Equal(4, KdbxHeader.Read(path).FormatMajorVersion);
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, _master));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, _master));
 
         using var again = new HardwareKey(new SoftwareYubiKey(SoftwareYubiKey.KeePassXcTestSecret), 2);
-        using var reopened = Vault.Open(path, _master, null, again);
+        using var reopened = ClaimedVault.Open(path, _master, null, again);
         Assert.Single(reopened.ReadEntries());
     }
 

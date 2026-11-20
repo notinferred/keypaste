@@ -6,6 +6,7 @@ using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Launch;
 using Keypaste.Core.Ownership;
+using Keypaste.Core.Tests;
 
 namespace Keypaste.Cli.Tests;
 
@@ -28,7 +29,7 @@ internal sealed class UnlockedOwner : IAsyncDisposable
 
     private UnlockedOwner(CliHarness harness, string pipe, string master, ApprovalAnswer answer, HardwareKey? hardwareKey)
     {
-        _vault = Vault.Open(harness.VaultPath, master, null, hardwareKey);
+        _vault = ClaimedVault.Open(harness.VaultPath, master, null, hardwareKey);
         Lifetime.Own(_launches);
         Channel = new ScriptedChannel(answer);
         _gate = new ApprovalGate(Channel, TimeProvider.System, ApprovalLimits.Default);

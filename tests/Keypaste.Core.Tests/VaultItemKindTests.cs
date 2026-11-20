@@ -40,13 +40,13 @@ public sealed class VaultItemKindTests : IDisposable
     {
         var path = NewVaultPath();
 
-        using (var vault = Vault.Create(path, _master))
+        using (var vault = ClaimedVault.Create(path, _master))
         {
             vault.CreateEntry(new VaultEntry { Title = "Thing", Password = "pw", Kind = kind }, [], []);
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, _master);
+        using var reopened = ClaimedVault.Open(path, _master);
 
         Assert.Equal(kind, reopened.ReadEntries().Single(entry => entry.Title == "Thing").Kind);
     }
@@ -71,7 +71,7 @@ public sealed class VaultItemKindTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, _master);
+        using var reopened = ClaimedVault.Open(path, _master);
 
         Assert.Equal(ItemKind.ApiKey, Read(reopened).Kind);
     }
@@ -89,7 +89,7 @@ public sealed class VaultItemKindTests : IDisposable
 
     private static Vault Seeded(string path)
     {
-        var vault = Vault.Create(path, _master);
+        var vault = ClaimedVault.Create(path, _master);
         vault.AddEntry(new VaultEntry { Title = _github.Title, GroupPath = _github.GroupPath, Username = "alice", Password = "login-password" });
         vault.Save();
         return vault;

@@ -144,7 +144,7 @@ public sealed class UnlockQuickUnlockTests : IDisposable
     public async Task A_key_changed_since_the_lock_is_said_and_the_screen_stops_offering_Windows_Hello()
     {
         await UnlockAndLockAsync(VaultLockReason.Manual);
-        using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
+        using (var vault = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
         {
             vault.ChangeAccess(new VaultAccessChange(true, AccessKeyfileChange.Keep), "a-new-password", "a-new-password");
         }

@@ -111,7 +111,7 @@ public sealed class VaultSaveUnderATransactedNameTests : IDisposable
         });
 
         // The claim is that the write landed, so read it back.
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         Assert.Equal("kept", reopened.Find("written-while-contended")?.Password, StringComparer.Ordinal);
         Assert.NotNull(reopened.Find("seeded"));
 
@@ -233,7 +233,7 @@ public sealed class VaultSaveUnderATransactedNameTests : IDisposable
 
         // The vault it could not write is still the vault it opened.
         held.RollBack();
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
         Assert.NotNull(reopened.Find("seeded"));
         Assert.Null(reopened.Find("never-written"));
     }
@@ -300,7 +300,7 @@ public sealed class VaultSaveUnderATransactedNameTests : IDisposable
         var home = Directory.CreateDirectory(System.IO.Path.Combine(_directory, name)).FullName;
         var path = System.IO.Path.Combine(home, "vault.kdbx");
 
-        var vault = Vault.Create(path, MasterPassword);
+        var vault = ClaimedVault.Create(path, MasterPassword);
         vault.AddEntry(new VaultEntry { Title = "seeded", Password = "seed" });
 
         // Saved before the name is held, so the file exists: FileTransactionEx writes in place when

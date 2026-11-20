@@ -102,7 +102,7 @@ public sealed class KdbxImportViewModelTests : IDisposable
         Assert.Empty(_opened);
 
         _session.Lock(VaultLockReason.Manual);
-        using var reopened = Vault.Open(_vault.Path_, TempVault.Password);
+        using var reopened = ClaimedVault.Open(_vault.Path_, TempVault.Password);
         Assert.Equal("v2", reopened.Find(new EntryName("foreign/Banking", "Checking"))!.Password);
         Assert.NotNull(reopened.Find(new EntryName("foreign/Banking/Cards", "Visa")));
         Assert.NotNull(reopened.Find(new EntryName(string.Empty, "example")));
@@ -119,7 +119,7 @@ public sealed class KdbxImportViewModelTests : IDisposable
         await Unlock(import);
         var before = _session.Unlocked!.Search(string.Empty).Select(match => match.Name).ToList();
 
-        using (var other = Vault.Open(_vault.Path_, TempVault.Password))
+        using (var other = ClaimedVault.Open(_vault.Path_, TempVault.Password))
         {
             other.AddEntry(new VaultEntry { GroupPath = "elsewhere", Title = "x", Password = "x" });
             other.Save();

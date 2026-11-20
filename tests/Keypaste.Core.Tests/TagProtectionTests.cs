@@ -66,7 +66,7 @@ public sealed class TagProtectionTests : IDisposable
 
     private Vault Seeded()
     {
-        var vault = Vault.Create(Path.Combine(_directory, Guid.NewGuid().ToString("N") + ".kdbx"), _master);
+        var vault = ClaimedVault.Create(Path.Combine(_directory, Guid.NewGuid().ToString("N") + ".kdbx"), _master);
         Add(vault, "services", "Stripe", "env:billing", "finance");
         Add(vault, "services", "Database", "env:billing:prod");
         Add(vault, "services", "Odd", "env:billing:Prod");

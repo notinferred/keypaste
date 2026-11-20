@@ -42,7 +42,7 @@ public sealed class EntriesViewOrganizeTests : IDisposable
         _directory = Directory.CreateTempSubdirectory("keypaste-organize-view-").FullName;
         _vaultPath = Path.Combine(_directory, "vault.kdbx");
 
-        using var vault = Vault.Create(_vaultPath, Master);
+        using var vault = ClaimedVault.Create(_vaultPath, Master);
         vault.AddEntry(new VaultEntry
         {
             Title = "production",

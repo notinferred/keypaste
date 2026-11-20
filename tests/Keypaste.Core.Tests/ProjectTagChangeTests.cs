@@ -12,7 +12,7 @@ public sealed class ProjectTagChangeTests : IDisposable
 
     public ProjectTagChangeTests()
     {
-        _vault = Vault.Create(Path.Combine(_directory, "v.kdbx"), EnvStoreTests.MasterPassword);
+        _vault = ClaimedVault.Create(Path.Combine(_directory, "v.kdbx"), EnvStoreTests.MasterPassword);
         _vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Stripe", Password = "login" });
         Assert.True(_vault.SetFields(_stripe, [new FieldWrite("STRIPE_KEY", "s"), new FieldWrite("WEBHOOK", "w"), new FieldWrite("Region", "eu")]));
     }

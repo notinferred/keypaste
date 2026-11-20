@@ -269,7 +269,7 @@ public sealed class EntryExposureTests
         {
             var stripe = Name("services", "Stripe");
 
-            using var vault = Vault.Create(Path.Combine(directory, "vault.kdbx"), EnvStoreTests.MasterPassword);
+            using var vault = ClaimedVault.Create(Path.Combine(directory, "vault.kdbx"), EnvStoreTests.MasterPassword);
             vault.AddEntry(new VaultEntry { GroupPath = stripe.GroupPath, Title = stripe.Title, Password = "login-sentinel", Url = "https://stripe.example" });
             Assert.True(vault.SetFields(stripe, [new FieldWrite("STRIPE_SECRET_KEY", "key-sentinel"), new FieldWrite("Region", "eu")]));
             Assert.True(vault.AddTag(stripe, "env:billing"));
@@ -445,7 +445,7 @@ public sealed class EntryExposureTests
 
     private static Vault ReservedVault(string directory)
     {
-        var vault = Vault.Create(Path.Combine(directory, "vault.kdbx"), EnvStoreTests.MasterPassword);
+        var vault = ClaimedVault.Create(Path.Combine(directory, "vault.kdbx"), EnvStoreTests.MasterPassword);
         vault.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "KEY", Password = "v" });
         vault.AddEntry(new VaultEntry { GroupPath = ReservedGroups.Tokens, Title = "7d2e91c0", Password = "verifier" });
         vault.AddEntry(new VaultEntry { GroupPath = ReservedGroups.Shares, Title = "link", Password = "revoke" });

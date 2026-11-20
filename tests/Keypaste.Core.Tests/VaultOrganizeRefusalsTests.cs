@@ -65,7 +65,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     {
         var path = Seeded();
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(_token));
             vault.Save();
@@ -83,7 +83,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     {
         var path = NewVaultPath();
 
-        using (var vault = Vault.Create(path, MasterPassword))
+        using (var vault = ClaimedVault.Create(path, MasterPassword))
         {
             vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "one", GroupPath = "env/billing" });
             vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "two", GroupPath = "env/billing" });
@@ -118,7 +118,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     {
         var path = Seeded();
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(new EntryName("keys", "SPARE")));
             vault.Save();
@@ -139,7 +139,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     {
         var path = NewVaultPath();
 
-        using (var vault = Vault.Create(path, MasterPassword))
+        using (var vault = ClaimedVault.Create(path, MasterPassword))
         {
             vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "v", GroupPath = "env/billing" });
             vault.AddEntry(new VaultEntry { Title = "ONE", Password = "1", GroupPath = "twins" });
@@ -268,7 +268,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     {
         var path = NewVaultPath();
 
-        using (var vault = Vault.Create(path, MasterPassword))
+        using (var vault = ClaimedVault.Create(path, MasterPassword))
         {
             vault.AddEntry(new VaultEntry { Title = "nested/TOKEN", Password = "slashed", GroupPath = "keys" });
             vault.AddEntry(new VaultEntry { Title = "OTHER", Password = "other", GroupPath = "keys/nested" });
@@ -293,7 +293,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     {
         var path = NewVaultPath();
 
-        using (var vault = Vault.Create(path, MasterPassword))
+        using (var vault = ClaimedVault.Create(path, MasterPassword))
         {
             vault.AddEntry(new VaultEntry { Title = "deep/TOKEN", Password = "slashed", GroupPath = "top" });
             vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "nested", GroupPath = "top/x" });
@@ -317,7 +317,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     {
         var path = NewVaultPath();
 
-        using (var vault = Vault.Create(path, MasterPassword))
+        using (var vault = ClaimedVault.Create(path, MasterPassword))
         {
             vault.AddEntry(new VaultEntry { Title = "nested/TOKEN", Password = "slashed", GroupPath = "env/dev" });
             vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "nested", GroupPath = "env/dev/nested" });
@@ -325,7 +325,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, MasterPassword);
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
 
         Assert.Equal(
             OrganizeOutcome.Renamed,
@@ -346,7 +346,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     [InlineData("Kept")]
     public void ANameUnderEnv_IsAsOrdinaryAsAnywhere(string title)
     {
-        using var vault = Vault.Open(Seeded(), MasterPassword);
+        using var vault = ClaimedVault.Open(Seeded(), MasterPassword);
 
         Assert.Equal(OrganizeOutcome.Renamed, vault.RenameEntry(_token, title, out _));
     }
@@ -354,7 +354,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     [Fact]
     public void AnEntryMovesIntoTheEnvRootOrAGroupUnderIt_LikeAnyOther()
     {
-        using var vault = Vault.Open(Seeded(), MasterPassword);
+        using var vault = ClaimedVault.Open(Seeded(), MasterPassword);
 
         Assert.Equal(OrganizeOutcome.Moved, vault.MoveEntry(new EntryName("keys", "SPARE"), "env", out _));
         Assert.Equal(OrganizeOutcome.Moved, vault.MoveEntry(new EntryName("env/shipping", "Kept"), "env/billing", out _));
@@ -394,7 +394,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     {
         var path = Seeded();
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(new EntryName("keys", "SPARE")));
             vault.Save();
@@ -412,7 +412,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     {
         var path = Seeded();
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(new EntryName("keys", "SPARE")));
             vault.Save();
@@ -476,7 +476,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     {
         var path = Seeded();
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             vault.AddEntry(new VaultEntry { Title = "record", Password = "verifier", GroupPath = ReservedGroups.Tokens });
             vault.Save();
@@ -501,7 +501,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     {
         var path = Seeded();
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Assert.Equal(GroupOutcome.Created, vault.CreateGroup("keys", "env", out _));
             Assert.Equal(GroupOutcome.Created, vault.CreateGroup("keys", ReservedGroups.Root, out _));
@@ -520,7 +520,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     {
         var path = Seeded();
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Assert.Equal(GroupOutcome.Created, vault.CreateGroup("keys", "inner", out _));
             Assert.Equal(GroupOutcome.Created, vault.CreateGroup("keys/inner", "deeper", out _));
@@ -547,7 +547,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     {
         var path = Seeded();
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(new EntryName("env/shipping", "Kept")));
             vault.Save();
@@ -568,7 +568,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     {
         var path = Seeded();
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Assert.Equal(GroupOutcome.Created, vault.CreateGroup("keys", "billing", out _));
             vault.Save();
@@ -584,7 +584,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     {
         var path = NewVaultPath();
 
-        using (var vault = Vault.Create(path, MasterPassword))
+        using (var vault = ClaimedVault.Create(path, MasterPassword))
         {
             vault.AddEntry(new VaultEntry { Title = "x/TOKEN", Password = "slashed", GroupPath = "top" });
             vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "nested", GroupPath = "spare/x" });
@@ -604,7 +604,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     {
         var path = Seeded();
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             vault.SetRecyclesDeletedEntries(false);
             Assert.Equal(GroupOutcome.Created, vault.CreateGroup(string.Empty, "outer", out _));
@@ -626,7 +626,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     {
         var path = Seeded();
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(new EntryName("keys", "SPARE")));
             vault.AddEntry(new VaultEntry { Title = "record", Password = "verifier", GroupPath = ReservedGroups.Tokens });
@@ -648,7 +648,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     {
         var path = NewVaultPath();
 
-        using (var vault = Vault.Create(path, MasterPassword))
+        using (var vault = ClaimedVault.Create(path, MasterPassword))
         {
             vault.AddEntry(new VaultEntry { Title = "a/b", Password = "slashed", GroupPath = "keys" });
             vault.AddEntry(new VaultEntry { Title = " leading", Password = "padded", GroupPath = "keys" });
@@ -667,7 +667,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     {
         var path = NewVaultPath();
 
-        using (var vault = Vault.Create(path, MasterPassword))
+        using (var vault = ClaimedVault.Create(path, MasterPassword))
         {
             vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "one", GroupPath = "env/billing" });
             vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "two", GroupPath = "env/billing" });
@@ -694,7 +694,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
         var bytes = File.ReadAllBytes(path);
         var before = Shape(path);
 
-        using (var vault = Vault.Open(path, MasterPassword))
+        using (var vault = ClaimedVault.Open(path, MasterPassword))
         {
             refused(vault);
 
@@ -707,7 +707,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
 
     private static List<string> Shape(string path)
     {
-        using var vault = Vault.Open(path, MasterPassword);
+        using var vault = ClaimedVault.Open(path, MasterPassword);
 
         List<string> rows =
         [
@@ -724,7 +724,7 @@ public sealed class VaultOrganizeRefusalsTests : IDisposable
     {
         var path = NewVaultPath();
 
-        using var vault = Vault.Create(path, MasterPassword);
+        using var vault = ClaimedVault.Create(path, MasterPassword);
 
         vault.AddEntry(new VaultEntry { Title = "TOKEN", Password = "v3", GroupPath = "env/billing" });
         vault.AddEntry(new VaultEntry { Title = "KEPT", Password = "kept", GroupPath = "env/billing" });

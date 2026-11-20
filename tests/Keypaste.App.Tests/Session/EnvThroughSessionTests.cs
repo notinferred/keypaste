@@ -24,7 +24,7 @@ public sealed class EnvThroughSessionTests : IDisposable
 
     public EnvThroughSessionTests()
     {
-        using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
+        using (var vault = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
         {
             ProjectVariables.Set(vault, "dev", "TOKEN", "v1");
             vault.Save();
@@ -68,7 +68,7 @@ public sealed class EnvThroughSessionTests : IDisposable
     [Fact]
     public async Task After_another_program_saves_the_file_nothing_is_released_until_it_is_unlocked_again()
     {
-        using (var writer = Vault.Open(_fixture.Path_, TempVault.Password))
+        using (var writer = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
         {
             ProjectVariables.Set(writer, "dev", "TOKEN", "external");
             writer.Save();

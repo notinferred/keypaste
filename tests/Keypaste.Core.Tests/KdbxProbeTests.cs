@@ -16,7 +16,7 @@ public sealed class KdbxProbeTests : IDisposable
     public void Probe_Keypaste4_Argon2d()
     {
         var path = Path.Combine(_directory, "mine.kdbx");
-        using (var vault = Vault.Create(path, _password))
+        using (var vault = ClaimedVault.Create(path, _password))
         {
             vault.Save();
         }
@@ -70,7 +70,7 @@ public sealed class KdbxProbeTests : IDisposable
     public void Probe_TruncatedHeader_IsRefused()
     {
         var path = Path.Combine(_directory, "cut.kdbx");
-        using (var vault = Vault.Create(path, _password))
+        using (var vault = ClaimedVault.Create(path, _password))
         {
             vault.Save();
         }
@@ -106,7 +106,7 @@ public sealed class KdbxProbeTests : IDisposable
     public void Probe_FindsASiblingKeyfile()
     {
         var path = Path.Combine(_directory, "acme.kdbx");
-        using (var vault = Vault.Create(path, _password))
+        using (var vault = ClaimedVault.Create(path, _password))
         {
             vault.Save();
         }

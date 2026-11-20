@@ -25,7 +25,7 @@ public sealed class ScopedTokensViewModelTests : IDisposable
     {
         var path = Path.Combine(_directory, "vault.kdbx");
 
-        using (var vault = Vault.Create(path, _master))
+        using (var vault = ClaimedVault.Create(path, _master))
         {
             vault.AddEntry(new VaultEntry { GroupPath = "env/acme-api/staging", Title = "DATABASE_URL", Password = "db" });
             vault.AddEntry(new VaultEntry { Title = "github", Password = "gh" });
@@ -87,7 +87,7 @@ public sealed class ScopedTokensViewModelTests : IDisposable
         Assert.Contains("shown once", message, StringComparison.Ordinal);
         Assert.Equal(TokenCheck.Valid, new TokenStore(_session.Unlocked!).Verify(token, _clock.GetUtcNow(), out _));
 
-        using (var reopened = Vault.Open(_session.VaultPath!, _master))
+        using (var reopened = ClaimedVault.Open(_session.VaultPath!, _master))
         {
             Assert.Equal("ci", Assert.Single(new TokenStore(reopened).List()).Name);
         }

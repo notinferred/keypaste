@@ -229,7 +229,7 @@ public sealed class ScreenRenderer
         var clock = new ManualClock(AppClock.Start);
         var personalPath = Path.Combine(demo.Home, "Personal.kdbx");
 
-        using (var personal = Vault.Create(personalPath, _master))
+        using (var personal = ClaimedVault.Create(personalPath, _master))
         {
             personal.AddEntry(new VaultEntry { Title = "gmail", Username = "maya.ortiz@gmail.com", Password = "demo-gm-3a11", Url = "https://mail.google.com" });
             personal.AddEntry(new VaultEntry { Title = "netflix", Username = "maya.o", Password = "demo-nf-82Lq", Url = "https://netflix.com" });
@@ -301,7 +301,7 @@ public sealed class ScreenRenderer
         var path = Path.Combine(demo.Home, "first.kdbx");
         File.Delete(path);
 
-        using (var made = Vault.Create(path, _master))
+        using (var made = ClaimedVault.Create(path, _master))
         {
             made.Save();
         }
@@ -561,7 +561,7 @@ public sealed class ScreenRenderer
 
         if (!File.Exists(other))
         {
-            using var made = Vault.Create(other, _master);
+            using var made = ClaimedVault.Create(other, _master);
             made.Save();
         }
 
@@ -689,7 +689,7 @@ public sealed class ScreenRenderer
         try
         {
             using (var key = new Core.HardwareKeys.HardwareKey(device, 2))
-            using (var vault = Vault.CreateWith(path, _master, null, key))
+            using (var vault = ClaimedVault.CreateWith(path, _master, null, key))
             {
                 vault.AddEntry(new VaultEntry { Title = "github", Password = "demo-gh-7Hq2x", GroupPath = "Work" });
                 vault.Save();
@@ -1036,7 +1036,7 @@ public sealed class ScreenRenderer
     /// <summary>The Secrets screen in its states: a login, a project's home entry, its menu, the new-entry form, history, and the default window.</summary>
     private static void DrawSecrets(DemoVault demo, string output)
     {
-        using (var vault = Vault.Open(demo.Path, _master))
+        using (var vault = ClaimedVault.Open(demo.Path, _master))
         {
             vault.UpdateEntry(new VaultEntry { Title = "github", Username = "maya@acme.dev", Password = "demo-gh-rotated-9Qk", Url = "https://github.com", Notes = "Recovery codes are in the safe.", GroupPath = "Work" });
 
@@ -1336,7 +1336,7 @@ public sealed class ScreenRenderer
 
         var source = Path.Combine(demo.Home, "personal.kdbx");
 
-        using (var foreign = Vault.Create(source, "keepassxc-demo"))
+        using (var foreign = ClaimedVault.Create(source, "keepassxc-demo"))
         {
             foreign.AddEntry(new VaultEntry { Title = "Checking", Username = "maya.ortiz", Password = "demo-bank-1", GroupPath = "Banking" });
             foreign.AddEntry(new VaultEntry { Title = "Savings", Username = "maya.ortiz", Password = "demo-bank-2", GroupPath = "Banking" });
@@ -1910,7 +1910,7 @@ public sealed class ScreenRenderer
     {
         using var empty = new TempHome();
         var database = Path.Combine(empty.Path, "personal.kdbx");
-        using (var kept = Vault.Create(database, "first-run-demo"))
+        using (var kept = ClaimedVault.Create(database, "first-run-demo"))
         {
             kept.Save();
         }
@@ -2672,7 +2672,7 @@ public sealed class ScreenRenderer
         {
             Path = System.IO.Path.Combine(_directory, "acme.kdbx");
 
-            using var vault = Vault.Create(Path, _master);
+            using var vault = ClaimedVault.Create(Path, _master);
             vault.AddEntry(new VaultEntry { Title = "github", Username = "maya@acme.dev", Password = "demo-gh-7Hq2x", Url = "https://github.com", GroupPath = "Work" });
             vault.SetFields(new EntryName("Work", "github"), [new FieldWrite("GITHUB_TOKEN", "demo-ghp-4f2a9c"), new FieldWrite("Region", "eu-west-1", Protect: false)]);
             vault.AddTag(new EntryName("Work", "github"), "env:acme-api:prod");

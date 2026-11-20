@@ -40,7 +40,7 @@ public sealed class SessionAuthorityMergeTests : IDisposable
     {
         _log = new OwnerLog(_directory);
 
-        using (var seed = Vault.Create(VaultPath, _master))
+        using (var seed = ClaimedVault.Create(VaultPath, _master))
         {
             seed.AddEntry(new VaultEntry { GroupPath = _github.GroupPath, Title = _github.Title, Password = "github-0" });
             seed.AddEntry(new VaultEntry { GroupPath = _stripe.GroupPath, Title = _stripe.Title, Password = "stripe-0" });
@@ -48,7 +48,7 @@ public sealed class SessionAuthorityMergeTests : IDisposable
             seed.Save();
         }
 
-        _vault = Vault.Open(VaultPath, _master);
+        _vault = ClaimedVault.Open(VaultPath, _master);
     }
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;

@@ -51,6 +51,7 @@ on:
       - 'tests/Keypaste.Core.Tests/ScriptedBridgeChannels.cs'
       - 'tests/Keypaste.Core.Tests/ForeignEdit.cs'
       - 'tests/Keypaste.Core.Tests/TestZones.cs'
+      - 'tests/Keypaste.Core.Tests/ClaimedVault.cs'
       - 'scripts/verify.sh'
       - 'keypaste.app.slnx'
       - 'release-targets.json'

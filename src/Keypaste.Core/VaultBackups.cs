@@ -1,5 +1,6 @@
 using System.Globalization;
 using Keypaste.Core.Internal;
+using Keypaste.Core.Ownership;
 using Polly;
 
 namespace Keypaste.Core;
@@ -326,7 +327,7 @@ public static class VaultBackups
         int entries, groups, projects;
         try
         {
-            using var vault = Vault.Open(listed.Path, password, keyfilePath, hardwareKey);
+            using var vault = Vault.OpenReadOnly(listed.Path, password, keyfilePath, hardwareKey);
             entries = vault.ReadEntries(includeReserved: true).Count;
             groups = vault.ReadGroupPaths(includeReserved: true).Count;
             projects = ProjectCatalog.Read(vault).Projects.Count;
@@ -346,9 +347,11 @@ public static class VaultBackups
         return new VaultBackupSummary(vaultPath, listed, entries, groups, projects, Facts(vaultPath), digest);
     }
 
-    /// <summary>Puts a validated backup in the vault's place, byte for byte.</summary>
+    /// <summary>Puts a validated backup in the vault's place, byte for byte, under this process's claim on the vault.</summary>
+    /// <param name="claim">This process's claim on the vault, so no other keypaste process holds it while it is replaced.</param>
     /// <param name="validated">What <see cref="Inspect"/> returned for the backup.</param>
     /// <returns>Which copy was restored, and what became of the file it replaced.</returns>
+    /// <exception cref="ArgumentException"><paramref name="claim"/> names another vault or was released.</exception>
     /// <exception cref="VaultRestoreException">The backup is no longer the one validated, or the vault could not be replaced.</exception>
     /// <exception cref="VaultBackupException">The vault being replaced could not be kept, so it was not replaced.</exception>
     /// <exception cref="VaultChangedOnDiskException">The vault changed during the restore, so it was not replaced.</exception>
@@ -372,8 +375,9 @@ public static class VaultBackups
     /// turn the rename into a copy over the live vault, which a kill could leave half written.
     /// </para>
     /// </remarks>
-    public static VaultRestoreReport Restore(VaultBackupSummary validated) => Restore(validated, null, null);
+    public static VaultRestoreReport Restore(VaultClaim claim, VaultBackupSummary validated) => Restore(claim, validated, null, null);
 
+    /// <param name="claim">This process's claim on the vault.</param>
     /// <param name="validated">What <see cref="Inspect"/> returned for the backup.</param>
     /// <param name="beforeReplacing">
     /// Called with the staged file's path after the vault has been kept and before it is replaced, so
@@ -381,9 +385,11 @@ public static class VaultBackups
     /// </param>
     /// <param name="waitBetweenAttempts">Called instead of sleeping between rename attempts.</param>
     internal static VaultRestoreReport Restore(
-        VaultBackupSummary validated, Action<string>? beforeReplacing, Action<int>? waitBetweenAttempts)
+        VaultClaim claim, VaultBackupSummary validated, Action<string>? beforeReplacing, Action<int>? waitBetweenAttempts)
     {
+        ArgumentNullException.ThrowIfNull(claim);
         ArgumentNullException.ThrowIfNull(validated);
+        claim.CheckHolds(validated.VaultPath, nameof(claim));
 
         return KeePassInterop.WhileNoSaveReplaces(() => Replace(validated, beforeReplacing, waitBetweenAttempts));
     }
@@ -585,7 +591,7 @@ public static class VaultBackups
 
     /// <summary>Removes staged files a killed restore left beside the vault.</summary>
     /// <remarks>
-    /// Only from <see cref="Restore(VaultBackupSummary)"/>, with the gate held. A save sweeping these would delete one
+    /// Only from <see cref="Restore(VaultClaim, VaultBackupSummary)"/>, with the gate held. A save sweeping these would delete one
     /// between its close and its rename.
     /// </remarks>
     private static void SweepStaged(string vaultPath)

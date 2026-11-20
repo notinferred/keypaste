@@ -50,7 +50,7 @@ public sealed class HostileNameRenderingTests : IDisposable
         _directory = Directory.CreateTempSubdirectory("keypaste-hostile-app-").FullName;
         _vaultPath = Path.Combine(_directory, "vault.kdbx");
 
-        using var vault = Vault.Create(_vaultPath, _master);
+        using var vault = ClaimedVault.Create(_vaultPath, _master);
         vault.AddEntry(new VaultEntry
         {
             Title = "prod" + _bidi + "token" + _zwsp,
@@ -82,7 +82,7 @@ public sealed class HostileNameRenderingTests : IDisposable
 
     private EntryRow Row()
     {
-        using var vault = Vault.Open(_vaultPath, _master);
+        using var vault = ClaimedVault.Open(_vaultPath, _master);
         var entry = vault.ReadEntries().Single();
         return new EntryRow(entry.Title, entry.GroupPath) { Uuid = "hostile" };
     }

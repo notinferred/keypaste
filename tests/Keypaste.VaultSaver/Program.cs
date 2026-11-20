@@ -1,4 +1,5 @@
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 
 namespace Keypaste.VaultSaver;
 
@@ -66,7 +67,7 @@ internal static class Program
 
         try
         {
-            using var vault = Vault.Open(args[0], password);
+            using var vault = ClaimedVault.Open(args[0], password);
             vault.AddEntry(new VaultEntry { Title = "written under contention", Password = "secret" });
             vault.SaveWaiting(waitBetweenAttempts: null, attempts: attempts);
 
@@ -91,7 +92,7 @@ internal static class Program
     {
         try
         {
-            using var vault = Vault.Open(vaultPath, password);
+            using var vault = ClaimedVault.Open(vaultPath, password);
             vault.AddEntry(new VaultEntry { Title = "never written", Password = "secret" });
             vault.SaveWaiting(waitBetweenAttempts: null, duringAttempt: _ => Hold());
             return 0;
@@ -126,7 +127,7 @@ internal static class Program
             var backup = VaultBackups.List(vaultPath).Single(candidate => Path.GetFileName(candidate.Path) == backupName);
             var validated = VaultBackups.Inspect(vaultPath, backup, password);
 
-            VaultBackups.Restore(
+            ClaimedVault.Restore(
                 validated,
                 beforeReplacing: _ => Hold(),
                 waitBetweenAttempts: null);

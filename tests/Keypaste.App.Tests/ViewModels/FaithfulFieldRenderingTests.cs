@@ -57,7 +57,7 @@ public sealed class FaithfulFieldRenderingTests : IDisposable
         _directory = Directory.CreateTempSubdirectory("keypaste-faithful-").FullName;
         _vaultPath = Path.Combine(_directory, "vault.kdbx");
 
-        using var vault = Vault.Create(_vaultPath, _master);
+        using var vault = ClaimedVault.Create(_vaultPath, _master);
 
         vault.AddEntry(new VaultEntry
         {

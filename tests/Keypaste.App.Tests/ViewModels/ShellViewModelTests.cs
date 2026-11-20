@@ -19,7 +19,7 @@ public sealed class ShellViewModelTests : IDisposable
 
     public ShellViewModelTests()
     {
-        using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
+        using (var vault = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
         {
             vault.AddEntry(new VaultEntry { Title = "github", Username = "me", Password = "gh-secret", GroupPath = "Work" });
 
@@ -234,7 +234,7 @@ public sealed class ShellViewModelTests : IDisposable
     {
         using var fixture = new TempVault();
 
-        using (var vault = Vault.Open(fixture.Path_, TempVault.Password))
+        using (var vault = ClaimedVault.Open(fixture.Path_, TempVault.Password))
         {
             vault.AddEntry(new VaultEntry { Title = "OLD_KEY", Password = "old-secret", GroupPath = "env/acme" });
 

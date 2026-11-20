@@ -1,5 +1,6 @@
 using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Internal;
+using Keypaste.Core.Ownership;
 
 namespace Keypaste.Core;
 
@@ -72,7 +73,7 @@ public static class VaultCreation
 {
     /// <summary>Whether <paramref name="path"/> can receive a new vault. Writes nothing.</summary>
     /// <remarks>
-    /// Separate from <see cref="TryCreate(string, ReadOnlySpan{char}, ReadOnlySpan{char}, string?, out Vault?, out string)"/> so each front end keeps its own order of asking. The
+    /// Separate from <see cref="TryCreate(VaultClaim, string, ReadOnlySpan{char}, ReadOnlySpan{char}, string?, out Vault?, out string)"/> so each front end keeps its own order of asking. The
     /// CLI refuses an occupied path before it prompts for a password, and the desktop says so the
     /// moment the picker comes back, rather than after two fields have been filled in.
     /// </remarks>
@@ -86,6 +87,7 @@ public static class VaultCreation
     /// <summary>
     /// Applies every creation rule and, if they all pass, writes the vault and hands it back open.
     /// </summary>
+    /// <param name="claim">This process's claim on <paramref name="path"/>, which the created vault saves under.</param>
     /// <param name="path">Where the vault goes. Its parent directory is created if it is missing.</param>
     /// <param name="password">The new master password.</param>
     /// <param name="confirmation">The same password, typed again.</param>
@@ -113,17 +115,19 @@ public static class VaultCreation
     /// </para>
     /// </remarks>
     public static VaultCreationOutcome TryCreate(
+        VaultClaim claim,
         string path,
         ReadOnlySpan<char> password,
         ReadOnlySpan<char> confirmation,
         out Vault? created,
         out string failure) =>
-        TryCreate(path, password, confirmation, keyfilePath: null, out created, out failure);
+        TryCreate(claim, path, password, confirmation, keyfilePath: null, out created, out failure);
 
     /// <summary>
-    /// <see cref="TryCreate(string, ReadOnlySpan{char}, ReadOnlySpan{char}, out Vault?, out string)"/>,
+    /// <see cref="TryCreate(VaultClaim, string, ReadOnlySpan{char}, ReadOnlySpan{char}, out Vault?, out string)"/>,
     /// protected by an existing keyfile as well as the password.
     /// </summary>
+    /// <param name="claim">This process's claim on <paramref name="path"/>.</param>
     /// <param name="path">Where the vault goes.</param>
     /// <param name="password">The new master password, which is still required: keypaste makes no vault a keyfile alone opens.</param>
     /// <param name="confirmation">The same password, typed again.</param>
@@ -131,18 +135,20 @@ public static class VaultCreation
     /// <param name="created">The open vault, or <see langword="null"/> on every refusal.</param>
     /// <param name="failure">What the filesystem or the format said, when the outcome is <see cref="VaultCreationOutcome.Failed"/>.</param>
     public static VaultCreationOutcome TryCreate(
+        VaultClaim claim,
         string path,
         ReadOnlySpan<char> password,
         ReadOnlySpan<char> confirmation,
         string? keyfilePath,
         out Vault? created,
         out string failure) =>
-        TryCreate(path, password, confirmation, keyfilePath, hardwareKey: null, out created, out failure);
+        TryCreate(claim, path, password, confirmation, keyfilePath, hardwareKey: null, out created, out failure);
 
     /// <summary>
-    /// <see cref="TryCreate(string, ReadOnlySpan{char}, ReadOnlySpan{char}, string?, out Vault?, out string)"/>,
+    /// <see cref="TryCreate(VaultClaim, string, ReadOnlySpan{char}, ReadOnlySpan{char}, string?, out Vault?, out string)"/>,
     /// protected by a hardware key's slot as well as the password, as an access change attaches one.
     /// </summary>
+    /// <param name="claim">This process's claim on <paramref name="path"/>.</param>
     /// <param name="path">Where the vault goes.</param>
     /// <param name="password">The new master password, which is still required.</param>
     /// <param name="confirmation">The same password, typed again.</param>
@@ -156,6 +162,7 @@ public static class VaultCreation
     /// <returns>What happened.</returns>
     /// <exception cref="HardwareKeyException">The hardware key did not answer the first save, so no vault was written.</exception>
     public static VaultCreationOutcome TryCreate(
+        VaultClaim claim,
         string path,
         ReadOnlySpan<char> password,
         ReadOnlySpan<char> confirmation,
@@ -165,6 +172,8 @@ public static class VaultCreation
         out string failure)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
+        ArgumentNullException.ThrowIfNull(claim);
+        claim.CheckHolds(path, nameof(claim));
 
         created = null;
         failure = string.Empty;
@@ -213,7 +222,7 @@ public static class VaultCreation
             }
 
 #pragma warning disable CA2000
-            var vault = Vault.CreateWith(path, password, keyfilePath, hardwareKey);
+            var vault = Vault.CreateWith(claim, path, password, keyfilePath, hardwareKey);
 #pragma warning restore CA2000
 
             var pathWasFree = !File.Exists(path);

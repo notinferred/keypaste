@@ -22,7 +22,7 @@ public sealed class VaultNoteMoveTests : IDisposable
     {
         var path = Saved((_stripe, NoteKeyCheckTests.FixtureNotes));
 
-        using (var vault = Vault.Open(path, _master))
+        using (var vault = ClaimedVault.Open(path, _master))
         using (var check = new NoteKeyCheck())
         {
             var edits = new List<VaultEdit>();
@@ -36,7 +36,7 @@ public sealed class VaultNoteMoveTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, _master);
+        using var reopened = ClaimedVault.Open(path, _master);
 
         Assert.Equal(
             [new EntryField("GITHUB_TOKEN", true, false), new EntryField("OPENAI_API_KEY", true, false), new EntryField("STRIPE_SECRET_KEY", true, false)],
@@ -57,7 +57,7 @@ public sealed class VaultNoteMoveTests : IDisposable
     {
         var path = Saved((_stripe, "A=1\nkeep this"), (_plain, "note\nB=2"));
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         using var check = new NoteKeyCheck();
         var edits = new List<VaultEdit>();
         vault.Edited += (_, edit) => edits.Add(edit);
@@ -75,7 +75,7 @@ public sealed class VaultNoteMoveTests : IDisposable
     public void Crlf_lines_leave_with_their_terminators_and_only_the_chosen_ones_leave()
     {
         // A KDBX save stores line breaks as LF, so CRLF notes exist only before the first save.
-        using var vault = Vault.Create(Path.Combine(_directory, "crlf.kdbx"), _master);
+        using var vault = ClaimedVault.Create(Path.Combine(_directory, "crlf.kdbx"), _master);
         vault.AddEntry(new VaultEntry { GroupPath = _stripe.GroupPath, Title = _stripe.Title, Password = "p", Notes = "first\r\nA=1\r\nmiddle\r\nB=2\r\n" });
         using var check = new NoteKeyCheck();
         var findings = check.Scan(vault);
@@ -92,7 +92,7 @@ public sealed class VaultNoteMoveTests : IDisposable
     {
         var path = Saved((_stripe, "text\nKEY=same"));
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         vault.SetFields(_stripe, [new FieldWrite("KEY", "same", Protect: false)]);
         using var check = new NoteKeyCheck();
 
@@ -107,7 +107,7 @@ public sealed class VaultNoteMoveTests : IDisposable
     {
         var path = Saved((_stripe, "A=1"), (_plain, "B=2"));
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         using var check = new NoteKeyCheck();
         var findings = check.Scan(vault);
         vault.UpdateEntry(vault.Find(_stripe)! with { Notes = "A=1\nedited" });
@@ -130,7 +130,7 @@ public sealed class VaultNoteMoveTests : IDisposable
     {
         var path = Saved((_stripe, "KEY=new"));
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         vault.SetFields(_stripe, [new FieldWrite("KEY", "old")]);
         vault.Save();
         using var check = new NoteKeyCheck();
@@ -150,7 +150,7 @@ public sealed class VaultNoteMoveTests : IDisposable
     {
         var path = Saved((_stripe, "KEY=a\nKEY=b"));
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         using var check = new NoteKeyCheck();
         var edits = 0;
         vault.Edited += (_, _) => edits++;
@@ -167,7 +167,7 @@ public sealed class VaultNoteMoveTests : IDisposable
     {
         var path = Saved((_stripe, "KEY=v"));
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         using var check = new NoteKeyCheck();
         var findings = check.Scan(vault);
         vault.RenameEntry(_stripe, "Renamed", out _);
@@ -184,7 +184,7 @@ public sealed class VaultNoteMoveTests : IDisposable
     {
         var path = Saved((_stripe, "KEY=v"));
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         using var first = new NoteKeyCheck();
         using var second = new NoteKeyCheck();
 
@@ -197,7 +197,7 @@ public sealed class VaultNoteMoveTests : IDisposable
     {
         var path = Saved((_stripe, "A_KEY=1\nB_KEY=2\nC_KEY=3\nkeep this"));
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         using var check = new NoteKeyCheck();
         var chosen = check.Scan(vault).Where(finding => finding.Field != "B_KEY").ToList();
 
@@ -217,7 +217,7 @@ public sealed class VaultNoteMoveTests : IDisposable
     {
         var path = Saved((_stripe, "KEY=v"));
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
         using var check = new NoteKeyCheck();
         var edits = 0;
         vault.Edited += (_, _) => edits++;
@@ -238,7 +238,7 @@ public sealed class VaultNoteMoveTests : IDisposable
     {
         var path = Path.Combine(_directory, Guid.NewGuid().ToString("N") + ".kdbx");
 
-        using var vault = Vault.Create(path, _master);
+        using var vault = ClaimedVault.Create(path, _master);
 
         foreach (var (name, notes) in entries)
         {

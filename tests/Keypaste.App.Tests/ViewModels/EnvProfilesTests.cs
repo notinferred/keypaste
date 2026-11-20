@@ -24,7 +24,7 @@ public sealed class EnvProfilesTests : IDisposable
 
     public EnvProfilesTests()
     {
-        using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
+        using (var vault = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
         {
             ProjectVariables.Set(vault, "acme-api", "DATABASE_URL", "dev-db");
             ProjectVariables.Set(vault, "acme-api", "prod", "DATABASE_URL", _prodValue);
@@ -81,7 +81,7 @@ public sealed class EnvProfilesTests : IDisposable
         project.SelectedProfile = "Prod";
         Assert.Equal("prod", project.SelectedProfile);
 
-        using var vault = Vault.Open(_fixture.Path_, TempVault.Password);
+        using var vault = ClaimedVault.Open(_fixture.Path_, TempVault.Password);
         var staging = new EntryName("env/acme-api", ".env.staging");
         Assert.NotNull(vault.ReadField(staging, "STAGING_ONLY"));
         Assert.Equal(["env:acme-api:staging"], vault.Tags(staging));
@@ -576,7 +576,7 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.False(project.IsAddingEntry);
         Assert.Contains(queue, project.Environments[0].Members.Select(member => member.Entry));
         Assert.Contains("QUEUE_KEY", project.Variables.Select(row => row.Key));
-        using var saved = Vault.Open(_fixture.Path_, TempVault.Password);
+        using var saved = ClaimedVault.Open(_fixture.Path_, TempVault.Password);
         Assert.Equal(["env:acme-api"], saved.Tags(queue));
     }
 
@@ -604,7 +604,7 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.Equal("Removed services/Mail from acme-api/dev. The item and its fields are kept.", screen.Notice);
         Assert.DoesNotContain(mail, project.Environments[0].Members.Select(member => member.Entry));
         Assert.DoesNotContain("MAIL_KEY", project.Variables.Select(row => row.Key));
-        using var saved = Vault.Open(_fixture.Path_, TempVault.Password);
+        using var saved = ClaimedVault.Open(_fixture.Path_, TempVault.Password);
         Assert.Equal(["finance"], saved.Tags(mail));
         Assert.Equal("mail_key-sentinel", saved.ReadField(mail, "MAIL_KEY"));
         Assert.Empty(saved.ReadRecycled());
@@ -643,7 +643,7 @@ public sealed class EnvProfilesTests : IDisposable
 
         Assert.Null(screen.Error);
         Assert.Empty(screen.MalformedTags);
-        using var saved = Vault.Open(_fixture.Path_, TempVault.Password);
+        using var saved = ClaimedVault.Open(_fixture.Path_, TempVault.Password);
         Assert.Equal(["env:acme-api:prod"], saved.Tags(odd));
     }
 

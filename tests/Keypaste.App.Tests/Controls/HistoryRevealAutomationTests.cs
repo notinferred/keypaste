@@ -198,7 +198,7 @@ public sealed class HistoryRevealAutomationTests
             _directory = Directory.CreateTempSubdirectory("keypaste-history-reveal-").FullName;
             var path = Path.Combine(_directory, "vault.kdbx");
 
-            using (var vault = Vault.Create(path, _master))
+            using (var vault = ClaimedVault.Create(path, _master))
             {
                 vault.AddEntry(new VaultEntry { Title = "github", Username = "me", Password = _superseded });
                 vault.UpdateEntry(new VaultEntry { Title = "github", Username = "me", Password = _current });

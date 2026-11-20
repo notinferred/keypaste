@@ -4,6 +4,7 @@ using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Cli;
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Consistency.Tests;
@@ -157,7 +158,7 @@ public sealed class RestoredEntryIsVisibleToTheCliTests
     /// <summary>One entry's history, read from the file rather than from the open session.</summary>
     private static IReadOnlyList<EntryRevision> HistoryOf(VaultFixture fixture, string title)
     {
-        using var vault = Vault.Open(fixture.VaultPath, VaultFixture.Master);
+        using var vault = ClaimedVault.Open(fixture.VaultPath, VaultFixture.Master);
         var found = vault.ReadEntries().Single(entry => entry.Title == title);
 
         return vault.ReadHistory(EntryName.Of(found))!;
@@ -165,7 +166,7 @@ public sealed class RestoredEntryIsVisibleToTheCliTests
 
     private static string? UuidOf(VaultFixture fixture, string title)
     {
-        using var vault = Vault.Open(fixture.VaultPath, VaultFixture.Master);
+        using var vault = ClaimedVault.Open(fixture.VaultPath, VaultFixture.Master);
         var found = vault.ReadEntries().Single(entry => entry.Title == title);
 
         return vault.EntryUuid(EntryName.Of(found));

@@ -20,4 +20,9 @@
     <ProjectReference Include="../../src/Keypaste.App/Keypaste.App.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Every vault these open or create for writing takes a claim of its own. -->
+    <Compile Include="../Keypaste.Core.Tests/ClaimedVault.cs" Link="ClaimedVault.cs" />
+  </ItemGroup>
+
 </Project>

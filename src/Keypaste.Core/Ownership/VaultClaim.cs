@@ -30,7 +30,7 @@ public sealed class VaultClaim : IDisposable
 
     private readonly FileStream _lock;
     private readonly string _ownerPath;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     private VaultClaim(FileStream held, string ownerPath, VaultIdentity vault, VaultOwner owner)
     {
@@ -45,6 +45,26 @@ public sealed class VaultClaim : IDisposable
 
     /// <summary>This process, as another one is told about it.</summary>
     public VaultOwner Owner { get; }
+
+    /// <summary>Whether this process still holds the vault: false once the claim is released.</summary>
+    internal bool IsHeld => !_disposed;
+
+    /// <summary>Refuses a write to <paramref name="vaultPath"/> under this claim unless it still holds that vault.</summary>
+    /// <param name="vaultPath">The vault about to be written.</param>
+    /// <param name="parameter">The caller's name for this claim.</param>
+    /// <exception cref="ArgumentException">The claim was released or is on another vault.</exception>
+    internal void CheckHolds(string vaultPath, string parameter)
+    {
+        if (!IsHeld)
+        {
+            throw new ArgumentException("That claim was released, so it no longer lets this process write the vault.", parameter);
+        }
+
+        if (!Vault.Names(vaultPath))
+        {
+            throw new ArgumentException($"That claim is on another vault than '{vaultPath}'.", parameter);
+        }
+    }
 
     /// <summary>Takes the claim on a vault, or says who holds it.</summary>
     /// <param name="home">keypaste's home directory.</param>

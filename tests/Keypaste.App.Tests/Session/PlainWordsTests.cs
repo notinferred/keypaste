@@ -197,7 +197,7 @@ public sealed partial class PlainWordsTests
         using (var empty = new TempHome())
         {
             var database = Path.Combine(empty.Path, "work.kdbx");
-            using (var created = Vault.Create(database, TempVault.Password))
+            using (var created = ClaimedVault.Create(database, TempVault.Password))
             {
                 created.Save();
             }

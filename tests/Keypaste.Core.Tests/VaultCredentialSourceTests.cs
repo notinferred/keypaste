@@ -39,7 +39,7 @@ public sealed class VaultCredentialSourceTests : IDisposable
     public VaultCredentialSourceTests()
     {
         _directory = Directory.CreateTempSubdirectory("keypaste-credential-tests-").FullName;
-        _vault = Vault.Create(Path.Combine(_directory, "vault.kdbx"), MasterPassword);
+        _vault = ClaimedVault.Create(Path.Combine(_directory, "vault.kdbx"), MasterPassword);
 
         _vault.AddEntry(new VaultEntry
         {
@@ -407,7 +407,7 @@ public sealed class VaultCredentialSourceTests : IDisposable
     [Fact]
     public void ADisposedVault_FailsClosedRatherThanThrowing()
     {
-        var vault = Vault.Create(Path.Combine(_directory, "disposed.kdbx"), MasterPassword);
+        var vault = ClaimedVault.Create(Path.Combine(_directory, "disposed.kdbx"), MasterPassword);
         vault.Dispose();
 
         var source = new VaultCredentialSource(() => vault);

@@ -1,4 +1,5 @@
 using Keypaste.Core;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -33,7 +34,7 @@ public sealed class EnvPullTests
     /// <summary>Reads the vault back through the core, so the assertion does not trust the CLI.</summary>
     private static IReadOnlyList<EnvVariable> Stored(CliHarness harness, string project)
     {
-        using var vault = Vault.Open(harness.VaultPath, Master);
+        using var vault = ClaimedVault.Open(harness.VaultPath, Master);
         return EnvResolution.List(vault, project, EnvProfileNames.Default).Variables;
     }
 
@@ -81,7 +82,7 @@ public sealed class EnvPullTests
         Assert.Contains("Nothing was imported", harness.Err, StringComparison.Ordinal);
 
         // Not merely "GOOD is absent" — the project itself must never have been created.
-        using var vault = Vault.Open(harness.VaultPath, Master);
+        using var vault = ClaimedVault.Open(harness.VaultPath, Master);
         Assert.Empty(ProjectCatalog.Read(vault).Projects);
     }
 
@@ -110,7 +111,7 @@ public sealed class EnvPullTests
         Assert.Contains("1 new, 1 updated, 1 unchanged", harness.Err, StringComparison.Ordinal);
         Assert.Contains("history", harness.Err, StringComparison.Ordinal);
 
-        using var vault = Vault.Open(harness.VaultPath, Master);
+        using var vault = ClaimedVault.Open(harness.VaultPath, Master);
         var stored = EnvResolution.List(vault, "billing", EnvProfileNames.Default).Variables.ToDictionary(v => v.Key, v => v.Value, StringComparer.Ordinal);
         Assert.Equal("new", stored["CHANGED"]);
         Assert.Equal("keep-me", stored["SAME"]);
@@ -134,7 +135,7 @@ public sealed class EnvPullTests
         Assert.Equal(CliApp.ExitUsageError, exit);
         Assert.Contains("Cancelled.", harness.Err, StringComparison.Ordinal);
 
-        using var vault = Vault.Open(harness.VaultPath, Master);
+        using var vault = ClaimedVault.Open(harness.VaultPath, Master);
         Assert.Empty(ProjectCatalog.Read(vault).Projects);
         Assert.True(File.Exists(path));
     }
@@ -426,7 +427,7 @@ public sealed class EnvPullTests
             }
 
             harness.Prompt.OnPrompt = null;
-            using var elsewhere = Vault.Open(harness.VaultPath, Master);
+            using var elsewhere = ClaimedVault.Open(harness.VaultPath, Master);
             elsewhere.AddEntry(new VaultEntry { Title = "from-the-terminal", Password = "second" });
             elsewhere.Save();
         };

@@ -28,7 +28,7 @@ public sealed class VaultFieldTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, _master);
+        using var reopened = ClaimedVault.Open(path, _master);
 
         Assert.Equal(
             [new EntryField("Region", false, false), new EntryField("STRIPE_SECRET_KEY", true, false)],
@@ -181,7 +181,7 @@ public sealed class VaultFieldTests : IDisposable
         var path = NewVaultPath();
         KdbxImportTests.WriteForeign(path, _master);
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
 
         Assert.Equal([new EntryField("PIN", true, false), new EntryField("otp", true, true)], vault.Fields(_checking));
         Assert.Equal("4321", vault.ReadField(_checking, "PIN"));
@@ -194,7 +194,7 @@ public sealed class VaultFieldTests : IDisposable
         var path = NewVaultPath();
         KdbxImportTests.WriteForeign(path, _master);
 
-        using (var vault = Vault.Open(path, _master))
+        using (var vault = ClaimedVault.Open(path, _master))
         {
             vault.SetFields(_checking, [new FieldWrite("PIN", "9876"), new FieldWrite("IBAN", "DE00")]);
             vault.Save();
@@ -245,7 +245,7 @@ public sealed class VaultFieldTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, _master);
+        using var reopened = ClaimedVault.Open(path, _master);
 
         Assert.Equal([new EntryField("STRIPE_KEY", true, false), new EntryField("region", false, false)], reopened.Fields(_stripe));
         Assert.Equal("k1", reopened.ReadField(_stripe, "STRIPE_KEY"));
@@ -292,7 +292,7 @@ public sealed class VaultFieldTests : IDisposable
         var path = NewVaultPath();
         KdbxImportTests.WriteForeign(path, _master);
 
-        using var vault = Vault.Open(path, _master);
+        using var vault = ClaimedVault.Open(path, _master);
 
         Assert.Throws<VaultException>(() => vault.RenameField(_checking, "otp", "OLD_OTP"));
         Assert.Equal(SavedRead.Current, vault.ReadSaved(out _));
@@ -344,7 +344,7 @@ public sealed class VaultFieldTests : IDisposable
 
     private static Vault Seeded(string path)
     {
-        var vault = Vault.Create(path, _master);
+        var vault = ClaimedVault.Create(path, _master);
         vault.AddEntry(new VaultEntry { Title = _stripe.Title, GroupPath = _stripe.GroupPath, Password = "login-password" });
         vault.Save();
         return vault;

@@ -103,7 +103,7 @@ public sealed class OnePasswordCsvReaderTests : IDisposable
     public void Imported_into_a_vault_every_part_lands_or_is_named_with_why()
     {
         var vaultPath = Path.Combine(_directory, "vault.kdbx");
-        using var vault = Vault.Create(vaultPath, _master);
+        using var vault = ClaimedVault.Create(vaultPath, _master);
         using var source = ExportImport.Open(Write("1PasswordExport.csv", Export()), ExportImport.Readers)!;
 
         var plan = source.Plan(vault, "1Password");
@@ -128,7 +128,7 @@ public sealed class OnePasswordCsvReaderTests : IDisposable
 
         source.Commit(vault, plan, saving => saving.Save());
 
-        using var reopened = Vault.Open(vaultPath, _master);
+        using var reopened = ClaimedVault.Open(vaultPath, _master);
         var github = new EntryName("1Password", "GitHub");
         var bank = new EntryName("1Password", "Bank");
 
@@ -153,7 +153,7 @@ public sealed class OnePasswordCsvReaderTests : IDisposable
     public void No_item_row_loss_or_omission_shows_a_value()
     {
         var vaultPath = Path.Combine(_directory, "vault.kdbx");
-        using var vault = Vault.Create(vaultPath, _master);
+        using var vault = ClaimedVault.Create(vaultPath, _master);
         using var source = ExportImport.Open(Write("1PasswordExport.csv", Export()), ExportImport.Readers)!;
         var plan = source.Plan(vault, "1Password");
 

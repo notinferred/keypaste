@@ -50,7 +50,7 @@ public sealed class TwofishVaultTests : IDisposable
         Assert.Equal(version, before.Version);
         Assert.Equal("Twofish", before.Cipher);
 
-        using (var vault = Vault.Open(path, _password))
+        using (var vault = ClaimedVault.Open(path, _password))
         {
             Assert.Equal("twofish-value", vault.Find("TOKEN")?.Password);
             vault.AddEntry(new VaultEntry { Title = "added", Password = "added-value" });
@@ -62,7 +62,7 @@ public sealed class TwofishVaultTests : IDisposable
         Assert.Equal("Twofish", after.Cipher);
         Assert.Equal("AES-KDF", after.Kdf);
 
-        using var reopened = Vault.Open(path, _password);
+        using var reopened = ClaimedVault.Open(path, _password);
         Assert.Equal("twofish-value", reopened.Find("TOKEN")?.Password);
         Assert.Equal("added-value", reopened.Find("added")?.Password);
     }
@@ -74,7 +74,7 @@ public sealed class TwofishVaultTests : IDisposable
     {
         var path = Write("locked.kdbx", kdbx31);
 
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, "not-" + _password));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, "not-" + _password));
     }
 
     /// <summary>One entry, written by the vendored library under Twofish and AES-KDF, as KDBX 4 or, through its internal version switch, 3.1.</summary>

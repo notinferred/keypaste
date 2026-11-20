@@ -28,7 +28,7 @@ public sealed class RunSessionTests : IDisposable
     {
         _harness.SeedVault(_master);
 
-        using (var vault = Vault.Open(_harness.VaultPath, _master))
+        using (var vault = ClaimedVault.Open(_harness.VaultPath, _master))
         {
             ProjectVariables.Set(vault, "dev", "TOKEN", _value);
             ExpiredHolder(vault, new EntryName("services", "Broken"), "env:broken", "BROKEN_KEY");
@@ -87,7 +87,7 @@ public sealed class RunSessionTests : IDisposable
     public async Task A_set_of_200_KiB_reaches_the_child_whole()
     {
         var large = Enumerable.Range(0, 7).Select(i => new EnvVariable($"BLOB_{i}", new string((char)('a' + i), 30_000))).ToList();
-        using (var vault = Vault.Open(_harness.VaultPath, _master))
+        using (var vault = ClaimedVault.Open(_harness.VaultPath, _master))
         {
             foreach (var variable in large)
             {
@@ -295,7 +295,7 @@ public sealed class RunSessionTests : IDisposable
     public async Task RunSession_ReferenceFile_RequestsOnlyReferencedKeys()
     {
         AddStaging(("TOKEN", "staging-token"), ("UNUSED", "unused-value"));
-        using (var vault = Vault.Open(_harness.VaultPath, _master))
+        using (var vault = ClaimedVault.Open(_harness.VaultPath, _master))
         {
             ExpiredHolder(vault, new EntryName("services", "Stale"), "env:dev:staging", "STALE_KEY");
             vault.Save();
@@ -344,7 +344,7 @@ public sealed class RunSessionTests : IDisposable
     [InlineData(true)]
     public async Task A_project_the_project_option_names_is_the_one_released_even_when_it_starts_with_a_dash(bool confirmedInTheApp)
     {
-        using (var vault = Vault.Open(_harness.VaultPath, _master))
+        using (var vault = ClaimedVault.Open(_harness.VaultPath, _master))
         {
             ProjectVariables.Set(vault, "--help", "HELP_TOKEN", _value);
             vault.Save();
@@ -500,7 +500,7 @@ public sealed class RunSessionTests : IDisposable
 
     private void AddStaging(params (string Key, string Value)[] variables)
     {
-        using var vault = Vault.Open(_harness.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
 
         foreach (var (key, value) in variables)
         {

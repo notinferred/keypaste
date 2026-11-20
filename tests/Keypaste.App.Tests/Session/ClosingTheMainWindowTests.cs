@@ -13,6 +13,7 @@ using Keypaste.Core.HardwareKeys;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Settings;
+using Keypaste.Core.Tests;
 using Keypaste.Core.Tests.HardwareKeys;
 using Xunit;
 
@@ -317,7 +318,7 @@ public sealed class ClosingTheMainWindowTests
     {
         var vault = Path.Combine(fixture.Home, "agents.kdbx");
 
-        using var created = Core.Vault.Create(vault, TempVault.Password);
+        using var created = ClaimedVault.Create(vault, TempVault.Password);
         created.AddEntry(new VaultEntry { GroupPath = "env/ci", Title = "DEPLOY_KEY", Password = _sentinel });
         TempVault.Sees(created, "f21");
         created.Save();
@@ -330,7 +331,7 @@ public sealed class ClosingTheMainWindowTests
         var vault = Path.Combine(fixture.Home, "keyed.kdbx");
 
         using var key = new HardwareKey(new SoftwareYubiKey(_keySecret), 2);
-        using var created = Core.Vault.CreateWith(vault, TempVault.Password, null, key);
+        using var created = ClaimedVault.CreateWith(vault, TempVault.Password, null, key);
         created.AddEntry(new VaultEntry { GroupPath = "env/ci", Title = "DEPLOY_KEY", Password = _sentinel });
         TempVault.Sees(created, "f21");
         created.Save();

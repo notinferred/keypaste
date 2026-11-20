@@ -808,7 +808,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
         ResetPassword();
         Message = string.Empty;
         Restore = new RestoreBackupViewModel(
-            path, _session.Clock, () => _session.IdleTimeout, _post, OnRestoredAsync, KeyfilePath, _picker.PickKeyfileAsync,
+            path, _session.Clock, () => _session.IdleTimeout, _post, _session.RestoreBackup, OnRestoredAsync, KeyfilePath, _picker.PickKeyfileAsync,
             HardwareKeySlot is { } slot ? () => _session.NewHardwareKey(slot) : null,
             _paste);
     }

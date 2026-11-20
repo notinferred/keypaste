@@ -35,7 +35,7 @@ public sealed class EntriesOrganizeTests : IDisposable
         _directory = Directory.CreateTempSubdirectory("keypaste-organize-screen-").FullName;
         _vaultPath = Path.Combine(_directory, "vault.kdbx");
 
-        using var vault = Vault.Create(_vaultPath, Master);
+        using var vault = ClaimedVault.Create(_vaultPath, Master);
 
         vault.AddEntry(new VaultEntry
         {
@@ -100,7 +100,7 @@ public sealed class EntriesOrganizeTests : IDisposable
     {
         IReadOnlyList<string> groupsBefore;
 
-        using (var before = Vault.Open(_vaultPath, Master))
+        using (var before = ClaimedVault.Open(_vaultPath, Master))
         {
             groupsBefore = before.ReadGroupPaths();
         }
@@ -129,7 +129,7 @@ public sealed class EntriesOrganizeTests : IDisposable
             Assert.False(detail.IsEditing, entries.Error);
         }
 
-        using var reopened = Vault.Open(_vaultPath, Master);
+        using var reopened = ClaimedVault.Open(_vaultPath, Master);
         var name = new EntryName("servers", "PROD_DB");
 
         Assert.Equal(groupsBefore, reopened.ReadGroupPaths());
@@ -146,7 +146,7 @@ public sealed class EntriesOrganizeTests : IDisposable
     [Fact]
     public void A_duplicate_is_selected_beside_the_item_and_names_the_project_tags_it_left_out()
     {
-        using (var vault = Vault.Open(_vaultPath, Master))
+        using (var vault = ClaimedVault.Open(_vaultPath, Master))
         {
             var key = new EntryName("env/billing", "STRIPE_KEY");
             Assert.True(vault.AddTag(key, "env:billing"));
@@ -173,7 +173,7 @@ public sealed class EntriesOrganizeTests : IDisposable
             Assert.Equal("Duplicated production as production (copy).", entries.Notice);
         }
 
-        using var reopened = Vault.Open(_vaultPath, Master);
+        using var reopened = ClaimedVault.Open(_vaultPath, Master);
         var copy = new EntryName("env/billing", "STRIPE_KEY (copy)");
 
         Assert.Equal("sk", reopened.Find(copy)!.Password, StringComparer.Ordinal);
@@ -247,7 +247,7 @@ public sealed class EntriesOrganizeTests : IDisposable
             Assert.Null(entries.Error);
         }
 
-        using var reopened = Vault.Open(_vaultPath, Master);
+        using var reopened = ClaimedVault.Open(_vaultPath, Master);
 
         // The save happened, so the sweep below is not a sweep of a file nothing wrote.
         Assert.NotNull(reopened.Find(new EntryName(string.Empty, "unrelated")));
@@ -316,7 +316,7 @@ public sealed class EntriesOrganizeTests : IDisposable
     [Fact]
     public void A_row_matched_on_a_tag_names_the_tag()
     {
-        using (var vault = Vault.Open(_vaultPath, Master))
+        using (var vault = ClaimedVault.Open(_vaultPath, Master))
         {
             Assert.True(vault.AddTag(new EntryName(string.Empty, "github"), "billing-ops"));
             vault.Save();

@@ -5,7 +5,6 @@ using Keypaste.App.Session;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
-using Keypaste.Core;
 using Keypaste.Core.Tests;
 using Xunit;
 
@@ -19,7 +18,7 @@ public sealed class OpenProjectRowTests
     {
         using var fixture = new TempVault();
 
-        using (var vault = Vault.Open(fixture.Path_, TempVault.Password))
+        using (var vault = ClaimedVault.Open(fixture.Path_, TempVault.Password))
         {
             ProjectVariables.Set(vault, "acme-api", "DATABASE_URL", "db-1");
             ProjectVariables.Set(vault, "acme-web", "VERCEL_TOKEN", "vt-2");

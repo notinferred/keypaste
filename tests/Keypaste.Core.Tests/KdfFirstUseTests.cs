@@ -47,25 +47,36 @@ public sealed class KdfFirstUseTests(ITestOutputHelper output)
     private static Tally Burst(bool warm)
     {
         var tally = new Tally(warm);
-        for (var i = 0; i < _iterationCount; i++)
+        var home = Directory.CreateTempSubdirectory("keypaste-kdf-first-use-").FullName;
+
+        try
         {
-            RunIsolated(warm, tally);
+            for (var i = 0; i < _iterationCount; i++)
+            {
+                RunIsolated(warm, tally, home);
+            }
+        }
+        finally
+        {
+            Directory.Delete(home, recursive: true);
         }
 
         return tally;
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void RunIsolated(bool warm, Tally tally)
+    private static void RunIsolated(bool warm, Tally tally, string home)
     {
         var context = new FirstUseContext();
+        IDisposable? claim = null;
         try
         {
             var core = context.LoadFromAssemblyName(typeof(Vault).Assembly.GetName());
+            var path = Path.Combine(Path.GetTempPath(), "keypaste-kdf-first-use-never-written.kdbx");
+            claim = Claim(core, home, path);
             var create = core.GetType("Keypaste.Core.Vault", throwOnError: true)!
                 .GetMethod(nameof(Vault.Create), BindingFlags.Public | BindingFlags.Static)!
-                .CreateDelegate<CreateVault>();
-            var path = Path.Combine(Path.GetTempPath(), "keypaste-kdf-first-use-never-written.kdbx");
+                .CreateDelegate<CreateVault>(claim);
 
             if (warm)
             {
@@ -112,8 +123,22 @@ public sealed class KdfFirstUseTests(ITestOutputHelper output)
         }
         finally
         {
+            claim?.Dispose();
             context.Unload();
         }
+    }
+
+    /// <summary>The isolated core's claim on <paramref name="path"/>, which every create in the burst shares.</summary>
+    private static IDisposable Claim(Assembly core, string home, string path)
+    {
+        var kind = Enum.Parse(core.GetType("Keypaste.Core.Ownership.OwnerKind", throwOnError: true)!, nameof(Ownership.OwnerKind.CommandLine));
+        object?[] arguments = [home, path, kind, null, null];
+        var acquired = (bool)core.GetType("Keypaste.Core.Ownership.VaultClaim", throwOnError: true)!
+            .GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .Single(method => method.Name == nameof(Ownership.VaultClaim.TryAcquire) && method.GetParameters().Length == 5)
+            .Invoke(null, arguments)!;
+
+        return acquired ? (IDisposable)arguments[3]! : throw new InvalidOperationException((string?)arguments[4]);
     }
 
     private static string ReadRegistry(AssemblyLoadContext context)

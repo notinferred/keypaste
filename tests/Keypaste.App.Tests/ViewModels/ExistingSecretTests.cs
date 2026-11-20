@@ -46,7 +46,7 @@ public sealed class ExistingSecretTests : IDisposable
         _directory = Directory.CreateTempSubdirectory("keypaste-existing-secret-").FullName;
         _vaultPath = Path.Combine(_directory, "vault.kdbx");
 
-        using var vault = Vault.Create(_vaultPath, _master);
+        using var vault = ClaimedVault.Create(_vaultPath, _master);
         vault.AddEntry(new VaultEntry { Title = "github", Username = "me", Password = "the-old-one" });
         ProjectVariables.Set(vault, "billing", "STRIPE_KEY", "the-old-value");
         vault.Save();
@@ -440,13 +440,13 @@ public sealed class ExistingSecretTests : IDisposable
     /// <summary>A new key the screen added, from billing's home entry (D-0413).</summary>
     private string? RereadHomeField(string key)
     {
-        using var vault = Vault.Open(_vaultPath, _master);
+        using var vault = ClaimedVault.Open(_vaultPath, _master);
         return vault.ReadField(new EntryName("env/billing", ".env"), key);
     }
 
     private string? Reread(string path)
     {
-        using var vault = Vault.Open(_vaultPath, _master);
+        using var vault = ClaimedVault.Open(_vaultPath, _master);
         return vault.Find(path)?.Password;
     }
 

@@ -26,7 +26,7 @@ public sealed class TokenVerbTests : IDisposable
         _harness.Environment[KeypasteHome.EnvironmentVariable] = _harness.Directory;
         _harness.SeedVault(Master);
 
-        using (var vault = Vault.Open(_harness.VaultPath, Master))
+        using (var vault = ClaimedVault.Open(_harness.VaultPath, Master))
         {
             ProjectVariables.Set(vault, "acme-api", "staging", "DATABASE_URL", Value);
             ProjectVariables.Set(vault, "acme-api", "staging", "API_KEY", "sk_token_verb_sentinel");
@@ -164,7 +164,7 @@ public sealed class TokenVerbTests : IDisposable
         _harness.AssertExit(0, _harness.Run("token", "revoke", "ci-staging", "--vault", _harness.VaultPath));
 
         Assert.Contains("✓ revoked ci-staging", _harness.Err, StringComparison.Ordinal);
-        using var vault = Vault.Open(_harness.VaultPath, Master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, Master);
         Assert.Empty(new TokenStore(vault).List());
         Assert.Equal(TokenCheck.Unknown, new TokenStore(vault).Verify(token, _harness.Clock.Now, out _));
         Assert.Empty(vault.ReadRecycled());
@@ -281,7 +281,7 @@ public sealed class TokenVerbTests : IDisposable
     [Fact]
     public void Bundle_RefusesASetHoldingAnEntryTaggedIntoProd()
     {
-        using (var vault = Vault.Open(_harness.VaultPath, Master))
+        using (var vault = ClaimedVault.Open(_harness.VaultPath, Master))
         {
             var deploy = new EntryName("services", "Deploy");
             vault.AddEntry(new VaultEntry { GroupPath = "services", Title = "Deploy", Password = "deploy-login" });
@@ -381,7 +381,7 @@ public sealed class TokenVerbTests : IDisposable
 
     private void AssertNoSecretOrVerifier(string token)
     {
-        using var vault = Vault.Open(_harness.VaultPath, Master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, Master);
         var verifiers = vault.ReadEntries(includeReserved: true).Where(entry => entry.GroupPath == ReservedGroups.Tokens).Select(entry => entry.Password).ToList();
 
         Assert.NotEmpty(verifiers);

@@ -155,9 +155,9 @@ public sealed class UnlockHardwareKeyTests : IDisposable
         Assert.Equal(2, RecentVaults.Load(KeypasteHome.RecentPath(_home.Path)).Single().HardwareKeySlot);
 
         _session.Lock(VaultLockReason.Manual);
-        Assert.Throws<InvalidMasterPasswordException>(() => Vault.Open(path, _master));
+        Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(path, _master));
         using var key = new HardwareKey(new SoftwareYubiKey(_secret), 2);
-        using var reopened = Vault.Open(path, _master, null, key);
+        using var reopened = ClaimedVault.Open(path, _master, null, key);
         Assert.Empty(reopened.ReadEntries());
     }
 
@@ -244,7 +244,7 @@ public sealed class UnlockHardwareKeyTests : IDisposable
     {
         var path = Path.Combine(_home.Path, $"{Guid.NewGuid():n}.kdbx");
         using var key = new HardwareKey(new SoftwareYubiKey(_secret), 2);
-        using var vault = Vault.CreateWith(path, _master, null, key);
+        using var vault = ClaimedVault.CreateWith(path, _master, null, key);
         vault.AddEntry(new VaultEntry { Title = "github", Password = "gh" });
         vault.Save();
         return path;

@@ -29,7 +29,7 @@ public sealed class HardwareKeySessionTests : IDisposable
         _path = Path.Combine(_home.Path, "vault.kdbx");
 
         using var key = new HardwareKey(new SoftwareYubiKey(_secret), 2);
-        using var vault = Vault.CreateWith(_path, _master, null, key);
+        using var vault = ClaimedVault.CreateWith(_path, _master, null, key);
         vault.AddEntry(new VaultEntry { Title = "github", Password = "gh" });
         vault.Save();
     }
@@ -53,7 +53,7 @@ public sealed class HardwareKeySessionTests : IDisposable
         _session.Lock(VaultLockReason.Manual);
 
         using var key = new HardwareKey(new SoftwareYubiKey(_secret), 2);
-        using var reopened = Vault.Open(_path, _master, null, key);
+        using var reopened = ClaimedVault.Open(_path, _master, null, key);
         Assert.Equal("saved", reopened.Find("added")?.Password);
     }
 

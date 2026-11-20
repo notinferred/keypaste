@@ -194,7 +194,7 @@ public sealed class QuickUnlockTests : IDisposable
         UnlockAndKeep();
         _session.Lock(VaultLockReason.Manual);
 
-        using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
+        using (var vault = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
         {
             vault.ChangeAccess(new VaultAccessChange(true, AccessKeyfileChange.Keep), _next, _next);
         }
@@ -213,7 +213,7 @@ public sealed class QuickUnlockTests : IDisposable
         UnlockAndKeep();
         _session.Lock(VaultLockReason.Manual);
 
-        using (var vault = Vault.Open(_fixture.Path_, TempVault.Password))
+        using (var vault = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
         {
             vault.AddEntry(new VaultEntry { Title = "saved-elsewhere", Password = "outside" });
             vault.Save();
@@ -330,7 +330,7 @@ public sealed class QuickUnlockTests : IDisposable
         var path = Path.Combine(_fixture.Home, "yubikey.kdbx");
 
         using (var key = new HardwareKey(new SoftwareYubiKey(secret), 2))
-        using (var created = Vault.CreateWith(path, TempVault.Password, null, key))
+        using (var created = ClaimedVault.CreateWith(path, TempVault.Password, null, key))
         {
             created.AddEntry(new VaultEntry { Title = "github", Password = "gh" });
             created.Save();

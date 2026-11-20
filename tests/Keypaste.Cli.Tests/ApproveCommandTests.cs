@@ -6,6 +6,7 @@ using Keypaste.Core;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -120,7 +121,7 @@ public sealed class ApproveCommandTests : IDisposable
 
         await approver.StopAsync(terminal);
 
-        using (var vault = Vault.Open(_harness.VaultPath, _master))
+        using (var vault = ClaimedVault.Open(_harness.VaultPath, _master))
         {
             Assert.Equal("approve-command-new-value", vault.Find(new EntryName("env/dev", "TOKEN"))!.Password);
         }
@@ -144,7 +145,7 @@ public sealed class ApproveCommandTests : IDisposable
 
         await approver.StopAsync(terminal);
 
-        using var vault = Vault.Open(_harness.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
         Assert.NotNull(vault.Find(new EntryName("env/dev", "TOKEN")));
     }
 
@@ -157,7 +158,7 @@ public sealed class ApproveCommandTests : IDisposable
     {
         await using var approver = await RunningApprover.StartAsync(_harness, _master, "y");
 
-        using (var other = Vault.Open(_harness.VaultPath, _master))
+        using (var other = ClaimedVault.Open(_harness.VaultPath, _master))
         {
             other.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "OTHER", Password = "other-program-value" });
             other.Save();
@@ -170,7 +171,7 @@ public sealed class ApproveCommandTests : IDisposable
         terminal.AssertExit(CliApp.ExitSuccess, terminal.Run("set", "env/dev/TOKEN", "--vault", _harness.VaultPath));
         await approver.StopAsync(terminal);
 
-        using var vault = Vault.Open(_harness.VaultPath, _master);
+        using var vault = ClaimedVault.Open(_harness.VaultPath, _master);
         Assert.Equal("approve-command-new-value", vault.Find(new EntryName("env/dev", "TOKEN"))!.Password);
         Assert.Equal("other-program-value", vault.Find(new EntryName("env/dev", "OTHER"))!.Password);
         Assert.DoesNotContain("other-program-value", approver.Text, StringComparison.Ordinal);
@@ -183,7 +184,7 @@ public sealed class ApproveCommandTests : IDisposable
         await using var approver = await RunningApprover.StartAsync(_harness, _master);
         var elsewhere = Path.Combine(_harness.Directory, "elsewhere.kdbx");
 
-        using (var other = Vault.Create(elsewhere, _master))
+        using (var other = ClaimedVault.Create(elsewhere, _master))
         {
             other.Save();
         }

@@ -31,7 +31,7 @@ public sealed class RememberedAnswerRequestTests : IDisposable
 
     public RememberedAnswerRequestTests()
     {
-        using (var created = Vault.Create(VaultPath, EnvStoreTests.MasterPassword))
+        using (var created = ClaimedVault.Create(VaultPath, EnvStoreTests.MasterPassword))
         {
             created.AddEntry(new VaultEntry { GroupPath = _github.GroupPath, Title = _github.Title, Username = "octocat", Password = _password });
             ProjectVariables.Set(created, "acme-api", "DATABASE_URL", "SENTINEL-REMEMBERED-DB");
@@ -44,7 +44,7 @@ public sealed class RememberedAnswerRequestTests : IDisposable
             created.Save();
         }
 
-        _vault = Vault.Open(VaultPath, EnvStoreTests.MasterPassword);
+        _vault = ClaimedVault.Open(VaultPath, EnvStoreTests.MasterPassword);
         _log = new OwnerLog(_directory);
         _gate = new ApprovalGate(_channel, _clock, ApprovalLimits.Default);
         _authority = new SessionAuthority(

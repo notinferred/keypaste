@@ -42,7 +42,7 @@ public sealed class VaultIndexTests : IDisposable
     [Fact]
     public void A_host_field_gives_an_origin_only_while_settings_show_hosts_and_the_url_gives_none()
     {
-        using var vault = Vault.Create(Path.Combine(_directory, "hosts.kdbx"), _master);
+        using var vault = ClaimedVault.Create(Path.Combine(_directory, "hosts.kdbx"), _master);
         var server = new EntryName("Ops", "Database");
         var site = new EntryName("Web", "Shop");
         vault.AddEntry(new VaultEntry { Title = server.Title, GroupPath = server.GroupPath, Password = "pw" });
@@ -81,7 +81,7 @@ public sealed class VaultIndexTests : IDisposable
     [Fact]
     public void An_entry_carries_its_kind_its_uuid_its_askable_fields_and_its_project_tags()
     {
-        using var vault = Vault.Create(Path.Combine(_directory, "kinds.kdbx"), _master);
+        using var vault = ClaimedVault.Create(Path.Combine(_directory, "kinds.kdbx"), _master);
         var name = new EntryName("Ops", "Database");
         vault.AddEntry(new VaultEntry { Title = name.Title, GroupPath = name.GroupPath, Username = "admin", Password = "pw" });
         vault.SetKind(name, ItemKind.Database);
@@ -131,7 +131,7 @@ public sealed class VaultIndexTests : IDisposable
 
     private Vault Saved(params VaultEntry[] entries)
     {
-        var vault = Vault.Create(Path.Combine(_directory, Guid.NewGuid().ToString("N") + ".kdbx"), _master);
+        var vault = ClaimedVault.Create(Path.Combine(_directory, Guid.NewGuid().ToString("N") + ".kdbx"), _master);
 
         foreach (var entry in entries)
         {

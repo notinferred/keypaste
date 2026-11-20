@@ -238,7 +238,7 @@ public sealed class CultureAgreementTests : IDisposable
 
         Under(writer, () =>
         {
-            using var vault = Vault.Create(path, EnvStoreTests.MasterPassword);
+            using var vault = ClaimedVault.Create(path, EnvStoreTests.MasterPassword);
             vault.AddEntry(new VaultEntry { GroupPath = name.GroupPath, Title = name.Title, Password = "s3cret" });
             Assert.True(vault.AddTag(name, "\u00E4"));
             Assert.True(vault.AddTag(name, "z"));
@@ -250,7 +250,7 @@ public sealed class CultureAgreementTests : IDisposable
         {
             var tags = Under(reader, () =>
             {
-                using var vault = Vault.Open(path, EnvStoreTests.MasterPassword);
+                using var vault = ClaimedVault.Open(path, EnvStoreTests.MasterPassword);
                 return vault.Tags(name);
             });
 
@@ -274,7 +274,7 @@ public sealed class CultureAgreementTests : IDisposable
 
         var token = Under(writer, () =>
         {
-            using var vault = Vault.Create(path, EnvStoreTests.MasterPassword);
+            using var vault = ClaimedVault.Create(path, EnvStoreTests.MasterPassword);
             vault.AddEntry(new VaultEntry { GroupPath = name.GroupPath, Title = name.Title, Password = "s3cret", Username = "İI" });
             vault.SetExpiryUnchecked(name, expires);
 
@@ -286,7 +286,7 @@ public sealed class CultureAgreementTests : IDisposable
 
         Under(reader, () =>
         {
-            using var vault = Vault.Open(path, EnvStoreTests.MasterPassword);
+            using var vault = ClaimedVault.Open(path, EnvStoreTests.MasterPassword);
             var entry = vault.Find(name);
             Assert.NotNull(entry);
             Assert.Equal("s3cret", entry.Password, StringComparer.Ordinal);

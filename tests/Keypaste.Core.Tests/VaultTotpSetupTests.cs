@@ -35,7 +35,7 @@ public sealed class VaultTotpSetupTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, _master);
+        using var reopened = ClaimedVault.Open(path, _master);
         using var spec = reopened.ReadTotp(_github, out var refusal);
 
         Assert.Equal($"otpauth://totp/GitHub?secret={_sha1Base32}&period=30&digits=6&issuer=GitHub", reopened.ReadField(_github, TotpSpec.OtpField));
@@ -191,7 +191,7 @@ public sealed class VaultTotpSetupTests : IDisposable
             vault.Save();
         }
 
-        using var reopened = Vault.Open(path, _master);
+        using var reopened = ClaimedVault.Open(path, _master);
         using var spec = reopened.ReadTotp(created, out _);
 
         Assert.Equal($"otpauth://totp/GitLab?secret={_sha1Base32}&period=30&digits=6&issuer=GitLab", reopened.ReadField(created, TotpSpec.OtpField));
@@ -226,7 +226,7 @@ public sealed class VaultTotpSetupTests : IDisposable
 
     private static Vault Seeded(string path)
     {
-        var vault = Vault.Create(path, _master);
+        var vault = ClaimedVault.Create(path, _master);
         vault.AddEntry(new VaultEntry { Title = _github.Title, GroupPath = _github.GroupPath, Username = "alice", Password = "login-password" });
         vault.Save();
         return vault;

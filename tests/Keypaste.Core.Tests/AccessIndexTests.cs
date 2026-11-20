@@ -211,7 +211,7 @@ public sealed class AccessIndexTests : IDisposable
 
     private IReadOnlyList<IndexedEntry> Index(params (VaultEntry Entry, string[] Tags)[] entries)
     {
-        using var vault = Vault.Create(Path.Combine(_directory, Guid.NewGuid().ToString("N") + ".kdbx"), _master);
+        using var vault = ClaimedVault.Create(Path.Combine(_directory, Guid.NewGuid().ToString("N") + ".kdbx"), _master);
 
         foreach (var (entry, tags) in entries)
         {

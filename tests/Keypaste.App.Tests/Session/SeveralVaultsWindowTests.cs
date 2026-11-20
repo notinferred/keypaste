@@ -7,6 +7,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.App.Tests.Session;
@@ -29,7 +30,7 @@ public sealed class SeveralVaultsWindowTests
             using var fixture = new TempVault();
             var acmePath = Path.Combine(fixture.Home, "acme.kdbx");
 
-            using (var created = Vault.Create(acmePath, TempVault.Password))
+            using (var created = ClaimedVault.Create(acmePath, TempVault.Password))
             {
                 created.AddEntry(new VaultEntry { Title = "github", Username = "maya@acme.dev", Password = "acme-gh-9Qe2" });
                 created.Save();

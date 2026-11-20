@@ -30,7 +30,7 @@ public sealed class VaultExportTests
         Assert.Equal(1, picker.ExportCalls);
         Assert.Equal(File.ReadAllBytes(fixture.Path_), File.ReadAllBytes(picker.ExportPath));
 
-        using var copy = Vault.Open(picker.ExportPath, TempVault.Password);
+        using var copy = ClaimedVault.Open(picker.ExportPath, TempVault.Password);
         Assert.Equal(TempVault.ExamplePassword, copy.Find("example")?.Password);
         Assert.Contains("elsewhere.kdbx", model.Message, StringComparison.Ordinal);
     }
