@@ -1,23 +1,22 @@
-using Keypaste.Core;
-
-namespace Keypaste.App.Session;
+namespace Keypaste.Core.Ownership;
 
 /// <summary>
 /// Watches one open vault's file for another program's save, such as a sync tool's, and merges it with the open copy
-/// within five seconds, whichever vault the window shows.
+/// within five seconds, for either approver.
 /// </summary>
 /// <remarks>
 /// It watches the vault's folder, not the file alone, because another program often saves by renaming a new file over it,
 /// and compares the file a moment after the last change it sees; a folder that cannot be watched leaves the five-second
-/// poll. A save keypaste refused is merged by the session itself, and a merge it refuses is left to the person's Reload.
+/// poll. A save the approver refused is merged by the approver itself, and a merge it refuses waits for the file to change.
 /// </remarks>
-internal sealed class VaultFileWatch : IDisposable
+public sealed class VaultFileWatch : IDisposable
 {
-    internal static readonly TimeSpan Poll = TimeSpan.FromSeconds(5);
+    /// <summary>How often the file is compared with the open copy, whatever the folder watch reports.</summary>
+    public static readonly TimeSpan Poll = TimeSpan.FromSeconds(5);
 
     private static readonly TimeSpan _settle = TimeSpan.FromMilliseconds(250);
 
-    private readonly AppVaultSession _session;
+    private readonly IWatchedVault _watched;
     private readonly Lock _gate = new();
     private readonly ITimer _poll;
     private readonly ITimer _settleTimer;
@@ -26,18 +25,18 @@ internal sealed class VaultFileWatch : IDisposable
     private bool _isMerging;
     private bool _disposed;
 
-    /// <param name="session">The vault's session, whose clock the poll and the settling run on.</param>
-    internal VaultFileWatch(AppVaultSession session)
+    /// <param name="watched">The approver's open vault, whose clock the poll and the settling run on.</param>
+    public VaultFileWatch(IWatchedVault watched)
     {
-        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(watched);
 
-        _session = session;
-        _poll = session.Clock.CreateTimer(_ => Check(), null, Poll, Poll);
-        _settleTimer = session.Clock.CreateTimer(_ => Check(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-        _session.Opened += OnOpened;
-        _session.Locked += OnLocked;
+        _watched = watched;
+        _poll = watched.Clock.CreateTimer(_ => Check(), null, Poll, Poll);
+        _settleTimer = watched.Clock.CreateTimer(_ => Check(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        _watched.Opened += OnOpened;
+        _watched.Locked += OnLocked;
 
-        if (_session.IsUnlocked)
+        if (_watched.Open is not null)
         {
             WatchFolder();
 
@@ -46,14 +45,14 @@ internal sealed class VaultFileWatch : IDisposable
         }
     }
 
-    /// <summary>The vault's session.</summary>
-    internal AppVaultSession Session => _session;
+    /// <summary>The vault watched.</summary>
+    public IWatchedVault Watched => _watched;
 
     /// <summary>Raised on whichever thread noticed it, when the file may hold another save or a merge started or finished.</summary>
-    internal event EventHandler? Changed;
+    public event EventHandler? Changed;
 
     /// <summary>Whether a merge of another program's save runs now.</summary>
-    internal bool IsMerging
+    public bool IsMerging
     {
         get
         {
@@ -65,7 +64,7 @@ internal sealed class VaultFileWatch : IDisposable
     }
 
     /// <summary>The merge the poll or the folder watch started, or a completed task when none runs.</summary>
-    internal Task Merging
+    public Task Merging
     {
         get
         {
@@ -76,10 +75,10 @@ internal sealed class VaultFileWatch : IDisposable
         }
     }
 
-    /// <summary>Compares the file with the open copy now, merging another program's save where the session merges.</summary>
-    internal void Check()
+    /// <summary>Compares the file with the open copy now, merging another program's save where the approver merges.</summary>
+    public void Check()
     {
-        if (_session.Unlocked is not { } vault)
+        if (_watched.Open is not { } vault)
         {
             return;
         }
@@ -95,7 +94,7 @@ internal sealed class VaultFileWatch : IDisposable
             return;
         }
 
-        if (state.Status == VaultSaveStatus.ChangedOnDisk && File.Exists(vault.Path) && _session.MergeRefusal() is null && _session.Merges)
+        if (state.Status == VaultSaveStatus.ChangedOnDisk && File.Exists(vault.Path) && _watched.MergesAnotherSave)
         {
             StartMerge();
         }
@@ -113,11 +112,11 @@ internal sealed class VaultFileWatch : IDisposable
             }
 
             _isMerging = true;
-            _merging = AppVaultSession.OnItsOwnThread(() =>
+            _merging = OnItsOwnThread(() =>
             {
                 try
                 {
-                    _session.Merge();
+                    _watched.MergeAnotherSave();
                 }
                 finally
                 {
@@ -134,9 +133,25 @@ internal sealed class VaultFileWatch : IDisposable
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>Runs <paramref name="work"/> on a thread of its own, which starts at once however busy the thread pool is.</summary>
+    /// <remarks>Not the pool's: a merge withdraws what agents wait for, which the pool delivers, so it must not first wait for the pool to start it.</remarks>
+    private static Task OnItsOwnThread(Action work)
+    {
+        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            work();
+            done.SetResult();
+        })
+        { IsBackground = true };
+
+        thread.Start();
+        return done.Task;
+    }
+
     private void OnOpened(object? sender, EventArgs e) => WatchFolder();
 
-    private void OnLocked(object? sender, VaultLockReason reason)
+    private void OnLocked(object? sender, EventArgs e)
     {
         lock (_gate)
         {
@@ -147,7 +162,7 @@ internal sealed class VaultFileWatch : IDisposable
 
     private void WatchFolder()
     {
-        if (_session.VaultPath is not { } path || Path.GetDirectoryName(Path.GetFullPath(path)) is not { Length: > 0 } folder)
+        if (_watched.Open?.Path is not { } path || Path.GetDirectoryName(Path.GetFullPath(path)) is not { Length: > 0 } folder)
         {
             return;
         }
@@ -204,6 +219,7 @@ internal sealed class VaultFileWatch : IDisposable
         }
     }
 
+    /// <inheritdoc/>
     public void Dispose()
     {
         lock (_gate)
@@ -218,8 +234,8 @@ internal sealed class VaultFileWatch : IDisposable
             _folder = null;
         }
 
-        _session.Opened -= OnOpened;
-        _session.Locked -= OnLocked;
+        _watched.Opened -= OnOpened;
+        _watched.Locked -= OnLocked;
         _poll.Dispose();
         _settleTimer.Dispose();
     }

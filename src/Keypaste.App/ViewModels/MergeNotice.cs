@@ -5,10 +5,10 @@ using Keypaste.Core.Approval;
 
 namespace Keypaste.App.ViewModels;
 
-/// <summary>What the shell says about a merge of another program's save: items and groups by name, never a value (D-0639).</summary>
+/// <summary>What the shell says about a merge of another program's save: items and groups by name, never a value.</summary>
 internal static class MergeNotice
 {
-    /// <summary>How many items a sentence names before it counts the rest, as D-0492's notice does.</summary>
+    /// <summary>How many items a sentence names before it counts the rest.</summary>
     private const int _named = 3;
 
     /// <summary>The notice after a merge that carried this copy's changes into another program's save and saved the result.</summary>
@@ -52,21 +52,10 @@ internal static class MergeNotice
     {
         ArgumentNullException.ThrowIfNull(refused);
 
-        return refused.Outcome switch
-        {
-            VaultMergeSaveOutcome.AnotherVault => "the file now holds another vault",
-            VaultMergeSaveOutcome.BelowKdbx4 =>
-                "the file uses an older KeePass format, which keypaste does not merge; choose the newer format in KeePassXC's database settings",
-            VaultMergeSaveOutcome.DuplicateUuids => "two items in one copy share an identity, which KeePass does not allow",
-            VaultMergeSaveOutcome.HardwareKeyUnanswered => "your hardware key did not answer; keypaste asks it again when you save or the file changes",
-            VaultMergeSaveOutcome.Unreadable => "the file could not be read, as while a program is still writing it; keypaste tries again when it changes",
-            VaultMergeSaveOutcome.ChangedAgain => "the file kept changing while keypaste merged it; keypaste tries again when it changes",
-            VaultMergeSaveOutcome.KeyRefused => "the password or key you unlocked with no longer opens the file",
-            _ => $"the merged vault could not be saved: {refused.Reason.TrimEnd('.')}",
-        };
+        return VaultMergeSave.Refusal(refused.Outcome, refused.Reason);
     }
 
-    /// <summary>The items the open copy had changed and the merge saved, as D-0492 names what a reload would discard.</summary>
+    /// <summary>The items the open copy had changed and the merge saved.</summary>
     private static string Carried(IReadOnlyList<EntryName> carried)
     {
         var items = carried.Where(name => !ReservedGroups.IsReserved(name.GroupPath)).ToList();

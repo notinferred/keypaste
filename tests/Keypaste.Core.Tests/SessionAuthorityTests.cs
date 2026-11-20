@@ -413,7 +413,7 @@ public sealed class SessionAuthorityTests : IDisposable
         Assert.Equal(AuditMethod.VaultChanged, listing.Refusal);
         Assert.Equal(1, _fixture.Channel.Asked);
         Assert.Equal(external, File.ReadAllBytes(VaultPath));
-        Assert.Contains(_fixture.Narration, line => line.Contains("restart keypaste approve", StringComparison.Ordinal));
+        Assert.Contains(_fixture.Narration, line => line.Contains("nothing is served until keypaste merges that save", StringComparison.Ordinal));
     }
 
     /// <summary>

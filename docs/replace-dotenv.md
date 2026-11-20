@@ -178,7 +178,7 @@ If you cannot recover access, rotate each credential at its provider.
 
 keypaste has no built-in sync. You can copy or synchronize the encrypted `.kdbx` with an existing file-sync service or a USB drive; keep the master password separate. A cloud vault synced end to end and a relay for team projects are planned and not yet built.
 
-The desktop app merges a save the sync tool delivers with the copy it holds open, keeping both machines' changes when they edited different fields of one item, and Recommendations offers a sync tool's conflicted copy for review and merge. The CLI and `keypaste approve` refuse to save over a file another program changed. Edit in one place at a time where you can, and let synchronization finish before switching machines.
+The desktop app merges a save the sync tool delivers with the copy it holds open, keeping both machines' changes when they edited different fields of one item, and Recommendations offers a sync tool's conflicted copy for review and merge. `keypaste approve` merges such a save the same way, and the CLI's other commands refuse to save over a file another program changed. Edit in one place at a time where you can, and let synchronization finish before switching machines.
 
 ### Can my teammate use the same vault?
 

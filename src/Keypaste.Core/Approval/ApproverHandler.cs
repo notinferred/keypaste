@@ -742,7 +742,7 @@ public sealed partial class ApproverHandler
     private string Stale(CredentialFailure failure, string what)
     {
         _narrate?.Invoke(failure == CredentialFailure.ChangedOnDisk
-            ? $"refused {what}: another program changed the vault file, so nothing is served from the copy unlocked here; restart keypaste approve to serve what the file holds now"
+            ? $"refused {what}: another program changed the vault file, so nothing is served until keypaste merges that save"
             : $"refused {what}: {Explain(failure)}");
 
         return Explain(failure);

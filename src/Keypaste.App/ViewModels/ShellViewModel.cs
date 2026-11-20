@@ -7,6 +7,7 @@ using Keypaste.Core;
 using Keypaste.Core.Editing;
 using Keypaste.Core.Linking;
 using Keypaste.Core.Login;
+using Keypaste.Core.Ownership;
 using Keypaste.Core.Sharing;
 
 namespace Keypaste.App.ViewModels;
@@ -1348,7 +1349,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (ReferenceEquals(watch.Session, ShownSession))
+        if (ReferenceEquals(watch.Watched, ShownSession))
         {
             ReadVaultStatus();
         }

@@ -148,6 +148,75 @@ public sealed class ApproveCommandTests : IDisposable
         Assert.NotNull(vault.Find(new EntryName("env/dev", "TOKEN")));
     }
 
+    /// <summary>
+    /// Another program's save of the vault <c>keypaste approve</c> holds is merged by its file watch, without a restart, and a
+    /// terminal's edit allowed afterwards is saved into the merged copy, the file holding both.
+    /// </summary>
+    [Fact]
+    public async Task AnotherProgramsSave_IsMergedWithoutARestart_AndALaterEditSavedWithIt()
+    {
+        await using var approver = await RunningApprover.StartAsync(_harness, _master, "y");
+
+        using (var other = Vault.Open(_harness.VaultPath, _master))
+        {
+            other.AddEntry(new VaultEntry { GroupPath = "env/dev", Title = "OTHER", Password = "other-program-value" });
+            other.Save();
+        }
+
+        await approver.WaitForAsync("keypaste: another program saved the vault; agents are answered from what it saved.");
+
+        using var terminal = Terminal(approver);
+        terminal.Prompt.Enqueue("approve-command-new-value");
+        terminal.AssertExit(CliApp.ExitSuccess, terminal.Run("set", "env/dev/TOKEN", "--vault", _harness.VaultPath));
+        await approver.StopAsync(terminal);
+
+        using var vault = Vault.Open(_harness.VaultPath, _master);
+        Assert.Equal("approve-command-new-value", vault.Find(new EntryName("env/dev", "TOKEN"))!.Password);
+        Assert.Equal("other-program-value", vault.Find(new EntryName("env/dev", "OTHER"))!.Password);
+        Assert.DoesNotContain("other-program-value", approver.Text, StringComparison.Ordinal);
+    }
+
+    /// <summary>A file that now holds another vault is not merged: the terminal says why, the approver keeps running, and the file is left as it is.</summary>
+    [Fact]
+    public async Task AnotherVaultMovedOverTheFile_IsRefusedInItsTerminal_AndLeftAsItIs()
+    {
+        await using var approver = await RunningApprover.StartAsync(_harness, _master);
+        var elsewhere = Path.Combine(_harness.Directory, "elsewhere.kdbx");
+
+        using (var other = Vault.Create(elsewhere, _master))
+        {
+            other.Save();
+        }
+
+        var moved = File.ReadAllBytes(elsewhere);
+        File.Move(elsewhere, _harness.VaultPath, overwrite: true);
+
+        await approver.WaitForAsync(
+            "keypaste: another program saved the vault, and keypaste could not merge it: the file now holds another vault. Agents are refused until keypaste can merge it or you restart keypaste approve.");
+
+        using var terminal = Terminal(approver);
+        await approver.StopAsync(terminal);
+        Assert.Equal(moved, File.ReadAllBytes(_harness.VaultPath));
+    }
+
+    /// <summary>A merge refused because the password or key file unlocked with no longer opens the file says so, and locks.</summary>
+    [Fact]
+    public void AMergeTheUnlocksKeyNoLongerOpens_SaysSoAndLocks()
+    {
+        using var stderr = new StringWriter();
+        var locked = false;
+
+        ApproveCommand.Merged(
+            new VaultMergeSave(VaultMergeSaveOutcome.KeyRefused, "The key no longer opens the file."),
+            new AgentConsole(stderr, interactive: false),
+            () => locked = true);
+
+        Assert.True(locked);
+        Assert.Equal(
+            "keypaste: another program saved the vault, and the password or key you unlocked with no longer opens the file. Locking the vault; run keypaste approve again to unlock it." + Environment.NewLine,
+            stderr.ToString());
+    }
+
     private CliHarness Terminal(RunningApprover approver)
     {
         var terminal = new CliHarness();
@@ -220,6 +289,17 @@ public sealed class ApproveCommandTests : IDisposable
 
             Assert.Contains("listening on", approver.Text, StringComparison.Ordinal);
             return approver;
+        }
+
+        /// <summary>Waits until it has printed <paramref name="line"/>.</summary>
+        internal async Task WaitForAsync(string line)
+        {
+            for (var waited = TimeSpan.Zero; waited < _wait && !Text.Contains(line, StringComparison.Ordinal); waited += TimeSpan.FromMilliseconds(100))
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(100), Token);
+            }
+
+            Assert.Contains(line, Text, StringComparison.Ordinal);
         }
 
         /// <summary>Locks it from a terminal, as a person would, and waits for it to stop.</summary>

@@ -424,10 +424,11 @@ internal static class ToolText
         saved, or the vault was reloaded or merged with another program's save while this call
         waited. Nothing was read or released.
 
-        Try once more in a moment: the keypaste desktop app merges another program's save by itself.
-        If you are refused again, ask the person you are working with to look at the notice in the
-        desktop app, which says why it could not merge and offers Reload, or to restart
-        `keypaste approve`, and then try again. This call was recorded in the audit log as denied.
+        Try once more in a moment: the keypaste desktop app and `keypaste approve` merge another
+        program's save by themselves. If you are refused again, ask the person you are working with to
+        read why keypaste could not merge it, in the desktop app's notice, which offers Reload, or in
+        the terminal running `keypaste approve`, and then try again. This call was recorded in the
+        audit log as denied.
         """;
 
     /// <summary>Why a call was refused when this server names no vault.</summary>

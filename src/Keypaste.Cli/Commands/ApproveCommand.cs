@@ -52,6 +52,9 @@ namespace Keypaste.Cli.Commands;
 /// </remarks>
 internal static class ApproveCommand
 {
+    /// <summary>The approver, as the line of a merge it saved records it.</summary>
+    internal const string Surface = "keypaste approve";
+
     private static readonly Option<string> _timeout = Syntax.Value(
         "--approval-timeout",
         "seconds",
@@ -148,40 +151,9 @@ internal static class ApproveCommand
 
         // The approver saves only what a person confirmed under the claim it holds, so no save here can
         // land under another owner.
-        AgentSave Save(Func<Vault, bool> edit)
-        {
-            try
-            {
-                if (!lifetime.IsLive)
-                {
-                    return new AgentSave(AgentSaveOutcome.Locked, "the vault is locked");
-                }
+        using var held = new HeldVault(vault, lifetime);
 
-                if (!edit(vault))
-                {
-                    return AgentSave.Unchanged;
-                }
-
-                vault.Save();
-                return AgentSave.Saved;
-            }
-            catch (VaultChangedOnDiskException)
-            {
-                return new AgentSave(
-                    AgentSaveOutcome.ChangedOnDisk,
-                    "another program changed the vault file since keypaste approve opened it; restart keypaste approve to read it again");
-            }
-            catch (VaultException ex)
-            {
-                return new AgentSave(AgentSaveOutcome.Failed, ex.Message);
-            }
-            catch (ObjectDisposedException)
-            {
-                return new AgentSave(AgentSaveOutcome.Locked, "the vault is locked");
-            }
-        }
-
-        var rules = new SealedAgentRules(rulesFile, () => lifetime.IsLive ? vault : null, Save, AgentRulesFile.Shared(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
+        var rules = new SealedAgentRules(rulesFile, () => held.Open, held.Save, AgentRulesFile.Shared(context.Environment.Get(KeypasteHome.EnvironmentVariable)));
         SessionServer server;
 
         try
@@ -193,7 +165,7 @@ internal static class ApproveCommand
                 Vault = claim.Vault,
                 Lifetime = lifetime,
                 CurrentLifetime = () => lifetime,
-                UnlockedFor = asked => ReferenceEquals(asked, lifetime) && asked.IsLive ? vault : null,
+                UnlockedFor = held.UnlockedFor,
                 Channel = new TerminalApprovalChannel(context.Prompt, console, limits.Window, TimeProvider.System),
                 Limits = limits,
                 Rules = rules,
@@ -206,7 +178,7 @@ internal static class ApproveCommand
                 Narrate = Narrate,
 
                 // A terminal's edit, once the person allows it here, is saved under the same claim.
-                WriteEdit = (asked, edit) => ReferenceEquals(asked, lifetime) ? Save(edit) : new AgentSave(AgentSaveOutcome.Locked, "the vault is locked"),
+                WriteEdit = (asked, edit) => ReferenceEquals(asked, lifetime) ? held.Save(edit) : new AgentSave(AgentSaveOutcome.Locked, "the vault is locked"),
 
                 // A browser pairs once the person here confirms the code it shows, for this computer.
                 BrowserPairings = new OwnerPairings(BrowserPairings.In(KeypasteHome.Resolve(context.Environment.Get(KeypasteHome.EnvironmentVariable)))),
@@ -221,6 +193,10 @@ internal static class ApproveCommand
 
         using (server)
         {
+            held.MergeThrough(server.Authority, Surface);
+            held.Merged += (_, merged) => Merged(merged, console, () => Stop(lifetime, stop));
+            using var watch = new VaultFileWatch(held);
+
             // A signal ends the lifetime and then stops the listener, rather than ending the
             // process, so a waiting request is answered as locked, the vault is disposed and the
             // nothing is abandoned mid-flight.
@@ -249,6 +225,64 @@ internal static class ApproveCommand
 
         console.WriteLine("keypaste: keypaste approve has stopped. The vault is locked.");
         return CliApp.ExitSuccess;
+    }
+
+    /// <summary>
+    /// Tells the person what a merge of another program's save came to, by name and never by value, and locks once the
+    /// password or key file unlocked with no longer opens the file.
+    /// </summary>
+    /// <param name="merged">What the merge came to.</param>
+    /// <param name="console">The person's terminal.</param>
+    /// <param name="lockNow">Ends the unlock and stops the listener.</param>
+    internal static void Merged(VaultMergeSave merged, AgentConsole console, Action lockNow)
+    {
+        ArgumentNullException.ThrowIfNull(merged);
+        ArgumentNullException.ThrowIfNull(console);
+        ArgumentNullException.ThrowIfNull(lockNow);
+
+        switch (merged.Outcome)
+        {
+            case VaultMergeSaveOutcome.Saved:
+                console.WriteLine("keypaste: another program saved the vault; keypaste merged it with the changes made here and saved it. Agents are answered from the merged copy.");
+                break;
+            case VaultMergeSaveOutcome.Updated:
+                console.WriteLine("keypaste: another program saved the vault; agents are answered from what it saved.");
+                break;
+            case VaultMergeSaveOutcome.Unchanged or VaultMergeSaveOutcome.Locked:
+                return;
+            case VaultMergeSaveOutcome.KeyRefused:
+                console.WriteLine($"keypaste: another program saved the vault, and {VaultMergeSave.Refusal(merged.Outcome, merged.Reason)}. Locking the vault; run keypaste approve again to unlock it.");
+                lockNow();
+                return;
+            default:
+                console.WriteLine($"keypaste: another program saved the vault, and keypaste could not merge it: {VaultMergeSave.Refusal(merged.Outcome, merged.Reason)}. Agents are refused until keypaste can merge it or you restart keypaste approve.");
+                return;
+        }
+
+        if (merged.Report is not { } report)
+        {
+            return;
+        }
+
+        foreach (var conflict in report.Conflicts)
+        {
+            console.WriteLine(conflict.OpenCopyCurrent
+                ? $"keypaste: both changed {ApprovalPrompt.Shown(conflict.Item)}; this copy's version is current and the other program's is in its history."
+                : $"keypaste: both changed {ApprovalPrompt.Shown(conflict.Item)}; the other program's version is current and this copy's is in its history.");
+        }
+
+        foreach (var combined in report.Combined)
+        {
+            console.WriteLine($"keypaste: both changed {ApprovalPrompt.Shown(combined)}; each change is kept, and where both changed one field the newer value is current and the other in its history.");
+        }
+
+        foreach (var kept in report.Kept)
+        {
+            var where = kept.Recycled ? "It is in Trash with" : "keypaste kept it with";
+            console.WriteLine(kept.DeletedInFile
+                ? $"keypaste: the other program deleted {ApprovalPrompt.Shown(kept.Item)} after it was changed here. {where} that change."
+                : $"keypaste: {ApprovalPrompt.Shown(kept.Item)} was deleted here after the other program changed it. {where} that change.");
+        }
     }
 
     /// <summary>Ends the lifetime, then stops the listener; a stop that arrives after the approver has gone does nothing.</summary>

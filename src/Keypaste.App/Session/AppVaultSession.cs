@@ -28,16 +28,16 @@ namespace Keypaste.App.Session;
 /// <para>
 /// <b>It holds the vault's claim while unlocked</b>, taken before the password is spent, so a vault
 /// another keypaste process holds is refused by name and never opened, and it mints a fresh
-/// <see cref="SessionId"/> for every unlock (D-0309).
+/// <see cref="SessionId"/> for every unlock.
 /// </para>
 /// <para>
 /// <b>Every lock ends the unlock's <see cref="SessionLifetime"/> first</b>, before the vault is
 /// disposed, whatever the reason: manual, idle, minimize, an access change, a replaced vault or
 /// shutdown. That one transition is what withdraws requests an agent has waiting
-/// (D-0313); a reload withdraws them too, keeping the lifetime (D-0412).
+///; a reload withdraws them too, keeping the lifetime.
 /// </para>
 /// <para>
-/// <b>Another program's save is merged through the owner serving the unlock</b> (D-0542, D-0622, D-0638). Every write, reload,
+/// <b>Another program's save is merged through the owner serving the unlock</b>. Every write, reload,
 /// access change and merge holds one edit gate, so an edit made during a merge waits and then applies by name to the
 /// merged copy, and a save refused because the file changed merges at once. A lock never waits for that gate.
 /// </para>
@@ -48,7 +48,7 @@ namespace Keypaste.App.Session;
 /// would have made the whole idle policy untestable.
 /// </para>
 /// </remarks>
-internal sealed class AppVaultSession : IDisposable, IIdleWatched
+internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
 {
     /// <summary>The shipped default, and what any unreadable setting falls back to.</summary>
     internal static readonly TimeSpan DefaultIdleTimeout = TimeSpan.FromMinutes(30);
@@ -123,7 +123,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched
     /// <summary>What reaches hardware keys, or null where none can be reached.</summary>
     internal IChallengeResponseDevice? HardwareKeys { get; }
 
-    /// <summary>The copies a quick unlock opens a locked vault from, or null where the app offers none (D-0550).</summary>
+    /// <summary>The copies a quick unlock opens a locked vault from, or null where the app offers none.</summary>
     internal QuickUnlockCopies? QuickUnlock { get; }
 
     /// <summary>What a refused quick unlock came to, when <see cref="TryResume"/> answered <see cref="UnlockOutcome.QuickUnlockRefused"/>.</summary>
@@ -135,7 +135,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched
     /// <summary>What opens the vault again under its new factors after an access change; <see cref="Vault.Open(string, ReadOnlySpan{char}, string?, HardwareKey?)"/> unless a test gives another.</summary>
     internal VaultOpener ReopenAfterAccessChange { get; init; } = Vault.Open;
 
-    /// <summary>Whether a lock for <paramref name="reason"/> leaves the vault's quick unlock copy, so it can be resumed without its password (D-0551).</summary>
+    /// <summary>Whether a lock for <paramref name="reason"/> leaves the vault's quick unlock copy, so it can be resumed without its password.</summary>
     /// <remarks>
     /// A person's own locks and the idle lock do. A lock another program asked for, a vault replaced, a key that
     /// changed and quitting force the full unlock.
@@ -216,7 +216,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched
     /// </summary>
     /// <remarks>
     /// Forwarded from whichever vault is open, so what agents were given from an entry is withdrawn
-    /// when it changes, and everything when the vault's access does (D-0318).
+    /// when it changes, and everything when the vault's access does.
     /// </remarks>
     internal event EventHandler<VaultEdit>? Edited;
 
@@ -226,7 +226,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched
 
     /// <summary>
     /// Merges another program's save for the owner serving one unlock, as <see cref="SessionAuthority.Merge(Vault, Func{Vault, bool}, string)"/>
-    /// does: withdrawing, merging and saving, recording a saved merge and handing the merged copy to <c>swap</c> (D-0622).
+    /// does: withdrawing, merging and saving, recording a saved merge and handing the merged copy to <c>swap</c>.
     /// </summary>
     internal delegate VaultMergeSave OwnerMerge(Vault open, Func<Vault, bool> swap);
 
@@ -292,8 +292,30 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched
         }
     }
 
+    TimeProvider IWatchedVault.Clock => _clock;
+
+    Vault? IWatchedVault.Open => Unlocked;
+
+    bool IWatchedVault.MergesAnotherSave => MergeRefusal() is null && Merges;
+
+    void IWatchedVault.MergeAnotherSave() => Merge();
+
+    event EventHandler? IWatchedVault.Opened
+    {
+        add => Opened += value;
+        remove => Opened -= value;
+    }
+
+    event EventHandler? IWatchedVault.Locked
+    {
+        add => LockedForWatch += value;
+        remove => LockedForWatch -= value;
+    }
+
+    private event EventHandler? LockedForWatch;
+
     /// <summary>The last merge's refusal, while the file still holds the bytes it refused; null otherwise.</summary>
-    /// <remarks>Hashes the file, as the status line's comparison does. The watch and the poll merge again only once this is null (D-0543).</remarks>
+    /// <remarks>Hashes the file, as the status line's comparison does. The watch and the poll merge again only once this is null.</remarks>
     internal MergeResult? MergeRefusal()
     {
         string? path;
@@ -561,7 +583,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched
             return UnlockOutcome.NotAKdbx;
         }
 
-        // A keyfile that is not there is said before the password is spent on it (D-0284).
+        // A keyfile that is not there is said before the password is spent on it.
         if (keyfilePath is not null && !VaultKeyfile.Inspect(keyfilePath).Accepted)
         {
             return UnlockOutcome.KeyfileUnusable;
@@ -631,13 +653,13 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched
     internal bool CanResume(string? path) =>
         QuickUnlock is { } copies && !string.IsNullOrEmpty(path) && copies.Has(VaultIdentity.Of(_home, path));
 
-    /// <summary>Opens a locked vault again from its quick unlock copy, once the person answers Windows Hello (D-0550).</summary>
+    /// <summary>Opens a locked vault again from its quick unlock copy, once the person answers Windows Hello.</summary>
     /// <param name="path">The <c>.kdbx</c> file.</param>
     /// <returns>What happened; <see cref="LastQuickUnlock"/> says why for <see cref="UnlockOutcome.QuickUnlockRefused"/>.</returns>
     /// <remarks>
     /// <para>
     /// The vault's claim is taken first, as an unlock takes it before the password is read, so a vault another process
-    /// holds is refused without asking anything and keeps its copy (D-0309).
+    /// holds is refused without asking anything and keeps its copy.
     /// </para>
     /// <para>
     /// The key is rebuilt from the copy's parts and the file opened as a password unlock opens it: the key derivation
@@ -721,7 +743,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched
 
     /// <summary>
     /// After a password unlock, asks the person through Windows Hello to keep this unlock's key parts sealed, so a lock
-    /// that allows it can be resumed without the password (D-0550).
+    /// that allows it can be resumed without the password.
     /// </summary>
     /// <returns>What came of it; <see cref="QuickUnlockOutcome.Unavailable"/> where the app offers no quick unlock.</returns>
     /// <remarks>
@@ -947,6 +969,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched
         if (replaced is { } reason)
         {
             Locked?.Invoke(this, reason);
+            LockedForWatch?.Invoke(this, EventArgs.Empty);
         }
 
         Opened?.Invoke(this, EventArgs.Empty);
@@ -1055,7 +1078,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched
     /// the file from disk with it and the session's keyfile, before anything is written.
     /// </para>
     /// <para>
-    /// A vault whose access changed refuses every later write until it is reopened (D-0293), so the
+    /// A vault whose access changed refuses every later write until it is reopened, so the
     /// session opens it again under the new factors and swaps it in without reporting a lock: the
     /// person stays where they were, as in KeePassXC. If that reopen fails the session locks instead,
     /// with <see cref="VaultLockReason.AccessChanged"/>.
@@ -1190,9 +1213,9 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched
     /// <remarks>
     /// <para>
     /// A save refused because another program saved the file merges that save with the open vault, which holds the
-    /// edit, and is answered as saved once the merged copy is (D-0542). A save that fails otherwise, or whose merge
+    /// edit, and is answered as saved once the merged copy is. A save that fails otherwise, or whose merge
     /// is refused, leaves the edit in the open vault, as the change the titlebar reports unsaved and a reload
-    /// discards (D-0412). A caller whose edit must not reach a later save undoes it when
+    /// discards. A caller whose edit must not reach a later save undoes it when
     /// <see cref="WriteResult{T}.Unwritten"/> is set.
     /// </para>
     /// <para>
@@ -1214,13 +1237,13 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched
     {
         ArgumentNullException.ThrowIfNull(lifetime);
 
-        // A connection's write: a lock stops the endpoint, which waits for this very connection to end (D-0392).
+        // A connection's write: a lock stops the endpoint, which waits for this very connection to end.
         return WriteMerging(() => UnlockedFor(lifetime) is { } vault ? (vault, lifetime.Ended) : null, edit, changed, lockApart: true);
     }
 
     /// <summary>
     /// Runs an edit that saves for itself, through the save <see cref="Write{T}(Func{Vault, T}, Func{T, bool})"/> makes,
-    /// so it can take itself back out of the open vault when that save fails, as an export's import does (D-0567).
+    /// so it can take itself back out of the open vault when that save fails, as an export's import does.
     /// </summary>
     /// <typeparam name="T">What the edit returns.</typeparam>
     /// <param name="edit">The edit, given the open vault and the save to call once it has changed it.</param>
@@ -1358,12 +1381,12 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched
     /// <returns>What happened.</returns>
     /// <remarks>
     /// <para>
-    /// For a person told that another program saved the vault (D-0412). The file is opened with the
+    /// For a person told that another program saved the vault. The file is opened with the
     /// key this unlock holds, so nothing is asked again except a hardware key's touch. The lifetime
     /// stays, so connected agents are not cut off, and what they have waiting is withdrawn, as after an
-    /// access change (D-0318), with every request still waiting on a person, as a lock withdraws them,
+    /// access change, with every request still waiting on a person, as a lock withdraws them,
     /// so an agent asks again. A change the open copy holds that no save wrote is discarded; nothing
-    /// is merged. The app offers it only once a merge was refused (D-0543).
+    /// is merged. The app offers it only once a merge was refused.
     /// </para>
     /// <para>
     /// When the key no longer opens the file, another program changed what unlocks it, and the
@@ -1440,10 +1463,10 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched
             : new ReloadResult(ReloadOutcome.Locked);
     }
 
-    /// <summary>Merges another program's save with the open vault, as the folder watch's settle and the poll ask (D-0542).</summary>
+    /// <summary>Merges another program's save with the open vault, as the folder watch's settle and the poll ask.</summary>
     /// <returns>
     /// What became of it, or the standing refusal when the file still holds the bytes the last merge refused, which is not
-    /// tried again until it changes (D-0543); null when nothing serving this unlock merges, it is locked, or the file holds
+    /// tried again until it changes; null when nothing serving this unlock merges, it is locked, or the file holds
     /// what the open vault last read or wrote.
     /// </returns>
     /// <remarks>
@@ -1546,7 +1569,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched
         return new Merging(result, Attempted: true, KeyRefused: merged.Outcome == VaultMergeSaveOutcome.KeyRefused);
     }
 
-    /// <summary>Says what a merge came to, then locks when the unlock's key no longer opens the file (D-0543). Called outside the edit gate.</summary>
+    /// <summary>Says what a merge came to, then locks when the unlock's key no longer opens the file. Called outside the edit gate.</summary>
     /// <param name="merging">What the merge came to.</param>
     /// <param name="lockApart">Whether to lock on a thread of its own and return at once, for a caller the lock waits for.</param>
     private void Finish(Merging merging, bool lockApart = false)
@@ -1752,12 +1775,13 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched
         if (locked)
         {
             Locked?.Invoke(this, reason);
+            LockedForWatch?.Invoke(this, EventArgs.Empty);
         }
     }
 
     /// <summary>Locks as <see cref="Lock(VaultLockReason)"/> does, on a thread of its own, for a person's lock asked on the UI thread.</summary>
     /// <param name="reason">Why.</param>
-    /// <returns>Completes once that lock has returned, so its endpoint has stopped (D-0392) while the window kept painting.</returns>
+    /// <returns>Completes once that lock has returned, so its endpoint has stopped while the window kept painting.</returns>
     internal Task LockAsync(VaultLockReason reason) => OnItsOwnThread(() => Lock(reason));
 
     /// <summary>Runs <paramref name="work"/> on a thread of its own, which starts at once however busy the thread pool is.</summary>

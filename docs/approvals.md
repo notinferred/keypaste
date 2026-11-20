@@ -169,7 +169,7 @@ A call is refused when its line cannot be written. The log is never rotated or t
 | `no-session` | The request did not reach the current unlock of the vault's holder: no vault named or chosen, another vault answered, or the vault was locked or unlocked again in between. |
 | `vault-locked` | The vault was locked, or locked while the request waited. |
 | `vault-changed` | The holder's copy no longer matched the file, because another program saved it, a change was still being saved, or the vault was reloaded or merged while the request waited. Nothing was read. |
-| `merged` | On a `vault_merge` line: the app merged another program's save with its own changes, naming the items both changed, never a value. |
+| `merged` | On a `vault_merge` line: the app or `keypaste approve` merged another program's save with its own changes, naming the items both changed, never a value. |
 | `timed-out` / `cancelled` | Nobody answered in time / the client stopped waiting, or a lock or reload took a confirmation down. |
 | `busy` / `cooldown` | Too many requests already waiting / the same field was refused a moment ago. |
 | `undeliverable` | Authorized, but too large to send in one reply. Nothing was released. |
@@ -246,7 +246,7 @@ The next record starts a new file, and the archive still verifies with `keypaste
 
 ## Limits
 
-`keypaste approve` keeps the vault unlocked while it runs and has no idle lock; stop it to lock. It serves the vault as it was when unlocked, and once another program changes the file it refuses every request as `vault-changed` until you restart it. Locking the desktop app does not stop a terminal approver holding another vault.
+`keypaste approve` keeps the vault unlocked while it runs and has no idle lock; stop it to lock. Once another program saves the file, it refuses requests as `vault-changed` until it has merged that save, within five seconds, and says in its terminal what the merge did. A save it cannot merge, such as a file that now holds another vault, keeps requests refused until the file changes again or you restart it, and a file the password or key file you unlocked with no longer opens stops it. Locking the desktop app does not stop a terminal approver holding another vault.
 
 keypaste keeps no released value between requests, but it cannot erase what the client, its transcripts or a launched process kept, and stopping the approver revokes nothing at the credential's provider. [SECURITY](../SECURITY.md) and [THREATS](../THREATS.md) set out these boundaries.
 

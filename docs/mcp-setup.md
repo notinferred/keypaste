@@ -176,7 +176,7 @@ You should get two JSON lines back, the second listing `list_entry_names`, `find
 
 - **Startup fails.** Check that the executable path is absolute, the file is executable (`chmod +x`) and `~/.keypaste` is writable. `keypaste doctor` reports the vault, the process holding it and each AI tool's registration.
 - **"Nothing holds this vault unlocked."** Unlock the vault in the app, or start `keypaste approve --vault <path>` for the vault the bridge names. If one is running, check that both use the same `--approver` or `KEYPASTE_APPROVER`.
-- **The vault is locked, or `vault-changed`.** The holder locked, or another program saved the file. The app merges that save and answers again; `keypaste approve` needs a restart.
+- **The vault is locked, or `vault-changed`.** The holder locked, or another program saved the file. The app or `keypaste approve` merges that save and answers again.
 - **Nothing in the audit log.** Confirm the client called a tool, then check `KEYPASTE_HOME`: the app or `keypaste approve` writes in its own home, and `--audit-log` moves only the bridge's lines. The client's MCP server log shows keypaste's stderr.
 - **Protocol errors.** Look for wrappers or shell profiles that print to stdout, which a stdio MCP server reserves for protocol messages.
 - **An old command is refused.** `keypaste agent`, `keypaste mcp serve`, `keypaste mcp setup` and `keypaste mcp policy` are refused in the 1.0.0 build, each naming the command that replaced it, and `keypaste doctor` flags a client still registered to start `keypaste-mcp`.

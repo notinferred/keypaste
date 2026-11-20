@@ -1,3 +1,9 @@
+using System.Security.Cryptography;
+using Keypaste.Core.Agents;
+using Keypaste.Core.Approval;
+using Keypaste.Core.Audit;
+using Keypaste.Core.Ipc;
+using Keypaste.Core.Ownership;
 using Keypaste.Core.Tokens;
 using Xunit;
 
@@ -178,6 +184,66 @@ public sealed class MergeTests
         Assert.Empty(new TokenStore(merged).List());
     }
 
+    /// <summary>
+    /// G9: <c>keypaste approve</c> narrows an agent, then a sync tool moves an older copy KeePassXC saved over the file, and its watch
+    /// merges it: the narrowing holds, its count of rule changes current with the older record in history, and KeePassXC's edit kept.
+    /// </summary>
+    [Fact]
+    public async Task An_older_KeePassXC_copy_moved_over_the_file_keeps_an_agent_keypaste_approve_narrowed_narrowed()
+    {
+        using var file = Seeded();
+        var older = Path.Combine(file.Directory_, "older.kdbx");
+        await using var approver = HeldApprover.Start(file);
+
+        Assert.True(approver.Narrow(FieldCategory.CustomField, CategoryRule.Ask, out var said), said);
+        File.Copy(file.Path_, older);
+        Edit(older, "work/github", "-u", "kpxc-user");
+        Thread.Sleep(_pastAnEditsStamp);
+        Assert.True(approver.Narrow(FieldCategory.Password, CategoryRule.Block, out said), said);
+
+        File.Move(older, file.Path_, overwrite: true);
+        var merged = await approver.MergeAsync();
+
+        Assert.Equal(VaultMergeSaveOutcome.Saved, merged.Outcome);
+        Assert.True(approver.Rules.TryRead(out var rules, out var problem), problem);
+        Assert.Equal(CategoryRule.Block, rules.RuleFor(ApproverFixture.Agent, FieldCategory.Password));
+        var blocked = await approver.RequestAsync(_stripe);
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Blocked), (blocked!.Decision, blocked.Method));
+
+        file.AssertKdbx4();
+        var count = KeePassXcCli.Export(file.Path_).Descendants("Entry")
+            .Single(entry => KeePassXcVault.StringValue(entry, "Title")?.StartsWith(SealedAgentRules.KeyTitle + "-", StringComparison.Ordinal) == true
+                && entry.Parent?.Name.LocalName == "Group");
+        Assert.Equal("2", KeePassXcVault.StringValue(count, SealedAgentRules.CountField));
+        Assert.Contains("1", count.Element("History")!.Elements("Entry").Select(version => KeePassXcVault.StringValue(version, SealedAgentRules.CountField)));
+        Assert.Equal(["kpxc-user"], KeePassXcCli.Show(file.Path_, "work/github", "UserName"));
+    }
+
+    /// <summary>
+    /// G10: KeePassXC saves while <c>keypaste approve</c> serves a bridge: the next request is refused as <c>vault-changed</c>, and once its
+    /// watch merges the save the one after is served from the merged copy, asked again, in the same session.
+    /// </summary>
+    [Fact]
+    public async Task KeePassXCs_save_while_keypaste_approve_serves_is_refused_then_served_merged_in_the_same_session()
+    {
+        using var file = Seeded();
+        await using var approver = HeldApprover.Start(file);
+        Assert.Equal("stripe-0", (await approver.RequestAsync(_stripe))!.Value);
+
+        EditPassword(file, "work/stripe", "kpxc-value");
+        var refused = await approver.RequestAsync(_stripe);
+        var merged = await approver.MergeAsync();
+        var served = await approver.RequestAsync(_stripe);
+
+        Assert.Equal((AuditDecision.Denied, AuditMethod.VaultChanged), (refused!.Decision, refused.Method));
+        Assert.Null(refused.Value);
+        Assert.Equal(VaultMergeSaveOutcome.Updated, merged.Outcome);
+        Assert.Equal((AuditDecision.Granted, AuditMethod.Prompt), (served!.Decision, served.Method));
+        Assert.Equal("kpxc-value", served.Value);
+        Assert.Equal(HeldApprover.Session, served.Session);
+        Assert.Equal(2, approver.Asked);
+    }
+
     private static KeePassXcVault Seeded()
     {
         var file = new KeePassXcVault();
@@ -191,7 +257,9 @@ public sealed class MergeTests
     private static void Update(Vault vault, EntryName name, string password) =>
         Assert.True(vault.UpdateEntry(name, new VaultEntry { GroupPath = name.GroupPath, Title = name.Title, Username = "user", Password = password }));
 
-    private static void Edit(KeePassXcVault file, string entry, params string[] change) => KeePassXcCli.Run("edit", file.Path_, [.. change, entry]);
+    private static void Edit(KeePassXcVault file, string entry, params string[] change) => Edit(file.Path_, entry, change);
+
+    private static void Edit(string vault, string entry, params string[] change) => KeePassXcCli.Run("edit", vault, [.. change, entry]);
 
     // keepassxc-cli reads the vault's password, then the new one twice.
     private static void EditPassword(KeePassXcVault file, string entry, string password) =>
@@ -232,5 +300,122 @@ public sealed class MergeTests
     {
         var entry = KeePassXcCli.Export(file.Path_).Descendants("Entry").First(e => KeePassXcVault.StringValue(e, "Title") == title);
         return entry.Element("History")?.Descendants("Value").Select(v => v.Value).ToHashSet() ?? [];
+    }
+    /// <summary>
+    /// <c>keypaste approve</c>'s owner as it composes one: the vault it holds, its sealed agent settings, its server on a pipe of its
+    /// own and its file watch, on a clock the test moves so the watch merges when the test says.
+    /// </summary>
+    private sealed class HeldApprover : IAsyncDisposable
+    {
+        internal const string Session = "session-one";
+
+        private static readonly TimeSpan _wait = TimeSpan.FromSeconds(30);
+
+        private readonly SessionLifetime _lifetime = new(Session);
+        private readonly ManualClock _clock = new();
+        private readonly FakeChannel _channel = new() { Answer = ApprovalAnswer.ApprovedOnce };
+        private readonly CancellationTokenSource _stop = new();
+        private readonly OwnerLog _log;
+        private readonly HeldVault _held;
+        private readonly SessionServer _server;
+        private readonly VaultFileWatch _watch;
+        private readonly Task _running;
+        private readonly string _pipe = "keypaste-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
+        private readonly string _vault;
+        private ApproverClient? _client;
+
+        private HeldApprover(KeePassXcVault file)
+        {
+            _vault = file.Path_;
+            _log = new OwnerLog(file.Directory_);
+            // The held vault owns the copy it is given and disposes whichever copy it ends with.
+#pragma warning disable CA2000
+            _held = new HeldVault(file.Open(), _lifetime, _clock);
+#pragma warning restore CA2000
+            var identity = VaultIdentity.Of(file.Directory_, file.Path_);
+            Rules = new SealedAgentRules(AgentRulesFile.For(file.Directory_, identity), () => _held.Open, _held.Save);
+            _server = SessionServer.Listen(_pipe, new SessionServerOptions
+            {
+                Vault = identity,
+                Lifetime = _lifetime,
+                CurrentLifetime = () => _lifetime,
+                UnlockedFor = _held.UnlockedFor,
+                Channel = _channel,
+                Rules = Rules,
+                Audit = () => _log.Log,
+            });
+            _held.MergeThrough(_server.Authority, "keypaste approve");
+            _watch = new VaultFileWatch(_held);
+            _running = _server.RunAsync(_stop.Token);
+        }
+
+        internal SealedAgentRules Rules { get; }
+
+        internal int Asked => _channel.Asked;
+
+        internal static HeldApprover Start(KeePassXcVault file) => new(file);
+
+        /// <summary>Narrows the agent's rule for a category, as <c>keypaste clients</c> asks the approver to.</summary>
+        internal bool Narrow(FieldCategory category, CategoryRule rule, out string said) =>
+            _server.Authority.ChangeRules(ApproverFixture.Agent, rules => rules.Narrowing(ApproverFixture.Agent, category, rule), RequestRecords.RulesClient, out said).Changed;
+
+        /// <summary>Moves the clock past the watch's poll and waits for the merge it starts.</summary>
+        internal async Task<VaultMergeSave> MergeAsync()
+        {
+            var merged = new TaskCompletionSource<VaultMergeSave>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _held.Merged += (_, result) => merged.TrySetResult(result);
+            _clock.Advance(VaultFileWatch.Poll);
+            return await merged.Task.WaitAsync(_wait, Token);
+        }
+
+        internal async Task<CredentialReply?> RequestAsync(EntryName entry)
+        {
+            if (_client is null)
+            {
+                _client = await ApproverClient.TryConnectAsync(_pipe, _wait, Token);
+                Assert.NotNull(_client);
+                Assert.True((await _client.AttachAsync(new AttachRequest(_vault), Token))?.Attached);
+            }
+
+            return await _client.RequestAsync(new CredentialRequest
+            {
+                Entry = $"{entry.GroupPath}/{entry.Title}",
+                Field = "password",
+                Reason = "deploy billing",
+                Exposure = ["work/**"],
+                ClientLabel = ApproverFixture.Agent,
+                Vault = _vault,
+                Session = Session,
+            }, Token);
+        }
+
+        private static CancellationToken Token => TestContext.Current.CancellationToken;
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_client is not null)
+            {
+                await _client.DisposeAsync();
+            }
+
+            _lifetime.End();
+            await _stop.CancelAsync();
+
+            try
+            {
+                await _running;
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
+            {
+                // Tearing the listener down is how it stops.
+            }
+
+            _watch.Dispose();
+            _server.Dispose();
+            _held.Dispose();
+            _log.Dispose();
+            _lifetime.Dispose();
+            _stop.Dispose();
+        }
     }
 }

@@ -72,6 +72,22 @@ public sealed record VaultMergeSave(VaultMergeSaveOutcome Outcome, string Reason
 
     /// <summary>Whether the owner's audit line of a merge it saved was written.</summary>
     public bool Recorded { get; init; }
+
+    /// <summary>Why keypaste did not merge another program's save, as a clause either owner says it in.</summary>
+    /// <param name="outcome">What became of the merge, one that left no merged copy.</param>
+    /// <param name="reason">Why the merged copy could not be saved, for an outcome the clause has no words of its own for.</param>
+    public static string Refusal(VaultMergeSaveOutcome outcome, string reason) => outcome switch
+    {
+        VaultMergeSaveOutcome.AnotherVault => "the file now holds another vault",
+        VaultMergeSaveOutcome.BelowKdbx4 =>
+            "the file uses an older KeePass format, which keypaste does not merge; choose the newer format in KeePassXC's database settings",
+        VaultMergeSaveOutcome.DuplicateUuids => "two items in one copy share an identity, which KeePass does not allow",
+        VaultMergeSaveOutcome.HardwareKeyUnanswered => "your hardware key did not answer; keypaste asks it again when you save or the file changes",
+        VaultMergeSaveOutcome.Unreadable => "the file could not be read, as while a program is still writing it; keypaste tries again when it changes",
+        VaultMergeSaveOutcome.ChangedAgain => "the file kept changing while keypaste merged it; keypaste tries again when it changes",
+        VaultMergeSaveOutcome.KeyRefused => "the password or key you unlocked with no longer opens the file",
+        _ => $"the merged vault could not be saved: {reason?.TrimEnd('.')}",
+    };
 }
 
 /// <summary>What a merge of the open vault with another program's save did, by name and never by value, for the notice and the audit line.</summary>

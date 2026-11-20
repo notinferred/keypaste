@@ -18,12 +18,12 @@ namespace Keypaste.Cli.Tests;
 /// </para>
 /// <para>
 /// A save is a call that writes the vault file: <c>Save</c>, <c>ChangeAccess</c>, and the share service's
-/// <c>CreateAsync</c> and <c>RevokeAsync</c>, which save the links' records.
+/// <c>CreateAsync</c> and <c>RevokeAsync</c>, which save the links' records, and a <c>HeldVault</c> made, through which <c>keypaste approve</c> saves.
 /// </para>
 /// </remarks>
 public sealed class SavingVerbSourceRulesTests
 {
-    private static readonly string[] _saves = [".Save()", ".ChangeAccess(", ".CreateAsync(", ".RevokeAsync("];
+    private static readonly string[] _saves = [".Save()", ".ChangeAccess(", ".CreateAsync(", ".RevokeAsync(", "new HeldVault("];
 
     private static readonly Regex _opens = new(@"VaultSession\.(Open|OpenThen|OpenHeld)\s*(?:<[^>()]*>)?\s*\(", RegexOptions.Compiled);
 
