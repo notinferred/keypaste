@@ -61,6 +61,37 @@ public static class ItemReminderCheck
 
         return reminders;
     }
+
+    /// <summary>The first moment after now at which an item's expiry passes or comes within the reminder days, when the findings of both checks change with no edit.</summary>
+    /// <param name="vault">The unlocked vault.</param>
+    /// <param name="now">The time the last check compared expiries with.</param>
+    /// <param name="expiryDays">How many days before its expiry an item is listed; 0 lists none.</param>
+    /// <returns>That moment, or null when no item reported on has an expiry still to come.</returns>
+    public static DateTimeOffset? NextChange(Vault vault, DateTimeOffset now, int expiryDays)
+    {
+        ArgumentNullException.ThrowIfNull(vault);
+        ArgumentOutOfRangeException.ThrowIfNegative(expiryDays);
+
+        DateTimeOffset? next = null;
+
+        foreach (var item in vault.ReadReminderFacts())
+        {
+            if (item.Excluded || item.Expires is not { } expires || expires <= now)
+            {
+                continue;
+            }
+
+            var listed = expires.AddDays(-expiryDays);
+            var change = expiryDays > 0 && listed > now ? listed : expires;
+
+            if (next is null || change < next)
+            {
+                next = change;
+            }
+        }
+
+        return next;
+    }
 }
 
 /// <summary>One live item's expiry, URL, kind and needs-update tag, as the reminder check reads them.</summary>

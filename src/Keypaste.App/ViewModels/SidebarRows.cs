@@ -194,6 +194,9 @@ internal sealed record PlaceRow(VaultSection? Vault, ItemPlace Place, string Cou
     /// <summary>Whether it is drawn at the sidebar's top level rather than under a vault.</summary>
     internal bool IsTop => Vault is null;
 
+    /// <summary>The row's automation id, which no language changes: Place&lt;place&gt; under a vault, All&lt;place&gt; above them.</summary>
+    internal string AutomationId => $"{(IsTop ? "All" : "Place")}{Place}";
+
     /// <summary>The row's name for a screen reader, which reads a list item by its content's text.</summary>
     public override string ToString() => Count.Length > 0 ? $"{Title}, {Count}" : Title;
 }

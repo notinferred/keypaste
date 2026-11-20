@@ -35,6 +35,7 @@ internal interface ISecretPrompt
     /// <param name="prompt">The choice line as it should read now; called again for each redraw.</param>
     /// <param name="choices">The lowercase keys that choose something other than no.</param>
     /// <param name="cancellationToken">Stops waiting for a key.</param>
-    /// <returns>The chosen key, <c>'d'</c> for a deny key or anything else a line said, or null at end of input or cancellation.</returns>
+    /// <returns>The chosen key, <c>'d'</c> for a deny key or anything else a line said, or null at end of input.</returns>
+    /// <exception cref="OperationCanceledException">The question was withdrawn while waiting for a key.</exception>
     char? ReadChoice(Func<string> prompt, string choices, CancellationToken cancellationToken);
 }

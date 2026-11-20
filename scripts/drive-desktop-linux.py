@@ -22,6 +22,7 @@ gi.require_version("Atspi", "2.0")
 from gi.repository import Atspi, GLib  # noqa: E402
 
 MAIN = "keypaste"
+POPUP = "PopupRoot"
 TITLE = os.environ.get("DRIVE_WINDOW") or MAIN
 POLL = 0.05
 
@@ -97,6 +98,18 @@ def window():
     return None
 
 
+def window_and_popups():
+    """The window, then each menu or flyout its application has open: AT-SPI lists a popup as a frame of its own beside
+    the window, which Avalonia names by its class, where UI Automation lists it under the window."""
+    frame = window()
+    if frame is None:
+        return
+    yield frame
+    for other in children(frame.get_application()):
+        if name_of(other) == POPUP and state(other, Atspi.StateType.SHOWING):
+            yield other
+
+
 def descendants(root, depth=0):
     if root is None or depth > 80:
         return
@@ -123,11 +136,11 @@ def automation_id(element):
 
 
 def named(locator, predicate=lambda e: True):
-    """A name, or id:<automation id>, either with [n] for the nth match in tree order, among what the window shows:
-    Avalonia lists only what it shows, and Qt lists a wizard's or a stack's hidden pages too."""
+    """A name, or id:<automation id>, either with [n] for the nth match in tree order, among what the window and its
+    popups show: Avalonia lists only what it shows, and Qt lists a wizard's or a stack's hidden pages too."""
     kind, wanted, index = parse(locator)
     seen = 0
-    for element in descendants(window()):
+    for element in (found for root in window_and_popups() for found in descendants(root)):
         value = automation_id(element) if kind == "id" else name_of(element)
         if value == wanted and state(element, Atspi.StateType.SHOWING) and predicate(element):
             seen += 1
@@ -250,6 +263,16 @@ def centre(element):
     return box.x + box.width // 2, box.y + box.height // 2
 
 
+def action_index(element, wanted):
+    """The index of the element's action named <wanted>, or None."""
+    if not has(element, "Action"):
+        return None
+    for i in range(Atspi.Action.get_n_actions(element)):
+        if Atspi.Action.get_action_name(element, i) == wanted:
+            return i
+    return None
+
+
 def pressable(locator, what):
     """A control with an action once it is enabled, as a person waits for a button that is armed a moment late."""
     element = located(locator, lambda e: has(e, "Action"), what=what)
@@ -353,8 +376,16 @@ def act(action, args):
             raise Refused(f"'{args[0]}' is not inside a list item")
         parent = item.get_parent()
         index = item.get_index_in_parent()
-        if not has(parent, "Selection") or not Atspi.Selection.select_child(parent, index):
+        # By the item's own Select where it has one: Avalonia's list may order its children for the tree and for
+        # select_child differently once its rows have been re-sorted.
+        select = action_index(item, "select")
+        if select is not None:
+            if not Atspi.Action.do_action(item, select):
+                raise Refused(f"the item holding '{args[0]}' refused its Select")
+        elif not has(parent, "Selection") or not Atspi.Selection.select_child(parent, index):
             raise Refused(f"the list holding '{args[0]}' refused the selection")
+        if until(5, lambda: True if state(item, Atspi.StateType.SELECTED) else None) is None:
+            raise Refused(f"the item holding '{args[0]}' was not selected")
         return f"selected '{args[0]}'\nitem {index + 1} of {listed(parent)}"
 
     if action == "select-nth":

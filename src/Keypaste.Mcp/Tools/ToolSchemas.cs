@@ -156,6 +156,7 @@ internal static class ToolSchemas
         """;
 
     /// <summary>The four arguments the build prompt specifies for <c>request_credential</c>.</summary>
+    /// <remarks><c>field</c> refuses the names <c>CredentialRequestRules.Check</c> refuses, with no lookahead, which clients using RE2 cannot compile.</remarks>
     internal const string CredentialInputJson = """
         {
           "type": "object",
@@ -170,6 +171,18 @@ internal static class ToolSchemas
               "type": "string",
               "minLength": 1,
               "maxLength": 128,
+              "anyOf": [
+                { "enum": ["password", "username", "url", "notes", "totp"] },
+                {
+                  "not": {
+                    "anyOf": [
+                      { "pattern": "^([Tt][Ii][Tt][Ll][Ee]|[Uu][Ss][Ee][Rr][Nn][Aa][Mm][Ee]|[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Uu][Rr][Ll]|[Nn][Oo][Tt][Ee][Ss])$" },
+                      { "enum": ["otp", "TOTP Seed", "TOTP Settings", "attachment"] },
+                      { "pattern": "^TimeOtp-" }
+                    ]
+                  }
+                }
+              ],
               "description": "Which single field to release: password, username, url or notes; totp for the item's current TOTP code, never its seed; or the exact name of one of the item's custom fields, as list_entry_names gives it, such as OPENAI_API_KEY. Never more than one."
             },
             "vault": {

@@ -156,7 +156,7 @@
                         <TextBlock Classes="caption" Classes.mono="{Binding HasSeveralKeys}" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" />
                       </StackPanel>
                       <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                        <Button Classes="sm" Content="{x:Static res:Strings.MoveToFields}" AutomationProperties.Name="{Binding Entry, StringFormat={x:Static res:Strings.MoveTheKeysOfValueToFields}}" IsVisible="{Binding NeedsReview}" Command="{Binding MoveCommand}" />
+                        <Button Classes="sm" Content="{x:Static res:Strings.MoveToFields}" AutomationProperties.AutomationId="{Binding Entry, StringFormat='MoveToFields:{0}'}" AutomationProperties.Name="{Binding Entry, StringFormat={x:Static res:Strings.MoveTheKeysOfValueToFields}}" IsVisible="{Binding NeedsReview}" Command="{Binding MoveCommand}" />
                         <Button Classes="sm" Content="{x:Static res:Strings.MoveToStage}" AutomationProperties.Name="{Binding Entry, StringFormat={x:Static res:Strings.MoveTheKeysOfValueToAStage}}" IsVisible="{Binding NeedsReview}" Command="{Binding AskMoveToStageCommand}" />
                         <Button Classes="sm ghost on-point" Content="{x:Static res:Strings.Dismiss}" AutomationProperties.Name="{Binding Entry, StringFormat={x:Static res:Strings.DismissValue}}" IsVisible="{Binding NeedsReview}" Command="{Binding DismissCommand}" />
                         <Button Classes="sm ghost" Content="{x:Static res:Strings.ReviewAgain}" AutomationProperties.Name="{Binding Entry, StringFormat={x:Static res:Strings.ReviewValueAgain}}" IsVisible="{Binding IsDismissed}" Command="{Binding ReviewAgainCommand}" />

@@ -544,14 +544,14 @@
                            IsVisible="{Binding HasHardwareKeyWarning}" />
                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
                   <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelCommand}" />
-                  <Button Classes="danger" Content="{x:Static res:Strings.ChangeAccess}" Command="{Binding ConfirmCommand}" />
+                  <Button Name="ConfirmAccessChange" Classes="danger" Content="{x:Static res:Strings.ChangeAccess}" Command="{Binding ConfirmCommand}" />
                 </StackPanel>
               </StackPanel>
             </Border>
 
             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" IsVisible="{Binding IsEditing}">
               <Button Name="CloseAccessForm" Classes="ghost lg" Content="{x:Static res:Strings.Cancel}" Command="{Binding CloseFormCommand}" />
-              <Button Classes="primary lg" Content="{x:Static res:Strings.Change}" Command="{Binding ReviewCommand}" />
+              <Button Name="ReviewAccessChange" Classes="primary lg" Content="{x:Static res:Strings.Change}" Command="{Binding ReviewCommand}" />
             </StackPanel>
           </StackPanel>
         </ScrollViewer>

@@ -1058,6 +1058,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             new ShareClient(transport, endpoint ?? ShareEndpoint.Default),
 #pragma warning restore RS0030
             _clock,
+            Core.Audit.KeypasteHome.Resolve(Home),
             () => Core.Audit.AuditLog.TryOpen(auditPath, _clock, out var log, out _) ? log : null);
 
         return new SharingViewModel(

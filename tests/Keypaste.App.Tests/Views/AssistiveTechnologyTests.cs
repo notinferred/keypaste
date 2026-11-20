@@ -80,6 +80,24 @@ public sealed class AssistiveTechnologyTests
     });
 
     [Fact]
+    public Task The_rails_places_the_sidebars_rows_and_the_settings_sections_carry_ids_no_language_changes() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell("keypaste-row-ids-");
+        shell.OpenProject();
+        RenderedShell.Drain();
+
+        string[] Ids(string list) =>
+            [.. shell.Named<ListBox>(list).GetVisualDescendants().OfType<ListBoxItem>().Select(row => ControlAutomationPeer.CreatePeerForElement(row).GetAutomationId() ?? string.Empty)];
+
+        Assert.Subset(Ids("RailNav").ToHashSet(), new HashSet<string> { "RailEntries", "RailAgentActivity", "RailRecommendations", "RailSettings" });
+        Assert.Subset(Ids("Nav").ToHashSet(), new HashSet<string> { "PlaceAll", "PlaceEnvironments", "PlaceTrash", "Project:billing" });
+
+        shell.Show<SettingsViewModel>(DestinationKind.Settings);
+        RenderedShell.Drain();
+        Assert.Equal(SettingsSectionChoice.All.Select(section => section.AutomationId), Ids("SettingsSections"));
+    });
+
+    [Fact]
     public Task An_items_row_says_its_columns_and_never_its_notes() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-row-");

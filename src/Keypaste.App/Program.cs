@@ -87,7 +87,8 @@ internal static class Program
             }),
             Console.Error,
             ReopenWait,
-            browserHosts.Hosts);
+            browserHosts.Hosts,
+            OperatingSystem.IsLinux() ? LoginItems.ForThisProcess() as XdgAutostart : null);
     }
 
     private static Func<AppClaim, int> OnceADisplayIsAwake(Func<AppClaim, int> start) =>
@@ -103,14 +104,16 @@ internal static class Program
     /// <param name="stderr">Where a start the running app never answered says so.</param>
     /// <param name="wait">How long to wait for the running app to answer.</param>
     /// <param name="browserHosts">The browsers' manifests, which every start re-points as it does the link; null where there is no <c>keypaste</c> to name.</param>
+    /// <param name="autostart">Linux's open-at-login entry, which every start re-points from a program since moved, as an AppImage is; null elsewhere.</param>
     /// <returns>The app's exit code, 0 when the running app showed its window, or 1 when it never answered.</returns>
-    internal static int Run(string[] args, string home, ICliLink? cliLink, Func<AppClaim, int> start, TextWriter stderr, TimeSpan wait, BrowserHosts? browserHosts = null)
+    internal static int Run(string[] args, string home, ICliLink? cliLink, Func<AppClaim, int> start, TextWriter stderr, TimeSpan wait, BrowserHosts? browserHosts = null, XdgAutostart? autostart = null)
     {
         ArgumentNullException.ThrowIfNull(start);
         ArgumentNullException.ThrowIfNull(stderr);
 
         cliLink?.KeepCurrent();
         browserHosts?.KeepCurrent();
+        autostart?.KeepCurrent();
 
         AppClaim? claim = null;
 

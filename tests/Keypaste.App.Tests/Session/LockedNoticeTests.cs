@@ -9,6 +9,7 @@ using Keypaste.App.Views;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Settings;
+using Keypaste.Core.Tests;
 using Xunit;
 using static Keypaste.App.Tests.Session.DesktopApprovalTests;
 
@@ -231,6 +232,49 @@ public sealed class LockedNoticeTests
         });
 
     [Fact]
+    public Task Deleting_app_toml_while_locked_ends_the_listening_for_the_vault_it_chose() =>
+        WithChoice(watch: null, async (locked, home, chosen, _, _) =>
+        {
+            Assert.True(await TellNamedAsync(home, chosen), "the notice did not listen for the chosen vault");
+
+            File.Delete(KeypasteHome.SettingsPath(home.Path));
+
+            await HeardUntil(home, chosen, heard: false);
+        });
+
+    [Fact]
+    public Task A_vault_chosen_where_app_toml_cannot_be_watched_is_listened_for_once_the_clock_moves() =>
+        WithChoice((_, _) => throw new IOException("The configured user limit on the number of inotify watches was reached."), async (_, home, before, after, clock) =>
+        {
+            Assert.Equal(ChooseOutcome.Chosen, ChosenVault.Choose(home.Path, after, onlyIfNone: false));
+            Assert.True(await TellNamedAsync(home, before), "the notice stopped listening for the chosen vault before the clock moved");
+
+            clock.Advance(TimeSpan.FromSeconds(4));
+
+            await HeardUntil(home, after, heard: true);
+            Assert.False(await TellNamedAsync(home, before), "the notice still listened for the vault chosen before");
+        });
+
+    [Fact]
+    public Task A_vault_chosen_after_the_watch_of_app_toml_fails_is_listened_for_once_the_clock_moves()
+    {
+        FailingWatcher? watcher = null;
+
+        // It watches a folder app.toml is not in, so only the reading on the clock can follow the change.
+        return WithChoice((_, file) => watcher = new FailingWatcher(Path.GetTempPath(), file), async (_, home, before, after, clock) =>
+        {
+            watcher!.Fail();
+            WindowInput.Drain();
+            Assert.Equal(ChooseOutcome.Chosen, ChosenVault.Choose(home.Path, after, onlyIfNone: false));
+
+            clock.Advance(TimeSpan.FromSeconds(4));
+
+            await HeardUntil(home, after, heard: true);
+            Assert.False(await TellNamedAsync(home, before), "the notice still listened for the vault chosen before");
+        });
+    }
+
+    [Fact]
     public Task Unlocking_takes_a_notice_still_up_down() =>
         HeadlessSession.On(async () =>
         {
@@ -398,6 +442,42 @@ public sealed class LockedNoticeTests
             await test(app, lifetime, system, vault.Path_, notices);
         });
 
+    /// <summary>A notice built on a home of its own and a manual clock, its unlock screen showing one vault and another chosen, with a third to choose.</summary>
+    private static Task WithChoice(Func<string, string, FileSystemWatcher>? watch, Func<LockedNotice, TempHome, string, string, ManualClock, Task> test) =>
+        HeadlessSession.On(async () =>
+        {
+            using var home = new TempHome();
+            using var shown = new TempVault();
+            var before = Path.Combine(shown.Home, "before.kdbx");
+            var after = Path.Combine(shown.Home, "after.kdbx");
+            File.Copy(shown.Path_, before);
+            File.Copy(shown.Path_, after);
+            Assert.Equal(ChooseOutcome.Chosen, ChosenVault.Choose(home.Path, before, onlyIfNone: false));
+            var clock = new ManualClock();
+            using var session = new AppVaultSession(clock, home: home.Path);
+            using var locked = new LockedNotice(session, () => { }, clock, _ => { }, watch: watch);
+            using var screen = new UnlockViewModel(session, home.Path, new FakeVaultFilePicker(), () => { });
+            Assert.True(screen.Offer(shown.Path_));
+            locked.Watch(screen);
+
+            await test(locked, home, before, after, clock);
+        });
+
+    private static Task<bool> TellNamedAsync(TempHome home, string vault) =>
+        LockedAppEndpoint.TellAsync(LockedAppEndpoint.NameFor(VaultIdentity.Of(home.Path, vault)), Token);
+
+    private static async Task HeardUntil(TempHome home, string vault, bool heard)
+    {
+        var deadline = DateTime.UtcNow + _wait;
+
+        while (await TellNamedAsync(home, vault) != heard)
+        {
+            Assert.True(DateTime.UtcNow < deadline, heard ? "the notice never listened for that vault" : "the notice never stopped listening for that vault");
+            WindowInput.Drain();
+            await Task.Delay(20, Token);
+        }
+    }
+
     private static Task<bool> TellAsync(string vault) =>
         LockedAppEndpoint.TellAsync(LockedAppEndpoint.NameFor(VaultIdentity.Of(Home, vault)), Token);
 
@@ -475,6 +555,12 @@ public sealed class LockedNoticeTests
             WindowInput.Drain();
             await Task.Delay(20, Token);
         }
+    }
+
+    /// <summary>A watcher whose failure a test raises, as the system raises one when it drops the watch.</summary>
+    private sealed class FailingWatcher(string directory, string file) : FileSystemWatcher(directory, file)
+    {
+        internal void Fail() => OnError(new ErrorEventArgs(new IOException("The watch was dropped.")));
     }
 
     /// <summary>Makes a vault the chosen one in the process's home, putting back the one chosen before when disposed.</summary>

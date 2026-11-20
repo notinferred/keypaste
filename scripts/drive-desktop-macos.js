@@ -146,6 +146,13 @@ function window(pid) {
   return windowsOf(pid).find(w => titled(ax.text(w, 'AXTitle'))) || null;
 }
 
+// The window, then each menu or flyout the app has open: an untitled window of its own here, where UI Automation lists it under the window.
+function windowAndPopups(pid) {
+  const frame = window(pid);
+  if (!frame) return [];
+  return [frame, ...windowsOf(pid).filter(w => !$.CFEqual(w, frame) && ax.text(w, 'AXTitle') === '')];
+}
+
 // Visits the window's elements in tree order until stop says so; returns those visited.
 function walk(root, stop) {
   const all = [];
@@ -178,15 +185,16 @@ function locate(locator) {
 
 // The nth element the predicate accepts, once one is there; whole reads the rest of the tree too.
 function search(pid, predicate, index = 1, whole = false) {
-  const frame = window(pid);
-  if (!frame) return null;
   let seen = 0;
-  let at = -1;
-  const all = walk(frame, (node, i) => {
-    if (at < 0 && predicate(node) && ++seen === index) at = i;
-    return at >= 0 && !whole;
-  });
-  return at < 0 ? null : { node: all[at], all, index: at };
+  for (const root of windowAndPopups(pid)) {
+    let at = -1;
+    const all = walk(root, (node, i) => {
+      if (at < 0 && predicate(node) && ++seen === index) at = i;
+      return at >= 0 && !whole;
+    });
+    if (at >= 0) return { node: all[at], all, index: at };
+  }
+  return null;
 }
 
 function find(pid, predicate, seconds, index = 1, whole = false) {
@@ -229,8 +237,11 @@ function enabled(node, seconds) {
 
 function press(node, locator) {
   if (!enabled(node, 10)) throw new Refused(`'${locator}' stayed disabled for 10 s`);
+  // A press answers only once what it starts, such as a save, has run: wait as a person would, not the default 6 s.
+  $.AXUIElementSetMessagingTimeout(node.element, 60);
+  const began = Date.now();
   const status = ax.press(node.element);
-  if (status !== 0) throw new Refused(`'${locator}' refused AXPress (${status})`);
+  if (status !== 0) throw new Refused(`'${locator}' refused AXPress (${status}) after ${Date.now() - began} ms`);
 }
 
 // A real pointer click at the element's centre, once the app has brought it into view.
@@ -336,9 +347,9 @@ function keepTree(pid, why) {
   const folder = environment('DRIVE_TREE_DIR');
   if (!folder || !(pid > 0)) return '';
   const lines = [`${why}; the app's windows: ${windowsOf(pid).map(w => JSON.stringify(ax.text(w, 'AXTitle'))).join(', ')}`];
-  const frame = window(pid);
-  if (frame) walk(frame, node => { lines.push(attempt(() => describe(node), `${'  '.repeat(node.depth)}unread`)); return false; });
-  else lines.push(`no window titled ${JSON.stringify(TITLE)}`);
+  const roots = windowAndPopups(pid);
+  for (const root of roots) walk(root, node => { lines.push(attempt(() => describe(node), `${'  '.repeat(node.depth)}unread`)); return false; });
+  if (!roots.length) lines.push(`no window titled ${JSON.stringify(TITLE)}`);
   const name = `tree-${Date.now()}.txt`;
   $(lines.join('\n') + '\n').writeToFileAtomicallyEncodingError($(`${folder}/${name}`), true, $.NSUTF8StringEncoding, null);
   return `; the window's tree is in ${name}`;

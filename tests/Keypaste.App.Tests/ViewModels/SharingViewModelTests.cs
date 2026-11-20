@@ -66,6 +66,7 @@ public sealed class SharingViewModelTests : IDisposable
         new ShareService(
             new ShareClient(_server, ShareEndpoint.Default),
             _clock,
+            _vault.Home,
             () => AuditLog.TryOpen(KeypasteHome.AuditPath(_vault.Home), _clock, out var log, out _) ? log : null),
         _toasts.Add,
         unavailable,

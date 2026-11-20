@@ -81,6 +81,9 @@ internal sealed class FakeApprover : IAsyncDisposable
     /// </summary>
     internal Action? DropListingOnce { get; set; }
 
+    /// <summary>Set to end the connection without answering every listing, as an owner listening whose exchanges fail would.</summary>
+    internal bool DropsListings { get; set; }
+
     /// <summary>Every listing that reached the approver, in the order it arrived.</summary>
     internal ConcurrentQueue<NamesRequest> ListingsReceived { get; } = [];
 
@@ -272,6 +275,11 @@ internal sealed class FakeApprover : IAsyncDisposable
                 approver.DropListingOnce = null;
                 drop();
                 throw new IOException("the fake approver dropped this listing unanswered");
+            }
+
+            if (approver.DropsListings)
+            {
+                throw new IOException("the fake approver drops every listing unanswered");
             }
 
             return ValueTask.FromResult(approver.Names with { Session = approver.Session, Recorded = approver.Records });

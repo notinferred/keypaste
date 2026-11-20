@@ -183,8 +183,59 @@ public sealed class ServerToolsTests
         var result = await CallAsync(client, ToolText.ListToolName);
 
         Assert.True(result.IsError);
-        Assert.DoesNotContain("STRIPE_KEY", TextOf(result), StringComparison.Ordinal);
-        Assert.NotEmpty(harness.AuditLines());
+        Assert.Equal(ToolText.ApproverFailed, TextOf(result));
+        Assert.Equal("failed", MethodOf(Assert.Single(harness.AuditLines())));
+    }
+
+    /// <summary>A listing whose exchange fails with an owner listening is recorded as failed, not as an owner nobody runs.</summary>
+    [Fact]
+    public async Task AListingWhoseExchangeFails_WithAnOwnerListening_IsRecordedAsFailed()
+    {
+        await using var approver = new FakeApprover();
+        approver.Names = new NamesReply(true, [new ListedEntry(new EntryName("env/dev", "STRIPE_KEY"), ["password"], [])], string.Empty, true);
+        approver.DropsListings = true;
+        approver.Start();
+        await using var harness = new McpHarness(approver.PipeName);
+        var client = await harness.StartAsync();
+
+        var result = await CallAsync(client, ToolText.ListToolName);
+
+        Assert.True(result.IsError);
+        Assert.Equal(ToolText.ApproverFailed, TextOf(result));
+        Assert.NotEmpty(approver.ListingsReceived);
+        Assert.Equal("failed", MethodOf(Assert.Single(harness.AuditLines())));
+    }
+
+    /// <summary>A listing with nothing listening for its vault is the one recorded as having no approver.</summary>
+    [Fact]
+    public async Task AListingWithNothingListening_IsRecordedAsNoApprover()
+    {
+        await using var harness = new McpHarness("keypaste-nobody-" + Convert.ToHexStringLower(System.Security.Cryptography.RandomNumberGenerator.GetBytes(8)));
+        var client = await harness.StartAsync();
+
+        var result = await CallAsync(client, ToolText.ListToolName);
+
+        Assert.True(result.IsError);
+        Assert.Equal(ToolText.NoApproverForListing, TextOf(result));
+        Assert.Equal("no-approver", MethodOf(Assert.Single(harness.AuditLines())));
+    }
+
+    /// <summary>A listing the agent withdrew, by closing the bridge's input, is recorded as cancelled and never sent.</summary>
+    [Fact]
+    public async Task AListingAfterTheClientsInputEnded_IsRecordedAsCancelled()
+    {
+        await using var approver = new FakeApprover();
+        approver.Start();
+        await using var harness = new McpHarness(approver.PipeName);
+        var client = await harness.StartAsync();
+        await harness.EndInputAsync();
+
+        var result = await CallAsync(client, ToolText.ListToolName);
+
+        Assert.True(result.IsError);
+        Assert.Equal(ToolText.Cancelled, TextOf(result));
+        Assert.Empty(approver.ListingsReceived);
+        Assert.Equal("cancelled", MethodOf(Assert.Single(harness.AuditLines())));
     }
 
     [Fact]
@@ -648,24 +699,53 @@ public sealed class ServerToolsTests
     }
 
     /// <summary>
-    /// The schema bounds a field's name as the core does, so it never refuses a custom field the owner would answer, whatever its
-    /// shape; the bridge and the owner refuse a TOTP seed's field and a standard name in another case.
+    /// The schema admits exactly the field names the core lets <c>request_credential</c> name, so it never refuses a custom field the owner
+    /// would answer, whatever its shape, and never admits a name the bridge and the owner refuse: a standard name in another
+    /// case, a TOTP seed's field or the word for an attachment, which only <c>request_attachment</c> takes.
     /// </summary>
     [Theory]
-    [InlineData("OPENAI_API_KEY", true)]
-    [InlineData("Recovery codes", true)]
-    [InlineData("openai_api_key", true)]
-    [InlineData("otp", false)]
-    [InlineData("URL", false)]
-    public void TheSchemaAndTheCoreAgreeAboutFields(string custom, bool requestable)
+    [InlineData("password")]
+    [InlineData("totp")]
+    [InlineData("OPENAI_API_KEY")]
+    [InlineData("Recovery codes")]
+    [InlineData("openai_api_key")]
+    [InlineData("KPXC_TOKEN")]
+    [InlineData("KP2A_URL_1")]
+    [InlineData("OTP")]
+    [InlineData("passwords")]
+    [InlineData("PASSWORD")]
+    [InlineData("Password")]
+    [InlineData("URL")]
+    [InlineData("title")]
+    [InlineData("UserName")]
+    [InlineData("otp")]
+    [InlineData("TOTP Seed")]
+    [InlineData("TOTP Settings")]
+    [InlineData("TimeOtp-Secret-Base32")]
+    [InlineData("attachment")]
+    public void TheSchemaAndTheCoreAgreeAboutFields(string field)
     {
         using var schema = JsonDocument.Parse(ToolSchemas.CredentialInputJson);
-        var field = schema.RootElement.GetProperty("properties").GetProperty("field");
+        var fieldSchema = schema.RootElement.GetProperty("properties").GetProperty("field");
 
-        Assert.Equal((1, CredentialFields.MaximumFieldLength), (field.GetProperty("minLength").GetInt32(), field.GetProperty("maxLength").GetInt32()));
-        Assert.All(CredentialFields.All.Append(CredentialFields.Totp), name => Assert.True(CredentialFields.IsRequestable(name)));
-        Assert.Equal(requestable, CredentialFields.IsRequestable(custom));
+        Assert.Equal((1, CredentialFields.MaximumFieldLength), (fieldSchema.GetProperty("minLength").GetInt32(), fieldSchema.GetProperty("maxLength").GetInt32()));
+        Assert.Equal(CredentialRequestRules.Check("work/github", field, attachment: null, "deploy") is null, SchemaAdmits(fieldSchema, field));
     }
+
+    /// <summary>Evaluates the keywords a string argument's schema uses, ECMAScript patterns as MCP clients read them, failing on any other.</summary>
+    private static bool SchemaAdmits(JsonElement schema, string value) =>
+        schema.EnumerateObject().All(keyword => keyword.Name switch
+        {
+            "type" => keyword.Value.GetString() == "string",
+            "description" => true,
+            "minLength" => value.Length >= keyword.Value.GetInt32(),
+            "maxLength" => value.Length <= keyword.Value.GetInt32(),
+            "enum" => keyword.Value.EnumerateArray().Any(choice => choice.GetString() == value),
+            "pattern" => System.Text.RegularExpressions.Regex.IsMatch(value, keyword.Value.GetString()!, System.Text.RegularExpressions.RegexOptions.ECMAScript),
+            "anyOf" => keyword.Value.EnumerateArray().Any(branch => SchemaAdmits(branch, value)),
+            "not" => !SchemaAdmits(keyword.Value, value),
+            _ => throw new InvalidOperationException($"the test does not evaluate '{keyword.Name}'"),
+        });
 
     /// <summary>
     /// The bounds an agent is told about are the ones the vault's owner refuses outside of.

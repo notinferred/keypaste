@@ -1,8 +1,8 @@
 # shellcheck shell=bash
 # Drives an installed keypaste app from outside its process for the desktop exercises: UI Automation
 # on Windows (drive-desktop-windows.ps1), AT-SPI and xdotool on Linux (drive-desktop-linux.py), the accessibility
-# API and System Events on macOS (drive-desktop-macos.js). Sourced after the exercise defines ROOT and platform;
-# on Windows and macOS, APP_PID names the app to drive.
+# API and System Events on macOS (drive-desktop-macos.js), with the app's start and stop around them. Sourced after
+# the exercise defines ROOT and RID, and lib/macos-install.sh; on Windows and macOS, APP_PID names the app to drive.
 #
 #   drive [--window <title>] <verb> [arguments...]
 #
@@ -76,8 +76,95 @@ mac_osascript() {
   mac_bounded "$seconds" osascript -l JavaScript "$@"
 }
 
-# The app's Ctrl+<digit> chords are Cmd+<digit> on macOS (docs/desktop.md).
-shortcut() { if [ "$(platform)" = macos ]; then drive key "cmd+$1"; else drive key "ctrl+$1"; fi; }
+# The desktop platform of the exercise's RID; die is the exercise's own.
+platform() {
+  case "$RID" in
+    win-x64) echo windows ;;
+    linux-x64) echo linux ;;
+    osx-arm64) echo macos ;;
+    *) die "no desktop candidate for $RID" ;;
+  esac
+}
+
+sha256_of() { if command -v sha256sum >/dev/null; then sha256sum < "$1"; else shasum -a 256 < "$1"; fi | awk '{print $1}'; }
+
+# go <id>: a click on the rail's place or the sidebar's row, as a person reaches a screen: RailEntries, RailAgentActivity,
+# RailRecommendations and RailSettings on the rail; Place<place> and Project:<name> in the sidebar.
+go() { drive click "id:$1"; }
+
+# says <locator> <prefix>: waits up to 30 s until the element's text starts with <prefix>, and prints it.
+says() {
+  local said=''
+  for _ in $(seq 1 30); do
+    said="$(drive read "$1" 2>&1 | tr -d '\r')"
+    case "$said" in "$2"*) printf '%s\n' "$said"; return 0 ;; esac
+    sleep 1
+  done
+  echo "$1 says '$said', not '$2...'"
+  return 1
+}
+
+# app_start <app> <output path without extension>: starts the installed app with this shell's environment, its output
+# in <path>.out and <path>.log, and sets APP_PID to the process whose window is driven. The Windows and macOS drivers
+# write the window's tree beside them whenever a step cannot be done.
+app_start() {
+  case "$(platform)" in
+    windows)
+      DRIVE_TREE_DIR="$(cygpath -w "$(dirname "$2")")"
+      export DRIVE_TREE_DIR
+      windows_start "$1" "$2"
+      ;;
+    macos)
+      DRIVE_TREE_DIR="$(dirname "$2")"
+      export DRIVE_TREE_DIR
+      APP_PID="$(mac_start "$1" "$2.log")" || { echo "$APP_PID"; APP_PID=''; return 1; }
+      ;;
+    *)
+      "$1" > "$2.log" 2>&1 &
+      APP_PID=$!
+      ;;
+  esac
+}
+
+# Stops what app_start started, if anything.
+app_stop() {
+  [ -n "${APP_PID:-}" ] || return 0
+  case "$(platform)" in
+    windows) windows_stop ;;
+    macos) mac_quit ;;
+    *)
+      pkill -f usr/bin/keypaste-app 2>/dev/null || true
+      kill "$APP_PID" 2>/dev/null || true
+      wait "$APP_PID" 2>/dev/null || true
+      ;;
+  esac
+  APP_PID=''
+  sleep 2
+}
+
+# windows_start <exe> <output path without extension>: sets LAUNCH_PID to the started app and APP_PID to the copy it
+# starts of itself with .NET's diagnostics port off and waits for, whose window is driven, or to LAUNCH_PID where no
+# copy appears.
+windows_start() {
+  local cr=$'\r'
+  # To a file, not a pipe: the app inherits PowerShell's handles, and an inherited pipe would hold this shell until the app exits.
+  powershell -NoProfile -NonInteractive -Command "(Start-Process -FilePath '$(cygpath -w "$1")' -RedirectStandardOutput '$(cygpath -w "$2.out")' -RedirectStandardError '$(cygpath -w "$2.log")' -PassThru).Id" \
+    > "$2.pid" || { echo "PowerShell could not start $1"; return 1; }
+  LAUNCH_PID="$(tr -d "$cr" < "$2.pid")"
+  case "$LAUNCH_PID" in '' | *[!0-9]*) echo "starting $1 gave no process ID: $LAUNCH_PID"; LAUNCH_PID=''; return 1 ;; esac
+  APP_PID="$(powershell -NoProfile -NonInteractive -Command "\$deadline = (Get-Date).AddSeconds(15)
+    do {
+      \$child = Get-CimInstance Win32_Process -Filter 'ParentProcessId=$LAUNCH_PID' | Where-Object Name -eq 'keypaste-app.exe' | Select-Object -First 1
+      if (-not \$child) { Start-Sleep -Milliseconds 250 }
+    } while (-not \$child -and (Get-Date) -lt \$deadline)
+    if (\$child) { \$child.ProcessId } else { $LAUNCH_PID }" | tr -d "$cr")"
+}
+
+windows_stop() {
+  taskkill //F //T //PID "${LAUNCH_PID:-$APP_PID}" > /dev/null 2>&1 || true
+  taskkill //F //PID "$APP_PID" > /dev/null 2>&1 || true
+  LAUNCH_PID=''
+}
 
 # Avalonia publishes its AT-SPI tree only once the session's accessibility bus says a reader is present.
 enable_accessibility() {

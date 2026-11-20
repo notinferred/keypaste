@@ -447,14 +447,15 @@ public sealed class MaskedInputAutomationTests
         });
 
     /// <summary>
-    /// The control this one exists instead of. <c>PasswordChar</c> hides the characters on screen
-    /// and changes nothing about what the accessibility bus is told, which is T-22's opening
-    /// sentence and is asserted here rather than quoted.
+    /// The control this one exists instead of: a <c>TextBox</c> tells the accessibility bus its text
+    /// through its value pattern, which T-22's opening sentence names and is asserted here rather
+    /// than quoted. Since Avalonia 12.1.5 the pattern masks it only while <c>PasswordChar</c> is set
+    /// and the password is not revealed.
     /// </summary>
     [Fact]
     public Task A_value_exposing_control_in_its_place_fails_the_check() => HeadlessSession.On(() =>
     {
-        var box = new TextBox { Text = Fixture, PasswordChar = '•' };
+        var box = new TextBox { Text = Fixture };
 
         var value = ControlAutomationPeer.CreatePeerForElement(box).GetProvider<IValueProvider>();
         Assert.Equal(Fixture, value?.Value);

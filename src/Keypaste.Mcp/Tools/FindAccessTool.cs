@@ -91,7 +91,7 @@ internal sealed class FindAccessTool(
 
             if (search.Availability != VaultAvailability.Available)
             {
-                if (!search.Recorded && !Recorded(Denial(client, query, Method(search.Availability), search.AuditReason ?? search.Reason, route.Key)))
+                if (!search.Recorded && !Recorded(Denial(client, query, search.RefusalMethod, search.AuditReason ?? search.Reason, route.Key)))
                 {
                     return ToolResults.Refuse(ToolText.AuditUnavailable);
                 }
@@ -225,16 +225,6 @@ internal sealed class FindAccessTool(
 
     private AuditRecord Denial(AuditClient client, AccessQuery query, AuditMethod method, string reason, string? vaultKey, string? session = null) =>
         RequestRecords.Finding(client, query, AuditDecision.Denied, method, reason, options.Exposure.Globs, session, vaultKey);
-
-    /// <summary>Which word the log gets for a search that found nothing to show, as the listing's.</summary>
-    private static AuditMethod Method(VaultAvailability availability) => availability switch
-    {
-        VaultAvailability.Locked => AuditMethod.VaultLocked,
-        VaultAvailability.Busy => AuditMethod.Busy,
-        VaultAvailability.NoSession => AuditMethod.NoSession,
-        VaultAvailability.Changed => AuditMethod.VaultChanged,
-        _ => AuditMethod.NoApprover,
-    };
 
     /// <summary>Writes the line of a search no owner recorded before it is answered, refusing the search when it cannot.</summary>
     private CallToolResult Record(AuditRecord record, CallToolResult answer) =>

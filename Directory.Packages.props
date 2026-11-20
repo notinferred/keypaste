@@ -55,10 +55,10 @@
        CommunityToolkit.Mvvm, a .NET Foundation package with no dependencies of its own, generates
        the view models' properties and commands at build time. -->
   <ItemGroup Label="Desktop app">
-    <PackageVersion Include="Avalonia" Version="12.1.0" />
-    <PackageVersion Include="Avalonia.Desktop" Version="12.1.0" />
-    <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.1.0" />
-    <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.1.0" />
+    <PackageVersion Include="Avalonia" Version="12.1.5" />
+    <PackageVersion Include="Avalonia.Desktop" Version="12.1.5" />
+    <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.1.5" />
+    <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.1.5" />
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <!-- org.freedesktop.Notifications on the session bus (Q.14): the D-Bus client Avalonia.FreeDesktop already brings at this version,
          named so the app's own use of it is pinned. It speaks only to the local bus and carries only fixed words. -->
@@ -91,7 +91,7 @@
        integration package buys an attribute and costs a dependency. One session per process — a
        second throws on the 'avares' URI parser — so the test project shares one static session. -->
   <ItemGroup Label="Desktop app tests">
-    <PackageVersion Include="Avalonia.Headless" Version="12.1.0" />
+    <PackageVersion Include="Avalonia.Headless" Version="12.1.5" />
   </ItemGroup>
 
   <!-- Build-time only, in packaging/windows: harvests the staged payload into the MSI and ships

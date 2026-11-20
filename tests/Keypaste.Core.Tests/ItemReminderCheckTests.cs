@@ -56,6 +56,31 @@ public sealed class ItemReminderCheckTests : IDisposable
     }
 
     [Fact]
+    public void The_next_change_is_the_first_expiry_to_pass_or_come_within_the_window_of_an_item_reported_on()
+    {
+        Seed(created =>
+        {
+            Add(created, _past, "https://mail.example.com", ItemKind.Login);
+            created.SetExpiryUnchecked(_past, _now);
+            Add(created, _mail, "https://mail.example.com", ItemKind.Login);
+            created.SetExpiryUnchecked(_mail, _now.AddDays(3));
+            Add(created, _later, "https://mail.example.com", ItemKind.Login);
+            created.SetExpiryUnchecked(_later, _now.AddDays(14).AddHours(2));
+            Add(created, _cloud, "https://console.aws.amazon.com", ItemKind.ApiKey);
+            created.SetExpiryUnchecked(_cloud, _now.AddHours(1));
+        });
+
+        ForeignEdit.Apply(VaultPath, _master, _cloud.Title, _elsewhere, entry => entry.QualityCheck = false);
+
+        using var vault = Vault.Open(VaultPath, _master);
+
+        Assert.Equal(_now.AddHours(2), ItemReminderCheck.NextChange(vault, _now, 14));
+        Assert.Equal(_now.AddDays(3), ItemReminderCheck.NextChange(vault, _now, 0));
+        Assert.Equal(_now.AddDays(14).AddHours(2), ItemReminderCheck.NextChange(vault, _now.AddDays(3), 0));
+        Assert.Null(ItemReminderCheck.NextChange(vault, _now.AddDays(15), 14));
+    }
+
+    [Fact]
     public void Off_lists_no_expiry_and_still_lists_an_item_marked_as_needing_an_update()
     {
         Seed(created =>

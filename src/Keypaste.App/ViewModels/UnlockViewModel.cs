@@ -46,6 +46,9 @@ internal sealed class KeePassXcDatabaseItem(string path)
 
     internal string Location { get; } = DisplayTextSanitizer.Escaped(path);
 
+    /// <summary>The row's automation id.</summary>
+    internal string AutomationId => $"KeePassXc:{Title}";
+
     public override string ToString() => Name;
 }
 

@@ -245,7 +245,7 @@
                     <TextBlock Classes="caption" Text="{x:Static res:Strings.EverythingRunInThatTerminalCanReadX8c42c2}" />
                     <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
                       <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding Launch.CancelLaunchCommand}" />
-                      <Button Classes="primary" Content="{x:Static res:Strings.Start}" Command="{Binding Launch.ConfirmLaunchCommand}" />
+                      <Button Name="StartRun" Classes="primary" Content="{x:Static res:Strings.Start}" Command="{Binding Launch.ConfirmLaunchCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -256,12 +256,12 @@
                     <TextBlock Classes="dialog-title" Text="{x:Static res:Strings.OnThisMachine}" />
                     <TextBlock Classes="label" Text="{x:Static res:Strings.ProjectDirectory}" />
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                      <TextBox Classes="mono" Text="{Binding Launch.Directory}"
+                      <TextBox Name="LaunchDirectory" Classes="mono" Text="{Binding Launch.Directory}"
                                PlaceholderText="{x:Static res:Strings.ExampleProjectDirectory}" AutomationProperties.Name="{x:Static res:Strings.ProjectDirectory}" />
                       <Button Grid.Column="1" Content="{x:Static res:Strings.Choose}" Command="{Binding Launch.ChooseDirectoryCommand}" />
                     </Grid>
                     <TextBlock Classes="label" Text="{x:Static res:Strings.Command}" />
-                    <TextBox Classes="mono" Text="{Binding Launch.Command}" PlaceholderText="npm start"
+                    <TextBox Name="LaunchCommand" Classes="mono" Text="{Binding Launch.Command}" PlaceholderText="npm start"
                              AutomationProperties.Name="{x:Static res:Strings.Command}" />
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                       <TextBlock Classes="caption" TextWrapping="Wrap" VerticalAlignment="Center" Text="{x:Static res:Strings.TheCommandAndProgramsRunningAsYouCanReadTheseValues}" />
@@ -275,7 +275,7 @@
                     </Grid>
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding Launch.CancelSetUpCommand}" />
-                      <Button Classes="primary" Content="{x:Static res:Strings.Save}" Command="{Binding Launch.SaveCommand}" />
+                      <Button Name="SaveLaunch" Classes="primary" Content="{x:Static res:Strings.Save}" Command="{Binding Launch.SaveCommand}" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -478,7 +478,7 @@
                       <TextBlock Classes="dialog-title" Text="{Binding SelectedProfile, StringFormat={x:Static res:Strings.AddAKeyToValue}}" />
                       <StackPanel Spacing="6">
                         <TextBlock Classes="label" Text="{x:Static res:Strings.KeyName}" />
-                        <TextBox Classes="mono" Text="{Binding NewKey}" PlaceholderText="STRIPE_KEY" Width="320" HorizontalAlignment="Left"
+                        <TextBox Name="NewKeyName" Classes="mono" Text="{Binding NewKey}" PlaceholderText="STRIPE_KEY" Width="320" HorizontalAlignment="Left"
                                  AutomationProperties.Name="{x:Static res:Strings.NewKey}" />
                       </StackPanel>
                       <TextBlock x:Name="NewKeyProblem" ctl:ShowInView.Scrolls="True"
@@ -526,7 +526,7 @@
                                  Text="{Binding NewValue.Note}" />
                       <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelAddCommand}" />
-                        <Button Classes="primary" Content="{x:Static res:Strings.Add}" Command="{Binding ConfirmAddCommand}" />
+                        <Button Name="AddKey" Classes="primary" Content="{x:Static res:Strings.Add}" Command="{Binding ConfirmAddCommand}" />
                       </StackPanel>
                     </StackPanel>
                   </Border>

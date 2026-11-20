@@ -1,0 +1,29 @@
+name: install-desktop-main
+
+# After each successful app.yml run on main, installs that run's Linux package and performs the install exercise and
+# R.1a's acts through install-desktop.yml, so a change that breaks them fails on main within the day. A rehearsal
+# with main's scripts, never release evidence; Windows and macOS stay dispatched by hand.
+
+on:
+  workflow_run:
+    workflows: [app]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: install-desktop on main
+    if: github.event.workflow_run.conclusion == 'success'
+    uses: ./.github/workflows/install-desktop.yml
+    with:
+      app_run_id: ${{ github.event.workflow_run.id }}
+      rehearsal: true
+      dev: true
+      runner: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+      attestations: read

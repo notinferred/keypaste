@@ -223,7 +223,7 @@ internal sealed class ConsoleSecretPrompt : ISecretPrompt
             cancellationToken.WaitHandle.WaitOne(PollInterval);
         }
 
-        return null;
+        throw new OperationCanceledException(cancellationToken);
     }
 
     /// <summary>What one line of redirected input chooses: a key in <paramref name="choices"/>, spelled as the key or as its word, and otherwise <c>'d'</c>.</summary>

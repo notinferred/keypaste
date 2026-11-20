@@ -80,7 +80,7 @@ internal sealed class ListEntryNamesTool(
 
             if (listing.Availability != VaultAvailability.Available)
             {
-                if (!listing.Recorded && !Recorded(Denial(client, Method(listing.Availability), listing.AuditReason ?? listing.Reason, route.Key)))
+                if (!listing.Recorded && !Recorded(Denial(client, listing.RefusalMethod, listing.AuditReason ?? listing.Reason, route.Key)))
                 {
                     return ToolResults.Refuse(ToolText.AuditUnavailable);
                 }
@@ -127,23 +127,6 @@ internal sealed class ListEntryNamesTool(
 
     private AuditRecord Denial(AuditClient client, AuditMethod method, string reason, string? vaultKey, string? session = null) =>
         RequestRecords.Listing(client, AuditDecision.Denied, method, reason, options.Exposure.Globs, session, vaultKey);
-
-    /// <summary>Which word the log gets for a listing that produced no names.</summary>
-    /// <remarks>
-    /// <c>Failed</c> has recorded itself as <see cref="AuditMethod.NoApprover"/> since 2.2, which
-    /// reads as "nobody was running one" when the truth may be that the source threw. That is
-    /// pre-existing and left alone here; what F.3b adds is
-    /// <see cref="VaultAvailability.Busy"/>, which has a word of its own precisely so it is not
-    /// filed under either of the other two.
-    /// </remarks>
-    private static AuditMethod Method(VaultAvailability availability) => availability switch
-    {
-        VaultAvailability.Locked => AuditMethod.VaultLocked,
-        VaultAvailability.Busy => AuditMethod.Busy,
-        VaultAvailability.NoSession => AuditMethod.NoSession,
-        VaultAvailability.Changed => AuditMethod.VaultChanged,
-        _ => AuditMethod.NoApprover,
-    };
 
     /// <summary>
     /// Writes the audit line of a listing no owner recorded first, and turns a failure to write into a refusal.

@@ -189,7 +189,7 @@ public sealed class SayWhatIsHappeningTests
         using var clipboard = new ClipboardCountdown(new Tests.Clipboard.FakeClipboard(), _clock);
         using var server = new FakeShareServer { Now = _clock.GetUtcNow() };
         using var held = new HeldHandler(server);
-        using var model = new SharingViewModel(session, clipboard, new ShareService(new ShareClient(held, ShareEndpoint.Default), _clock, () => AuditLog.TryOpen(KeypasteHome.AuditPath(fixture.Home), _clock, out var log, out _) ? log : null));
+        using var model = new SharingViewModel(session, clipboard, new ShareService(new ShareClient(held, ShareEndpoint.Default), _clock, fixture.Home, () => AuditLog.TryOpen(KeypasteHome.AuditPath(fixture.Home), _clock, out var log, out _) ? log : null));
         var dialog = new Window { Content = new ShareDialogView { DataContext = model } };
         var list = new Window { Content = new SharingView { DataContext = model } };
         dialog.Show();
@@ -233,7 +233,7 @@ public sealed class SayWhatIsHappeningTests
         using var session = new AppVaultSession(_clock, home: fixture.Home);
         using var clipboard = new ClipboardCountdown(new Tests.Clipboard.FakeClipboard(), _clock);
         using var server = new FakeShareServer();
-        using var model = new SharingViewModel(session, clipboard, new ShareService(new ShareClient(server, ShareEndpoint.Default), _clock, () => null));
+        using var model = new SharingViewModel(session, clipboard, new ShareService(new ShareClient(server, ShareEndpoint.Default), _clock, fixture.Home, () => null));
 
         await model.CreateCommand.ExecuteAsync(null);
 

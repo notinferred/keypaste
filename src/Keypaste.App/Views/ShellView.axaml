@@ -67,14 +67,16 @@
       <Setter Property="Padding" Value="16,8,16,16" />
     </Style>
 
-    <!-- A sidebar row is announced by its title, the rows being view models rather than text. -->
+    <!-- A sidebar row is announced by its title, the rows being view models rather than text, and found by its id. -->
     <Style Selector="ListBox.nav > ListBoxItem">
       <Setter Property="AutomationProperties.Name" Value="{ReflectionBinding Title}" />
+      <Setter Property="AutomationProperties.AutomationId" Value="{ReflectionBinding AutomationId}" />
     </Style>
 
     <!-- The rail draws no words, so a row is announced with its status and says the rest as a tooltip. -->
     <Style Selector="ListBox.rail > ListBoxItem">
       <Setter Property="AutomationProperties.Name" Value="{ReflectionBinding RailName}" />
+      <Setter Property="AutomationProperties.AutomationId" Value="{ReflectionBinding AutomationId}" />
       <Setter Property="AutomationProperties.HelpText" Value="{ReflectionBinding Detail}" />
       <Setter Property="ToolTip.Tip" Value="{ReflectionBinding RailTip}" />
       <Setter Property="ToolTip.Placement" Value="Right" />

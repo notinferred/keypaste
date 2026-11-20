@@ -43,13 +43,13 @@ readonly ENTRY_TITLE='install-check'
 readonly PROJECT='install'
 readonly VARIABLE='APP_ADDED'
 readonly AGENT_STATUS='Keypaste approve (process '
-readonly LINK_BUTTON='Link the keypaste command'
-readonly LINKED_PREFIX="A terminal runs this app's keypaste from "
 readonly CR=$'\r'
 readonly TAB=$'\t'
 
 # shellcheck source=scripts/lib/desktop-drive.sh
 . "$ROOT/scripts/lib/desktop-drive.sh"
+# shellcheck source=scripts/lib/desktop-checks.sh
+. "$ROOT/scripts/lib/desktop-checks.sh"
 # shellcheck source=scripts/lib/terminal.sh
 . "$ROOT/scripts/lib/terminal.sh"
 # shellcheck source=scripts/lib/macos-install.sh
@@ -59,15 +59,7 @@ usage() {
   echo 'usage: bash scripts/exercise-desktop-install.sh <rid> <candidate-file> <version> <cli-dir> <output-dir> | --classify <output-dir> | --selftest'
 }
 
-die() { echo "::error::$*" >&2; exit 1; }
-
 # --- classification -------------------------------------------------------------------------------
-
-verdict() { jq -cn --arg check "$1" --arg result "$2" --arg why "$3" '{check: $check, result: $result, why: $why}'; }
-
-fact_of() { [ -s "$1/facts.jsonl" ] && jq -rs --arg k "$2" '[.[] | select(.fact == $k) | .value] | last // empty' "$1/facts.jsonl" || true; }
-
-step() { [ -s "$1/driver.jsonl" ] && jq -rs --arg a "$2" '[.[] | select(.action == $a)] | last | if . == null then "" else "\(.status)\t\(.detail)" end' "$1/driver.jsonl" || true; }
 
 classify() {
   local dir="$1" check result why record status detail blocked='' after_unlock nonce readback colours ran got installed=''
@@ -234,34 +226,7 @@ refusals() {
 
 # --- recording ------------------------------------------------------------------------------------
 
-fact() { jq -cn --arg fact "$1" --arg value "$2" '{fact: $fact, value: $value}' >> "$OUT/facts.jsonl"; }
-
-record() { jq -cn --arg action "$1" --arg status "$2" --arg detail "$3" '{action: $action, status: $status, detail: $detail}' >> "$OUT/driver.jsonl"; }
-
-# act <name> <command...>: runs it, records ok or refused with its output, and returns its status.
-act() {
-  local name="$1" status=ok
-  shift
-  # Not a subshell: what the command sets is kept for the steps after it.
-  "$@" > "$OUT/act.log" 2>&1 || status=refused
-  record "$name" "$status" "$(tail -n 20 "$OUT/act.log" | tr -d "$CR")"
-  [ "$status" = ok ]
-}
-
-platform() {
-  case "$RID" in
-    win-x64) echo windows ;;
-    linux-x64) echo linux ;;
-    osx-arm64) echo macos ;;
-    *) die "no installation candidate for $RID" ;;
-  esac
-}
-
 checks() { if [ "$1" = macos ]; then echo "${CHECKS[*]:0:2} gatekeeper ${CHECKS[*]:2}"; else echo "${CHECKS[*]}"; fi; }
-
-native() { if [ "$(platform)" = windows ]; then cygpath -m "$1"; else printf '%s' "$1"; fi; }
-
-sha256_of() { if command -v sha256sum >/dev/null; then sha256sum < "$1"; else shasum -a 256 < "$1"; fi | awk '{print $1}'; }
 
 # A rehearsal's candidate: app.yml's package for this RID under the branch build's -dryrun version, intact
 # against the .sha256 that job wrote beside it. Nothing attests a branch build.
@@ -290,7 +255,8 @@ fixture() {
   HOME_DIR="$OUT/home"
   vault_dir="$OUT/vault"
   mkdir -p "$HOME_DIR" "$vault_dir"
-  VAULT="$vault_dir/install-check.kdbx"
+  # The app names a vault after its file, so the name differs from the item's title a locator must find alone.
+  VAULT="$vault_dir/install-vault.kdbx"
   VAULT_NATIVE="$(native "$VAULT")"
   export KEYPASTE_HOME
   KEYPASTE_HOME="$(native "$HOME_DIR")"
@@ -316,7 +282,7 @@ wait_for_change() {
   return 1
 }
 
-# --- install, launch and stop --------------------------------------------------------------------
+# --- install --------------------------------------------------------------------------------------
 
 install_candidate() {
   if [ "$(platform)" = windows ]; then
@@ -358,39 +324,6 @@ install_candidate() {
   fi
 }
 
-launch() {
-  local log="$OUT/app-$1.log"
-  if [ "$(platform)" = windows ]; then
-    # To a file, not a pipe: the app inherits PowerShell's handles, and an inherited pipe would hold this shell until the app exits.
-    powershell -NoProfile -Command "\$env:KEYPASTE_HOME = '$KEYPASTE_HOME'; \$env:KEYPASTE_APPROVER = '${2:-}'; (Start-Process -FilePath '$(cygpath -w "$APP")' -RedirectStandardOutput '$(cygpath -w "$log.out")' -RedirectStandardError '$(cygpath -w "$log")' -PassThru).Id" \
-      > "$OUT/app-$1.pid"
-    APP_PID="$(tr -d "$CR" < "$OUT/app-$1.pid")"
-  elif [ "$(platform)" = macos ]; then
-    APP_PID="$(export KEYPASTE_APPROVER="${2:-}"; mac_start "$APP" "$log")" || { echo "$APP_PID"; return 1; }
-  else
-    KEYPASTE_APPROVER="${2:-}" "$APP" > "$log" 2>&1 &
-    APP_PID=$!
-  fi
-  echo "started pid $APP_PID"
-}
-
-stop_app() {
-  if [ "$(platform)" = windows ]; then
-    taskkill //F //PID "$APP_PID" > /dev/null 2>&1 || true
-  elif [ "$(platform)" = macos ]; then
-    mac_quit
-  else
-    pkill -f "usr/bin/keypaste-app" 2>/dev/null || true
-    kill "$APP_PID" 2>/dev/null || true
-    wait "$APP_PID" 2>/dev/null || true
-  fi
-  sleep 2
-}
-
-unlock() {
-  act "$1" drive type "$MASTER" && act "$1-enter" drive key Return && act "$1" drive find 'Lock now'
-}
-
 # What a new terminal runs as keypaste, read as it would read its PATH, and what it should run.
 terminal_shell() {
   local said folder
@@ -415,42 +348,31 @@ terminal_shell() {
 first_session() {
   local before
   if [ "$(platform)" = linux ]; then act accessibility enable_accessibility || return 0; fi
-  launch first > /dev/null
+  KEYPASTE_APPROVER='' app_start "$APP" "$OUT/app-first" || return 0
   act window drive window 120 || return 0
   act screenshot drive screenshot "$(native "$OUT/first-window.png")" || return 0
-  # A fresh home opens on the first-launch screen.
-  act agree-terms drive invoke Continue || return 0
-  act password-focus drive focus id:Password || return 0
-  unlock unlocked || return 0
+  agree_and_unlock "$MASTER" || return 0
+  if [ "$(platform)" != windows ]; then link_from_settings "$APP" || true; fi
 
-  case "$(platform)" in
-    linux) { act settings shortcut 4 && act link-cli drive invoke "$LINK_BUTTON" && act linked drive find-prefix "$LINKED_PREFIX"; } || true ;;
-    # Settings reads the link as absent first, so its Link then finds this copy already linked and asks for nothing.
-    macos)
-      { act settings shortcut 4 && act link-offered drive find "$LINK_BUTTON" && act link-made mac_cli_link "$APP/Contents/MacOS/keypaste" \
-        && act link-cli drive invoke "$LINK_BUTTON" && act linked drive find-prefix "$LINKED_PREFIX"; } || true
-      ;;
-  esac
-
-  act entry-shortcut shortcut 1 || return 0
+  act items go RailEntries || return 0
   act entry-listed drive find "$ENTRY_TITLE" || return 0
 
   NONCE="edited-in-app-$RANDOM$RANDOM"
   fact nonce "$NONCE"
   before="$(sha256_of "$VAULT")"
   act select-entry drive select "$ENTRY_TITLE" \
-    && act entry-menu drive toggle 'More actions' \
-    && act edit-entry drive invoke 'Edit fields' \
-    && act username drive set-after Username "$NONCE" \
-    && act save-entry drive invoke Save \
+    && act edit-entry drive invoke id:EditItem \
+    && act username drive set-named id:DraftUsername "$NONCE" \
+    && act save-entry drive invoke id:SaveEdit \
     || return 0
   if wait_for_change "$before"; then fact vault_changed_by_edit true; else fact vault_changed_by_edit false; return 0; fi
 
+  # Environments opens the vault's first project, its only one here, whose row then holds the sidebar's selection.
   before="$(sha256_of "$VAULT")"
-  act open-project drive select "$PROJECT" \
-    && act begin-variable drive invoke 'Add a key to dev' \
-    && act variable-name drive set-named 'New key' "$VARIABLE" \
-    && act add-variable drive invoke Add \
+  act open-project go PlaceEnvironments \
+    && act begin-variable drive invoke id:AddVariable \
+    && act variable-name drive set-named id:NewKeyName "$VARIABLE" \
+    && act add-variable drive invoke id:AddKey \
     || return 0
   if wait_for_change "$before"; then fact vault_changed_by_variable true; else fact vault_changed_by_variable false; fi
 }
@@ -476,9 +398,9 @@ approval() {
   done
   act agent-listening grep 'listening on' "$OUT/agent-stderr.txt" || { kill "$agent_pid" 2>/dev/null || true; return 0; }
 
-  launch second "$pipe" > /dev/null
+  KEYPASTE_APPROVER="$pipe" app_start "$APP" "$OUT/app-second" || true
   if act second-window drive window 120 && act second-unlock drive type "$MASTER" && act second-unlock-enter drive key Return \
-    && act agent-activity drive find-prefix "$AGENT_STATUS"; then
+    && act agent-activity says id:Owner "$AGENT_STATUS"; then
     fact agent_activity "$(step "$OUT" agent-activity | cut -f2)"
   fi
 
@@ -497,7 +419,7 @@ approval() {
   fact audit_decision "$(jq -rs '[.[] | select(.decision != null)] | last | .decision // empty' "$audit" 2>/dev/null | tr -d '\r')"
   fact audit_method "$(jq -rs '[.[] | select(.decision != null)] | last | .method // empty' "$audit" 2>/dev/null | tr -d '\r')"
 
-  stop_app
+  app_stop
   kill "$agent_pid" 2>/dev/null || true
   wait "$agent_pid" 2>/dev/null || true
 }
@@ -558,7 +480,7 @@ run_all() {
       fact launcher_cleared "$(mac_launcher "$APP")"
     fi
     if [ "$cleared" = true ]; then first_session || true; fi
-    stop_app
+    app_stop
     if [ "$(platform)" != windows ]; then act terminal-shell terminal_shell || true; fi
     if [ "$(step "$OUT" add-variable | cut -f1)" = ok ]; then env_run; fi
     approval || true
@@ -596,7 +518,7 @@ selftest() {
       '{"action":"install","status":"ok","detail":"msiexec /i exited 0"}' \
       '{"action":"window","status":"ok","detail":"window keypaste"}' \
       '{"action":"screenshot","status":"ok","detail":"colours=412 size=1000x680"}' \
-      '{"action":"unlocked","status":"ok","detail":"found Lock now"}' \
+      '{"action":"unlocked","status":"ok","detail":"found id:LockButton"}' \
       '{"action":"entry-listed","status":"ok","detail":"found install-check"}' \
       '{"action":"save-entry","status":"ok","detail":"invoked Save"}' \
       '{"action":"add-variable","status":"ok","detail":"invoked Add"}' \
@@ -627,7 +549,7 @@ selftest() {
   passing_linux() {
     passing "$1"
     printf '%s\n' \
-      '{"action":"settings","status":"ok","detail":"sent ctrl+4"}' \
+      '{"action":"settings","status":"ok","detail":"clicked id:RailSettings at 26,400"}' \
       '{"action":"link-cli","status":"ok","detail":"invoked Link the keypaste command"}' \
       '{"action":"linked","status":"ok","detail":"A terminal runs this app\u0027s keypaste from /home/runner/.local/bin/keypaste."}' >> "$work/$1/driver.jsonl"
     set_fact "$1" platform linux

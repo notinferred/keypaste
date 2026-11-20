@@ -17,6 +17,9 @@ internal sealed partial class NavItem : ObservableObject
 
     internal string Icon => Destination.Icon;
 
+    /// <summary>The row's automation id, which no language changes.</summary>
+    internal string AutomationId => $"Rail{Destination.Kind}";
+
     /// <summary>The number at the right of the row, or empty. Always muted: a live signal is the dot's.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasBadge), nameof(RailName))]
@@ -72,6 +75,9 @@ internal sealed record ProjectRow(string Name, int Count)
 {
     /// <summary>The row's name for a screen reader.</summary>
     internal string Title => Name;
+
+    /// <summary>The row's automation id.</summary>
+    internal string AutomationId => $"Project:{Name}";
 
     /// <summary>The row's name for a screen reader, which reads a list item by its content's text.</summary>
     public override string ToString() => string.Create(CultureInfo.InvariantCulture, $"{Name}, {Count}");

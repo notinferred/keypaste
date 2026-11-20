@@ -877,6 +877,7 @@
                               <!-- Opens the row's own context menu, whose commands the Item menu holds too. It names the field, never a value. -->
                               <Button x:Name="FieldMenu" Classes="ghost icon sm"
                                       IsVisible="{Binding IsWritable}"
+                                      AutomationProperties.AutomationId="{Binding Name, StringFormat='FieldMenu:{0}'}"
                                       ToolTip.Tip="{x:Static res:Strings.MoreActions}"
                                       AutomationProperties.Name="{Binding DisplayName, StringFormat={x:Static res:Strings.MoreActionsForValue}}">
                                 <ctl:KpIcon Icon="ellipsis" Size="14" />
@@ -945,7 +946,7 @@
                                            FilterMode="ContainsOrdinal"
                                            PlaceholderText="env:project:prod"
                                            Width="220" />
-                          <Button Classes="ghost sm" Content="{x:Static res:Strings.AddTag}" Command="{Binding AddTagCommand}" />
+                          <Button Name="AddTag" Classes="ghost sm" Content="{x:Static res:Strings.AddTag}" Command="{Binding AddTagCommand}" />
                         </StackPanel>
                         <ItemsControl ItemsSource="{Binding ChipTags}" IsVisible="{Binding ChipTags.Count}">
                           <ItemsControl.ItemsPanel>
@@ -1073,7 +1074,7 @@
                         </ItemsControl>
                         <StackPanel Orientation="Horizontal" Spacing="8">
                           <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelTagChangeCommand}" />
-                          <Button Classes="primary" Content="{Binding TagChangeAction}" Command="{Binding ConfirmTagChangeCommand}" />
+                          <Button Name="ConfirmTagChange" Classes="primary" Content="{Binding TagChangeAction}" Command="{Binding ConfirmTagChangeCommand}" />
                         </StackPanel>
                       </StackPanel>
                     </Border>
@@ -1123,7 +1124,7 @@
                                       OffContent="Plain" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                           <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding CancelAddFieldCommand}" />
-                          <Button Classes="primary" Content="{x:Static res:Strings.Add}" Command="{Binding ConfirmAddFieldCommand}" />
+                          <Button Name="ConfirmAddField" Classes="primary" Content="{x:Static res:Strings.Add}" Command="{Binding ConfirmAddFieldCommand}" />
                         </StackPanel>
                       </StackPanel>
                     </Border>

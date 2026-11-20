@@ -155,10 +155,13 @@ public sealed class DrawnMaskTests
         Assert.Equal(_alpha.Length, _beta.Length);
         Assert.Empty(_alpha.Intersect(_beta));
 
+        // A tip the pointer rests on opens on a timer, not on the value; the wait makes any such popup fail every run.
         WindowInput.Click(window, field);
+        WindowInput.Leave(window);
         WindowInput.Type(window, _alpha);
         var first = AutomationSurface.Of(window);
 
+        Thread.Sleep(ToolTip.GetShowDelay(field) * 2);
         Clear(window, field);
         WindowInput.Type(window, _beta);
         var second = AutomationSurface.Of(window);

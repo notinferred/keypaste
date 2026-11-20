@@ -18,7 +18,8 @@ internal sealed record PasswordGroup(string Heading, string Reason, IReadOnlyLis
 /// <remarks>
 /// <para>
 /// Owned by the shell for one unlock, because the Settings screen is rebuilt on every visit. It is
-/// checked when the shell is built, which is on unlock, and again after each save. Nothing here is
+/// checked when the shell is built, which is on unlock, again after each save, and when an item's
+/// expiry passes or comes within the reminder days. Nothing here is
 /// shown anywhere else: no banner, no toast, only a quiet count on its sidebar row.
 /// </para>
 /// <para>
@@ -44,6 +45,9 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     private readonly bool _dismissalsReadable;
     private readonly NoteKeyCheck _check = new();
 
+    // Bounds how late a recheck comes after the computer sleeps, since the timer runs on the monotonic clock.
+    private static readonly TimeSpan _longestRecheck = TimeSpan.FromHours(1);
+
     private readonly List<Dismissal> _dismissals;
     private IReadOnlyList<NoteKeyFinding> _noteKeys = [];
     private IReadOnlyList<LostProjectTag> _lost = [];
@@ -53,6 +57,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     private SameNameTells? _tells;
     private bool _disposed;
     private int _generation;
+    private ITimer? _recheck;
 
     /// <param name="session">The session whose vault is checked.</param>
     /// <param name="home">The keypaste home dismissals are kept in.</param>
@@ -317,6 +322,8 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     {
         var generation = ++_generation;
         _expiryDays = ExpiryDays;
+        _recheck?.Dispose();
+        _recheck = null;
 
         if (_disposed || _session.Unlocked is not { } vault)
         {
@@ -369,7 +376,8 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
                 LostProjectTagCheck.Scan(vault),
                 PasswordHealthCheck.Scan(vault, now),
                 ItemReminderCheck.Scan(vault, now, expiryDays),
-                SameNameTells.Of(vault.ReadEntries()));
+                SameNameTells.Of(vault.ReadEntries()),
+                ItemReminderCheck.NextChange(vault, now, expiryDays));
         }
         catch (ObjectDisposedException)
         {
@@ -397,6 +405,25 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
         _reminders = found.Reminders;
         _tells = found.Tells;
         Show();
+
+        if (found.NextChange is { } next)
+        {
+            var due = next - _session.Clock.GetUtcNow();
+            due = due < TimeSpan.Zero ? TimeSpan.Zero : due > _longestRecheck ? _longestRecheck : due;
+            _recheck = _session.Clock.CreateTimer(_ => Post(Check), null, due, Timeout.InfiniteTimeSpan);
+        }
+    }
+
+    private void Post(Action action)
+    {
+        if (_post is { } post)
+        {
+            post(action);
+        }
+        else
+        {
+            action();
+        }
     }
 
     /// <summary>Shows the last check's findings, each dismissed or not, without reading the vault again.</summary>
@@ -687,6 +714,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
         LostTags = [];
         Passwords = [];
         Reminders = [];
+        _recheck?.Dispose();
         _check.Dispose();
     }
 
@@ -791,5 +819,6 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
         IReadOnlyList<LostProjectTag> Lost,
         IReadOnlyList<PasswordFinding> Passwords,
         IReadOnlyList<ItemReminder> Reminders,
-        SameNameTells Tells);
+        SameNameTells Tells,
+        DateTimeOffset? NextChange);
 }

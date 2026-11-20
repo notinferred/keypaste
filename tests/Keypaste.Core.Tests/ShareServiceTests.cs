@@ -2,6 +2,7 @@ using System.Net;
 using Keypaste.Core.Activity;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Ownership;
 using Keypaste.Core.Sharing;
 using Xunit;
 
@@ -147,6 +148,31 @@ public sealed class ShareServiceTests : IDisposable
         return outcome;
     }
 
+    private string VaultKey => VaultIdentity.Of(_fixture.Home, _fixture.VaultPath).Key;
+
+    /// <summary>Both share lines name the vault shared from, so a share counts as a use of its item in that vault alone, on the card and the last-used dot.</summary>
+    [Fact]
+    public async Task ShareLines_NameTheirVault_SoAShareIsAUseInThatVaultAlone()
+    {
+        using var vault = _fixture.Open();
+        var created = await _fixture.Service().CreateAsync(vault, ShareFixture.Request(), CancellationToken.None);
+        Assert.True(created.Ok, created.Message);
+        Assert.True((await _fixture.Service().RevokeAsync(vault, created.Info!.Id, CancellationToken.None)).Ok);
+
+        var lines = AuditLines();
+        Assert.Equal(["share-created", "share-revoked"], lines.Select(line => line.Method));
+        Assert.All(lines, line => Assert.Equal(VaultKey, line.Vault));
+
+        var otherKey = VaultIdentity.Of(_fixture.Home, Path.Combine(Path.GetDirectoryName(_fixture.VaultPath)!, "other.kdbx")).Key;
+        var here = EntryActivity.Build(lines, VaultKey, ApproverActivity.None, [], _fixture.Clock.GetUtcNow());
+        var elsewhere = EntryActivity.Build(lines, otherKey, ApproverActivity.None, [], _fixture.Clock.GetUtcNow());
+
+        Assert.NotNull(here.Use(ShareFixture.Stripe).LastUsed);
+        Assert.Equal("keypaste share", Assert.Single(here.Access(ShareFixture.Stripe).Clients).Client);
+        Assert.Null(elsewhere.Use(ShareFixture.Stripe).LastUsed);
+        Assert.Empty(elsewhere.Access(ShareFixture.Stripe).Clients);
+    }
+
     private IReadOnlyList<AuditEntry> AuditLines()
     {
         Assert.True(AuditReader.TryRead(_fixture.AuditPath, out var entries, out var unreadable, out var error), error);
@@ -245,7 +271,7 @@ public sealed class ShareServiceTests : IDisposable
         Assert.Equal(new string?[] { string.Empty, first.Uuid, string.Empty, first.Uuid }, lines.Select(line => (string?)line.Item));
 
         // A line naming the path alone is neither item's, so it never reaches the other of the pair.
-        var activity = EntryActivity.Build(lines, string.Empty, ApproverActivity.None, [], _fixture.Clock.GetUtcNow());
+        var activity = EntryActivity.Build(lines, VaultKey, ApproverActivity.None, [], _fixture.Clock.GetUtcNow());
         Assert.Equal("keypaste share", Assert.Single(activity.Access(first, byItem: true).Clients).Client);
         Assert.Empty(activity.Access(second, byItem: true).Clients);
     }

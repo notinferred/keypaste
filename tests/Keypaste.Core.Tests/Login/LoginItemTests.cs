@@ -211,6 +211,41 @@ public sealed class LoginItemTests : IDisposable
     }
 
     [Fact]
+    public void An_XDG_entry_naming_a_moved_AppImage_is_re_pointed_to_this_one_and_reads_on()
+    {
+        var directory = XdgAutostart.DirectoryFor(null, _home);
+        Assert.True(new XdgAutostart(directory, Path.Combine(_home, "Downloads", "key \"paste\" `$1` 100%\\.AppImage")).Enable());
+        var moved = new XdgAutostart(directory, Path.Combine(_home, "Applications", "keypaste.AppImage"));
+        Assert.False(moved.IsEnabled);
+
+        Assert.True(moved.KeepCurrent());
+
+        Assert.True(moved.IsEnabled);
+        Assert.False(moved.KeepCurrent());
+    }
+
+    [Fact]
+    public void An_XDG_entry_naming_another_copy_that_exists_or_one_keypaste_did_not_write_is_left_as_it_is()
+    {
+        var directory = XdgAutostart.DirectoryFor(null, _home);
+        var other = Path.Combine(_home, "other.AppImage");
+        File.WriteAllText(other, string.Empty);
+        var item = new XdgAutostart(directory, Path.Combine(_home, "keypaste.AppImage"));
+        Assert.True(new XdgAutostart(directory, other).Enable());
+        var anotherCopys = File.ReadAllBytes(item.FilePath);
+
+        Assert.False(item.KeepCurrent());
+        Assert.Equal(anotherCopys, File.ReadAllBytes(item.FilePath));
+
+        var persons = new XdgAutostart(directory, Path.Combine(_home, "gone.AppImage")).Document.Replace("Terminal=false", "Terminal=true", StringComparison.Ordinal);
+        File.WriteAllText(item.FilePath, persons);
+
+        Assert.False(item.KeepCurrent());
+        Assert.Equal(persons, File.ReadAllText(item.FilePath));
+        Assert.False(item.IsEnabled);
+    }
+
+    [Fact]
     public void The_XDG_directory_follows_an_absolute_config_home_only()
     {
         var config = Path.Combine(_home, "config");

@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+`keypaste approve` answers a request whose standard input has closed as having nobody to answer, saying so, with no refusal cooldown; an agent's listing that was withdrawn or failed is logged as cancelled or failed, not as no approver; an expiry that passes while a vault is unlocked shows in Security without a save; the locked screen follows `app.toml` being deleted and keeps reading it where the system refuses a file watch; on Linux, Open at login follows an AppImage that was moved; a share link counts as a use only in the vault it was made from; and on macOS the app no longer quits when a screen reader is running and an announcement clears. (F.112)
+
 The browser extension takes keypaste's look and words: Connect is Pair, each popup names its state and the step that fixes an error, the in-page list has a row for every state, and a login field's button is a key. (F.131)
 
 The desktop app is redrawn to one set of buttons, menus, focus rings and grouped rows: search sits at the top of the list, Lock on the rail, unlock and first launch drop the grid, prompts show their time as a bar, Agents connects a tool from one sheet with its setup prompt and config, Security moves a note's keys together, and Settings is one list of sections. (F.130)

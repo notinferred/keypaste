@@ -129,13 +129,43 @@ public sealed class TerminalApprovalChannelTests
         Assert.Contains("keypaste: denied. Nothing was released.", rig.Stderr.ToString(), StringComparison.Ordinal);
     }
 
-    /// <summary>End of input — a closed pipe, a Ctrl+D — is a denial, not a hang and not a yes.</summary>
+    /// <summary>Standard input closing is no person's answer: nobody could be asked, nothing is released, and the terminal says why.</summary>
     [Fact]
-    public async Task EndOfInput_Denies()
+    public async Task EndOfInput_IsNoChannel_AndSaysStandardInputClosed()
     {
         var rig = Build();
 
-        Assert.Equal(ApprovalAnswer.Denied, await rig.Channel.AskAsync(Prompt(), Token));
+        var answer = await rig.Channel.AskAsync(Prompt(), Token);
+
+        Assert.Equal((ApprovalAnswer.NoChannel, Core.Audit.AuditMethod.NoApprover), (answer, answer.ToAuditMethod()));
+        Assert.Contains("keypaste: standard input closed, so nobody can answer here. Nothing was released.", rig.Stderr.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("keypaste: denied.", rig.Stderr.ToString(), StringComparison.Ordinal);
+    }
+
+    /// <summary>Every later question a prompt asks, a confirmation, a pick or a value to save, is no channel too once input ends.</summary>
+    [Fact]
+    public async Task EndOfInput_AtAnyLaterQuestion_IsNoChannel()
+    {
+        Assert.Equal(ApprovalAnswer.NoChannel, await Build("a").Channel.AskAsync(Offering(), Token));
+        Assert.Equal(new ItemPick(ApprovalAnswer.NoChannel, 0), await Build("1").Channel.AskToPickAsync(Picker(), Token));
+        Assert.Equal(new SaveAnswer(ApprovalAnswer.NoChannel, null), await Build("t").Channel.AskToSaveAsync(SavePromptFor(), Token));
+        Assert.Equal(new SaveAnswer(ApprovalAnswer.NoChannel, null), await Build("t", "sk_typed_value").Channel.AskToSaveAsync(SavePromptFor(), Token));
+        Assert.Equal(ApprovalAnswer.NoChannel, await Build().Channel.AskAsync(LinkedSet(), Token));
+    }
+
+    /// <summary>A request standard input's end left unanswered holds nothing back: the same field asked again is put to the person, not refused for the cooldown.</summary>
+    [Fact]
+    public async Task EndOfInput_StartsNoCooldown()
+    {
+        var rig = Build();
+        using var gate = new ApprovalGate(rig.Channel, TimeProvider.System, ApprovalLimits.Default);
+
+        var first = await gate.AskAsync("env/dev/STRIPE_KEY|password", Prompt(), Token);
+        rig.Prompt.Enqueue("o");
+        var second = await gate.AskAsync("env/dev/STRIPE_KEY|password", Prompt(), Token);
+
+        Assert.Equal((ApprovalAnswer.NoChannel, ApprovalAnswer.ApprovedOnce), (first, second));
+        Assert.Equal(2, rig.Prompt.PromptsSeen.Count);
     }
 
     /// <summary>Paints by marking each tone, so a test sees what was coloured and how without reading escapes.</summary>

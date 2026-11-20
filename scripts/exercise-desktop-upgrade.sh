@@ -12,7 +12,7 @@
 # MSI appends its folder to the user Path, keeps one entry through an upgrade and removes only that entry on
 # uninstall, which an entry of the user's own, added first, shows. Open at login's Run value, written after the
 # first install as the app's Settings writes it, must come through the upgrade unchanged and be gone after the
-# uninstall. The lower app starts first and is Continued past its first-launch screen, which writes
+# uninstall. The lower app starts first and is agreed to on its first-launch screen, which writes
 # app.toml, as it is on Linux and macOS. The upgraded app then starts once and shows its window before the data is read, so what its first
 # start writes is compared too, as on Linux and macOS. On Linux the upgrade is a download left
 # beside the old image: the lower app links keypaste from Settings, a start of the higher image while the lower
@@ -71,16 +71,18 @@ readonly VALUES=(first-value second-value third-value)
 readonly HISTORY_TITLES=3
 readonly DOWNGRADE_MESSAGE='A newer keypaste is already installed.'
 readonly INSTALL_FAILED='Action ended.*InstallFinalize. Return value 3|Action ended.*InstallFiles. Return value 3'
-readonly LINK_BUTTON='Link the keypaste command'
-readonly LINKED_PREFIX="A terminal runs this app's keypaste from "
-readonly OPEN_AT_LOGIN='Open keypaste at login'
 readonly RUN_KEY='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 readonly FILE_TYPE='progid open-with'
 readonly CR=$'\r'
 readonly TAB=$'\t'
+# Who made the data: current, or policy-file for a release whose agents' rules were a hand-written policy.toml.
+MAKER=current
+ENV_TITLE='.env'
 
 # shellcheck source=scripts/lib/desktop-drive.sh
 . "$ROOT/scripts/lib/desktop-drive.sh"
+# shellcheck source=scripts/lib/desktop-checks.sh
+. "$ROOT/scripts/lib/desktop-checks.sh"
 # shellcheck source=scripts/lib/terminal.sh
 . "$ROOT/scripts/lib/terminal.sh"
 # shellcheck source=scripts/lib/macos-install.sh
@@ -90,15 +92,7 @@ usage() {
   echo 'usage: bash scripts/exercise-desktop-upgrade.sh <rid> <candidates-dir> <cli-version> <cli-dir> <output-dir> | --classify <output-dir> | --selftest'
 }
 
-die() { echo "::error::$*" >&2; exit 1; }
-
 # --- classification -------------------------------------------------------------------------------
-
-verdict() { jq -cn --arg check "$1" --arg result "$2" --arg why "$3" '{check: $check, result: $result, why: $why}'; }
-
-fact_of() { [ -s "$1/facts.jsonl" ] && jq -rs --arg k "$2" '[.[] | select(.fact == $k) | .value] | last // empty' "$1/facts.jsonl" || true; }
-
-step() { [ -s "$1/driver.jsonl" ] && jq -rs --arg a "$2" '[.[] | select(.action == $a)] | last | if . == null then "" else "\(.status)\t\(.detail)" end' "$1/driver.jsonl" || true; }
 
 classify() {
   local dir="$1" check result why record status detail blocked='' platform made
@@ -155,7 +149,7 @@ classify() {
   emit install-lower
 
   # On Linux the person links keypaste from the lower app's Settings before the baseline is taken, since the
-  # app's unlock writes its settings; on Windows the person only presses Continue on the first-launch screen, which writes them too.
+  # app's unlock writes its settings; on Windows the person only presses Agree on the first-launch screen, which writes them too.
   # A Settings step that could not be done is named before the baseline it would have completed.
   if judge fixture && judge baseline; then
     made="$detail"
@@ -259,33 +253,6 @@ classify() {
 
 # --- recording ------------------------------------------------------------------------------------
 
-fact() { jq -cn --arg fact "$1" --arg value "$2" '{fact: $fact, value: $value}' >> "$OUT/facts.jsonl"; }
-
-record() { jq -cn --arg action "$1" --arg status "$2" --arg detail "$3" '{action: $action, status: $status, detail: $detail}' >> "$OUT/driver.jsonl"; }
-
-# act <name> <command...>: runs it, records ok or refused with its output, and returns its status.
-act() {
-  local name="$1" status=ok
-  shift
-  # Not a subshell: what the command sets is kept for the steps after it.
-  "$@" > "$OUT/act.log" 2>&1 || status=refused
-  record "$name" "$status" "$(tail -n 20 "$OUT/act.log" | tr -d "$CR")"
-  [ "$status" = ok ]
-}
-
-platform() {
-  case "$RID" in
-    win-x64) echo windows ;;
-    linux-x64) echo linux ;;
-    osx-arm64) echo macos ;;
-    *) die "no installation candidate for $RID" ;;
-  esac
-}
-
-native() { if [ "$PLATFORM" = windows ]; then cygpath -m "$1"; else printf '%s' "$1"; fi; }
-
-sha256_of() { if command -v sha256sum >/dev/null; then sha256sum < "$1"; else shasum -a 256 < "$1"; fi | awk '{print $1}'; }
-
 powershell_out() { powershell -NoProfile -NonInteractive -Command "$1" | tr -d "$CR"; }
 
 candidate() { # candidate <version>
@@ -298,12 +265,21 @@ candidate() { # candidate <version>
 
 # --- the data whose survival is the point ---------------------------------------------------------
 
-# The five files a user would lose: the vault, the app's two settings files, this computer's agent rules and the
-# audit; on macOS also Open at login's LaunchAgent. The rules are agents.toml, or clients.toml where the CLI that
-# made the data is a release from before agents.toml.
-rules_file() { if [ -f "$HOME_DIR/clients.toml" ]; then printf 'clients.toml'; else printf 'agents.toml'; fi; }
+# The files a user would lose: the vault, the app's two settings files, this computer's agent rules and the audit;
+# on macOS also Open at login's LaunchAgent. The rules are the vault's file in agents/, or the shared agents.toml
+# where the CLI that made the data is a release from before each vault kept its own. A release whose rules were a
+# hand-written policy.toml leaves them out: what becomes of them is recorded (policy_file), not checked, while what
+# 1.0.0 does with them is undecided.
+rules_file() {
+  local file
+  for file in "$HOME_DIR/agents.toml" "$HOME_DIR"/agents/*.toml; do
+    if [ -f "$file" ]; then printf '%s' "$file"; return; fi
+  done
+  printf '%s' "$HOME_DIR/agents/vault.toml"
+}
 data_files() {
-  printf '%s\n' "$VAULT" "$HOME_DIR/app.toml" "$HOME_DIR/recent.toml" "$HOME_DIR/$(rules_file)" "$HOME_DIR/audit.jsonl"
+  printf '%s\n' "$VAULT" "$HOME_DIR/app.toml" "$HOME_DIR/recent.toml" "$HOME_DIR/audit.jsonl"
+  if [ "$MAKER" = current ]; then rules_file; echo; fi
   if [ "$PLATFORM" = macos ]; then printf '%s\n' "$LAUNCH_AGENT"; fi
 }
 
@@ -339,7 +315,7 @@ keepassxc() {
   # 2.7 renamed export to db-export and kept the old name; whichever answers, the reading is the same.
   { printf '%s\n' "$MASTER" | "$kpxc" db-export --format xml "$VAULT_NATIVE" 2>/dev/null \
     || printf '%s\n' "$MASTER" | "$kpxc" export --format xml "$VAULT_NATIVE" 2>/dev/null; } \
-    | tr -d " \t$CR\n" | grep -oF "<Key>Title</Key><Value>$HOME_ENTRY</Value>" | grep -c . || true
+    | tr -d " \t$CR\n" | grep -oF "<Key>Title</Key><Value>$ENV_TITLE</Value>" | grep -c . || true
 }
 
 # Everything the transitions must preserve, made by the CLI/MCP.
@@ -349,6 +325,10 @@ fixture() {
   [ -n "$KP" ] || { echo "no keypaste under $CLI_DIR"; return 1; }
   chmod +x "$KP" 2>/dev/null || true
   "$KP" --version | tr -d "$CR" | grep -qF "$CLI_VERSION" || { echo "the CLI is not $CLI_VERSION: $("$KP" --version)"; return 1; }
+  # A release from before `keypaste clients`, such as 0.3.0, kept each variable as its own item and agents' rules in a
+  # policy.toml the person writes, and its bridge is keypaste-mcp beside it.
+  if "$KP" clients --help >/dev/null 2>&1; then MAKER=current; ENV_TITLE="$HOME_ENTRY"; else MAKER=policy-file; ENV_TITLE="$VARIABLE"; fi
+  fact fixture_maker "$MAKER"
 
   mkdir -p "$(dirname "$VAULT")" "$HOME_DIR"
   printf '%s\n%s\n' "$MASTER" "$MASTER" | "$KP" init "$VAULT_NATIVE" >/dev/null || { echo 'keypaste init failed'; return 1; }
@@ -361,12 +341,19 @@ fixture() {
       || { echo "keypaste env set $value failed"; return 1; }
   done
 
-  # The agent's run off in this computer's rules, made before any recent vault names one to hold it: a ceiling in
-  # clients.toml from a release before agents.toml, an unsealed agents.toml from one after it.
-  "$KP" clients upgrade-check --run off >/dev/null 2>&1 || { echo 'keypaste clients did not write the agent rules'; return 1; }
-  "$KP" clients --json 2>/dev/null \
-    | jq -e '. == [{"kind":"ceiling","label":"upgrade-check","run":"off"}] or any(.[]; .kind == "agent" and .name == "upgrade-check" and .run == "off")' >/dev/null \
-    || { echo 'keypaste clients --json does not read the agent rules back'; return 1; }
+  if [ "$MAKER" = current ]; then
+    # The agent's run off in this vault's rules, made before any recent vault names one to hold it.
+    "$KP" clients upgrade-check --run off --vault "$VAULT_NATIVE" >/dev/null 2>&1 || { echo 'keypaste clients did not write the agent rules'; return 1; }
+    "$KP" clients --json --vault "$VAULT_NATIVE" 2>/dev/null \
+      | jq -e 'any(.[]; .kind == "agent" and .name == "upgrade-check" and .run == "off")' >/dev/null \
+      || { echo 'keypaste clients --json does not read the agent rules back'; return 1; }
+  else
+    # The rule releasing the project's variable to this agent unasked, written as that release's guide has a person write it.
+    printf '[[allow]]\nclient = "upgrade-check"\nentries = ["env/%s/**"]\nfields = ["password"]\nmax_ttl_seconds = 300\n' "$PROJECT" > "$HOME_DIR/policy.toml"
+    chmod 600 "$HOME_DIR/policy.toml" && chmod 700 "$HOME_DIR"
+    "$KP" policy ls 2>&1 | grep -q '^1 rule' || { echo "keypaste policy ls does not read the rule: $("$KP" policy ls 2>&1)"; return 1; }
+    fact policy_file_at_fixture "$(sha256_of "$HOME_DIR/policy.toml")"
+  fi
   printf '[[vault]]\npath = "%s"\nopened_at = "%s"\n' "$VAULT_NATIVE" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$HOME_DIR/recent.toml"
   printf '[[settings]]\nidle_timeout_seconds = 28800\n' > "$HOME_DIR/app.toml"
   echo "vault $VAULT_NATIVE with $ENTRY and env/$PROJECT, made by $("$KP" --version | tr -d "$CR")"
@@ -386,20 +373,32 @@ baseline() {
 
 audit_record() {
   local pipe="keypaste-upgrade-check-$$-$RANDOM" agent_pid
-  printf '%s\no\n' "$MASTER" | "$KP" approve --vault "$VAULT_NATIVE" --approver "$pipe" --approval-timeout 55 \
-    > /dev/null 2> "$OUT/agent-stderr.txt" &
+  if [ "$MAKER" = current ]; then
+    printf '%s\no\n' "$MASTER" | "$KP" approve --vault "$VAULT_NATIVE" --approver "$pipe" --approval-timeout 55 \
+      > /dev/null 2> "$OUT/agent-stderr.txt" &
+  else
+    printf '%s\n' "$MASTER" | "$KP" agent --vault "$VAULT_NATIVE" --approver "$pipe" --approval-timeout 55 \
+      > /dev/null 2> "$OUT/agent-stderr.txt" &
+  fi
   agent_pid=$!
   for _ in $(seq 1 150); do
     grep -q 'listening on' "$OUT/agent-stderr.txt" 2>/dev/null && break
     kill -0 "$agent_pid" 2>/dev/null || break
     sleep 0.2
   done
+  local server=("$KP" mcp) protocol=2025-11-25 request
+  request="{\"entry\":\"env/$PROJECT/$HOME_ENTRY\",\"field\":\"$VARIABLE\",\"reason\":\"4.7d writes one audit record before the upgrade\"}"
+  if [ "$MAKER" != current ]; then
+    server=("$(dirname "$KP")/keypaste-mcp")
+    protocol=2025-06-18
+    request="{\"entry\":\"env/$PROJECT/$VARIABLE\",\"field\":\"password\",\"ttl_seconds\":60,\"reason\":\"4.7d writes one audit record before the upgrade\"}"
+  fi
   {
-    printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"upgrade-check","version":"1.0.0"}}}'
+    printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"$protocol\",\"capabilities\":{},\"clientInfo\":{\"name\":\"upgrade-check\",\"version\":\"1.0.0\"}}}"
     printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
-    printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":{\"entry\":\"env/$PROJECT/$HOME_ENTRY\",\"field\":\"$VARIABLE\",\"reason\":\"4.7d writes one audit record before the upgrade\"}}}"
+    printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"request_credential\",\"arguments\":$request}}"
     sleep 5
-  } | "$KP" mcp --vault "$VAULT_NATIVE" --expose 'env/**' --approver "$pipe" --client-label upgrade-check \
+  } | "${server[@]}" --vault "$VAULT_NATIVE" --expose 'env/**' --approver "$pipe" --client-label upgrade-check \
       > "$OUT/mcp-response.jsonl" 2> "$OUT/mcp-stderr.txt" || true
   kill "$agent_pid" 2>/dev/null || true
   wait "$agent_pid" 2>/dev/null || true
@@ -411,14 +410,41 @@ audit_record() {
 
 read_after() { # read_after <when>
   compare "$1"
-  fact "token_after_$1" "$(cli get "env/$PROJECT/$HOME_ENTRY" --field "$VARIABLE" --reveal || true)"
+  if [ "$MAKER" = current ]; then
+    fact "token_after_$1" "$(cli get "env/$PROJECT/$HOME_ENTRY" --field "$VARIABLE" --reveal || true)"
+  else
+    fact "token_after_$1" "$(cli get "env/$PROJECT/$VARIABLE" --show || true)"
+  fi
   if printf '%s\n' "$MASTER" | "$KP" log verify > "$OUT/log-verify-$1.txt" 2>&1; then
     fact "log_verify_after_$1" pass
   else
     fact "log_verify_after_$1" "exit $?"
   fi
   fact "keepassxc_after_$1" "$(keepassxc)"
-  "$KP" clients --json > "$OUT/ceilings-$1.json" 2>&1 || true
+  if [ "$MAKER" = current ]; then
+    "$KP" clients --json --vault "$VAULT_NATIVE" > "$OUT/rules-$1.json" 2>&1 || true
+  else
+    old_rules "$1"
+  fi
+}
+
+# What became of policy.toml's rule after <when>: the file, the made-it release's reading of it, and the reading of
+# the keypaste a new terminal now runs, its doctor's included. Recorded, never judged.
+old_rules() {
+  local file="$HOME_DIR/policy.toml" now
+  if [ ! -f "$file" ]; then fact "policy_file_after_$1" absent
+  elif [ "$(sha256_of "$file")" = "$(fact_read policy_file_at_fixture)" ]; then fact "policy_file_after_$1" unchanged
+  else fact "policy_file_after_$1" changed
+  fi
+  fact "policy_ls_after_$1" "$("$KP" policy ls 2>&1 | head -n 1 | tr -d "$CR")"
+  now="$(terminal_expected)"
+  [ "$PLATFORM" != windows ] || now="$(cygpath -u "$now")"
+  if [ -x "$now" ]; then
+    fact "rules_read_by_installed_after_$1" "$("$now" clients --json --vault "$VAULT_NATIVE" 2>&1 | tr -d "$CR" | tr '\n' ' ')"
+    fact "doctor_on_policy_file_after_$1" "$("$now" doctor 2>&1 | tr -d "$CR" | grep -i 'policy.toml' | tr '\n' ' ')"
+  else
+    fact "rules_read_by_installed_after_$1" "no keypaste at $now"
+  fi
 }
 
 # --- a new terminal -------------------------------------------------------------------------------
@@ -466,16 +492,18 @@ mark_user_path() {
 }
 
 # Open at login's Run value as the app writes it (WindowsRunKey), or absent.
-run_value() { powershell_out "(Get-Item '$RUN_KEY').GetValue('keypaste', 'absent')"; }
+# A runner's profile may have no Run key at all, which reads as no value, as the app reads it.
+run_value() { powershell_out "if (Test-Path '$RUN_KEY') { (Get-Item '$RUN_KEY').GetValue('keypaste', 'absent') } else { 'absent' }"; }
 
 # .kdbx's Open With entry as the MSI's VaultFileType component writes it: its parts found, or absent.
 file_type() {
   powershell_out "\$found = @(); if (Test-Path 'HKCU:\\Software\\Classes\\keypaste.Vault\\shell\\open\\command') { \$found += 'progid' }; if ((Get-Item 'HKCU:\\Software\\Classes\\.kdbx\\OpenWithProgids' -ErrorAction SilentlyContinue).Property -contains 'keypaste.Vault') { \$found += 'open-with' }; if (\$found) { \$found -join ' ' } else { 'absent' }"
 }
 
-# Open at login turned on as Settings does it: the Run value naming the installed app, with --background.
+# Open at login turned on as Settings does it: the Run value naming the installed app, with --background, the key
+# made first where the profile has none.
 open_at_login() {
-  powershell_out "New-ItemProperty -Path '$RUN_KEY' -Name keypaste -Value '\"$(cygpath -w "$APP")\" --background' -PropertyType String -Force | Out-Null" \
+  powershell_out "if (-not (Test-Path '$RUN_KEY')) { New-Item -Path '$RUN_KEY' -Force | Out-Null }; New-ItemProperty -Path '$RUN_KEY' -Name keypaste -Value '\"$(cygpath -w "$APP")\" --background' -PropertyType String -Force | Out-Null" \
     || { echo 'the Run value could not be written'; return 1; }
   fact run_value_after_install "$(run_value)"
 }
@@ -485,66 +513,26 @@ open_at_login() {
 # Every start stops the running app first, since a second start only asks the running one to show its
 # window. macOS starts the bundle through LaunchServices, Windows the installed program through PowerShell.
 start_app() { # start_app <appimage|bundle|exe> <name>
-  stop_app
-  if [ "$PLATFORM" = macos ]; then
-    APP_PID="$(mac_start "$1" "$OUT/app-$2.log")" || { echo "$APP_PID"; APP_PID=''; return 1; }
-  elif [ "$PLATFORM" = windows ]; then
-    # To a file, not a pipe: the app inherits PowerShell's handles, and an inherited pipe would hold this shell until the app exits.
-    powershell -NoProfile -NonInteractive -Command "(Start-Process -FilePath '$(cygpath -w "$1")' -RedirectStandardOutput '$(cygpath -w "$OUT/app-$2.out")' -RedirectStandardError '$(cygpath -w "$OUT/app-$2.log")' -PassThru).Id" \
-      > "$OUT/app-$2.pid" || { echo "PowerShell could not start $1"; return 1; }
-    APP_PID="$(tr -d "$CR" < "$OUT/app-$2.pid")"
-    case "$APP_PID" in '' | *[!0-9]*) echo "starting $1 gave no process ID: $APP_PID"; APP_PID=''; return 1 ;; esac
-  else
-    "$1" > "$OUT/app-$2.log" 2>&1 &
-    APP_PID=$!
-  fi
-}
-
-stop_app() {
-  [ -n "${APP_PID:-}" ] || return 0
-  if [ "$PLATFORM" = macos ]; then
-    mac_quit
-  elif [ "$PLATFORM" = windows ]; then
-    taskkill //F //PID "$APP_PID" > /dev/null 2>&1 || true
-  else
-    pkill -f usr/bin/keypaste-app 2>/dev/null || true
-    kill "$APP_PID" 2>/dev/null || true
-    wait "$APP_PID" 2>/dev/null || true
-  fi
-  APP_PID=''
-  sleep 2
+  app_stop
+  app_start "$1" "$OUT/app-$2"
 }
 
 # The lower app agreed to once, so the agreement is in app.toml before the baseline hashes it.
 agree_to_terms() {
   start_app "$APP" lower || true
-  { act window drive window 120 && act agree-terms drive invoke Continue; } || true
-  stop_app
+  { act window drive window 120 && act agree-terms drive invoke id:Agree; } || true
+  app_stop
 }
 
-# The lower app, unlocked, links keypaste from Settings as a person does once; a new terminal then runs it.
-link_from_settings() {
+# The lower app, unlocked, links keypaste from Settings as a person does once, and on macOS turns on Open at login
+# there too; a new terminal then runs it.
+link_lower() {
   if [ "$PLATFORM" = linux ]; then act accessibility enable_accessibility || return 0; fi
   start_app "$APP" lower || true
-  # A fresh home opens on the first-launch screen.
-  { act window drive window 120 \
-    && act agree-terms drive invoke Continue && act password-focus drive focus id:Password \
-    && act unlocked drive type "$MASTER" && act unlocked-enter drive key Return && act unlocked drive find 'Lock now' \
-    && act settings shortcut 4 && link_cli; } || true
-  stop_app
+  { act window drive window 120 && agree_and_unlock "$MASTER" && link_from_settings "$APP" \
+    && { [ "$PLATFORM" != macos ] || { act open-at-login drive toggle id:OpenAtLogin && act login-item login_item; }; }; } || true
+  app_stop
   probe fixture
-}
-
-# Linux's Link writes the link itself. macOS's asks an administrator, so a runner makes the link with sudo while
-# Link is offered and Link then finds this copy linked; Open at login is turned on there too.
-link_cli() {
-  if [ "$PLATFORM" = linux ]; then
-    act link-cli drive invoke "$LINK_BUTTON" && act linked drive find-prefix "$LINKED_PREFIX"
-  else
-    act link-offered drive find "$LINK_BUTTON" && act link-made mac_cli_link "$APP/Contents/MacOS/keypaste" \
-      && act link-cli drive invoke "$LINK_BUTTON" && act linked drive find-prefix "$LINKED_PREFIX" \
-      && act open-at-login drive toggle "$OPEN_AT_LOGIN" && act login-item login_item
-  fi
 }
 
 login_item() {
@@ -559,8 +547,8 @@ login_item() {
 # it left, and what it changed is recorded.
 unlock_upgraded() {
   { act upgraded-typed drive type "$MASTER" && act upgraded-unlocked-enter drive key Return \
-    && act upgraded-unlocked drive find 'Lock now'; } || true
-  stop_app
+    && act upgraded-unlocked drive find id:LockButton; } || true
+  app_stop
   mv "$OUT/hashes-baseline.txt" "$OUT/hashes-baseline-before-unlock.txt"
   snapshot "$OUT/hashes-baseline.txt"
   fact unlock_changed "$(diff "$OUT/hashes-baseline-before-unlock.txt" "$OUT/hashes-baseline.txt" | sed -n 's/^> [^ ]*  //p' | tr '\n' ' ')"
@@ -675,8 +663,8 @@ upgrade() {
     "$APP" --selftest > /dev/null || { echo 'the upgraded app failed --selftest'; return 1; }
     # Its first start, stopped before anything is read, so the Run value and the data are compared after it.
     start_app "$APP" higher || return 1
-    drive window 120 || { stop_app; echo "the $HIGHER app showed no window"; return 1; }
-    stop_app
+    drive window 120 || { app_stop; echo "the $HIGHER app showed no window"; return 1; }
+    app_stop
     fact run_value_after_upgrade "$(run_value)"
     fact file_type_after_upgrade "$(file_type)"
     probe upgrade
@@ -684,7 +672,7 @@ upgrade() {
   elif [ "$PLATFORM" = macos ]; then
     # The upgraded app is left running and locked, so the data is compared with it started, before its unlock.
     dmg="$(candidate "$HIGHER")" || return 1
-    stop_app
+    app_stop
     mac_quit
     mac_trash "$APP" || { echo "Finder did not move the $LOWER app to the Trash"; return 1; }
     mac_install "$dmg" "$APP" || return 1
@@ -692,7 +680,7 @@ upgrade() {
     "$APP/Contents/MacOS/keypaste-app" --selftest > /dev/null || { echo 'the upgraded app failed --selftest'; return 1; }
     fact products_after_upgrade "$(mac_bundles)"
     start_app "$APP" higher || return 1
-    drive window 120 || { stop_app; echo "the $HIGHER app showed no window"; return 1; }
+    drive window 120 || { app_stop; echo "the $HIGHER app showed no window"; return 1; }
     probe upgrade
     echo "Finder moved the $LOWER app to the Trash and $HIGHER's took its place; $APP reports $(fact_read higher_version) and shows its window"
   else
@@ -705,17 +693,17 @@ upgrade() {
     fact higher_version "$(app_version "$higher")"
     "$higher" --selftest > /dev/null || { echo 'the new AppImage failed --selftest'; return 1; }
     start_app "$APP" lower-running
-    drive window 120 || { stop_app; echo "the $LOWER app showed no window"; return 1; }
+    drive window 120 || { app_stop; echo "the $LOWER app showed no window"; return 1; }
     code=0
     timeout 60 "$higher" > "$OUT/app-higher-handed-off.log" 2>&1 || code=$?
-    [ "$code" = 0 ] || { stop_app; echo "the $HIGHER start beside the running $LOWER app exited $code"; return 1; }
+    [ "$code" = 0 ] || { app_stop; echo "the $HIGHER start beside the running $LOWER app exited $code"; return 1; }
     probe_until handed_off "$HIGHER"
     start_app "$higher" higher
-    drive window 120 || { stop_app; echo "the $HIGHER app showed no window"; return 1; }
+    drive window 120 || { app_stop; echo "the $HIGHER app showed no window"; return 1; }
     probe upgrade
     start_app "$APP" lower-again
-    drive window 120 || { stop_app; echo "the $LOWER app showed no window when started again"; return 1; }
-    stop_app
+    drive window 120 || { app_stop; echo "the $LOWER app showed no window when started again"; return 1; }
+    app_stop
     probe older_start
     rm -f "$APP"
     APP="$higher"
@@ -834,7 +822,7 @@ uninstall() {
     fact file_type_after_uninstall "$(file_type)"
     echo "msiexec /x exited 0"
   elif [ "$PLATFORM" = macos ]; then
-    stop_app
+    app_stop
     mac_trash "$APP" || { echo "Finder did not move $APP to the Trash"; return 1; }
     if [ -e "$APP" ]; then fact installed_app_after_uninstall "$APP"; else fact installed_app_after_uninstall absent; fi
     fact shortcut_after_uninstall absent
@@ -892,7 +880,7 @@ run_all() {
   fi
 
   if act install-lower install_lower && act fixture fixture; then
-    if [ "$PLATFORM" = windows ]; then agree_to_terms; else link_from_settings; fi
+    if [ "$PLATFORM" = windows ]; then agree_to_terms; else link_lower; fi
     if act baseline baseline && act upgrade upgrade; then
       act read-after-upgrade read_after upgrade || true
       if [ "$PLATFORM" = macos ]; then unlock_upgraded; fi
@@ -901,7 +889,7 @@ run_all() {
       act uninstall uninstall || true
     fi
   fi
-  stop_app
+  app_stop
   fact finished true
 
   classify "$OUT" > "$OUT/verdicts.jsonl"
@@ -936,7 +924,7 @@ selftest() {
       '{"action":"install-lower","status":"ok","detail":"msiexec /i exited 0"}' \
       '{"action":"fixture","status":"ok","detail":"vault made"}' \
       '{"action":"window","status":"ok","detail":"window keypaste"}' \
-      '{"action":"agree-terms","status":"ok","detail":"invoked Continue"}' \
+      '{"action":"agree-terms","status":"ok","detail":"invoked id:Agree"}' \
       '{"action":"baseline","status":"ok","detail":"vault made, 5 files"}' \
       '{"action":"upgrade","status":"ok","detail":"MajorUpgrade exited 0"}' \
       '{"action":"read-after-upgrade","status":"ok","detail":"read back"}' \
@@ -994,8 +982,8 @@ selftest() {
     drop_action "$1" downgrade
     printf '%s\n' \
       '{"action":"window","status":"ok","detail":"window keypaste"}' \
-      '{"action":"unlocked","status":"ok","detail":"found Lock now"}' \
-      '{"action":"settings","status":"ok","detail":"sent ctrl+4"}' \
+      '{"action":"unlocked","status":"ok","detail":"found id:LockButton"}' \
+      '{"action":"settings","status":"ok","detail":"clicked id:RailSettings at 26,400"}' \
       '{"action":"link-cli","status":"ok","detail":"invoked Link the keypaste command"}' \
       '{"action":"linked","status":"ok","detail":"A terminal runs this app\u0027s keypaste from /home/runner/.local/bin/keypaste."}' >> "$work/$1/driver.jsonl"
     set_fact "$1" platform linux
@@ -1015,17 +1003,17 @@ selftest() {
     drop_action "$1" downgrade
     printf '%s\n' \
       '{"action":"window","status":"ok","detail":"window keypaste"}' \
-      '{"action":"unlocked","status":"ok","detail":"found Lock now"}' \
-      '{"action":"settings","status":"ok","detail":"sent cmd+4"}' \
+      '{"action":"unlocked","status":"ok","detail":"found id:LockButton"}' \
+      '{"action":"settings","status":"ok","detail":"clicked id:RailSettings at 26,400"}' \
       '{"action":"link-offered","status":"ok","detail":"found Link the keypaste command"}' \
       '{"action":"link-made","status":"ok","detail":"/usr/local/bin/keypaste -> /Applications/keypaste.app/Contents/MacOS/keypaste"}' \
       '{"action":"link-cli","status":"ok","detail":"invoked Link the keypaste command"}' \
       '{"action":"linked","status":"ok","detail":"A terminal runs this app\u0027s keypaste from /usr/local/bin/keypaste."}' \
-      '{"action":"open-at-login","status":"ok","detail":"invoked Open keypaste at login"}' \
+      '{"action":"open-at-login","status":"ok","detail":"toggled id:OpenAtLogin"}' \
       '{"action":"login-item","status":"ok","detail":"com.keypaste.app.plist starts /Applications/keypaste.app/Contents/MacOS/keypaste-app"}' \
       '{"action":"upgraded-typed","status":"ok","detail":"typed 21 characters"}' \
       '{"action":"upgraded-unlocked-enter","status":"ok","detail":"sent Return"}' \
-      '{"action":"upgraded-unlocked","status":"ok","detail":"found Lock now"}' >> "$work/$1/driver.jsonl"
+      '{"action":"upgraded-unlocked","status":"ok","detail":"found id:LockButton"}' >> "$work/$1/driver.jsonl"
     set_fact "$1" platform macos
     set_fact "$1" terminal_expected "$mac_link"
     set_fact "$1" terminal_after_fixture "$mac_link"$'\t'"$LOWER"$'\t'"$bridge"
@@ -1059,7 +1047,7 @@ selftest() {
   passing fixture-incomplete
   set_fact fixture-incomplete baseline 'absent clients.toml'
   passing lower-not-answered
-  refuse_action lower-not-answered agree-terms "no button 'Continue'"
+  refuse_action lower-not-answered agree-terms "no button 'Agree'"
   passing no-baseline
   refuse_action no-baseline baseline 'no audit record was written'
   passing upgrade-not-taken

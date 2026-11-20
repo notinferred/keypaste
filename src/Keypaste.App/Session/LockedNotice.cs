@@ -25,16 +25,20 @@ internal sealed class LockedNotice : IDisposable
     // Long enough for a system that answers at once; a permission dialog the person has not reached yet gets the window.
     private static readonly TimeSpan _systemAnswers = TimeSpan.FromSeconds(5);
 
+    private static readonly TimeSpan _choicePoll = TimeSpan.FromSeconds(3);
+
     private readonly AppVaultSession _session;
     private readonly Action _open;
     private readonly TimeProvider _clock;
     private readonly Action<string> _unreachable;
     private readonly Action<Exception, string>? _unexpected;
     private readonly ISystemNotifications _notifications;
+    private readonly Func<string, string, FileSystemWatcher> _watch;
 
     // Read and written on the UI thread only.
     private readonly Dictionary<string, LockedAppEndpoint> _listening = new(StringComparer.Ordinal);
     private FileSystemWatcher? _choiceWatcher;
+    private ITimer? _choicePoller;
     private UnlockViewModel? _screen;
     private RaisedNotice? _raised;
     private bool _told;
@@ -43,11 +47,19 @@ internal sealed class LockedNotice : IDisposable
     /// <summary>Hears nothing until the first unlock screen is given to <see cref="Watch"/>.</summary>
     /// <param name="session">The session whose opening of a vault ends the listening.</param>
     /// <param name="open">Shows the main window.</param>
-    /// <param name="clock">The clock a notice's arming delay runs on.</param>
+    /// <param name="clock">The clock a notice's arming delay, and the reading of the chosen vault where <c>app.toml</c> cannot be watched, run on.</param>
     /// <param name="unreachable">Told why, when a vault's endpoint cannot be bound and no bridge can reach this app for it.</param>
     /// <param name="unexpected">Keeps a report of a notice that could not be shown, at the site it names, or null.</param>
     /// <param name="notifications">The system's notifications, or null to use the window alone.</param>
-    internal LockedNotice(AppVaultSession session, Action open, TimeProvider clock, Action<string> unreachable, Action<Exception, string>? unexpected = null, ISystemNotifications? notifications = null)
+    /// <param name="watch">Makes the watcher of a directory's file by name, or null for the system's.</param>
+    internal LockedNotice(
+        AppVaultSession session,
+        Action open,
+        TimeProvider clock,
+        Action<string> unreachable,
+        Action<Exception, string>? unexpected = null,
+        ISystemNotifications? notifications = null,
+        Func<string, string, FileSystemWatcher>? watch = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(open);
@@ -60,6 +72,7 @@ internal sealed class LockedNotice : IDisposable
         _unreachable = unreachable;
         _unexpected = unexpected;
         _notifications = notifications ?? new NoSystemNotifications();
+        _watch = watch ?? ((directory, file) => new FileSystemWatcher(directory, file));
         _session.Opened += OnOpened;
     }
 
@@ -118,6 +131,15 @@ internal sealed class LockedNotice : IDisposable
 
     private void OnChoiceChanged(object? sender, FileSystemEventArgs e) => UiThread.Post(Listen);
 
+    private void OnChoiceWatchFailed(object? sender, ErrorEventArgs e) => UiThread.Post(() =>
+    {
+        if (ReferenceEquals(sender, _choiceWatcher))
+        {
+            PollChoice();
+            Listen();
+        }
+    });
+
     private void OnScreenChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(UnlockViewModel.SelectedPath))
@@ -170,7 +192,7 @@ internal sealed class LockedNotice : IDisposable
     // `keypaste use` changes the chosen vault while the app stays locked, with no lock or change of screen to follow.
     private void WatchChoice()
     {
-        if (_choiceWatcher is not null)
+        if (_choiceWatcher is not null || _choicePoller is not null)
         {
             return;
         }
@@ -179,18 +201,26 @@ internal sealed class LockedNotice : IDisposable
 
         try
         {
-            _choiceWatcher = new FileSystemWatcher(Path.GetDirectoryName(settings)!, Path.GetFileName(settings));
+            _choiceWatcher = _watch(Path.GetDirectoryName(settings)!, Path.GetFileName(settings));
             _choiceWatcher.Changed += OnChoiceChanged;
             _choiceWatcher.Created += OnChoiceChanged;
+            _choiceWatcher.Deleted += OnChoiceChanged;
             _choiceWatcher.Renamed += OnChoiceChanged;
+            _choiceWatcher.Error += OnChoiceWatchFailed;
             _choiceWatcher.EnableRaisingEvents = true;
         }
         catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
         {
-            // A home that cannot be watched leaves the choice to be read again at the next lock or change of screen.
-            _choiceWatcher?.Dispose();
-            _choiceWatcher = null;
+            PollChoice();
         }
+    }
+
+    // Where the system refuses or drops the watch, as at Linux's limit on watches, the choice is read again on the clock until the next unlock.
+    private void PollChoice()
+    {
+        _choiceWatcher?.Dispose();
+        _choiceWatcher = null;
+        _choicePoller ??= _clock.CreateTimer(_ => UiThread.Post(Listen), null, _choicePoll, _choicePoll);
     }
 
     private void Tell(string name, string vault)
@@ -263,6 +293,8 @@ internal sealed class LockedNotice : IDisposable
 
         _choiceWatcher?.Dispose();
         _choiceWatcher = null;
+        _choicePoller?.Dispose();
+        _choicePoller = null;
 
         foreach (var endpoint in _listening.Values)
         {

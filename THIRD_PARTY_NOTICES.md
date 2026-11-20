@@ -142,19 +142,19 @@ Licence texts and any third-party notices a package bundles follow the table, ea
 
 | Package | Version | Ships in | Native code | Licence | Copyright | Project |
 |---|---|---|---|---|---|---|
-| Avalonia | 12.1.0 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia | 12.1.5 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
 | Avalonia.Angle.Windows.Natives | 2.1.27548.20260419 | Desktop (win-x64) | yes | See its text below | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/ |
-| Avalonia.Desktop | 12.1.0 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
-| Avalonia.Fonts.Inter | 12.1.0 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
-| Avalonia.FreeDesktop | 12.1.0 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
-| Avalonia.FreeDesktop.AtSpi | 12.1.0 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
-| Avalonia.HarfBuzz | 12.1.0 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
-| Avalonia.Native | 12.1.0 | Desktop | yes | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
-| Avalonia.Remote.Protocol | 12.1.0 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
-| Avalonia.Skia | 12.1.0 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
-| Avalonia.Themes.Fluent | 12.1.0 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
-| Avalonia.Win32 | 12.1.0 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
-| Avalonia.X11 | 12.1.0 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia.Desktop | 12.1.5 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia.Fonts.Inter | 12.1.5 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia.FreeDesktop | 12.1.5 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia.FreeDesktop.AtSpi | 12.1.5 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia.HarfBuzz | 12.1.5 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia.Native | 12.1.5 | Desktop | yes | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia.Remote.Protocol | 12.1.5 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia.Skia | 12.1.5 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia.Themes.Fluent | 12.1.5 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia.Win32 | 12.1.5 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
+| Avalonia.X11 | 12.1.5 | Desktop | no | MIT | Copyright 2013-2026 © The AvaloniaUI Project | https://avaloniaui.net/?utm_source=nuget&utm_medium=referral&utm_content=project_homepage_link |
 | CommunityToolkit.Diagnostics | 8.4.2 | Desktop | no | MIT | (c) .NET Foundation and Contributors. All rights reserved. | https://github.com/CommunityToolkit/dotnet |
 | CommunityToolkit.Mvvm | 8.4.2 | Desktop | no | MIT | (c) .NET Foundation and Contributors. All rights reserved. | https://github.com/CommunityToolkit/dotnet |
 | HarfBuzzSharp | 8.3.1.3 | Desktop | no | MIT | © Microsoft Corporation. All rights reserved. | https://go.microsoft.com/fwlink/?linkid=868515 |

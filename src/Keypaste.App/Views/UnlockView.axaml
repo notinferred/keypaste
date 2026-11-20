@@ -8,6 +8,13 @@
              x:DataType="vm:UnlockViewModel"
              Background="{DynamicResource KpBgApp}">
 
+  <UserControl.Styles>
+    <!-- A KeePassXC database's row is found by its id, as a click on it lands on the row. -->
+    <Style Selector="ListBox#KeePassXcList > ListBoxItem">
+      <Setter Property="AutomationProperties.AutomationId" Value="{ReflectionBinding AutomationId}" />
+    </Style>
+  </UserControl.Styles>
+
   <!-- Every vault locked, drawn as the window's shell draws a locked vault: the vaults this computer opened as locked sidebar
        rows, choosing one shows its unlock form, and Add vault… at the sidebar's foot. With none yet, the welcome alone. -->
   <Panel DragDrop.AllowDrop="True">

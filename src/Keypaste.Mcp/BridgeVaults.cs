@@ -147,12 +147,12 @@ internal sealed class BridgeVaults : IAsyncDisposable
             }
             catch (OperationCanceledException)
             {
-                return new VaultAnswer(route, new EntryNameListing(VaultAvailability.Failed, [], ToolText.Cancelled, true));
+                return new VaultAnswer(route, new EntryNameListing(VaultAvailability.Cancelled, [], ToolText.Cancelled, true));
             }
             catch (Exception)
             {
                 // Anything a source throws is still a call that was attempted, and is recorded as one.
-                return new VaultAnswer(route, new EntryNameListing(VaultAvailability.Failed, [], ToolText.VaultLocked, true));
+                return new VaultAnswer(route, new EntryNameListing(VaultAvailability.Failed, [], ToolText.ApproverFailed, true));
             }
         })).ConfigureAwait(false);
     }

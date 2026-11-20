@@ -305,7 +305,7 @@ public sealed class ConsoleSecretPromptTests
         await Task.Delay(ConsoleSecretPrompt.PollInterval * 3, TestContext.Current.CancellationToken);
         await withdraw.CancelAsync();
 
-        Assert.Null(await reading.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => reading.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
 
         var stopped = Volatile.Read(ref polls);
         await Task.Delay(ConsoleSecretPrompt.PollInterval * 3, TestContext.Current.CancellationToken);

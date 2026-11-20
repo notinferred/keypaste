@@ -33,7 +33,9 @@ internal sealed class ShareFixture : IDisposable
 
     internal string VaultPath => Path.Combine(_directory, "vault.kdbx");
 
-    internal string AuditPath => Path.Combine(_directory, "home", "audit.jsonl");
+    internal string Home => Path.Combine(_directory, "home");
+
+    internal string AuditPath => Path.Combine(Home, "audit.jsonl");
 
     internal FakeShareServer Server { get; } = new();
 
@@ -48,7 +50,7 @@ internal sealed class ShareFixture : IDisposable
     internal Vault Open() => Vault.Open(VaultPath, Master);
 
     internal ShareService Service(Uri? endpoint = null) =>
-        new(new ShareClient(Server, endpoint ?? ShareEndpoint.Default), Clock, OpenAudit);
+        new(new ShareClient(Server, endpoint ?? ShareEndpoint.Default), Clock, Home, OpenAudit);
 
     internal static ShareRequest Request(EntryName? entry = null, string field = "password", int views = 1, string? passphrase = null, string? to = null)
     {

@@ -12,9 +12,9 @@ namespace Keypaste.App.Controls;
 /// <remarks>
 /// <para>
 /// <b>Why this exists instead of <c>TextBox</c> with a <c>PasswordChar</c>.</b> Avalonia's
-/// <c>TextBoxAutomationPeer</c> implements <c>IValueProvider</c> and returns <c>Owner.Text</c> with
-/// no check for <c>PasswordChar</c>, and <c>TextBox</c> does not override
-/// <c>OnCreateAutomationPeer</c> to suppress it. <c>Avalonia.FreeDesktop.AtSpi</c> is in this app's
+/// <c>TextBoxAutomationPeer</c> implements <c>IValueProvider</c> and returns <c>Owner.Text</c>, masked
+/// only while <c>PasswordChar</c> is set and the password is not revealed, and <c>TextBox</c> does not
+/// override <c>OnCreateAutomationPeer</c> to suppress it. <c>Avalonia.FreeDesktop.AtSpi</c> is in this app's
 /// dependency closure and AT-SPI is a session-bus service, so a master password typed into a
 /// <c>TextBox</c> is readable by another process on the machine. <c>TextBox</c> also keeps an
 /// undo stack whose states each hold a <c>string</c>, which is a retained history of partial

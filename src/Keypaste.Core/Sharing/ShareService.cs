@@ -2,6 +2,7 @@
 using System.Buffers.Text;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Ownership;
 
 namespace Keypaste.Core.Sharing;
 
@@ -42,8 +43,9 @@ public sealed record ExpiredShares(int Forgotten, string? Failure);
 /// </remarks>
 /// <param name="client">The share server.</param>
 /// <param name="clock">What time it is.</param>
+/// <param name="home">keypaste's home, from <see cref="KeypasteHome.Resolve"/>, whose audit lines name each vault by its key there.</param>
 /// <param name="openAudit">Opens the audit log, or returns null when it cannot; the service disposes it.</param>
-public sealed class ShareService(ShareClient client, TimeProvider clock, Func<AuditLog?> openAudit)
+public sealed class ShareService(ShareClient client, TimeProvider clock, string home, Func<AuditLog?> openAudit)
 {
     /// <summary>The shortest a link may last.</summary>
     public static readonly TimeSpan MinimumTtl = TimeSpan.FromMinutes(5);
@@ -88,6 +90,7 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
 
     private readonly ShareClient _client = client ?? throw new ArgumentNullException(nameof(client));
     private readonly TimeProvider _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+    private readonly string _home = home ?? throw new ArgumentNullException(nameof(home));
     private readonly Func<AuditLog?> _openAudit = openAudit ?? throw new ArgumentNullException(nameof(openAudit));
 
     /// <summary>Uploads a sealed share, records it and audits it, then returns its link.</summary>
@@ -193,7 +196,7 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
             return Refused($"the vault could not be saved ({unsaved}), so the link was withdrawn");
         }
 
-        if (!TryAudit(AuditMethod.ShareCreated, info, ShareAuditReason.Created(info)))
+        if (!TryAudit(vault, AuditMethod.ShareCreated, info, ShareAuditReason.Created(info)))
         {
             await _client.RevokeAsync(info.Id, revokeToken, CancellationToken.None).ConfigureAwait(false);
             TryForget(vault, store, info.Id, save: true);
@@ -234,7 +237,7 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
             return new ShareOutcome(false, null, info, ShareFailure.None, $"the link was revoked, but the vault could not be saved ({unsaved})");
         }
 
-        if (!TryAudit(AuditMethod.ShareRevoked, info, $"share {info.Id} revoked"))
+        if (!TryAudit(vault, AuditMethod.ShareRevoked, info, $"share {info.Id} revoked"))
         {
             return new ShareOutcome(false, null, info, ShareFailure.None, "the link was revoked, but the audit log could not be written");
         }
@@ -268,7 +271,7 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
 
         foreach (var info in forgotten)
         {
-            if (!TryAudit(AuditMethod.ShareRevoked, info, $"share {info.Id} expired and forgotten"))
+            if (!TryAudit(vault, AuditMethod.ShareRevoked, info, $"share {info.Id} expired and forgotten"))
             {
                 unrecorded++;
             }
@@ -463,7 +466,7 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
         }
     }
 
-    private bool TryAudit(AuditMethod method, ShareInfo info, string reason)
+    private bool TryAudit(Vault vault, AuditMethod method, ShareInfo info, string reason)
     {
         using var audit = _openAudit();
 
@@ -476,6 +479,7 @@ public sealed class ShareService(ShareClient client, TimeProvider clock, Func<Au
                 Decision = AuditDecision.Granted,
                 Method = method,
                 Reason = reason,
+                Vault = VaultIdentity.Of(_home, vault.Path).Key,
             },
             out _);
     }

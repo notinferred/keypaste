@@ -13,13 +13,13 @@
 # once, so the first run offers it from KeePassXC's recent databases.
 #
 # The acts, in order, and the acts each needs:
-#   first-run      Continue on the first-launch screen, then KeePassXC's database offered on the first run, chosen and
-#                  unlocked, and Diagnostics saying no crash report waits
+#   first-run      Agree on the first-launch screen, then KeePassXC's database offered on the first run, chosen and
+#                  unlocked, and Diagnostics saying crash reports are off, so none are kept
 #   field          a key kept as a custom field from the item's pane                                  first-run
-#   notes-flag     a KEY=value line in notes flagged in Settings' Recommendations and moved to a field first-run
+#   notes-flag     a KEY=value line in notes flagged in Security's recommendations and moved to a field first-run
 #   project-run    the item tagged into a project, whose Run starts a child that receives the field   field
 #   edit-rerun     the value replaced, and the next Run's child receives the new one                  project-run
-#   connect        Agents' Connect registers Claude Code without a vault path; that command answers   first-run
+#   connect        Agents' Connect registers Claude Code pinned to this vault; that command answers   first-run
 #   approve-deny   Allow disarmed without focus, its request allowed once, a second one denied            connect, field
 #   restore        a revision, an item from Trash and a backup restored                               field
 #   change-access  the master password changed in Settings: the old one refused, the new one unlocks  first-run
@@ -56,7 +56,8 @@ readonly NOTE_KEY='ACTS_NOTE_KEY'
 readonly ENTRY_SCRATCH='acts-scratch'
 readonly PROJECT='acts'
 readonly TOOL='Claude Code'
-readonly PROMPT='keypaste: an agent is asking for a credential'
+# A prompt's title names the vault that asked.
+readonly PROMPT="keypaste: an agent is asking for a credential, in ${VAULT_NAME%.kdbx}"
 readonly CR=$'\r'
 readonly TAB=$'\t'
 
@@ -135,8 +136,8 @@ evidence_first_run() {
   if [ -z "$chosen" ]; then contradict 'the app unlocked and chose no vault for agents and the CLI in app.toml'
   elif [ "$(path_key "$chosen" "$platform")" != "$(path_key "$vault" "$platform")" ]; then
     contradict "the app chose $chosen, not KeePassXC's $vault"
-  elif [ "$crash" != 0 ]; then contradict "after Continue alone, app.toml says send_crash_reports = ${crash:-nothing}"
-  else pass "the first-launch screen showed, KeePassXC's recent databases offered $VAULT_NAME, and the app unlocked it and chose it: $vault; Continue alone wrote send_crash_reports = 0"
+  elif [ "$crash" != 0 ]; then contradict "after Agree alone, app.toml says send_crash_reports = ${crash:-nothing}"
+  else pass "the first-launch screen showed, KeePassXC's recent databases offered $VAULT_NAME, and the app unlocked it and chose it: $vault; Agree alone wrote send_crash_reports = 0"
   fi
 }
 
@@ -196,12 +197,14 @@ evidence_edit_rerun() {
 evidence_connect() {
   local registration vaulted tools
   registration="$(fact_of "$1" connect registration)"
-  vaulted="$(fact_of "$1" connect has_vault)"
+  vaulted="$(fact_of "$1" connect vault_arg)"
   tools="$(fact_of "$1" connect tools)"
   if [ -z "$registration" ]; then contradict "Connect completed and Claude Code's configuration holds no keypaste"
-  elif [ "$vaulted" != false ]; then contradict "Claude Code was registered with a vault path: $registration"
+  # Connect pins the vault in view, the one vault here.
+  elif [ "${vaulted##*[/\\]}" != "$VAULT_NAME" ]; then
+    contradict "Claude Code was registered with --vault '${vaulted:-none}', not this vault's $VAULT_NAME: $registration"
   elif [[ " $tools " != *' request_credential '* ]]; then contradict "the registered command answered without request_credential among its tools: ${tools:-none}"
-  else pass "Agents' Connect registered '$(fact_of "$1" connect command)' for Claude Code with no vault path, and that command answered as $(fact_of "$1" connect server)"
+  else pass "Agents' Connect registered '$(fact_of "$1" connect command)' for Claude Code with --vault $vaulted, and that command answered as $(fact_of "$1" connect server)"
   fi
 }
 
@@ -366,18 +369,7 @@ screenshot() {
   fi
 }
 
-platform() {
-  case "$RID" in
-    win-x64) echo windows ;;
-    linux-x64) echo linux ;;
-    osx-arm64) echo macos ;;
-    *) die "no desktop acts for $RID" ;;
-  esac
-}
-
 now_ms() { perl -MTime::HiRes=time -e 'printf "%d\n", time * 1000'; }
-
-sha256_of() { if command -v sha256sum > /dev/null; then sha256sum < "$1"; else shasum -a 256 < "$1"; fi | awk '{print $1}'; }
 
 sha256_text() { printf '%s' "$1" | if command -v sha256sum > /dev/null; then sha256sum; else shasum -a 256; fi | awk '{print $1}'; }
 
@@ -515,59 +507,18 @@ setup() {
 # --- the app --------------------------------------------------------------------------------------
 
 app_launch() {
-  local log="$OUT/app.log"
-  case "$PLATFORM" in
-    windows)
-      # To a file, not a pipe: the app inherits PowerShell's handles, and an inherited pipe would hold this shell.
-      powershell -NoProfile -Command "(Start-Process -FilePath '$(cygpath -w "$APP")' -RedirectStandardOutput '$(cygpath -w "$log.out")' -RedirectStandardError '$(cygpath -w "$log")' -PassThru).Id" \
-        > "$OUT/app.pid"
-      APP_PID="$(tr -d "$CR" < "$OUT/app.pid")"
-      # The Windows driver writes the window's automation tree here whenever a locator finds nothing.
-      DRIVE_TREE_DIR="$(native "$OUT")"
-      export DRIVE_TREE_DIR
-      ;;
-    macos)
-      # Where the driver keeps the window's tree when a step cannot be done.
-      export DRIVE_TREE_DIR="$OUT"
-      APP_PID="$(mac_start "$APP" "$log")" || { echo "$APP_PID"; return 1; }
-      ;;
-    linux)
-      "$APP" > "$log" 2>&1 &
-      APP_PID=$!
-      ;;
-  esac
-  [ -n "$APP_PID" ] || { echo "$APP started with no process id"; return 1; }
+  app_start "$APP" "$OUT/app" || return 1
   echo "started $APP as process $APP_PID in the default home"
 }
 
-app_quit() {
-  case "$PLATFORM" in
-    windows) taskkill //F //PID "$APP_PID" > /dev/null 2>&1 || true ;;
-    macos) mac_quit ;;
-    linux)
-      pkill -f usr/bin/keypaste-app 2> /dev/null || true
-      kill "$APP_PID" 2> /dev/null || true
-      wait "$APP_PID" 2> /dev/null || true
-      ;;
-  esac
-}
-
 # The unlock screen's password field is clicked first, as a person does, since the focus may be elsewhere.
-unlock_with() { drive focus id:Password && drive type "$1" && drive key Return && drive wait 'Lock now' 120; }
+unlock_with() { drive focus id:Password && drive type "$1" && drive key Return && drive wait id:LockButton 120; }
 
 # The vault the app chose for agents and the CLI: app.toml's vault, whose line ends in a comment and whose value holds
 # no quote or backslash (TomlWriter).
 chosen_vault() { sed -n 's/^vault = "\([^"]*\)".*$/\1/p' "$HOME_DIR/app.toml" 2> /dev/null | head -n 1; }
-# The project's page, from its row in the sidebar. Linux's AT-SPI (Avalonia 12.1) keeps a list's rows as it first
-# listed them, so the row the tag added is not among them there; it is reached as from the keyboard instead: the
-# Items row clicked, End to Agents, the last row, and Up to the project's row above it.
-open_project() {
-  if [ "$PLATFORM" = linux ]; then
-    drive click Items && drive key End && drive key Up && drive wait 'Project directory' 30
-  else
-    drive select "$PROJECT"
-  fi
-}
+# The project's page: Environments opens the vault's first project, its only one here.
+open_project() { go PlaceEnvironments && drive wait id:ProjectTitle 30; }
 
 # --- the vault through the CLI --------------------------------------------------------------------
 
@@ -956,8 +907,8 @@ wait_for_file() {
 # run_child: Run in a terminal and Start, then what the child reported.
 run_child() {
   rm -f "$RUN_DIR/report.txt"
-  attempt run drive invoke 'Run in a terminal' || return 1
-  attempt start drive invoke Start || return 1
+  attempt run drive invoke id:RunProject || return 1
+  attempt start drive invoke id:StartRun || return 1
   attempt child wait_for_file "$RUN_DIR/report.txt" 60 || return 1
   fact child "$(tr '\n' ' ' < "$RUN_DIR/report.txt" | tr -d "$CR")"
   fact child_field_sha256 "$(awk -F '\t' -v k="$FIELD" '$1 == k { print $2 }' "$RUN_DIR/report.txt" | tr -d "$CR")"
@@ -1000,7 +951,7 @@ read_registration() {
   REG_ENV=()
   while IFS= read -r line; do [ -z "$line" ] || REG_ENV+=("$line"); done < <(jq -r '.env // {} | to_entries[] | "\(.key)=\(.value)"' <<< "$entry" | tr -d "$CR")
   fact command "${REG_CMD[*]}"
-  if jq -e '[.args[]?] | any(. == "--vault" or startswith("--vault="))' <<< "$entry" > /dev/null; then fact has_vault true; else fact has_vault false; fi
+  fact vault_arg "$(jq -r '[.args[]?] as $a | [range(0; $a | length - 1) | select($a[.] == "--vault") | $a[. + 1]] | join(" ")' <<< "$entry" | tr -d "$CR")"
   # Git Bash starts a Windows path once it is its own spelling of it.
   if [ "$PLATFORM" = windows ]; then REG_CMD[0]="$(cygpath -u "${REG_CMD[0]}")"; fi
   echo "the registration starts ${REG_CMD[*]}"
@@ -1067,70 +1018,74 @@ act_first_run() {
   attempt launch app_launch || return 1
   attempt window drive window 120 || return 1
   # The first-launch screen stands before the welcome.
-  attempt agree-terms drive invoke Continue || return 1
-  attempt keepassxc-list drive find 'KEEPASSXC LAST OPENED' || return 1
-  attempt choose drive select "$VAULT_NAME" || return 1
+  attempt agree-terms drive invoke id:Agree || return 1
+  attempt keepassxc-list drive find id:KeePassXcList || return 1
+  attempt choose drive click "id:KeePassXc:${VAULT_NAME%.kdbx}" || return 1
   # Choosing the database leaves the focus on its list, so the password field is clicked as a person does.
   attempt password-focus drive focus id:Password || return 1
   attempt password drive type "$PASSWORD" || return 1
   # Timed inside the driver, from Return to the item list, since starting a driver can take longer than an unlock.
   attempt unlock drive key-wait Return "$ENTRY_FIELD" 120 || return 1
   fact unlock_ms "$(step_detail "$OUT" first-run unlock | sed -n 's/.* \([0-9][0-9]*\) ms after .*/\1/p')"
-  attempt unlocked drive find 'Lock now' || return 1
+  attempt unlocked drive find id:LockButton || return 1
   fact chosen_vault "$(chosen_vault)"
   fact crash_reports "$(sed -n 's/^send_crash_reports = \([0-9]*\).*$/\1/p' "$HOME_DIR/app.toml" 2> /dev/null | head -n 1)"
-  # Diagnostics says no report waits.
-  attempt settings shortcut 4 || return 1
-  attempt advanced drive invoke 'Open Advanced' || return 1
-  attempt diagnostics drive invoke 'Open diagnostics' || return 1
-  attempt crash-reports-none drive find 'No crash reports are waiting to be sent.' || return 1
+  attempt settings go RailSettings || return 1
+  attempt diagnostics go SectionDiagnostics || return 1
+  # Agree alone leaves crash reports off, so Diagnostics keeps none.
+  attempt crash-reports-none says id:CrashReportsSummary 'Send crash reports is off, so none are kept.' || return 1
 }
 
 act_field() {
-  attempt items shortcut 1 || return 1
+  attempt items go RailEntries || return 1
   attempt choose drive select "$ENTRY_FIELD" || return 1
-  attempt add-field drive invoke 'Add field' || return 1
+  attempt entry-menu drive invoke id:EntryMenu || return 1
+  # A menu's items offer no invoke to the drivers, so each is clicked, as a person does.
+  attempt add-field drive click id:AddField || return 1
   attempt name drive set-named id:NewFieldName "$FIELD" || return 1
   attempt value-focus drive focus id:NewFieldValue || return 1
   attempt value drive type "$VALUE1" || return 1
-  saved save_ms add drive invoke Add || return 1
+  saved save_ms add drive invoke id:ConfirmAddField || return 1
   fact field_sha256 "$(field_hash "$ENTRY_FIELD" "$FIELD")"
 }
 
 act_notes_flag() {
-  attempt settings shortcut 4 || return 1
-  attempt recommendations drive invoke 'Open recommendations' || return 1
-  attempt flagged drive find-prefix "$NOTE_KEY " || return 1
-  saved moved_ms move drive invoke "Move $NOTE_KEY to a field" || return 1
+  attempt security go RailRecommendations || return 1
+  # A row whose notes hold one key is headed by the key.
+  attempt flagged drive find "$NOTE_KEY" || return 1
+  saved moved_ms move drive invoke "id:MoveToFields:$ENTRY_NOTES" || return 1
   fact field_sha256 "$(field_hash "$ENTRY_NOTES" "$NOTE_KEY")"
   fact notes_hold_line "$(notes_hold_line)"
 }
 
 act_project_run() {
-  attempt items shortcut 1 || return 1
+  attempt items go RailEntries || return 1
   attempt choose drive select "$ENTRY_FIELD" || return 1
+  attempt tag-open drive toggle id:AddTagToggle || return 1
   attempt tag drive set-named id:NewTag "env:$PROJECT" || return 1
-  attempt add-tag drive invoke 'Add tag' || return 1
-  saved tagged_ms confirm-tag drive invoke 'Add tag[2]' || return 1
+  attempt add-tag drive invoke id:AddTag || return 1
+  saved tagged_ms confirm-tag drive invoke id:ConfirmTagChange || return 1
   attempt project open_project || return 1
   attempt key-row drive find "$FIELD" || return 1
-  attempt directory drive set-named 'Project directory' "$(native "$RUN_DIR")" || return 1
-  attempt command drive set-named Command "$(child_command)" || return 1
-  attempt save-command drive invoke Save || return 1
+  attempt project-menu drive invoke id:ProjectMore || return 1
+  attempt where-it-runs drive click id:ProjectWhereItRuns || return 1
+  attempt directory drive set-named id:LaunchDirectory "$(native "$RUN_DIR")" || return 1
+  attempt command drive set-named id:LaunchCommand "$(child_command)" || return 1
+  attempt save-command drive invoke id:SaveLaunch || return 1
   fact command "$(child_command)"
   run_child
 }
 
 act_edit_rerun() {
-  attempt items shortcut 1 || return 1
+  attempt items go RailEntries || return 1
   attempt choose drive select "$ENTRY_FIELD" || return 1
-  # The row's menu is a popup of its own, outside the window the driver searches, and takes the keyboard as it opens.
-  attempt field-menu drive invoke "More actions for $FIELD" || return 1
+  # The row's menu takes the keyboard as it opens, so its items are reached by key.
+  attempt field-menu drive invoke "id:FieldMenu:$FIELD" || return 1
   attempt replace-item drive key Down || return 1
   attempt replace drive key Return || return 1
   attempt value-focus drive focus id:ReplacementFieldValue || return 1
   attempt value drive type "$VALUE2" || return 1
-  saved replaced_ms confirm drive invoke Replace || return 1
+  saved replaced_ms confirm drive invoke id:ReplaceFieldSave || return 1
   fact field_sha256 "$(field_hash "$ENTRY_FIELD" "$FIELD")"
   attempt project open_project || return 1
   run_child
@@ -1139,13 +1094,14 @@ act_edit_rerun() {
 act_connect() {
   CLAUDE_VERSION="$(claude --version 2> /dev/null | head -n 1 | tr -d "$CR" || true)"
   fact claude "${CLAUDE_VERSION:-not on PATH}"
-  attempt agents shortcut 2 || return 1
-  attempt offered drive wait "Connect $TOOL" 90 || return 1
-  attempt connect drive invoke "Connect $TOOL" || return 1
-  # A TextBlock's accessible name is its text, so the plan is found by its automation id.
-  attempt plan drive read id:ConnectPlan || return 1
-  attempt run-it drive invoke "Connect $TOOL" || return 1
+  attempt agents go RailAgentActivity || return 1
+  attempt offered drive wait "$TOOL" 90 || return 1
+  attempt choose drive select "$TOOL" || return 1
+  attempt connect drive invoke id:ConnectTool || return 1
+  attempt plan drive read id:ConnectNote || return 1
+  attempt run-it drive invoke id:RunConnection || return 1
   attempt registered wait_registration 60 || return 1
+  attempt close-sheet drive invoke id:CloseSheet || return 1
   fact registration "$(registration_json)"
   attempt registration read_registration || return 1
   attempt client mcp_start connect || return 1
@@ -1160,7 +1116,7 @@ act_connect() {
 allow_reading() {
   local reading end=$((SECONDS + $2))
   while :; do
-    reading="$(drive --window "$PROMPT" enabled 'Allow once' 2>&1 | tail -n 1 | tr -d "$CR")"
+    reading="$(drive --window "$PROMPT" enabled id:AllowOnce 2>&1 | tail -n 1 | tr -d "$CR")"
     if [ "$reading" = "$1" ] || [ "$SECONDS" -ge "$end" ]; then break; fi
     sleep 0.2
   done
@@ -1176,14 +1132,14 @@ act_approve_deny() {
   attempt prompt drive --window "$PROMPT" window 60 || { mcp_finish; return 1; }
   screenshot approve-prompt "$PROMPT"
   # A real click on the app's main window takes focus with no second app; the wait passes the arming delay, which a prompt without focus must not count.
-  attempt main-front drive click Places || { mcp_finish; return 1; }
+  attempt main-front drive click id:RailNav || { mcp_finish; return 1; }
   allow_reading 'not enabled' 15 > /dev/null
   sleep 2
   fact allow_unfocused "$(allow_reading 'not enabled' 0)"
   # A person's click on the disarmed allow activates it, and it arms a second later; macOS's accessibility focus moves no key window between one app's windows.
-  attempt prompt-front drive --window "$PROMPT" click 'Allow once' || { mcp_finish; return 1; }
+  attempt prompt-front drive --window "$PROMPT" click id:AllowOnce || { mcp_finish; return 1; }
   fact allow_activated "$(allow_reading enabled 15)"
-  attempt allow drive --window "$PROMPT" invoke 'Allow once' || { mcp_finish; return 1; }
+  attempt allow drive --window "$PROMPT" invoke id:AllowOnce || { mcp_finish; return 1; }
   attempt allowed replied 60 3 || { mcp_finish; return 1; }
   fact allow_error "$(reply_of 3 '.result.isError // false')"
   fact allow_sha256 "$(reply_value 3)"
@@ -1191,7 +1147,7 @@ act_approve_deny() {
   mark="$(lines_in "$AUDIT")"
   mcp_request 4 'R.1a: a request a person denies'
   attempt prompt-again drive --window "$PROMPT" window 60 || { mcp_finish; return 1; }
-  attempt deny drive --window "$PROMPT" invoke Deny || { mcp_finish; return 1; }
+  attempt deny drive --window "$PROMPT" invoke id:Deny || { mcp_finish; return 1; }
   attempt denied replied 60 4 || { mcp_finish; return 1; }
   fact deny_error "$(reply_of 4 '.result.isError // false')"
   fact deny_value "$(reply_value 4)"
@@ -1202,64 +1158,72 @@ act_approve_deny() {
 act_restore() {
   local file
   # A revision: the newest the item's history keeps holds the value edit-rerun replaced.
-  attempt items shortcut 1 || return 1
+  attempt items go RailEntries || return 1
   attempt choose drive select "$ENTRY_FIELD" || return 1
-  attempt actions drive toggle 'More actions' || return 1
   attempt history drive invoke id:HistoryToggle || return 1
   attempt revision drive select-nth id:Revisions 1 || return 1
   # That revision holds the item's project tags as they are, so Restore this writes it without asking first.
   saved revision_ms restore-revision drive invoke id:RestoreRevision || return 1
   fact revision_sha256 "$(field_hash "$ENTRY_FIELD" "$FIELD")"
-  # An open history takes the whole view, so it is closed for the list to show again.
-  attempt hide-history drive invoke 'Hide history' || return 1
+  attempt hide-history drive invoke id:HistoryToggle || return 1
   # A deletion: the scratch item deleted, then restored from Trash.
   attempt choose-scratch drive select "$ENTRY_SCRATCH" || return 1
-  attempt scratch-actions drive toggle 'More actions' || return 1
-  saved deleted_ms delete drive invoke id:DeleteEntry || return 1
+  attempt scratch-actions drive invoke id:EntryMenu || return 1
+  saved deleted_ms delete drive click id:DeleteEntry || return 1
   fact deleted_listed "$(listed "$ENTRY_SCRATCH")"
-  attempt trash shortcut 3 || return 1
+  attempt trash go PlaceTrash || return 1
   attempt choose-trashed drive select "$ENTRY_SCRATCH" || return 1
   saved untrashed_ms restore-trashed drive invoke id:RestoreButton || return 1
   fact restored_listed "$(listed "$ENTRY_SCRATCH")"
   # A backup: what each backup and the vault hold, then the first the unlock screen lists restored.
   attempt backups backups || return 1
-  attempt lock drive invoke 'Lock now' || return 1
-  attempt restore-screen drive invoke 'Restore a backup' || return 1
-  attempt backup drive select-nth id:BackupList 1 || return 1
+  attempt lock drive invoke id:LockButton || return 1
+  # The unlock screen offers its backups after a refused unlock.
+  attempt refused-focus drive focus id:Password || return 1
+  attempt refused-password drive type "not-$PASSWORD" || return 1
+  attempt refused drive key Return || return 1
+  attempt restore-screen drive invoke id:RestoreBackup || return 1
+  # As with the password's change, the closed list's choices are reached by key: Down from none chosen is the first.
+  attempt backup-list drive focus id:BackupList || return 1
+  attempt backup drive key Down || return 1
   attempt backup-focus drive focus id:BackupPassword || return 1
   attempt backup-password drive type "$PASSWORD" || return 1
-  attempt check drive invoke 'Check this backup' || return 1
-  saved restored_ms restore-backup drive invoke 'Restore this backup' || return 1
+  attempt check drive invoke id:CheckBackup || return 1
+  saved restored_ms restore-backup drive invoke id:ConfirmRestore || return 1
   fact fingerprint_after "$(fingerprint "$VAULT_NATIVE")"
   for file in ${BACKUPS[@]+"${BACKUPS[@]}"}; do
     if [ "$(fingerprint "$(native "$file")")" = "$(fact_of "$OUT" restore fingerprint_after)" ]; then fact backup_match "$(basename "$file")"; fi
   done
   # The check unlocked the backup with its password, so the restored vault opens without asking again.
-  attempt reopened drive wait 'Lock now' 60 || return 1
+  attempt reopened drive wait id:LockButton 60 || return 1
 }
 
 act_change_access() {
-  attempt settings shortcut 4 || return 1
+  attempt settings go RailSettings || return 1
+  attempt this-vault go SectionThisVault || return 1
+  attempt access-form drive invoke id:OpenAccessForm || return 1
   attempt current-focus drive focus id:CurrentPassword || return 1
   attempt current drive type "$PASSWORD" || return 1
-  attempt set-new drive check 'Set a new master password' on || return 1
+  # A closed list's choices are not in the tree until it opens, so Down moves from Keep to Set a new master password.
+  attempt set-new-focus drive focus id:PasswordChange || return 1
+  attempt set-new drive key Down || return 1
   attempt new-focus drive focus id:AccessNewPassword || return 1
   attempt new drive type "$NEW_MASTER" || return 1
   attempt confirm-focus drive focus id:AccessConfirmPassword || return 1
   attempt confirm drive type "$NEW_MASTER" || return 1
-  attempt review drive invoke Change || return 1
-  saved changed_ms change drive invoke 'Change access' || return 1
+  attempt review drive invoke id:ReviewAccessChange || return 1
+  saved changed_ms change drive invoke id:ConfirmAccessChange || return 1
   fact old_password "$(opens_with "$PASSWORD")"
   fact new_password "$(opens_with "$NEW_MASTER")"
   PASSWORD="$NEW_MASTER"
-  attempt lock drive invoke 'Lock now' || return 1
+  attempt lock drive invoke id:LockButton || return 1
   attempt unlock-new unlock_with "$PASSWORD" || return 1
 }
 
 act_lock_refused() {
   local mark
-  attempt lock drive invoke 'Lock now' || return 1
-  attempt locked drive find Unlock || return 1
+  attempt lock drive invoke id:LockButton || return 1
+  attempt locked drive find id:Unlock || return 1
   mark="$(lines_in "$AUDIT")"
   attempt client mcp_start locked || return 1
   mcp_request 5 'R.1a: a request after the lock'
@@ -1334,7 +1298,7 @@ run_all() {
   fi
   CURRENT=run
   exec 8>&- 2> /dev/null || true
-  [ -z "$APP_PID" ] || app_quit
+  app_stop
   close_terminals
   rm -rf "$MCP_DIR" 2> /dev/null || true
   if [ -f "$AUDIT" ]; then cp "$AUDIT" "$OUT/audit.jsonl"; fi
@@ -1391,7 +1355,7 @@ selftest() {
         '{"act":"edit-rerun","fact":"child_field_sha256","value":"b2"}' \
         '{"act":"connect","fact":"registration","value":"{\"type\":\"stdio\",\"command\":\"/home/runner/.local/bin/keypaste\",\"args\":[\"mcp\"]}"}' \
         '{"act":"connect","fact":"command","value":"/home/runner/.local/bin/keypaste mcp"}' \
-        '{"act":"connect","fact":"has_vault","value":"false"}' \
+        '{"act":"connect","fact":"vault_arg","value":"/home/runner/vaults/acts.kdbx"}' \
         '{"act":"connect","fact":"server","value":"{\"name\":\"keypaste\"}"}' \
         '{"act":"connect","fact":"tools","value":"list_entries request_credential"}' \
         '{"act":"approve-deny","fact":"expected_sha256","value":"b2"}' \
@@ -1478,7 +1442,7 @@ selftest() {
   passing rerun-old
   set_fact rerun-old edit-rerun child_field_sha256 a1
   passing vault-path
-  set_fact vault-path connect has_vault true
+  set_fact vault-path connect vault_arg ''
   passing no-tool
   set_fact no-tool connect tools 'list_entries'
   passing automatic
@@ -1540,7 +1504,7 @@ selftest() {
   expect child-unset project-run contradiction 'without ACTS_FIELD'
   expect child-unset edit-rerun unreached
   expect rerun-old edit-rerun contradiction 'old value'
-  expect vault-path connect contradiction 'vault path'
+  expect vault-path connect contradiction "not this vault's"
   expect vault-path approve-deny unreached 'connect did not pass'
   expect vault-path lock-refused unreached 'connect did not pass'
   expect no-tool connect contradiction 'request_credential'

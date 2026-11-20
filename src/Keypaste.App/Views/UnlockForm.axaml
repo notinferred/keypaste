@@ -316,7 +316,8 @@
 
           <WrapPanel Classes="form-actions">
             <Button Classes="ghost" Content="{x:Static res:Strings.Cancel}" Command="{Binding $parent[views:UnlockForm].((vm:UnlockViewModel)DataContext).CloseRestoreCommand, FallbackValue={x:Null}}" />
-            <Button Classes="primary"
+            <Button Name="CheckBackup"
+                    Classes="primary"
                     Classes.busy="{Binding Busy}"
                     Command="{Binding CheckCommand}"
                     AutomationProperties.Name="{x:Static res:Strings.CheckThisBackup}">

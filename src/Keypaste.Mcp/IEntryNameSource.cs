@@ -1,10 +1,11 @@
 using Keypaste.Core;
+using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Keypaste.Mcp.Tools;
 
 namespace Keypaste.Mcp;
 
-/// <summary>Whether the vault could be read at all.</summary>
+/// <summary>Whether the vault could be read at all, and if not, how the asking ended.</summary>
 internal enum VaultAvailability
 {
     /// <summary>
@@ -16,7 +17,7 @@ internal enum VaultAvailability
     /// <summary>The names were read.</summary>
     Available = 1,
 
-    /// <summary>Something went wrong. Treated exactly like <see cref="Locked"/>: deny.</summary>
+    /// <summary>An owner was reached and the exchange failed, or the source threw.</summary>
     Failed = 2,
 
     /// <summary>
@@ -42,6 +43,12 @@ internal enum VaultAvailability
     /// <see cref="ToolText.AuditUnavailable"/> is what the agent is told.
     /// </summary>
     Unrecorded = 6,
+
+    /// <summary>The agent withdrew the call before an answer it could read.</summary>
+    Cancelled = 7,
+
+    /// <summary>No process holding the vault could be reached.</summary>
+    NoApprover = 8,
 }
 
 /// <summary>What the vault had to say when asked for its entry names or searched.</summary>
@@ -74,6 +81,20 @@ internal sealed record EntryNameListing(
 
     /// <summary>The reason the bridge's line records when it differs from what the agent is told, or null when it does not.</summary>
     public string? AuditReason { get; init; }
+
+    /// <summary>How the bridge's line records a listing or search that showed nothing.</summary>
+    /// <exception cref="InvalidOperationException">The vault was read.</exception>
+    public AuditMethod RefusalMethod => Availability switch
+    {
+        VaultAvailability.Locked => AuditMethod.VaultLocked,
+        VaultAvailability.Busy => AuditMethod.Busy,
+        VaultAvailability.NoSession => AuditMethod.NoSession,
+        VaultAvailability.Changed => AuditMethod.VaultChanged,
+        VaultAvailability.Cancelled => AuditMethod.Cancelled,
+        VaultAvailability.NoApprover => AuditMethod.NoApprover,
+        VaultAvailability.Failed or VaultAvailability.Unrecorded => AuditMethod.Failed,
+        _ => throw new InvalidOperationException("a vault that was read refused nothing"),
+    };
 }
 
 /// <summary>
@@ -194,15 +215,15 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
 
         if (outcome == ApproverOutcome.Refused)
         {
-            return refusal?.Refusal == Core.Audit.AuditMethod.VaultLocked
+            return refusal?.Refusal == AuditMethod.VaultLocked
                 ? new EntryNameListing(VaultAvailability.Locked, [], ToolText.VaultLocked, true)
                 : new EntryNameListing(VaultAvailability.NoSession, [], ToolText.NoSession, true);
         }
 
         // A withdrawn request's reply is still read, so one its owner recorded adds no line here.
-        if (cancellationToken.IsCancellationRequested && reply is not { Recorded: false })
+        if ((cancellationToken.IsCancellationRequested || approver.InputEnded.IsCancellationRequested) && reply is not { Recorded: false })
         {
-            return new EntryNameListing(VaultAvailability.Failed, [], ToolText.Cancelled, true) { Recorded = reply is not null };
+            return new EntryNameListing(VaultAvailability.Cancelled, [], ToolText.Cancelled, true) { Recorded = reply is not null };
         }
 
         if (reply is not { } answer)
@@ -213,8 +234,8 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
             }
 
             return await LockedApp.TellAsync(vault, cancellationToken).ConfigureAwait(false)
-                ? new EntryNameListing(VaultAvailability.Failed, [], ToolText.AppLockedForListing, true) { AuditReason = ToolText.NoApproverForListing }
-                : new EntryNameListing(VaultAvailability.Failed, [], ToolText.NoApproverForListing, true);
+                ? new EntryNameListing(VaultAvailability.NoApprover, [], ToolText.AppLockedForListing, true) { AuditReason = ToolText.NoApproverForListing }
+                : new EntryNameListing(VaultAvailability.NoApprover, [], ToolText.NoApproverForListing, true);
         }
 
         // Nothing an unrecorded reply named is shown: entry names are an asset too (law 5, T-6).
@@ -226,7 +247,7 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
             };
         }
 
-        if (answer.Refusal == Core.Audit.AuditMethod.VaultChanged)
+        if (answer.Refusal == AuditMethod.VaultChanged)
         {
             return new EntryNameListing(VaultAvailability.Changed, [], ToolText.VaultChanged, true)
             {

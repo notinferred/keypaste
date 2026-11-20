@@ -538,11 +538,13 @@ internal static class ShareCommand
 
     private static ShareService Service(CliContext context, HttpMessageHandler handler, Uri endpoint)
     {
-        var auditPath = KeypasteHome.AuditPath(context.Environment.Get(KeypasteHome.EnvironmentVariable));
+        var home = KeypasteHome.Resolve(context.Environment.Get(KeypasteHome.EnvironmentVariable));
+        var auditPath = KeypasteHome.AuditPath(home);
 
         return new ShareService(
             new ShareClient(handler, endpoint),
             context.Clock,
+            home,
             () => AuditLog.TryOpen(auditPath, context.Clock, out var log, out _) ? log : null);
     }
 

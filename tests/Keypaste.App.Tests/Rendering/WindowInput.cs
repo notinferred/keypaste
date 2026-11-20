@@ -43,6 +43,13 @@ internal static class WindowInput
         Drain();
     }
 
+    /// <summary>Moves the pointer off the window, so no control it rested on opens a tip on a timer.</summary>
+    internal static void Leave(TopLevel window)
+    {
+        window.MouseMove(new Point(-1, -1));
+        Drain();
+    }
+
     /// <summary>A click the platform hit-tests: a press and a release at the centre of <paramref name="control"/>.</summary>
     internal static void Tap(TopLevel window, Visual control)
     {

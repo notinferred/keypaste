@@ -81,18 +81,18 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         var numbers = string.Concat(Enumerable.Range(1, request.Candidates.Count).Select(number => number.ToString(CultureInfo.InvariantCulture)));
         _console.WriteLine(RenderPicker(request, RuleLine));
 
-        char? choice;
+        char choice;
 
         try
         {
             choice = await ChooseAsync(numbers, () => Picking(request.Candidates.Count, Remaining(started)), cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (Exception unanswered) when (IsUnanswerable(unanswered))
         {
-            return new ItemPick(Withdrawn("Nothing was released."), null);
+            return new ItemPick(Unanswered(unanswered, "Nothing was released."), null);
         }
 
-        if (choice is not { } digit || numbers.IndexOf(digit, StringComparison.Ordinal) is var picked && picked < 0)
+        if (numbers.IndexOf(choice, StringComparison.Ordinal) is var picked && picked < 0)
         {
             _console.WriteLine(string.Join(Environment.NewLine, _console.Paint(Tone.Danger, "keypaste: denied. Nothing was released."), RuleLine));
             return new ItemPick(ApprovalAnswer.Denied, null);
@@ -124,7 +124,8 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
             if (how == 't')
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                using var typed = await Task.Run(() => _prompt.ReadSecret("  value: "), CancellationToken.None).WaitAsync(cancellationToken).ConfigureAwait(false);
+                using var typed = await Task.Run(() => _prompt.ReadSecret("  value: "), CancellationToken.None).WaitAsync(cancellationToken).ConfigureAwait(false)
+                    ?? throw new EndOfStreamException();
                 value = typed is { Length: > 0 } ? new string(typed.Value) : null;
             }
             else if (how == 'g')
@@ -149,9 +150,9 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
             return confirmed ? new SaveAnswer(SaidSave(saved: true), value) : new SaveAnswer(SaidSave(saved: false), null);
         }
-        catch (OperationCanceledException)
+        catch (Exception unanswered) when (IsUnanswerable(unanswered))
         {
-            return new SaveAnswer(Withdrawn("Nothing was saved."), null);
+            return new SaveAnswer(Unanswered(unanswered, "Nothing was saved."), null);
         }
     }
 
@@ -214,15 +215,15 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         var started = _clock.GetTimestamp();
         _console.WriteLine(Render(request, RuleLine));
 
-        char? choice;
+        char choice;
 
         try
         {
             choice = await ChooseAsync(_confirmChoices, () => Confirmation(Remaining(started), request.DeletesForGood ? "delete for good" : "allow"), cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (Exception unanswered) when (IsUnanswerable(unanswered))
         {
-            return Withdrawn("Nothing was changed.");
+            return Unanswered(unanswered, "Nothing was changed.");
         }
 
         var answer = choice == 'y' ? ApprovalAnswer.ApprovedOnce : ApprovalAnswer.Denied;
@@ -286,15 +287,15 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         var started = _clock.GetTimestamp();
         _console.WriteLine(Render(request, RuleLine));
 
-        char? choice;
+        char choice;
 
         try
         {
             choice = await ChooseAsync(_confirmChoices, () => Confirmation(Remaining(started)), cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (Exception unanswered) when (IsUnanswerable(unanswered))
         {
-            return Withdrawn("Nothing was written.");
+            return Unanswered(unanswered, "Nothing was written.");
         }
 
         var answer = choice == 'y' ? ApprovalAnswer.ApprovedOnce : ApprovalAnswer.Denied;
@@ -316,16 +317,15 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         var started = _clock.GetTimestamp();
         _console.WriteLine(Render(request, RuleLine));
 
-        char? choice;
+        char choice;
 
         try
         {
             choice = await ChooseAsync(_confirmChoices, () => Confirmation(Remaining(started), "pair"), cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (Exception unanswered) when (IsUnanswerable(unanswered))
         {
-            _ = Withdrawn("Nothing was paired.");
-            return new PairingAnswer(ApprovalAnswer.Denied, null);
+            return new PairingAnswer(Unanswered(unanswered, "Nothing was paired."), null);
         }
 
         var allowed = choice == 'y';
@@ -348,16 +348,15 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         var started = _clock.GetTimestamp();
         _console.WriteLine(Render(request, RuleLine));
 
-        char? choice;
+        char choice;
 
         try
         {
             choice = await ChooseAsync(_confirmChoices, () => Confirmation(Remaining(started), "fill"), cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (Exception unanswered) when (IsUnanswerable(unanswered))
         {
-            _ = Withdrawn("Nothing was filled.");
-            return ApprovalAnswer.Denied;
+            return Unanswered(unanswered, "Nothing was filled.");
         }
 
         var filled = choice == 'y';
@@ -419,9 +418,9 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
             var choice = await ChooseAsync(_confirmChoices, () => Confirmation(Remaining(started), "allow once"), cancellationToken).ConfigureAwait(false);
             return Said(choice == 'y' ? ApprovalAnswer.ApprovedOnce : ApprovalAnswer.Denied);
         }
-        catch (OperationCanceledException)
+        catch (Exception unanswered) when (IsUnanswerable(unanswered))
         {
-            return Withdrawn("Nothing was released.");
+            return Unanswered(unanswered, "Nothing was released.");
         }
     }
 
@@ -446,7 +445,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
     private async ValueTask<ApprovalAnswer> AnswerAsync(long started, Always? always, CancellationToken cancellationToken)
     {
         var choices = _choices + (always is null ? string.Empty : "a");
-        char? choice;
+        char choice;
 
         try
         {
@@ -464,9 +463,9 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
                 return Said(confirmed ? ApprovalAnswer.AlwaysAllowed : ApprovalAnswer.Denied);
             }
         }
-        catch (OperationCanceledException)
+        catch (Exception unanswered) when (IsUnanswerable(unanswered))
         {
-            return Withdrawn("Nothing was released.");
+            return Unanswered(unanswered, "Nothing was released.");
         }
 
         return Said(choice == 'o' ? ApprovalAnswer.ApprovedOnce : ApprovalAnswer.Denied);
@@ -498,7 +497,8 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
     /// <summary>Reads one choice under a countdown, the choice line drawn and cleared around it.</summary>
     /// <exception cref="OperationCanceledException">The question was withdrawn.</exception>
-    private async ValueTask<char?> ChooseAsync(string choices, Func<string> choiceLine, CancellationToken cancellationToken)
+    /// <exception cref="EndOfStreamException">Standard input closed, so nobody can answer here.</exception>
+    private async ValueTask<char> ChooseAsync(string choices, Func<string> choiceLine, CancellationToken cancellationToken)
     {
         // Checked here rather than left to WaitAsync, which short-circuits on an already
         // completed task and never looks at the token: a read that finished before the await got
@@ -509,11 +509,11 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
         // A terminal read polls the token and stops within a poll interval; a redirected read
         // blocks on its pipe, so the wait is what gets cancelled and that reader is abandoned.
-        var reading = Task.Run(() => _prompt.ReadChoice(choiceLine, choices, cancellationToken), CancellationToken.None);
+        var reading = Task.Run(() => _prompt.ReadChoice(choiceLine, choices, cancellationToken), cancellationToken);
 
         try
         {
-            return await reading.WaitAsync(cancellationToken).ConfigureAwait(false);
+            return await reading.WaitAsync(cancellationToken).ConfigureAwait(false) ?? throw new EndOfStreamException();
         }
         catch (OperationCanceledException) when (_prompt.IsInteractive)
         {
@@ -527,14 +527,21 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         }
     }
 
-    private ApprovalAnswer Withdrawn(string nothing)
+    private static bool IsUnanswerable(Exception exception) => exception is OperationCanceledException or EndOfStreamException;
+
+    /// <summary>Says why a question went unanswered: once standard input has closed there is nowhere to ask, and a withdrawn one is a denial the gate records as withdrawn or timed out.</summary>
+    private ApprovalAnswer Unanswered(Exception unanswered, string nothing)
     {
+        var closed = unanswered is EndOfStreamException;
+
         _console.WriteLine(string.Join(
             Environment.NewLine,
             string.Empty,
-            _console.Paint(Tone.Danger, $"keypaste: the request was withdrawn before you answered. {nothing}"),
+            _console.Paint(Tone.Danger, closed
+                ? $"keypaste: standard input closed, so nobody can answer here. {nothing}"
+                : $"keypaste: the request was withdrawn before you answered. {nothing}"),
             RuleLine));
-        return ApprovalAnswer.Denied;
+        return closed ? ApprovalAnswer.NoChannel : ApprovalAnswer.Denied;
     }
 
     /// <summary>The choice line: what each key does, and how long is left to press one, at one width while it counts down.</summary>

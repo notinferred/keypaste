@@ -165,6 +165,34 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
     }
 
     [Fact]
+    public async Task An_expiry_that_passes_while_unlocked_is_listed_with_no_save()
+    {
+        _session.Unlocked!.SetExpiryUnchecked(_bank, AppClock.Start.AddMinutes(2));
+        using var shell = Shell();
+        await shell.Recommendations.Checking;
+        Assert.DoesNotContain(shell.Recommendations.Passwords, row => row.Finding.Entry == _bank);
+
+        _clock.Advance(TimeSpan.FromMinutes(3));
+        await shell.Recommendations.Checking;
+
+        var expired = Assert.Single(shell.Recommendations.Passwords, row => row.Finding.Entry == _bank);
+        Assert.Equal(PasswordProblem.Expired, expired.Finding.Problem);
+        Assert.Equal("5", Settings(shell).Count);
+    }
+
+    [Fact]
+    public void Disposing_stops_the_recheck_an_expiry_still_to_come_armed()
+    {
+        var before = _clock.PendingTimers;
+        var check = new RecommendationsViewModel(_session, _fixture.Home);
+        Assert.Equal(before + 1, _clock.PendingTimers);
+
+        check.Dispose();
+
+        Assert.Equal(before, _clock.PendingTimers);
+    }
+
+    [Fact]
     public async Task Replacing_a_weak_or_reused_password_takes_its_rows_off_the_list()
     {
         using var shell = Shell();

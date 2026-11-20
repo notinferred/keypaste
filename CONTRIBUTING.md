@@ -32,6 +32,8 @@ Work on a branch: commit, then `bash scripts/dev.sh` pushes it and follows the `
 - `--profile <backend|integration|desktop|desktop-gates> [--os <runner>]` runs one verify.sh profile through `dev.yml`, which is never a release gate, for a failure only one runner shows;
 - `--acts <app run>` installs an app run's packages and performs R.1a's acts, never as evidence.
 
+After each successful `app` run on `main`, `install-desktop-main.yml` installs that run's Linux package and performs the install exercise and R.1a's acts, as a rehearsal, so a change that breaks them fails on `main`; Windows and macOS stay dispatched by hand. The exercises drive the app's controls by automation ID, a control's `x:Name` or the AutomationId of a generated row, through `scripts/lib/desktop-drive.sh`.
+
 When the change and its documents are finished and the branch's fast tier is green, integrate without waiting further: `main`'s push runs every job once, and a failure there is fixed as the next work.
 
 A runner-only probe is iterated on a branch with `gh workflow run <workflow> --ref <branch>`, without a local run or a commit on `main` per attempt, and integrated once it passes. A new workflow needs its file on `main` once before it can be dispatched; later attempts run the branch's copy.
