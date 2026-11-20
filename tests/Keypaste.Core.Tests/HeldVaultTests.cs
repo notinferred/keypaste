@@ -76,6 +76,36 @@ public sealed class HeldVaultTests : IDisposable
     }
 
     [Fact]
+    public void ASaveLeavingOutAnotherProgramsData_SaysWhereTheCopyIs_Once()
+    {
+        ForeignXml.AddTo(VaultPath, _master);
+        using var lifetime = new SessionLifetime("session-two");
+#pragma warning disable CA2000
+        using var held = new HeldVault(ClaimedVault.Open(VaultPath, _master), lifetime);
+#pragma warning restore CA2000
+        List<VaultBackup> told = [];
+        held.ForeignDataKept += (_, kept) => told.Add(kept);
+
+        Assert.Equal(AgentSave.Saved, held.Save(vault => vault.UpdateEntry(new VaultEntry { GroupPath = _stripe.GroupPath, Title = _stripe.Title, Password = "mine" })));
+        Assert.Equal(AgentSave.Saved, held.Save(vault => vault.UpdateEntry(new VaultEntry { GroupPath = _stripe.GroupPath, Title = _stripe.Title, Password = "mine-again" })));
+
+        Assert.True(ForeignXml.Holds(Assert.Single(told).Path, _master));
+    }
+
+    [Fact]
+    public void AMergeLeavingOutAnotherProgramsData_SaysWhereTheCopyIs()
+    {
+        ForeignXml.AddTo(VaultPath, _master);
+        VaultMergeSave? merged = null;
+        _held.Merged += (_, merge) => merged = merge;
+
+        var saved = _held.Save(vault => vault.UpdateEntry(new VaultEntry { GroupPath = _stripe.GroupPath, Title = _stripe.Title, Password = "mine" }));
+
+        Assert.Equal(AgentSave.Saved, saved);
+        Assert.True(ForeignXml.Holds(merged!.ForeignDataKept!.Path, _master));
+    }
+
+    [Fact]
     public void AFileHoldingAnotherVault_IsRefusedOnce_AndTriedAgainOnlyOnceItChanges()
     {
         var copy = _held.Open;

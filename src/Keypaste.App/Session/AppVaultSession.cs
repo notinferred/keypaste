@@ -89,6 +89,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
     private SessionLifetime? _lifetime;
     private OwnerMerge? _ownerMerge;
     private MergeResult? _refusal;
+    private VaultBackup? _foreignDataKept;
     private byte[]? _refusedDigest;
     private ITimer? _timer;
     private ITimer? _holderWatch;
@@ -1658,7 +1659,10 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
             merged.Report,
             merged.Outcome == VaultMergeSaveOutcome.Saved ? carried : [],
             merged.Recorded,
-            _clock.GetUtcNow());
+            _clock.GetUtcNow())
+        {
+            ForeignDataKept = merged.ForeignDataKept,
+        };
 
         lock (_gate)
         {
@@ -1769,8 +1773,27 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
 
     private void OnVaultSaved(object? sender, EventArgs e)
     {
+        if ((sender as Vault)?.TakeForeignDataKept() is { } kept)
+        {
+            lock (_gate)
+            {
+                _foreignDataKept = kept;
+            }
+        }
+
         ForgetUnsaved();
         Saved?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>The copy kept of the file before a save left out another program's data, the first time it is asked after that save.</summary>
+    internal VaultBackup? TakeForeignDataKept()
+    {
+        lock (_gate)
+        {
+            var kept = _foreignDataKept;
+            _foreignDataKept = null;
+            return kept;
+        }
     }
 
     /// <summary>Forgets what the vault changed, once a save wrote it or another vault took its place.</summary>

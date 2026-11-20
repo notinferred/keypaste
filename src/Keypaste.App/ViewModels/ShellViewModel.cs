@@ -71,7 +71,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     private string _agentsDetail = string.Empty;
     private string? _reloadFailure;
     private readonly Dictionary<AppVaultSession, DateTimeOffset> _updatedAt = [];
-    private bool _noticeNamesAConflict;
+    private bool _noticeStays;
     private readonly Action<string, string?, int?>? _openInPlace;
     private Action? _discard;
     private Action? _keep;
@@ -183,8 +183,9 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// What the restore that opened this vault did, or what a merge of another program's save carried and named, until it is
-    /// dismissed or the vault locks; a later merge's notice follows one naming a conflict rather than replacing it.
+    /// What the restore that opened this vault did, what a merge of another program's save carried and named, or where a save left
+    /// another program's data, until it is dismissed or the vault locks; a later notice follows one naming a conflict or that data
+    /// rather than replacing it.
     /// </summary>
     /// <remarks>
     /// Said after the fact as well as before it, because only afterwards is it known whether the
@@ -1529,8 +1530,13 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             if (merged.Outcome == VaultMergeSaveOutcome.Saved)
             {
                 var said = MergeNotice.Saved(FileNameOf(session), merged);
-                Notice = _noticeNamesAConflict && Notice is { } standing ? $"{standing} {said}" : said;
-                _noticeNamesAConflict |= MergeNotice.NamesAConflict(merged);
+
+                if (merged.ForeignDataKept is { } kept)
+                {
+                    said = $"{said} {Vault.ForeignDataText(kept)}";
+                }
+
+                Say(said, stays: MergeNotice.NamesAConflict(merged) || merged.ForeignDataKept is not null);
             }
 
             Count();
@@ -1574,7 +1580,14 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     private void DismissNotice()
     {
         Notice = null;
-        _noticeNamesAConflict = false;
+        _noticeStays = false;
+    }
+
+    /// <summary>Shows <paramref name="said"/>, after a standing notice that must stay until dismissed rather than in its place.</summary>
+    private void Say(string said, bool stays)
+    {
+        Notice = _noticeStays && Notice is { } standing ? $"{standing} {said}" : said;
+        _noticeStays |= stays;
     }
 
     /// <summary>What reloading would discard, naming the items changed here since the last save and never a value.</summary>
@@ -1652,6 +1665,11 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         {
             _updatedAt.Remove(session);
             ReadVaultStatus();
+
+            if (session.TakeForeignDataKept() is { } kept)
+            {
+                Say(Vault.ForeignDataText(kept), stays: true);
+            }
 
             if (session.IsUnlocked)
             {

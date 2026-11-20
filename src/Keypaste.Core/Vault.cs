@@ -29,6 +29,8 @@ public sealed class Vault : IDisposable
     private bool _backedUp;
     private bool _rekeyed;
     private VaultBackup? _lastKept;
+    private bool _holdsForeignData;
+    private VaultBackup? _foreignDataKept;
     private Func<Vault, bool>? _beforeEachSave;
 
     /// <summary>The key this unlock's base digests content with, zeroed on disposal.</summary>
@@ -45,6 +47,7 @@ public sealed class Vault : IDisposable
         _stamp = stamp;
         _savedAt = _stamp is null ? null : WrittenAt(path);
         _base = interop.TakeBase(_baseKey);
+        _holdsForeignData = interop.ReadForeignData;
     }
 
     /// <summary>The path of the file backing this vault.</summary>
@@ -62,6 +65,31 @@ public sealed class Vault : IDisposable
     public const string OlderCopyText =
         "This vault's file is older than the copy this computer last opened. Another program restoring a backup, " +
         "a sync tool bringing back an earlier version or someone replacing the file can do this.";
+
+    /// <summary>
+    /// The copy kept of the file before a save of this vault left out data another program or a newer KeePass format wrote there, which
+    /// keypaste can't keep, the first time it is asked; null after that and while no save has left any out.
+    /// </summary>
+    /// <remarks>The save that leaves it out keeps that copy whatever the backup floor says.</remarks>
+    public VaultBackup? TakeForeignDataKept()
+    {
+        lock (_state)
+        {
+            var kept = _foreignDataKept;
+            _foreignDataKept = null;
+            return kept;
+        }
+    }
+
+    /// <summary>What a person is told about the copy <see cref="TakeForeignDataKept"/> named.</summary>
+    /// <param name="kept">That copy.</param>
+    public static string ForeignDataText(VaultBackup kept)
+    {
+        ArgumentNullException.ThrowIfNull(kept);
+
+        return "This vault held data from another program that keypaste can't keep, so the save left it out. " +
+            $"keypaste kept a copy of the file from before the save, with that data, at '{kept.Path}'.";
+    }
 
     /// <summary>The save count of the file as this vault last read or wrote it, or after a merge the larger of both copies'; null when no keypaste save has counted it.</summary>
     internal long? SaveCount => _interop.SaveCount;
@@ -275,7 +303,7 @@ public sealed class Vault : IDisposable
             }
 
             VaultBackups.Archive(Path, copyPath);
-            return new VaultMergeSave(VaultMergeSaveOutcome.Saved, string.Empty) { Report = report };
+            return new VaultMergeSave(VaultMergeSaveOutcome.Saved, string.Empty) { Report = report, ForeignDataKept = file.TakeForeignDataKept() };
         }
         catch (InvalidMasterPasswordException ex)
         {
@@ -425,7 +453,7 @@ public sealed class Vault : IDisposable
                     file.HasFileChangedSinceOpen, waitBetweenAttempts, KeePassInterop.SaveAttempts, duringAttempt, backUp: true, applyFloor: false);
 
                 handedOver = true;
-                return new VaultMergeSave(VaultMergeSaveOutcome.Saved, string.Empty) { Copy = file, Report = report, Kept = file._lastKept };
+                return new VaultMergeSave(VaultMergeSaveOutcome.Saved, string.Empty) { Copy = file, Report = report, Kept = file._lastKept, ForeignDataKept = file.TakeForeignDataKept() };
             }
             catch (VaultChangedOnDiskException)
             {
@@ -3353,6 +3381,13 @@ public sealed class Vault : IDisposable
 
         var clock = new SaveClock();
         var succeeded = false;
+        bool dropsForeignData;
+        VaultBackup? keptBeforeSave = null;
+
+        lock (_state)
+        {
+            dropsForeignData = _holdsForeignData;
+        }
 
         try
         {
@@ -3370,7 +3405,7 @@ public sealed class Vault : IDisposable
 
             var stamp = _interop.Save(
                 hasChangedOnDisk, waitBetweenAttempts, clock, attempts, duringAttempt,
-                backUp ? path => PreserveBefore(path, applyFloor) : null,
+                backUp || dropsForeignData ? path => keptBeforeSave = PreserveBefore(path, applyFloor && !dropsForeignData) : null,
                 keyChange,
                 cancellationToken);
             SeenSaveCount.Remember(_claim!.Home, _claim.Vault, _interop.SaveCount);
@@ -3384,6 +3419,12 @@ public sealed class Vault : IDisposable
                 _pending = false;
                 _changes++;
                 _writing = false;
+
+                if (dropsForeignData)
+                {
+                    _holdsForeignData = false;
+                    _foreignDataKept = keptBeforeSave;
+                }
             }
 
             succeeded = true;
@@ -3429,13 +3470,14 @@ public sealed class Vault : IDisposable
         }
     }
 
-    /// <summary>Keeps the bytes this save is about to replace. Called with the save gate held.</summary>
+    /// <summary>Keeps the bytes this save is about to replace, returning the copy or null when the floor left it out. Called with the save gate held.</summary>
     /// <remarks>
-    /// <paramref name="applyFloor"/> is false only on the overwriting and access-changing paths, and
+    /// <paramref name="applyFloor"/> is false only on the overwriting, merging and access-changing paths and for a save that leaves out
+    /// another program's data, and
     /// <see cref="_backedUp"/> is set only when the floor applies, so an overwriting save can neither
     /// be suppressed by an ordinary edit earlier in the unlock nor suppress one later in it.
     /// </remarks>
-    private void PreserveBefore(string path, bool applyFloor)
+    private VaultBackup? PreserveBefore(string path, bool applyFloor)
     {
         var outcome = VaultBackups.Preserve(
             path, DateTimeOffset.UtcNow, applyFloor, out var createdDirectory, out _lastKept);
@@ -3447,6 +3489,7 @@ public sealed class Vault : IDisposable
 
         LastBackup = new VaultBackupReport(
             VaultBackups.DirectoryFor(path), outcome, createdDirectory, VaultBackups.Retained);
+        return _lastKept;
     }
 
     /// <summary>Releases the vault's key material and decrypted contents.</summary>

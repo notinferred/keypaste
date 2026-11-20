@@ -70,6 +70,9 @@ public sealed record VaultMergeSave(VaultMergeSaveOutcome Outcome, string Reason
     /// <summary>The file the merged copy's save replaced, kept whatever the backup floor says.</summary>
     public VaultBackup? Kept { get; init; }
 
+    /// <summary>The copy kept of the file before the merged copy's save left out data another program wrote there that keypaste can't keep (<see cref="Vault.ForeignDataText"/>).</summary>
+    public VaultBackup? ForeignDataKept { get; init; }
+
     /// <summary>Whether the owner's audit line of a merge it saved was written.</summary>
     public bool Recorded { get; init; }
 

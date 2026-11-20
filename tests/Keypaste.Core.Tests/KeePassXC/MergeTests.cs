@@ -38,6 +38,19 @@ public sealed class MergeTests
         AssertReads(file, "work/github", "UserName", "kpxc-user");
     }
 
+    /// <summary>KeePassXC writes nothing KeePassLib skips, so its save merged says nothing of another program's data.</summary>
+    [Fact]
+    public void KeePassXCs_save_holds_nothing_the_merged_save_leaves_out()
+    {
+        using var file = Seeded();
+        using var open = file.Open();
+        Update(open, _stripe, "mine");
+
+        Edit(file, "work/github", "-u", "kpxc-user");
+
+        Assert.Null(Merge(open).ForeignDataKept);
+    }
+
     [Fact]
     public void KeePassXCs_save_keeps_the_count_of_keypastes_saves_and_the_merged_save_counts_on_from_it()
     {

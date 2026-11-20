@@ -221,10 +221,12 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     /// <summary>Merges a copy into the vault's file and moves the copy in with the backups.</summary>
     internal async Task MergeAsync(ConflictedCopyRow row)
     {
-        if (await RunMerge(row, save: true).ConfigureAwait(true) is { Outcome: VaultMergeSaveOutcome.Saved })
+        if (await RunMerge(row, save: true).ConfigureAwait(true) is { Outcome: VaultMergeSaveOutcome.Saved } merged)
         {
             row.Review = null;
-            Message = $"Merged {row.Name} and moved it in with this vault's backups.";
+            Message = merged.ForeignDataKept is { } kept
+                ? $"Merged {row.Name} and moved it in with this vault's backups. {Vault.ForeignDataText(kept)}"
+                : $"Merged {row.Name} and moved it in with this vault's backups.";
 
             if (_session.Unlocked is { } vault)
             {

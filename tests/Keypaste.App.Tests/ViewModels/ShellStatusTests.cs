@@ -469,6 +469,62 @@ public sealed class ShellStatusTests
         Assert.Equal("secret-mine", file.Find("env/app/MINE")!.Password);
     }
 
+    /// <summary>The save that leaves out another program's data says once where the copy holding it is, and the notice stays until dismissed.</summary>
+    [Fact]
+    public void ASaveLeavingOutAnotherProgramsData_SaysWhereTheCopyIs_Once()
+    {
+        using var fixture = new TempVault();
+        ForeignXml.AddTo(fixture.Path_, TempVault.Password);
+        var clock = new ManualClock(AppClock.Start);
+        using var session = new AppVaultSession(clock, home: fixture.Home);
+        Unlock(session, fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, authority: null, clock: clock);
+
+        session.Unlocked!.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "FIRST", Password = "x" });
+        session.Unlocked.Save();
+
+        var kept = VaultBackups.List(fixture.Path_)[0];
+        Assert.Equal(Vault.ForeignDataText(kept), shell.Notice);
+        Assert.True(ForeignXml.Holds(kept.Path, TempVault.Password));
+
+        session.Unlocked.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "SECOND", Password = "y" });
+        session.Unlocked.Save();
+
+        Assert.Equal(Vault.ForeignDataText(kept), shell.Notice);
+    }
+
+    /// <summary>A merge whose save leaves out data another program's save added says so after what the merge did.</summary>
+    [Fact]
+    public async Task AMergeLeavingOutAnotherProgramsData_SaysWhereTheCopyIs()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+#pragma warning disable CA2000
+        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
+#pragma warning restore CA2000
+        var session = authority.Session;
+        Unlock(session, fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, authority, clock: clock);
+        var name = Path.GetFileName(fixture.Path_);
+
+        ForeignXml.AddTo(fixture.Path_, TempVault.Password);
+        var write = session.Write(
+            vault =>
+            {
+                vault.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "MINE", Password = "secret-mine" });
+                return true;
+            },
+            added => added);
+        await shell.Merging.WaitAsync(_connect, Token);
+
+        Assert.Equal(WriteOutcome.Saved, write.Outcome);
+        var kept = VaultBackups.List(fixture.Path_)[0];
+        Assert.Equal(
+            $"Another program saved {name}, and keypaste merged it with your changes and saved. Your change to env/app/MINE is saved. {Vault.ForeignDataText(kept)}",
+            shell.Notice);
+        Assert.True(ForeignXml.Holds(kept.Path, TempVault.Password));
+    }
+
     /// <summary>
     /// The item open in the pane is purged by another program while it is edited: the merge keeps the change in Trash, so
     /// the save succeeded and the pane closes with no claim that the item could not be read.

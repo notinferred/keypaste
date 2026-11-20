@@ -70,6 +70,7 @@ internal static class VaultSession
             WarnIfOlder(vault, context);
             var exit = body(vault);
             Announce(vault, context);
+            WarnIfForeignDataLeftOut(vault, context);
             return exit;
         }
         catch (InvalidMasterPasswordException)
@@ -297,6 +298,15 @@ internal static class VaultSession
             context.Stderr.WriteLine(
                 $"keypaste: warning: {Vault.OlderCopyText} If you didn't expect it, look for the newer copy in your sync or backup "
                 + $"program's history, or among the copies keypaste kept before its saves in '{VaultBackups.DirectoryFor(vault.Path)}'.");
+        }
+    }
+
+    /// <summary>Says, on stderr, that the verb's save left out another program's data and where the copy holding it is.</summary>
+    private static void WarnIfForeignDataLeftOut(Vault vault, CliContext context)
+    {
+        if (vault.TakeForeignDataKept() is { } kept)
+        {
+            context.Stderr.WriteLine($"keypaste: warning: {Vault.ForeignDataText(kept)}");
         }
     }
 

@@ -2,6 +2,7 @@ using System.CommandLine;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ownership;
+using Keypaste.Core.Tests;
 using Xunit;
 
 namespace Keypaste.Cli.Tests;
@@ -61,6 +62,32 @@ public sealed class VaultSessionTests : IDisposable
         _harness.Stderr.GetStringBuilder().Clear();
         Assert.Equal(CliApp.ExitSuccess, Open(held));
         Assert.DoesNotContain(Vault.OlderCopyText, _harness.Err, StringComparison.Ordinal);
+    }
+
+    /// <summary>A verb whose save leaves out another program's data says once, on stderr, where the copy holding it is; a verb that only reads says nothing.</summary>
+    [Fact]
+    public void ASaveLeavingOutAnotherProgramsData_SaysWhereTheCopyIs_Once()
+    {
+        _harness.SeedVault(_master, ("env/dev/TOKEN", "first"));
+        _harness.Prompt.Enqueue(_master, "later");
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("add", "env/dev/LATER", "--vault", _harness.VaultPath));
+        ForeignXml.AddTo(_harness.VaultPath, _master);
+        const string warning = "keypaste: warning: This vault held data from another program";
+
+        Assert.Equal(CliApp.ExitSuccess, Open(held: false));
+        Assert.DoesNotContain(warning, _harness.Err, StringComparison.Ordinal);
+
+        _harness.Prompt.Enqueue(_master, "again");
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("add", "env/dev/AGAIN", "--vault", _harness.VaultPath));
+        var kept = VaultBackups.List(_harness.VaultPath)[0];
+        Assert.Single(_harness.Err.Split('\n'), line => line.StartsWith(warning, StringComparison.Ordinal));
+        Assert.Contains(kept.Path, _harness.Err, StringComparison.Ordinal);
+        Assert.True(ForeignXml.Holds(kept.Path, _master));
+
+        _harness.Stderr.GetStringBuilder().Clear();
+        _harness.Prompt.Enqueue(_master, "third");
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("add", "env/dev/THIRD", "--vault", _harness.VaultPath));
+        Assert.DoesNotContain(warning, _harness.Err, StringComparison.Ordinal);
     }
 
     private int Open(bool held)

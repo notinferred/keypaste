@@ -38,6 +38,12 @@ public sealed class HeldVault : IWatchedVault, IDisposable
     /// <summary>Raised after each merge of another program's save, on the thread that merged, once the merged copy is in place.</summary>
     public event EventHandler<VaultMergeSave>? Merged;
 
+    /// <summary>
+    /// Raised after a save of the open copy left out data another program wrote in the file that keypaste can't keep, naming the copy
+    /// kept of the file before it; a merged copy's save says so in <see cref="VaultMergeSave.ForeignDataKept"/> instead.
+    /// </summary>
+    public event EventHandler<VaultBackup>? ForeignDataKept;
+
     /// <summary>The open copy while the unlock is live; null once it has ended.</summary>
     public Vault? Open
     {
@@ -118,10 +124,16 @@ public sealed class HeldVault : IWatchedVault, IDisposable
 
         AgentSave saved;
         VaultMergeSave? merged = null;
+        VaultBackup? foreignDataKept = null;
 
         lock (_editGate)
         {
             saved = SaveNow(edit);
+
+            if (saved.Outcome == AgentSaveOutcome.Saved)
+            {
+                foreignDataKept = Open?.TakeForeignDataKept();
+            }
 
             if (saved.Outcome == AgentSaveOutcome.ChangedOnDisk)
             {
@@ -133,6 +145,11 @@ public sealed class HeldVault : IWatchedVault, IDisposable
                     null => saved,
                 };
             }
+        }
+
+        if (foreignDataKept is not null)
+        {
+            ForeignDataKept?.Invoke(this, foreignDataKept);
         }
 
         Finish(merged);

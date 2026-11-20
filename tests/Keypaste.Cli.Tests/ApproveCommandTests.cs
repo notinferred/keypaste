@@ -258,6 +258,21 @@ public sealed class ApproveCommandTests : IDisposable
             stderr.ToString());
     }
 
+    /// <summary>A merged copy's save that left out another program's data says where the copy holding it is.</summary>
+    [Fact]
+    public void AMergeLeavingOutAnotherProgramsData_SaysWhereTheCopyIs()
+    {
+        using var stderr = new StringWriter();
+        var kept = new VaultBackup(Path.Combine(_harness.Directory, "vault.kdbx.backups", "kept.kdbx"), DateTimeOffset.UnixEpoch);
+
+        ApproveCommand.Merged(
+            new VaultMergeSave(VaultMergeSaveOutcome.Saved, string.Empty) { ForeignDataKept = kept },
+            new AgentConsole(stderr, interactive: false),
+            () => { });
+
+        Assert.Contains($"keypaste: warning: {Vault.ForeignDataText(kept)}{Environment.NewLine}", stderr.ToString(), StringComparison.Ordinal);
+    }
+
     private CliHarness Terminal(RunningApprover approver)
     {
         var terminal = new CliHarness();

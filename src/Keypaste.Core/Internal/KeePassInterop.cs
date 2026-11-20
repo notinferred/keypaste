@@ -97,7 +97,11 @@ internal sealed class KeePassInterop : IDisposable
         _database = database;
         _entriesOnDisk = EntryIds(database);
         _saveCount = SaveCountOf(database);
+        ReadForeignData = database.UnknownElementsRead > 0;
     }
+
+    /// <summary>Whether the file this instance was read from held XML KeePassLib does not know, which its saves leave out.</summary>
+    internal bool ReadForeignData { get; }
 
     /// <summary>Creates a new KDBX4 vault protected by the given UTF-8 master password.</summary>
     /// <remarks>The caller owns <paramref name="utf8Password"/> and is responsible for zeroing it.</remarks>

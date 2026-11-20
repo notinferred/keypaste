@@ -2,7 +2,7 @@ using Keypaste.Core;
 
 namespace Keypaste.App.Session;
 
-/// <summary>What became of a merge of another program's save with the open vault, for the notice (D-0542).</summary>
+/// <summary>What became of a merge of another program's save with the open vault, for the notice.</summary>
 /// <param name="Outcome">What became of it.</param>
 /// <param name="Reason">Why there is no merged copy, as Core says it; empty when there is one.</param>
 /// <param name="Report">What the merge did, by name and never by value, once it merged.</param>
@@ -17,6 +17,9 @@ internal sealed record MergeResult(
     bool Recorded,
     DateTimeOffset At)
 {
+    /// <summary>The copy kept of the file before the merged copy's save left out another program's data, as <see cref="VaultMergeSave.ForeignDataKept"/>.</summary>
+    internal VaultBackup? ForeignDataKept { get; init; }
+
     /// <summary>Whether the merged copy is in place, so agents are served from it.</summary>
     internal bool Merged => Outcome is VaultMergeSaveOutcome.Saved or VaultMergeSaveOutcome.Updated;
 
