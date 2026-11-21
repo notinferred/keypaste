@@ -226,6 +226,27 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
     }
 
     [Fact]
+    public async Task Attaching_again_through_a_link_to_the_vault_keeps_the_pairing_and_naming_another_vault_is_refused()
+    {
+        File.WriteAllText(VaultPath, string.Empty);
+        var linked = VaultSaveTests.Link(Path.Combine(_directory, "linked.kdbx"), VaultPath);
+        var other = Path.Combine(_directory, "other.kdbx");
+        File.WriteAllText(other, string.Empty);
+        await using var owner = Owner.Start(this, browsers: new FakeBrowsers());
+        await using var link = await owner.AttachAsync(BrowserIdentity.ChromeWebStore);
+        await CheckAsync(link, "laptop");
+
+        Assert.True((await link.AttachAsync(new AttachRequest(linked) { Browser = BrowserIdentity.ChromeWebStore.Caller }, Token))?.Attached);
+        var throughTheLink = await link.ReleaseAsync(new BrowserReleaseRequest("laptop", Key(), "https://github.com/", _item) { Vault = linked, Session = "session-one" }, Token);
+        var elsewhere = await link.AttachAsync(new AttachRequest(other) { Browser = BrowserIdentity.ChromeWebStore.Caller }, Token);
+        var afterElsewhere = await link.ReleaseAsync(new BrowserReleaseRequest("laptop", Key(), "https://github.com/", _item) { Vault = VaultPath, Session = "session-one" }, Token);
+
+        Assert.Equal(BrowserOutcome.Done, throughTheLink?.Outcome);
+        Assert.False(elsewhere?.Attached);
+        Assert.NotEqual(BrowserOutcome.Done, afterElsewhere?.Outcome);
+    }
+
+    [Fact]
     public async Task A_check_that_fails_and_a_removed_pairing_each_leave_the_connection_bound_to_nothing()
     {
         var browsers = new FakeBrowsers();

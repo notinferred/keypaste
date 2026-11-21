@@ -234,6 +234,29 @@ public sealed class VaultRestoreTests : IDisposable
         Assert.Empty(Staged(link));
     }
 
+    [Fact]
+    public void ABackupKeptBesideALink_BeforeBackupsFollowedItsTarget_IsStillListedAndRestorable()
+    {
+        var target = SeededVault("before");
+        var link = VaultSaveTests.Link(Path.Combine(_directory, "linked.kdbx"), target);
+        var beside = Directory.CreateDirectory(link + ".backups").FullName;
+        var earlier = Path.Combine(beside, "linked.20200101T000000Z.kdbx");
+        File.Copy(target, earlier);
+
+        Edit(link, "after");
+        var backups = VaultBackups.List(link);
+        var kept = Assert.Single(backups, backup => backup.Path == earlier);
+
+        Assert.Equal(2, backups.Count);
+        Assert.True(VaultBackups.BelongsTo(link, earlier));
+
+        ClaimedVault.Restore(VaultBackups.Inspect(link, kept, _master));
+
+        Assert.Equal("before", ReadToken(target, _master));
+        Assert.True(File.Exists(earlier));
+        Assert.Equal(VaultBackups.DirectoryFor(target), Path.GetDirectoryName(VaultBackups.List(link)[0].Path));
+    }
+
     /// <remarks>
     /// Planted, because the core has no call that changes a master password until V.1a. The file is a
     /// real vault made under another password and given a name <c>List</c> recognises, which is what a

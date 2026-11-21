@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+A vault opened through a symbolic link keeps its backups in `<vault>.backups` beside the file the link points to, which is the file its saves replace, so opening it by the link and by the file no longer splits them; copies an earlier build kept beside the link are still listed, restorable and rotated when the vault is opened through that link. A browser's pairing now survives the relay naming the same vault by another path. (F.143)
+
 A new vault's first save, in `keypaste init` or the app's Create, writes a temporary file beside it and renames it into place, so a crash leaves no partial vault at the path and trying again works; the new file is readable by its owner alone on macOS and Linux. On macOS every save, backup, restore and export is flushed past the drive's cache. (F.142)
 
 A save on a full disk fails at once, naming the cause, instead of retrying for about two seconds, and removes the file it could not finish. A save or restore whose folder the system would not flush to the disk says so, in the app's notice, on stderr or in `keypaste approve`'s terminal, since a power cut before the system writes it could bring back the earlier file. Watching an open vault for another program's save reads the whole file only when its size or time changed, and once a minute regardless, rather than every five seconds, so a large or cloud-only vault is not reread or downloaded while nothing changes. (F.140)

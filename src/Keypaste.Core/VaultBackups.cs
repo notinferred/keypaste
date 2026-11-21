@@ -84,10 +84,10 @@ public static class VaultBackups
     /// <summary>The stamp in a backup's name. Fixed width, so an ordinal sort is chronological.</summary>
     private const string _stampFormat = "yyyyMMdd'T'HHmmss'Z'";
 
-    /// <summary>Where the backups of the vault at <paramref name="vaultPath"/> are kept.</summary>
+    /// <summary>Where the backups of the vault at <paramref name="vaultPath"/> are kept: beside the file a save replaces, which is a link's target rather than the link.</summary>
     /// <param name="vaultPath">The vault itself, not its directory.</param>
     /// <remarks>
-    /// Keyed on the vault's <b>whole file name</b>, extension included. Keying on the stem would give
+    /// Keyed on that file's <b>whole name</b>, extension included. Keying on the stem would give
     /// <c>personal.kdbx</c> and <c>personal.kdb</c> in one folder a single directory and identical
     /// backup names inside it, so retention would prune across both vaults.
     /// </remarks>
@@ -95,13 +95,19 @@ public static class VaultBackups
     {
         ArgumentException.ThrowIfNullOrEmpty(vaultPath);
 
-        var directory = Path.GetDirectoryName(Path.GetFullPath(vaultPath))
-            ?? throw new ArgumentException($"'{vaultPath}' has no directory to sit in.", nameof(vaultPath));
-
-        return Path.Combine(directory, Path.GetFileName(vaultPath) + DirectorySuffix);
+        return Beside(FileOf(vaultPath));
     }
 
-    /// <summary>Whether <paramref name="path"/> is the vault itself, its backup directory, or inside that directory.</summary>
+    /// <summary>The folders <see cref="List"/> reads that hold backups, <see cref="DirectoryFor"/> first and always.</summary>
+    /// <remarks>The second, beside a link, holds copies taken before backups followed the link's target, which may open with earlier credentials.</remarks>
+    public static IReadOnlyList<string> Directories(string vaultPath)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(vaultPath);
+
+        return [DirectoryFor(vaultPath), .. Folders(vaultPath).Skip(1).Where(folder => ListIn(folder.Directory, folder.NamedAfter).Count > 0).Select(folder => folder.Directory)];
+    }
+
+    /// <summary>Whether <paramref name="path"/> is the vault itself, one of its backup directories, or inside one.</summary>
     public static bool BelongsTo(string vaultPath, string path)
     {
         ArgumentException.ThrowIfNullOrEmpty(vaultPath);
@@ -112,10 +118,53 @@ public static class VaultBackups
             return true;
         }
 
-        var backups = PathIdentity.Canonical(DirectoryFor(vaultPath));
         var target = PathIdentity.Canonical(path);
-        return string.Equals(target, backups, PathIdentity.Comparison)
-            || target.StartsWith(backups + Path.DirectorySeparatorChar, PathIdentity.Comparison);
+        return Folders(vaultPath).Any(folder =>
+        {
+            var backups = PathIdentity.Canonical(folder.Directory);
+            return string.Equals(target, backups, PathIdentity.Comparison)
+                || target.StartsWith(backups + Path.DirectorySeparatorChar, PathIdentity.Comparison);
+        });
+    }
+
+    /// <summary>The file a save replaces: a link's final target, or the path as named when it is no link or cannot be followed.</summary>
+    private static string FileOf(string vaultPath)
+    {
+        var full = Path.GetFullPath(vaultPath);
+        try
+        {
+            return VaultFiles.WriteTarget(full);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return full;
+        }
+    }
+
+    private static string Beside(string file)
+    {
+        var directory = Path.GetDirectoryName(file)
+            ?? throw new ArgumentException($"'{file}' has no directory to sit in.", nameof(file));
+
+        return Path.Combine(directory, Path.GetFileName(file) + DirectorySuffix);
+    }
+
+    /// <summary>
+    /// The folders holding the vault's backups, each with the file its backups are named after:
+    /// <see cref="DirectoryFor"/>, and for a link also the folder beside the link, where backups went
+    /// before they followed the link's target.
+    /// </summary>
+    /// <remarks>The older folder is read and pruned in place, never moved: it may be on another volume, and its names carry the link's name.</remarks>
+    private static IEnumerable<(string Directory, string NamedAfter)> Folders(string vaultPath)
+    {
+        var file = FileOf(vaultPath);
+        yield return (Beside(file), file);
+
+        var named = Path.GetFullPath(vaultPath);
+        if (!string.Equals(named, file, StringComparison.Ordinal))
+        {
+            yield return (Beside(named), named);
+        }
     }
 
     /// <summary>Moves a conflicted copy already merged in with the vault's backups, under its own name, so no rotation removes it.</summary>
@@ -154,14 +203,35 @@ public static class VaultBackups
     {
         ArgumentException.ThrowIfNullOrEmpty(vaultPath);
 
-        var directory = DirectoryFor(vaultPath);
+        var found = new List<(VaultBackup Backup, int Counter)>();
+        foreach (var (directory, namedAfter) in Folders(vaultPath))
+        {
+            found.AddRange(ListIn(directory, namedAfter));
+        }
+
+        // The counter is part of the order and not a tiebreak to skip. Two backups sharing a second
+        // differ only by it, and an ordinal sort of the whole name gets them backwards: the second
+        // one is the one carrying "-2", and '-' sorts before the '.' that begins the first one's
+        // extension, so the older name would come out on top. That is reachable — SaveOverwriting
+        // takes a backup whatever else this unlock has already done.
+        found.Sort(static (left, right) =>
+        {
+            var byTime = right.Backup.TakenAt.CompareTo(left.Backup.TakenAt);
+            return byTime != 0 ? byTime : right.Counter.CompareTo(left.Counter);
+        });
+
+        return [.. found.Select(static parsed => parsed.Backup)];
+    }
+
+    private static List<(VaultBackup Backup, int Counter)> ListIn(string directory, string namedAfter)
+    {
         if (!Directory.Exists(directory))
         {
             return [];
         }
 
-        var prefix = Path.GetFileNameWithoutExtension(vaultPath) + ".";
-        var extension = Path.GetExtension(vaultPath);
+        var prefix = Path.GetFileNameWithoutExtension(namedAfter) + ".";
+        var extension = Path.GetExtension(namedAfter);
 
         string[] names;
         try
@@ -182,18 +252,7 @@ public static class VaultBackups
             }
         }
 
-        // The counter is part of the order and not a tiebreak to skip. Two backups sharing a second
-        // differ only by it, and an ordinal sort of the whole name gets them backwards: the second
-        // one is the one carrying "-2", and '-' sorts before the '.' that begins the first one's
-        // extension, so the older name would come out on top. That is reachable — SaveOverwriting
-        // takes a backup whatever else this unlock has already done.
-        found.Sort(static (left, right) =>
-        {
-            var byTime = right.Backup.TakenAt.CompareTo(left.Backup.TakenAt);
-            return byTime != 0 ? byTime : right.Counter.CompareTo(left.Counter);
-        });
-
-        return [.. found.Select(static parsed => parsed.Backup)];
+        return found;
     }
 
     /// <summary>
@@ -260,19 +319,20 @@ public static class VaultBackups
     /// </remarks>
     private static VaultBackup Keep(string vaultPath, DateTimeOffset now, out bool createdDirectory)
     {
-        var directory = DirectoryFor(vaultPath);
+        var file = FileOf(vaultPath);
+        var directory = Beside(file);
 
         createdDirectory = Ensure(directory);
 
         var reserved = Path.Combine(
             directory,
-            $".{Path.GetFileName(vaultPath)}.keypaste-{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8))}.tmp");
+            $".{Path.GetFileName(file)}.keypaste-{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8))}.tmp");
 
         try
         {
             VaultFiles.Copy(vaultPath, reserved);
 
-            var kept = Name(directory, vaultPath, now);
+            var kept = Name(directory, file, now);
             // A backup lost to a power cut leaves the vault as it is; the save that follows reports its own folder.
             _ = VaultFiles.Move(reserved, kept, overwrite: false);
 

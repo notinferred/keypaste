@@ -190,6 +190,30 @@ public sealed class AccessCommandTests
     }
 
     [Fact]
+    public void A_change_through_a_link_names_every_folder_holding_copies_and_counts_them_all()
+    {
+        using var harness = Seeded();
+        var link = Path.Combine(harness.Directory, "linked.kdbx");
+        try
+        {
+            File.CreateSymbolicLink(link, harness.VaultPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Assert.Skip($"this machine cannot create symbolic links: {ex.Message}");
+        }
+
+        var beside = Directory.CreateDirectory(link + ".backups").FullName;
+        File.Copy(harness.VaultPath, Path.Combine(beside, "linked.20200101T000000Z.kdbx"));
+
+        harness.Prompt.Enqueue(_master, _next, _next);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("access", "--password", "--vault", link));
+
+        Assert.Contains(
+            $"({VaultBackups.List(link).Count} in '{VaultBackups.DirectoryFor(link)}' and '{beside}')", harness.Err, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void A_password_change_alone_does_not_warn_about_a_keyfile()
     {
         using var harness = Seeded();

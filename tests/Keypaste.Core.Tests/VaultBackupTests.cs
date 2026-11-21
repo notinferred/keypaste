@@ -599,6 +599,24 @@ public sealed class VaultBackupTests : IDisposable
         }
     }
 
+    [Fact]
+    public void AVaultSavedThroughALinkAndByItsTarget_KeepsOneBackupFolder_BesideTheTarget()
+    {
+        var target = SeededVault("first", "personal.kdbx");
+        var link = VaultSaveTests.Link(Path.Combine(_directory, "work.kdbx"), target);
+
+        Edit(link, "second");
+        Age(target, TimeSpan.FromHours(1));
+        Edit(target, "third");
+
+        Assert.Equal(target + ".backups", VaultBackups.DirectoryFor(link));
+        Assert.Equal(VaultBackups.DirectoryFor(target), VaultBackups.DirectoryFor(link));
+        Assert.False(Directory.Exists(link + ".backups"));
+        Assert.Equal(2, VaultBackups.List(target).Count);
+        Assert.Equal(VaultBackups.List(target), VaultBackups.List(link));
+        Assert.All(VaultBackups.List(link), backup => Assert.StartsWith("personal.", Path.GetFileName(backup.Path), StringComparison.Ordinal));
+    }
+
     // ------------------------------------------------------------------ fixtures
 
     private const string _noUnixMode =

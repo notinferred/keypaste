@@ -297,7 +297,7 @@ public sealed class SessionAuthority : IApproverHandler
 
         // The relay attaches again before each of the extension's requests, so the same build on the same connection and unlock
         // keeps the pairing its check proved; anything else starts unbound.
-        if (earlier is { Browser: { } was } && ReferenceEquals(was, browser) && earlier.Session == lifetime.Id && earlier.Vault == request.Vault)
+        if (earlier is { Browser: { } was } && ReferenceEquals(was, browser) && earlier.Session == lifetime.Id && PathIdentity.SameFile(earlier.Vault, request.Vault))
         {
             attachment.Pairing = earlier.Pairing;
         }

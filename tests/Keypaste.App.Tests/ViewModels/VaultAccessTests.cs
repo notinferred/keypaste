@@ -116,6 +116,36 @@ public sealed class VaultAccessTests : IDisposable
     }
 
     [Fact]
+    public void A_change_through_a_link_names_the_folder_beside_the_link_that_still_holds_copies()
+    {
+        var link = Path.Combine(_directory, "linked.kdbx");
+        try
+        {
+            File.CreateSymbolicLink(link, _vaultPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Assert.Skip($"this machine cannot create symbolic links: {ex.Message}");
+        }
+
+        var beside = Directory.CreateDirectory(link + ".backups").FullName;
+        File.Copy(_vaultPath, Path.Combine(beside, "linked.20200101T000000Z.kdbx"));
+        using var session = new AppVaultSession(_clock);
+        using (var master = TempVault.Secret(_master))
+        {
+            Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(link, master.Value, null));
+        }
+
+        using var settings = Settings(session);
+        var access = settings.Access;
+        Enter(access, _master, _later);
+        access.ReviewCommand.Press();
+
+        Assert.Contains($"kept in {VaultBackups.DirectoryFor(link)} before", access.BackupCost, StringComparison.Ordinal);
+        Assert.Contains($"and in {beside},", access.BackupCost, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_password_changed_in_settings_keeps_the_app_open_and_only_the_new_one_opens_after_a_lock()
     {
         using var session = Unlocked(_master);
