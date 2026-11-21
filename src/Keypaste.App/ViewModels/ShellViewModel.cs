@@ -1531,9 +1531,9 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             {
                 var said = MergeNotice.Saved(FileNameOf(session), merged);
 
-                if (merged.ForeignDataKept is { } kept)
+                if (merged.LeftBehind is { } leftBehind)
                 {
-                    said = $"{said} {Vault.ForeignDataText(kept)}";
+                    said = $"{said} {leftBehind.Text}";
                 }
 
                 if (merged.Unflushed)
@@ -1541,7 +1541,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
                     said = $"{said} {Vault.UnflushedText}";
                 }
 
-                Say(said, stays: MergeNotice.NamesAConflict(merged) || merged.ForeignDataKept is not null || merged.Unflushed);
+                Say(said, stays: MergeNotice.NamesAConflict(merged) || merged.LeftBehind is not null || merged.Unflushed);
             }
 
             Count();
@@ -1671,9 +1671,9 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             _updatedAt.Remove(session);
             ReadVaultStatus();
 
-            if (session.TakeForeignDataKept() is { } kept)
+            if (session.TakeLeftBehind() is { } leftBehind)
             {
-                Say(Vault.ForeignDataText(kept), stays: true);
+                Say(leftBehind.Text, stays: true);
             }
 
             if (session.TakeUnflushedSave())

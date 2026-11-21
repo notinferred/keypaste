@@ -70,7 +70,7 @@ internal static class VaultSession
             WarnIfOlder(vault, context);
             var exit = body(vault);
             Announce(vault, context);
-            WarnIfForeignDataLeftOut(vault, context);
+            WarnIfLeftBehind(vault, context);
             WarnIfUnflushed(vault, context);
             return exit;
         }
@@ -302,12 +302,12 @@ internal static class VaultSession
         }
     }
 
-    /// <summary>Says, on stderr, that the verb's save left out another program's data and where the copy holding it is.</summary>
-    private static void WarnIfForeignDataLeftOut(Vault vault, CliContext context)
+    /// <summary>Says, on stderr, what the verb's save could not carry over from the file and where the copy holding it is.</summary>
+    private static void WarnIfLeftBehind(Vault vault, CliContext context)
     {
-        if (vault.TakeForeignDataKept() is { } kept)
+        if (vault.TakeLeftBehind() is { } leftBehind)
         {
-            context.Stderr.WriteLine($"keypaste: warning: {Vault.ForeignDataText(kept)}");
+            context.Stderr.WriteLine($"keypaste: warning: {leftBehind.Text}");
         }
     }
 

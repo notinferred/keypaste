@@ -90,6 +90,27 @@ public sealed class VaultSessionTests : IDisposable
         Assert.DoesNotContain(warning, _harness.Err, StringComparison.Ordinal);
     }
 
+    /// <summary>A verb whose save is a KDBX 3.1 vault's first says once, on stderr, that it wrote the current format and where the old file is.</summary>
+    [Fact]
+    public void AKdbx31VaultsFirstSave_SaysSoOnStderrOnce()
+    {
+        _harness.SeedVault(_master, ("env/dev/TOKEN", "first"));
+        Kdbx31.SaveAs(_harness.VaultPath, _master);
+        const string warning = "keypaste: warning: keypaste saved this vault in the current KeePass format, which KeePass before 2.35 can't open.";
+
+        _harness.Prompt.Enqueue(_master, "later");
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("add", "env/dev/LATER", "--vault", _harness.VaultPath));
+        var kept = VaultBackups.List(_harness.VaultPath)[0];
+        Assert.Single(_harness.Err.Split('\n'), line => line.StartsWith(warning, StringComparison.Ordinal));
+        Assert.Contains(kept.Path, _harness.Err, StringComparison.Ordinal);
+        Assert.Equal(3, KdbxHeader.Read(kept.Path).FormatMajorVersion);
+
+        _harness.Stderr.GetStringBuilder().Clear();
+        _harness.Prompt.Enqueue(_master, "again");
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("add", "env/dev/AGAIN", "--vault", _harness.VaultPath));
+        Assert.DoesNotContain(warning, _harness.Err, StringComparison.Ordinal);
+    }
+
     /// <summary>A verb whose save the system did not flush the vault's folder for says so once, on stderr, and succeeds.</summary>
     [Fact]
     public void ASaveWhoseFolderIsNotFlushed_SaysSoOnStderr()

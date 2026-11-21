@@ -484,13 +484,36 @@ public sealed class ShellStatusTests
         session.Unlocked.Save();
 
         var kept = VaultBackups.List(fixture.Path_)[0];
-        Assert.Equal(Vault.ForeignDataText(kept), shell.Notice);
+        var told = new VaultLeftBehind(kept, OtherProgramsData: true, OldFormat: false).Text;
+        Assert.Equal(told, shell.Notice);
+        Assert.Contains("four weeks", told, StringComparison.Ordinal);
         Assert.True(ForeignXml.Holds(kept.Path, TempVault.Password));
 
         session.Unlocked.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "SECOND", Password = "y" });
         session.Unlocked.Save();
 
-        Assert.Equal(Vault.ForeignDataText(kept), shell.Notice);
+        Assert.Equal(told, shell.Notice);
+    }
+
+    /// <summary>A KDBX 3.1 vault's first save says once that it wrote the current format and where the old file is, and the notice stays until dismissed.</summary>
+    [Fact]
+    public void AKdbx31VaultsFirstSave_SaysWhereTheOldFileIs_Once()
+    {
+        using var fixture = new TempVault();
+        Kdbx31.SaveAs(fixture.Path_, TempVault.Password);
+        var clock = new ManualClock(AppClock.Start);
+        using var session = new AppVaultSession(clock, home: fixture.Home);
+        Unlock(session, fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, authority: null, clock: clock);
+
+        session.Unlocked!.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "FIRST", Password = "x" });
+        session.Unlocked.Save();
+
+        var kept = VaultBackups.List(fixture.Path_)[0];
+        var told = new VaultLeftBehind(kept, OtherProgramsData: false, OldFormat: true).Text;
+        Assert.Equal(told, shell.Notice);
+        Assert.Equal(3, KdbxHeader.Read(kept.Path).FormatMajorVersion);
+        Assert.Null(session.TakeLeftBehind());
     }
 
     /// <summary>A save whose folder the system did not flush says so in the notice, and a later save that flushed it says nothing.</summary>
@@ -540,7 +563,7 @@ public sealed class ShellStatusTests
         Assert.Equal(WriteOutcome.Saved, write.Outcome);
         var kept = VaultBackups.List(fixture.Path_)[0];
         Assert.Equal(
-            $"Another program saved {name}, and keypaste merged it with your changes and saved. Your change to env/app/MINE is saved. {Vault.ForeignDataText(kept)}",
+            $"Another program saved {name}, and keypaste merged it with your changes and saved. Your change to env/app/MINE is saved. {new VaultLeftBehind(kept, OtherProgramsData: true, OldFormat: false).Text}",
             shell.Notice);
         Assert.True(ForeignXml.Holds(kept.Path, TempVault.Password));
     }

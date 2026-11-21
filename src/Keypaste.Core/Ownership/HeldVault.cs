@@ -39,10 +39,10 @@ public sealed class HeldVault : IWatchedVault, IDisposable
     public event EventHandler<VaultMergeSave>? Merged;
 
     /// <summary>
-    /// Raised after a save of the open copy left out data another program wrote in the file that keypaste can't keep, naming the copy
-    /// kept of the file before it; a merged copy's save says so in <see cref="VaultMergeSave.ForeignDataKept"/> instead.
+    /// Raised after a save of the open copy could not carry something over from the file it replaced (<see cref="Vault.TakeLeftBehind"/>),
+    /// naming the copy kept of the file before it; a merged copy's save says so in <see cref="VaultMergeSave.LeftBehind"/> instead.
     /// </summary>
-    public event EventHandler<VaultBackup>? ForeignDataKept;
+    public event EventHandler<VaultLeftBehind>? LeftBehind;
 
     /// <summary>
     /// Raised after a save of the open copy replaced the file without the system flushing its folder (<see cref="Vault.UnflushedText"/>);
@@ -130,7 +130,7 @@ public sealed class HeldVault : IWatchedVault, IDisposable
 
         AgentSave saved;
         VaultMergeSave? merged = null;
-        VaultBackup? foreignDataKept = null;
+        VaultLeftBehind? leftBehind = null;
         var unflushed = false;
 
         lock (_editGate)
@@ -139,7 +139,7 @@ public sealed class HeldVault : IWatchedVault, IDisposable
 
             if (saved.Outcome == AgentSaveOutcome.Saved)
             {
-                foreignDataKept = Open?.TakeForeignDataKept();
+                leftBehind = Open?.TakeLeftBehind();
                 unflushed = Open?.TakeUnflushedSave() == true;
             }
 
@@ -155,9 +155,9 @@ public sealed class HeldVault : IWatchedVault, IDisposable
             }
         }
 
-        if (foreignDataKept is not null)
+        if (leftBehind is not null)
         {
-            ForeignDataKept?.Invoke(this, foreignDataKept);
+            LeftBehind?.Invoke(this, leftBehind);
         }
 
         if (unflushed)

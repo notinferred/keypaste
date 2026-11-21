@@ -17,8 +17,8 @@ internal sealed record MergeResult(
     bool Recorded,
     DateTimeOffset At)
 {
-    /// <summary>The copy kept of the file before the merged copy's save left out another program's data, as <see cref="VaultMergeSave.ForeignDataKept"/>.</summary>
-    internal VaultBackup? ForeignDataKept { get; init; }
+    /// <summary>What the merged copy's save could not carry over from the file, as <see cref="VaultMergeSave.LeftBehind"/>.</summary>
+    internal VaultLeftBehind? LeftBehind { get; init; }
 
     /// <summary>Whether the merged copy's save replaced the file without the system flushing its folder, as <see cref="VaultMergeSave.Unflushed"/>.</summary>
     internal bool Unflushed { get; init; }

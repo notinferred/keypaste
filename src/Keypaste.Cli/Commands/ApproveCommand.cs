@@ -195,7 +195,7 @@ internal static class ApproveCommand
         {
             held.MergeThrough(server.Authority, Surface);
             held.Merged += (_, merged) => Merged(merged, console, () => Stop(lifetime, stop));
-            held.ForeignDataKept += (_, kept) => console.WriteLine($"keypaste: warning: {Vault.ForeignDataText(kept)}");
+            held.LeftBehind += (_, leftBehind) => console.WriteLine($"keypaste: warning: {leftBehind.Text}");
             held.Unflushed += (_, _) => console.WriteLine($"keypaste: warning: {Vault.UnflushedText}");
             var toldOf = new HashSet<string>(StringComparer.Ordinal);
             held.ConflictedCopies.Changed += (_, _) => ConflictedCopiesFound(held.ConflictedCopies.Found, toldOf, console);
@@ -249,9 +249,9 @@ internal static class ApproveCommand
             case VaultMergeSaveOutcome.Saved:
                 console.WriteLine("keypaste: another program saved the vault; keypaste merged it with the changes made here and saved it. Agents are answered from the merged copy.");
 
-                if (merged.ForeignDataKept is { } foreign)
+                if (merged.LeftBehind is { } leftBehind)
                 {
-                    console.WriteLine($"keypaste: warning: {Vault.ForeignDataText(foreign)}");
+                    console.WriteLine($"keypaste: warning: {leftBehind.Text}");
                 }
 
                 if (merged.Unflushed)

@@ -226,9 +226,9 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
             row.Review = null;
             Message = $"Merged {row.Name} and moved it in with this vault's backups.";
 
-            if (merged.ForeignDataKept is { } kept)
+            if (merged.LeftBehind is { } leftBehind)
             {
-                Message = $"{Message} {Vault.ForeignDataText(kept)}";
+                Message = $"{Message} {leftBehind.Text}";
             }
 
             if (merged.Unflushed)

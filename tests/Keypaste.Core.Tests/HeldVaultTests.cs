@@ -83,13 +83,32 @@ public sealed class HeldVaultTests : IDisposable
 #pragma warning disable CA2000
         using var held = new HeldVault(ClaimedVault.Open(VaultPath, _master), lifetime);
 #pragma warning restore CA2000
-        List<VaultBackup> told = [];
-        held.ForeignDataKept += (_, kept) => told.Add(kept);
+        List<VaultLeftBehind> told = [];
+        held.LeftBehind += (_, leftBehind) => told.Add(leftBehind);
 
         Assert.Equal(AgentSave.Saved, held.Save(vault => vault.UpdateEntry(new VaultEntry { GroupPath = _stripe.GroupPath, Title = _stripe.Title, Password = "mine" })));
         Assert.Equal(AgentSave.Saved, held.Save(vault => vault.UpdateEntry(new VaultEntry { GroupPath = _stripe.GroupPath, Title = _stripe.Title, Password = "mine-again" })));
 
-        Assert.True(ForeignXml.Holds(Assert.Single(told).Path, _master));
+        Assert.True(ForeignXml.Holds(Assert.Single(told).Kept.Path, _master));
+    }
+
+    [Fact]
+    public void AKdbx31VaultsFirstSave_SaysWhereTheOldFileIs_Once()
+    {
+        Kdbx31.SaveAs(VaultPath, _master);
+        using var lifetime = new SessionLifetime("session-two");
+#pragma warning disable CA2000
+        using var held = new HeldVault(ClaimedVault.Open(VaultPath, _master), lifetime);
+#pragma warning restore CA2000
+        List<VaultLeftBehind> told = [];
+        held.LeftBehind += (_, leftBehind) => told.Add(leftBehind);
+
+        Assert.Equal(AgentSave.Saved, held.Save(vault => vault.UpdateEntry(new VaultEntry { GroupPath = _stripe.GroupPath, Title = _stripe.Title, Password = "mine" })));
+        Assert.Equal(AgentSave.Saved, held.Save(vault => vault.UpdateEntry(new VaultEntry { GroupPath = _stripe.GroupPath, Title = _stripe.Title, Password = "mine-again" })));
+
+        var leftBehind = Assert.Single(told);
+        Assert.True(leftBehind.OldFormat);
+        Assert.Equal(3, KdbxHeader.Read(leftBehind.Kept.Path).FormatMajorVersion);
     }
 
     [Fact]
@@ -102,7 +121,7 @@ public sealed class HeldVaultTests : IDisposable
         var saved = _held.Save(vault => vault.UpdateEntry(new VaultEntry { GroupPath = _stripe.GroupPath, Title = _stripe.Title, Password = "mine" }));
 
         Assert.Equal(AgentSave.Saved, saved);
-        Assert.True(ForeignXml.Holds(merged!.ForeignDataKept!.Path, _master));
+        Assert.True(ForeignXml.Holds(merged!.LeftBehind!.Kept.Path, _master));
     }
 
     [Fact]

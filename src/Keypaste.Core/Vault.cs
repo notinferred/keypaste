@@ -30,7 +30,8 @@ public sealed class Vault : IDisposable
     private bool _rekeyed;
     private VaultBackup? _lastKept;
     private bool _holdsForeignData;
-    private VaultBackup? _foreignDataKept;
+    private bool _isOldFormat;
+    private VaultLeftBehind? _leftBehind;
     private bool _unflushed;
     private FileRead? _lastRead;
     private bool _keyDerivationChanged;
@@ -51,6 +52,7 @@ public sealed class Vault : IDisposable
         _savedAt = _stamp is null ? null : WrittenAt(path);
         _base = interop.TakeBase(_baseKey);
         _holdsForeignData = interop.ReadForeignData;
+        _isOldFormat = interop.ReadOldFormat;
     }
 
     /// <summary>The path of the file backing this vault.</summary>
@@ -70,28 +72,19 @@ public sealed class Vault : IDisposable
         "a sync tool bringing back an earlier version or someone replacing the file can do this.";
 
     /// <summary>
-    /// The copy kept of the file before a save of this vault left out data another program or a newer KeePass format wrote there, which
-    /// keypaste can't keep, the first time it is asked; null after that and while no save has left any out.
+    /// What a save of this vault could not carry over from the file it replaced, the first time it is asked: data another program or a
+    /// newer KeePass format wrote there, which keypaste can't keep, or the file's format older than KDBX 4; null after that and while no
+    /// save has left anything behind.
     /// </summary>
-    /// <remarks>The save that leaves it out keeps that copy whatever the backup floor says.</remarks>
-    public VaultBackup? TakeForeignDataKept()
+    /// <remarks>The save that leaves it behind keeps a copy of the file whatever the backup floor says.</remarks>
+    public VaultLeftBehind? TakeLeftBehind()
     {
         lock (_state)
         {
-            var kept = _foreignDataKept;
-            _foreignDataKept = null;
-            return kept;
+            var leftBehind = _leftBehind;
+            _leftBehind = null;
+            return leftBehind;
         }
-    }
-
-    /// <summary>What a person is told about the copy <see cref="TakeForeignDataKept"/> named.</summary>
-    /// <param name="kept">That copy.</param>
-    public static string ForeignDataText(VaultBackup kept)
-    {
-        ArgumentNullException.ThrowIfNull(kept);
-
-        return "This vault held data from another program that keypaste can't keep, so the save left it out. " +
-            $"keypaste kept a copy of the file from before the save, with that data, at '{kept.Path}'.";
     }
 
     /// <summary>Whether this vault's last save, if this was not asked since, replaced the file without the system flushing its folder to the disk.</summary>
@@ -361,7 +354,7 @@ public sealed class Vault : IDisposable
             }
 
             VaultBackups.Archive(Path, copyPath);
-            return new VaultMergeSave(VaultMergeSaveOutcome.Saved, string.Empty) { Report = report, ForeignDataKept = file.TakeForeignDataKept(), Unflushed = file.TakeUnflushedSave() };
+            return new VaultMergeSave(VaultMergeSaveOutcome.Saved, string.Empty) { Report = report, LeftBehind = file.TakeLeftBehind(), Unflushed = file.TakeUnflushedSave() };
         }
         catch (InvalidMasterPasswordException ex)
         {
@@ -511,7 +504,7 @@ public sealed class Vault : IDisposable
                     file.HasFileChangedSinceOpen, waitBetweenAttempts, KeePassInterop.SaveAttempts, duringAttempt, backUp: true, applyFloor: false);
 
                 handedOver = true;
-                return new VaultMergeSave(VaultMergeSaveOutcome.Saved, string.Empty) { Copy = file, Report = report, Kept = file._lastKept, ForeignDataKept = file.TakeForeignDataKept(), Unflushed = file.TakeUnflushedSave() };
+                return new VaultMergeSave(VaultMergeSaveOutcome.Saved, string.Empty) { Copy = file, Report = report, Kept = file._lastKept, LeftBehind = file.TakeLeftBehind(), Unflushed = file.TakeUnflushedSave() };
             }
             catch (VaultChangedOnDiskException)
             {
@@ -3479,14 +3472,18 @@ public sealed class Vault : IDisposable
         var clock = new SaveClock();
         var succeeded = false;
         bool dropsForeignData;
+        bool replacesOldFormat;
         bool changesKeyDerivation;
         VaultBackup? keptBeforeSave = null;
 
         lock (_state)
         {
             dropsForeignData = _holdsForeignData;
+            replacesOldFormat = _isOldFormat;
             changesKeyDerivation = _keyDerivationChanged;
         }
+
+        var mustKeepCopy = dropsForeignData || replacesOldFormat || changesKeyDerivation;
 
         try
         {
@@ -3504,7 +3501,7 @@ public sealed class Vault : IDisposable
 
             var stamp = _interop.Save(
                 hasChangedOnDisk, waitBetweenAttempts, clock, attempts, duringAttempt,
-                backUp || dropsForeignData || changesKeyDerivation ? path => keptBeforeSave = PreserveBefore(path, applyFloor && !dropsForeignData && !changesKeyDerivation) : null,
+                backUp || mustKeepCopy ? path => keptBeforeSave = PreserveBefore(path, applyFloor && !mustKeepCopy) : null,
                 keyChange,
                 cancellationToken);
             SeenSaveCount.Remember(_claim!.Home, _claim.Vault, _interop.SaveCount);
@@ -3525,10 +3522,11 @@ public sealed class Vault : IDisposable
                     _keyDerivationChanged = false;
                 }
 
-                if (dropsForeignData)
+                if (dropsForeignData || replacesOldFormat)
                 {
                     _holdsForeignData = false;
-                    _foreignDataKept = keptBeforeSave;
+                    _isOldFormat = false;
+                    _leftBehind = keptBeforeSave is null ? null : new VaultLeftBehind(keptBeforeSave, dropsForeignData, replacesOldFormat);
                 }
             }
 
@@ -3578,7 +3576,7 @@ public sealed class Vault : IDisposable
     /// <summary>Keeps the bytes this save is about to replace, returning the copy or null when the floor left it out. Called with the save gate held.</summary>
     /// <remarks>
     /// <paramref name="applyFloor"/> is false only on the overwriting, merging and access-changing paths and for a save that leaves out
-    /// another program's data or changes the key derivation, and
+    /// another program's data, replaces a format older than KDBX 4 or changes the key derivation, and
     /// <see cref="_backedUp"/> is set only when the floor applies, so an overwriting save can neither
     /// be suppressed by an ordinary edit earlier in the unlock nor suppress one later in it.
     /// </remarks>

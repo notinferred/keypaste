@@ -48,7 +48,7 @@ public sealed class MergeTests
 
         Edit(file, "work/github", "-u", "kpxc-user");
 
-        Assert.Null(Merge(open).ForeignDataKept);
+        Assert.Null(Merge(open).LeftBehind);
     }
 
     [Fact]

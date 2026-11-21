@@ -264,13 +264,14 @@ public sealed class ApproveCommandTests : IDisposable
     {
         using var stderr = new StringWriter();
         var kept = new VaultBackup(Path.Combine(_harness.Directory, "vault.kdbx.backups", "kept.kdbx"), DateTimeOffset.UnixEpoch);
+        var leftBehind = new VaultLeftBehind(kept, OtherProgramsData: true, OldFormat: false);
 
         ApproveCommand.Merged(
-            new VaultMergeSave(VaultMergeSaveOutcome.Saved, string.Empty) { ForeignDataKept = kept },
+            new VaultMergeSave(VaultMergeSaveOutcome.Saved, string.Empty) { LeftBehind = leftBehind },
             new AgentConsole(stderr, interactive: false),
             () => { });
 
-        Assert.Contains($"keypaste: warning: {Vault.ForeignDataText(kept)}{Environment.NewLine}", stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains($"keypaste: warning: {leftBehind.Text}{Environment.NewLine}", stderr.ToString(), StringComparison.Ordinal);
     }
 
     private CliHarness Terminal(RunningApprover approver)
