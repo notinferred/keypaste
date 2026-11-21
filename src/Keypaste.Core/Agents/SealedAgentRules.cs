@@ -65,7 +65,7 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
             return false;
         }
 
-        var key = Key(open);
+        var key = KeyOf(open);
         var holds = !read.Present || Sealed(read, open, key);
         _ignored = holds ? null : IgnoredText;
         rules = !holds ? AgentRules.Defaults : key is null ? read.Rules : FillSites.Shown(read.Rules, key);
@@ -75,7 +75,7 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
     /// <summary>Moves the home's earlier rules here when this vault's key sealed them and this vault has none of its own yet.</summary>
     private void TakeShared(Vault? open)
     {
-        if (shared is null || open is null || File.Exists(_file.Path) || !shared.TryReadFile(out var read, out _) || !read.Present || !Sealed(read, open, Key(open)))
+        if (shared is null || open is null || File.Exists(_file.Path) || !shared.TryReadFile(out var read, out _) || !read.Present || !Sealed(read, open, KeyOf(open)))
         {
             return;
         }
@@ -153,7 +153,8 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
     private static bool Matches(string expected, string seal) =>
         CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(expected), Encoding.ASCII.GetBytes(seal));
 
-    private static byte[]? Key(Vault? vault)
+    /// <summary>The vault's agent-rules key, or null while it is locked or holds none.</summary>
+    internal static byte[]? KeyOf(Vault? vault)
     {
         try
         {
@@ -167,6 +168,11 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
             return null;
         }
     }
+
+    /// <summary>Writes a new random key into the vault, unless it already holds one.</summary>
+    internal static bool WriteNewKey(Vault vault) =>
+        KeyOf(vault) is null
+        && vault.WriteRecord(new EntryName(ReservedGroups.Keys, KeyTitle), AcafIds.Agent, KeyField, Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
 
     /// <summary>The title of a home's own record of its count.</summary>
     /// <remarks>A record of its own, with a UUID derived from its title, because a merge takes an entry changed in both copies as the newer whole: two homes' counts in one entry would lose one.</remarks>
@@ -205,7 +211,7 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
             return false;
         }
 
-        key = Key(open);
+        key = KeyOf(open);
 
         if (key is not null)
         {
@@ -216,7 +222,7 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
         var made = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         var saved = _save(vault => vault.WriteRecord(new EntryName(ReservedGroups.Keys, KeyTitle), AcafIds.Agent, KeyField, made));
 
-        key = saved.Holds ? Key(_vault()) : null;
+        key = saved.Holds ? KeyOf(_vault()) : null;
         problem = key is not null ? string.Empty : $"the key could not be saved in the vault: {saved.Reason}";
         return key is not null;
     }

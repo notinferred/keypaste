@@ -109,9 +109,7 @@ public sealed class PasswordHealthRecommendationsTests : IDisposable
         }
 
         var stored = File.ReadAllText(KeypasteHome.RecommendationsPath(_fixture.Home));
-        Assert.Contains("\"password\"", stored, StringComparison.Ordinal);
-
-        foreach (var text in new[] { _weak, _shared, _strong, _alsoStrong, "Mail", "Forum", "Shop", "Cloud" })
+        foreach (var text in new[] { _weak, _shared, _strong, _alsoStrong, "Mail", "Forum", "Shop", "Cloud", "password", "weak", "reused" })
         {
             Assert.DoesNotContain(text, stored, StringComparison.Ordinal);
         }

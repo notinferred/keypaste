@@ -209,7 +209,7 @@ The app keeps this computer's settings in `~/.keypaste` (or `KEYPASTE_HOME`), be
 | `app.toml` | Idle timeout, theme, lock-on-minimize, whether closing the window keeps the app in the menu bar or tray, the vault agents and the CLI use when nothing names one, the window's place and size, zoom, and your answer on crash reports with the date of the terms you agreed to |
 | `crash-reports/` | Reports waiting to be sent while Send crash reports is on, each as Settings › Diagnostics lists it. Turning the switch off deletes the folder |
 | `projects.json` | Each project's saved directory and command. No variable names or values |
-| `recommendations.json` | Dismissed recommendations, by vault, entry ID and key name. No titles or values |
+| `recommendations.json` | Dismissed recommendations, each by its vault and a digest under a key the vault holds, so only that vault unlocked can tell which it hides. No entry IDs, names or values |
 | `save-counts/` | For each vault, by its identity rather than its path, the save count of the copy last opened or saved here, so an older copy is noticed. One number each |
 
 An unreadable settings file makes the app use defaults without overwriting it. Open keypaste at login is kept only as your login's own entry, which switching it off in Settings removes: a `keypaste` value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, `~/Library/LaunchAgents/com.keypaste.app.plist`, or `~/.config/autostart/keypaste.desktop`.

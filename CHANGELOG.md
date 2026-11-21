@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+`recommendations.json` no longer names the items, fields, projects or reminders you dismissed: each dismissal is kept as a digest under a key the vault holds, which the first dismissal in a vault without one saves into it. Dismissals an earlier build wrote still hold and are rewritten that way at your next dismissal or review in that vault. (F.145)
+
 A KDBX 3.1 vault's first save in keypaste keeps a copy of the file in `<vault>.backups` however recent the last one is, and the app, the CLI and `keypaste approve` say once that KeePass before 2.35 can't open the saved vault and where the old file is. That notice, and the one about another program's data, now say the copy stays among the backups for up to about four weeks, and attributes and header fields KeePassLib does not know are kept and named as unknown elements are. (F.144)
 
 A vault opened through a symbolic link keeps its backups in `<vault>.backups` beside the file the link points to, which is the file its saves replace, so opening it by the link and by the file no longer splits them; copies an earlier build kept beside the link are still listed, restorable and rotated when the vault is opened through that link. A browser's pairing now survives the relay naming the same vault by another path. (F.143)

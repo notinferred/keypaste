@@ -116,7 +116,8 @@ public sealed class LostTagRecommendationsTests : IDisposable
         }
 
         var stored = File.ReadAllText(KeypasteHome.RecommendationsPath(_fixture.Home));
-        Assert.Contains("lost-project-tag", stored, StringComparison.Ordinal);
+        Assert.DoesNotContain("lost-project-tag", stored, StringComparison.Ordinal);
+        Assert.DoesNotContain("billing", stored, StringComparison.Ordinal);
         Assert.DoesNotContain(_oldValue, stored, StringComparison.Ordinal);
         Assert.DoesNotContain(_newValue, stored, StringComparison.Ordinal);
         Assert.DoesNotContain("Billing", stored, StringComparison.Ordinal);

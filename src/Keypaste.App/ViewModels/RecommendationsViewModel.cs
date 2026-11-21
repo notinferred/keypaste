@@ -48,7 +48,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
     // Bounds how late a recheck comes after the computer sleeps, since the timer runs on the monotonic clock.
     private static readonly TimeSpan _longestRecheck = TimeSpan.FromHours(1);
 
-    private readonly List<Dismissal> _dismissals;
+    private readonly RecommendationDismissals _dismissals;
     private IReadOnlyList<NoteKeyFinding> _noteKeys = [];
     private IReadOnlyList<LostProjectTag> _lost = [];
     private IReadOnlyList<PasswordFinding> _weakReusedExpired = [];
@@ -82,8 +82,7 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
         _web = web;
         _expiryDays = ExpiryDays;
         _dismissalsPath = KeypasteHome.RecommendationsPath(home);
-        _dismissalsReadable = RecommendationDismissals.TryLoad(_dismissalsPath, out var dismissals);
-        _dismissals = [.. dismissals];
+        _dismissalsReadable = RecommendationDismissals.TryLoad(_dismissalsPath, out _dismissals);
 
         MoveSelectedCommand = new RelayCommand(() => Move([.. Rows.Where(row => row.IsSelected && !row.IsDismissed)]));
         SelectAllCommand = new RelayCommand(SelectAll);
@@ -496,11 +495,12 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
         }
 
         var vaultKey = VaultKey();
+        var key = RecommendationDismissals.KeyOf(_session.Unlocked);
         var keyfile = _session.Unlocked?.KeyfilePath;
         FragileKeyFile = keyfile is not null && VaultKeyfile.Inspect(keyfile).IsFragile ? Path.GetFileName(keyfile) : null;
-        FragileKeyFileDismissed = FragileKeyFile is not null && _dismissals.Contains(FragileKeyFileDismissal(vaultKey));
+        FragileKeyFileDismissed = FragileKeyFile is not null && _dismissals.IsDismissed(FragileKeyFileDismissal(vaultKey), key);
         WeakKeyDerivation = _session.Unlocked?.KeyDerivation is { IsWeakerThanKeypastes: true } derivation ? derivation : null;
-        KeyDerivationDismissed = WeakKeyDerivation is not null && _dismissals.Contains(KeyDerivationDismissal(vaultKey));
+        KeyDerivationDismissed = WeakKeyDerivation is not null && _dismissals.IsDismissed(KeyDerivationDismissal(vaultKey), key);
 
         if (WeakKeyDerivation is null || KeyDerivationDismissed)
         {
@@ -509,22 +509,22 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
 
         ShowConflictedCopies();
         Rows = [.. _noteKeys
-            .GroupBy(finding => (finding.EntryUuid, finding.Entry, Dismissed: IsDismissed(vaultKey, finding)))
+            .GroupBy(finding => (finding.EntryUuid, finding.Entry, Dismissed: IsDismissed(vaultKey, key, finding)))
             .Select(item => new RecommendationRow(this, [.. item.OrderBy(finding => finding.Line)], item.Key.Dismissed))
             .OrderBy(row => row.IsDismissed)
             .ThenBy(row => row.Entry, StringComparer.Ordinal)];
         LostTags = [.. _lost
-            .Select(finding => new LostTagRow(this, finding, IsDismissed(vaultKey, finding)))
+            .Select(finding => new LostTagRow(this, finding, IsDismissed(vaultKey, key, finding)))
             .OrderBy(row => row.IsDismissed)
             .ThenBy(row => row.Entry, StringComparer.Ordinal)
             .ThenBy(row => row.Tag, StringComparer.Ordinal)];
         Passwords = [.. _weakReusedExpired
-            .Select(finding => new PasswordRow(this, finding, IsDismissed(vaultKey, finding)))
+            .Select(finding => new PasswordRow(this, finding, IsDismissed(vaultKey, key, finding)))
             .OrderBy(row => row.IsDismissed)
             .ThenBy(row => row.Entry, StringComparer.Ordinal)
             .ThenBy(row => row.Finding.Problem)];
         Reminders = [.. _reminders
-            .Select(finding => new ReminderRow(this, finding, IsDismissed(vaultKey, finding)))
+            .Select(finding => new ReminderRow(this, finding, IsDismissed(vaultKey, key, finding)))
             .OrderBy(row => row.IsDismissed)
             .ThenBy(row => row.Finding.When ?? DateTimeOffset.MaxValue)
             .ThenBy(row => row.Entry, StringComparer.Ordinal)];
@@ -834,16 +834,40 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
 
     private void Dismiss(params IReadOnlyList<Dismissal> dismissals)
     {
-        _dismissals.AddRange(dismissals.Where(dismissal => !_dismissals.Contains(dismissal)).Distinct());
+        if (DismissalKey() is not { } key)
+        {
+            return;
+        }
+
+        _dismissals.Dismiss(dismissals, key);
         Message = Remember();
         Show();
     }
 
     private void ReviewAgain(params IReadOnlyList<Dismissal> dismissals)
     {
-        _dismissals.RemoveAll(dismissals.Contains);
+        _dismissals.ReviewAgain(dismissals, RecommendationDismissals.KeyOf(_session.Unlocked));
         Message = Remember();
         Show();
+    }
+
+    /// <summary>The vault's key for dismissals, saved in the vault first when it holds none, or null with <see cref="Message"/> saying why.</summary>
+    private byte[]? DismissalKey()
+    {
+        if (RecommendationDismissals.KeyOf(_session.Unlocked) is { } key)
+        {
+            return key;
+        }
+
+        var write = _session.Write(RecommendationDismissals.WriteKey, made => made);
+        key = write.Outcome is WriteOutcome.Saved or WriteOutcome.NothingToSave ? RecommendationDismissals.KeyOf(_session.Unlocked) : null;
+
+        if (key is null)
+        {
+            Message = write.Problem("dismiss it again") ?? "This could not be dismissed, because the vault could not be saved.";
+        }
+
+        return key;
     }
 
     private void SelectAll()
@@ -864,22 +888,22 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
             return "Your earlier dismissals could not be read, so this change lasts until you lock. Check that keypaste's folder can be read.";
         }
 
-        return RecommendationDismissals.Save(_dismissalsPath, _dismissals)
+        return _dismissals.Save(_dismissalsPath)
             ? string.Empty
             : "This change could not be saved on this machine, so it lasts until you lock. Check that keypaste's folder can be written.";
     }
 
-    private bool IsDismissed(string vaultKey, NoteKeyFinding finding) =>
-        _dismissals.Contains(new Dismissal(vaultKey, finding.EntryUuid, RecommendationDismissals.NoteKey, finding.Field));
+    private bool IsDismissed(string vaultKey, byte[]? key, NoteKeyFinding finding) =>
+        _dismissals.IsDismissed(new Dismissal(vaultKey, finding.EntryUuid, RecommendationDismissals.NoteKey, finding.Field), key);
 
-    private bool IsDismissed(string vaultKey, LostProjectTag finding) =>
-        _dismissals.Contains(new Dismissal(vaultKey, finding.EntryUuid, RecommendationDismissals.LostProjectTag, finding.Key));
+    private bool IsDismissed(string vaultKey, byte[]? key, LostProjectTag finding) =>
+        _dismissals.IsDismissed(new Dismissal(vaultKey, finding.EntryUuid, RecommendationDismissals.LostProjectTag, finding.Key), key);
 
-    private bool IsDismissed(string vaultKey, PasswordFinding finding) =>
-        _dismissals.Contains(new Dismissal(vaultKey, finding.EntryUuid, RecommendationDismissals.Password, finding.Key));
+    private bool IsDismissed(string vaultKey, byte[]? key, PasswordFinding finding) =>
+        _dismissals.IsDismissed(new Dismissal(vaultKey, finding.EntryUuid, RecommendationDismissals.Password, finding.Key), key);
 
-    private bool IsDismissed(string vaultKey, ItemReminder finding) =>
-        _dismissals.Contains(new Dismissal(vaultKey, finding.EntryUuid, RecommendationDismissals.Reminder, finding.Key));
+    private bool IsDismissed(string vaultKey, byte[]? key, ItemReminder finding) =>
+        _dismissals.IsDismissed(new Dismissal(vaultKey, finding.EntryUuid, RecommendationDismissals.Reminder, finding.Key), key);
 
     private int ExpiryDays => _preferences?.Current.ExpiryReminderDays ?? AppSettings.DefaultExpiryReminderDays;
 

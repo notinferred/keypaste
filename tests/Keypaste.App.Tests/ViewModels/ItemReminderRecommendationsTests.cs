@@ -115,7 +115,9 @@ public sealed class ItemReminderRecommendationsTests : IDisposable
         }
 
         var stored = File.ReadAllText(KeypasteHome.RecommendationsPath(_fixture.Home));
-        Assert.Contains("\"reminder\"", stored, StringComparison.Ordinal);
+        Assert.DoesNotContain("reminder", stored, StringComparison.Ordinal);
+        Assert.DoesNotContain("expires", stored, StringComparison.Ordinal);
+        Assert.DoesNotContain("needs-update", stored, StringComparison.Ordinal);
         Assert.DoesNotContain("GitHub", stored, StringComparison.Ordinal);
         Assert.DoesNotContain(_secret, stored, StringComparison.Ordinal);
 

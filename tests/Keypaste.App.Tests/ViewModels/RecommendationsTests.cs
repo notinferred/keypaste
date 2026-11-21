@@ -3,6 +3,7 @@ using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Recommendations;
 using Keypaste.Core.Tests;
 using Xunit;
 
@@ -115,9 +116,10 @@ public sealed class RecommendationsTests : IDisposable
         }
 
         var stored = File.ReadAllText(KeypasteHome.RecommendationsPath(_fixture.Home));
-        Assert.Contains("OPENAI_API_KEY", stored, StringComparison.Ordinal);
+        Assert.DoesNotContain("OPENAI_API_KEY", stored, StringComparison.Ordinal);
         Assert.DoesNotContain("sk-proj-2", stored, StringComparison.Ordinal);
         Assert.DoesNotContain("Stripe", stored, StringComparison.Ordinal);
+        Assert.DoesNotContain(RecommendationDismissals.NoteKey, stored, StringComparison.Ordinal);
 
         _session.Lock(VaultLockReason.Manual);
         Unlock();
@@ -132,6 +134,45 @@ public sealed class RecommendationsTests : IDisposable
 
         Assert.Equal("1", Settings(again).Count);
         Assert.DoesNotContain(again.Recommendations.Rows, row => row.IsDismissed);
+    }
+
+    [Fact]
+    public async Task An_earlier_files_dismissal_still_holds_and_is_kept_hidden_from_the_next_dismissal()
+    {
+        string entry;
+
+        using (var shell = Shell())
+        {
+            await shell.Recommendations.Checking;
+            entry = Assert.Single(shell.Recommendations.Rows).EntryUuid;
+        }
+
+        var path = KeypasteHome.RecommendationsPath(_fixture.Home);
+        var vaultKey = _session.Identity!.Key;
+        File.WriteAllText(path, "{\"dismissed\":[" + string.Join(",", ((string[])["STRIPE_SECRET_KEY", "OPENAI_API_KEY", "GITHUB_TOKEN"])
+            .Select(key => $$"""{"vault":"{{vaultKey}}","entry":"{{entry}}","kind":"note-key","key":"{{key}}"}""")) + "]}");
+
+        var vault = _session.Unlocked!;
+        vault.UpdateEntry(vault.Find(_plain)! with { Notes = "NEW_KEY=fresh" });
+        vault.Save();
+
+        using (var shell = Shell())
+        {
+            await shell.Recommendations.Checking;
+            Assert.True(shell.Recommendations.Rows.Single(row => row.EntryUuid == entry).IsDismissed);
+
+            shell.Recommendations.Rows.Single(row => row.EntryUuid != entry).DismissCommand.Press();
+        }
+
+        var stored = File.ReadAllText(path);
+        Assert.DoesNotContain("OPENAI_API_KEY", stored, StringComparison.Ordinal);
+        Assert.DoesNotContain("NEW_KEY", stored, StringComparison.Ordinal);
+        Assert.DoesNotContain(entry, stored, StringComparison.Ordinal);
+
+        using var again = Shell();
+        await again.Recommendations.Checking;
+        Assert.All(again.Recommendations.Rows, row => Assert.True(row.IsDismissed));
+        Assert.Equal(2, again.Recommendations.Rows.Count);
     }
 
     [Fact]
