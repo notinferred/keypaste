@@ -23,11 +23,6 @@ public sealed class VaultClaim : IDisposable
     /// <summary>The directory under keypaste's home that holds claims.</summary>
     public const string DirectoryName = "sessions";
 
-    private static readonly UnixFileMode _ownerOnlyDirectory =
-        UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
-
-    private static readonly UnixFileMode _ownerOnlyFile = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-
     private readonly FileStream _lock;
     private readonly string _ownerPath;
     private volatile bool _disposed;
@@ -121,11 +116,11 @@ public sealed class VaultClaim : IDisposable
 
         try
         {
-            CreateDirectory(directory);
+            HomeFiles.CreateOwnerOnlyFolder(directory);
 
             try
             {
-                held = new FileStream(lockPath, Options(FileMode.OpenOrCreate, FileAccess.Write, FileShare.None));
+                held = HomeFiles.Hold(lockPath);
             }
             catch (IOException) when (File.Exists(lockPath))
             {
@@ -136,7 +131,7 @@ public sealed class VaultClaim : IDisposable
 
             var owner = new VaultOwner(kind, Environment.ProcessId, vault.Path);
 
-            using (var stream = new FileStream(ownerPath, Options(FileMode.Create, FileAccess.Write, FileShare.Read)))
+            using (var stream = HomeFiles.Create(ownerPath))
             using (var writer = new StreamWriter(stream))
             {
                 writer.Write(Describe(owner));
@@ -187,7 +182,7 @@ public sealed class VaultClaim : IDisposable
         // description deleted.
         try
         {
-            File.Delete(_ownerPath);
+            HomeFiles.Delete(_ownerPath);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -240,30 +235,6 @@ public sealed class VaultClaim : IDisposable
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return null;
-        }
-    }
-
-    internal static FileStreamOptions Options(FileMode mode, FileAccess access, FileShare share)
-    {
-        var options = new FileStreamOptions { Mode = mode, Access = access, Share = share };
-
-        if (!OperatingSystem.IsWindows())
-        {
-            options.UnixCreateMode = _ownerOnlyFile;
-        }
-
-        return options;
-    }
-
-    internal static void CreateDirectory(string directory)
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            Directory.CreateDirectory(directory);
-        }
-        else
-        {
-            Directory.CreateDirectory(directory, _ownerOnlyDirectory);
         }
     }
 }

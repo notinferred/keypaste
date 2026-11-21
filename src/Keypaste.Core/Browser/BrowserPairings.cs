@@ -2,8 +2,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.Json;
 using Keypaste.Core.Agents;
-using Keypaste.Core.Ownership;
-using Keypaste.Infrastructure;
 
 namespace Keypaste.Core.Browser;
 
@@ -562,9 +560,9 @@ public sealed class BrowserPairings(string path)
         {
             try
             {
-                VaultClaim.CreateDirectory(directory);
+                HomeFiles.CreateOwnerOnlyFolder(directory);
                 problem = string.Empty;
-                return new FileStream(Path + ".lock", VaultClaim.Options(FileMode.OpenOrCreate, FileAccess.Write, FileShare.None));
+                return HomeFiles.Hold(Path + ".lock");
             }
             catch (IOException) when (Environment.TickCount64 < deadline)
             {
@@ -703,7 +701,7 @@ public sealed class BrowserPairings(string path)
 
         try
         {
-            AtomicFile.Write(Path, buffer.ToArray());
+            HomeFiles.Replace(Path, buffer.ToArray());
             problem = string.Empty;
             return true;
         }

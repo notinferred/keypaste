@@ -110,9 +110,6 @@ public sealed class AuditLog : IDisposable
 
     private static readonly UnixFileMode _ownerOnlyFile = UnixFileMode.UserRead | UnixFileMode.UserWrite;
 
-    private static readonly UnixFileMode _ownerOnlyDirectory =
-        UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
-
     private readonly Lock _gate = new();
     private readonly TimeProvider _clock;
     private bool _disposed;
@@ -212,7 +209,7 @@ public sealed class AuditLog : IDisposable
     {
         try
         {
-            return _lockRetries.Execute(static lockPath => new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.None), path + LockSuffix);
+            return _lockRetries.Execute(static lockPath => HomeFiles.Hold(lockPath), path + LockSuffix);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -225,22 +222,7 @@ public sealed class AuditLog : IDisposable
     /// Readable and deletable while it is held, so `keypaste log` works on a live file — including on
     /// Windows, where the default share mode would lock other readers out.
     /// </remarks>
-    private static FileStream OpenWriter(string path)
-    {
-        var options = new FileStreamOptions
-        {
-            Mode = FileMode.Append,
-            Access = FileAccess.Write,
-            Share = FileShare.ReadWrite | FileShare.Delete,
-        };
-
-        if (!OperatingSystem.IsWindows())
-        {
-            options.UnixCreateMode = _ownerOnlyFile;
-        }
-
-        return new FileStream(path, options);
-    }
+    private static FileStream OpenWriter(string path) => HomeFiles.Append(path);
 
     /// <summary>The same file, for reading the line a new record links to.</summary>
     /// <remarks>
@@ -534,13 +516,7 @@ public sealed class AuditLog : IDisposable
             return;
         }
 
-        if (OperatingSystem.IsWindows())
-        {
-            Directory.CreateDirectory(directory);
-            return;
-        }
-
-        Directory.CreateDirectory(directory, _ownerOnlyDirectory);
+        HomeFiles.CreateOwnerOnlyFolder(directory);
     }
 
     /// <summary>
@@ -564,7 +540,7 @@ public sealed class AuditLog : IDisposable
             return false;
         }
 
-        File.SetUnixFileMode(path, _ownerOnlyFile);
+        HomeFiles.MakeOwnerOnly(path);
         return true;
     }
 

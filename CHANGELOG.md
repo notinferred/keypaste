@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+Each vault's agent settings in `~/.keypaste/agents/` keep the sites where a browser filled a login encrypted under a key the vault holds, instead of in the clear; a file an earlier build wrote is rewritten that way at the next change, with every setting kept. (F.139)
+
 Security in the app suggests strengthening a vault whose password protection is weaker than keypaste's, AES-KDF or Argon2 below keypaste's settings, and `keypaste doctor` notes it; Strengthen says first that KeePass before 2.35 can no longer open the vault, while current KeePass, KeePassXC and the mobile apps can, then saves it with keypaste's Argon2 and keeps a copy of the file as it was. Nothing changes until you choose it. (F.138)
 
 A save that leaves out data another program or a newer KeePass format wrote in the vault, which keypaste can't keep, first keeps a copy of the file in `<vault>.backups` however recent the last one is, and the app, the CLI and `keypaste approve` say once where that copy is; saving goes on as before. (F.137)

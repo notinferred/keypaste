@@ -18,7 +18,8 @@ namespace Keypaste.Core.Agents;
 /// <para>
 /// Each sealed write counts up this home's count in the vault first, in a record of the home's own, and writes the file
 /// after, so a file sealed before the home's latest write, put back, is ignored too, a write whose file never lands leaves
-/// the defaults, and another home sharing the vault changes nothing here.
+/// the defaults, and another home sharing the vault changes nothing here. Each write keeps the sites of browser allowances encrypted
+/// under the same key (<see cref="FillSites"/>), and a read opens them.
 /// </para>
 /// <para>
 /// Each vault keeps its own file, so two vaults open at once never seal over each other's rules. The one
@@ -64,24 +65,24 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
             return false;
         }
 
-        var holds = !read.Present || Sealed(read, open);
+        var key = Key(open);
+        var holds = !read.Present || Sealed(read, open, key);
         _ignored = holds ? null : IgnoredText;
-        rules = holds ? read.Rules : AgentRules.Defaults;
+        rules = !holds ? AgentRules.Defaults : key is null ? read.Rules : FillSites.Shown(read.Rules, key);
         return true;
     }
 
     /// <summary>Moves the home's earlier rules here when this vault's key sealed them and this vault has none of its own yet.</summary>
     private void TakeShared(Vault? open)
     {
-        if (shared is null || open is null || File.Exists(_file.Path) || !shared.TryReadFile(out var read, out _) || !read.Present || !Sealed(read, open))
+        if (shared is null || open is null || File.Exists(_file.Path) || !shared.TryReadFile(out var read, out _) || !read.Present || !Sealed(read, open, Key(open)))
         {
             return;
         }
 
         try
         {
-            Directory.CreateDirectory(System.IO.Path.GetDirectoryName(_file.Path)!);
-            File.Move(shared.Path, _file.Path, overwrite: false);
+            HomeFiles.MoveWithoutReplacing(shared.Path, _file.Path);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -89,8 +90,8 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
         }
     }
 
-    private bool Sealed(RulesFileRead read, Vault? open) =>
-        read.Seal is { } seal && Key(open) is { } key && _file.HomeId() is { } home && Count(open, home) is { } count
+    private bool Sealed(RulesFileRead read, Vault? open, byte[]? key) =>
+        read.Seal is { } seal && key is not null && _file.HomeId() is { } home && Count(open, home) is { } count
         && Matches(Seal(key, home, count, read.Rules), seal);
 
     /// <inheritdoc/>
@@ -127,7 +128,9 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
             return false;
         }
 
-        if (!_file.TryWrite(next, Seal(key, home, count + 1, next), out problem))
+        var kept = FillSites.Hidden(next, key);
+
+        if (!_file.TryWrite(kept, Seal(key, home, count + 1, kept), out problem))
         {
             return false;
         }

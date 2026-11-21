@@ -1,5 +1,4 @@
 using System.Globalization;
-using Keypaste.Infrastructure;
 
 namespace Keypaste.Core.CrashReports;
 
@@ -33,8 +32,6 @@ public sealed class CrashOutbox
 
     private const int _markerBytes = 128;
     private const string _extension = ".json";
-    private const UnixFileMode _ownerOnlyFolder = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
-
     private readonly Lock _gate = new();
     private readonly TimeProvider _clock;
 
@@ -68,7 +65,7 @@ public sealed class CrashOutbox
                 var kept = Read(path);
                 var written = kept is null ? report : CrashScrubber.Merge(kept, report);
 
-                AtomicFile.Write(path, written.Json.Span);
+                HomeFiles.Replace(path, written.Json.Span);
                 File.SetLastWriteTimeUtc(path, _clock.GetUtcNow().UtcDateTime);
                 Tidy(report.Identity);
                 return true;
@@ -110,7 +107,7 @@ public sealed class CrashOutbox
 
                 if (Read(path) is { } kept && kept.Json.Span.SequenceEqual(report.Json.Span))
                 {
-                    File.Delete(path);
+                    HomeFiles.Delete(path);
                 }
 
                 return true;
@@ -132,7 +129,7 @@ public sealed class CrashOutbox
             {
                 if (Directory.Exists(Folder))
                 {
-                    Directory.Delete(Folder, recursive: true);
+                    HomeFiles.DeleteFolder(Folder);
                 }
 
                 return true;
@@ -153,7 +150,7 @@ public sealed class CrashOutbox
             try
             {
                 CreateFolder();
-                AtomicFile.Write(MarkerPath, Encoding.UTF8.GetBytes(CoreInfo.Version + " " + _clock.GetUtcNow().ToString("O", CultureInfo.InvariantCulture)));
+                HomeFiles.Replace(MarkerPath, Encoding.UTF8.GetBytes(CoreInfo.Version + " " + _clock.GetUtcNow().ToString("O", CultureInfo.InvariantCulture)));
                 return true;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -171,7 +168,7 @@ public sealed class CrashOutbox
         {
             try
             {
-                File.Delete(MarkerPath);
+                HomeFiles.Delete(MarkerPath);
                 return true;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -200,7 +197,7 @@ public sealed class CrashOutbox
                 }
 
                 var text = marker.Length <= _markerBytes ? File.ReadAllText(MarkerPath, Encoding.UTF8) : string.Empty;
-                File.Delete(MarkerPath);
+                HomeFiles.Delete(MarkerPath);
 
                 return text.Split(' ') is [var version, var started]
                     && version == CoreInfo.Version
@@ -235,7 +232,7 @@ public sealed class CrashOutbox
             }
             else
             {
-                File.Delete(path);
+                HomeFiles.Delete(path);
             }
         }
 
@@ -250,7 +247,7 @@ public sealed class CrashOutbox
                 break;
             }
 
-            File.Delete(each.Path);
+            HomeFiles.Delete(each.Path);
             bytes -= each.Report.Json.Length;
             waiting.Remove(each);
         }
@@ -279,15 +276,5 @@ public sealed class CrashOutbox
 
     private string PathOf(string identity) => Path.Combine(Folder, identity + _extension);
 
-    private void CreateFolder()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            Directory.CreateDirectory(Folder);
-        }
-        else
-        {
-            Directory.CreateDirectory(Folder, _ownerOnlyFolder);
-        }
-    }
+    private void CreateFolder() => HomeFiles.CreateOwnerOnlyFolder(Folder);
 }

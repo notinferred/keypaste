@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
 using Keypaste.Core.Ownership;
-using Keypaste.Infrastructure;
 
 namespace Keypaste.Core.Audit;
 
@@ -139,7 +138,7 @@ public static class AuditCompaction
             }
 
             // Staged whole before the lock is taken, so the writers' wait does not grow with the log.
-            using var staged = AtomicFile.Stage(full, compacted);
+            using var staged = HomeFiles.Stage(full, compacted);
             beforeCommit?.Invoke();
 
             using var held = AuditLog.AcquireWriteLock(full);

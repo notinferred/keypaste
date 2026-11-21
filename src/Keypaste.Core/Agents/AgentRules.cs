@@ -28,7 +28,7 @@ public sealed record RememberedPick(string Agent, string Name, string Field, str
 /// <summary>A login the person filled on one origin through one browser's pairing, kept so a pick of it in that page's list fills at once.</summary>
 /// <param name="Pairing">The pairing's name.</param>
 /// <param name="Paired">When that pairing was made, so a later pairing of the same name inherits nothing.</param>
-/// <param name="Origin">The page's origin, as <c>scheme://host:port</c>.</param>
+/// <param name="Origin">The page's origin, as <c>scheme://host:port</c>; in rules read from the file and not yet opened by the owner, encrypted under the vault's key.</param>
 /// <param name="Item">The item's UUID as hex.</param>
 public sealed record BrowserAllowance(string Pairing, DateTimeOffset Paired, string Origin, string Item);
 
@@ -479,6 +479,9 @@ public sealed record AgentRules
     /// <summary>These rules as a file holds them, its sections read in turn, nothing confirmed by a person.</summary>
     internal AgentRules Read(IReadOnlyList<AgentCategoryRule> agentCategories, IReadOnlyList<RememberedAnswer> answers, IReadOnlyList<RememberedPick> picks, IReadOnlyList<BrowserAllowance> allowances) =>
         this with { AgentCategories = [.. agentCategories], Answers = [.. answers], Picks = [.. picks], BrowserAllowances = [.. allowances] };
+
+    /// <summary>These rules with other browser allowances, as the file keeps or the owner reads them.</summary>
+    internal AgentRules WithBrowserAllowances(IEnumerable<BrowserAllowance> allowances) => this with { BrowserAllowances = [.. allowances] };
 
     private static bool Same(string left, string? right) => string.Equals(left, right, StringComparison.Ordinal);
 

@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Keypaste.Infrastructure;
 
 namespace Keypaste.Core.Projects;
 
@@ -180,12 +179,7 @@ public static class ProjectMappings
 
         try
         {
-            if (Path.GetDirectoryName(path) is { Length: > 0 } directory)
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            AtomicFile.Write(path, buffer.ToArray());
+            HomeFiles.Replace(path, buffer.ToArray());
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

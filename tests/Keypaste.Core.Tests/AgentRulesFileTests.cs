@@ -126,6 +126,8 @@ public sealed class AgentRulesFileTests : IDisposable
     [InlineData("[[agent]]\nname = \"claude-code\"\nrun = 2\n", "line 3")]
     [InlineData("[[agent]]\nname = \"a\"\n[[agent]]\nname = \"a\"\n", "same agent")]
     [InlineData("[[fill]]\npairing = \"laptop\"\npaired = \"2026-11-16T10:00:00Z\"\norigin = \"https://github.com\"\nitem = \"0123456789abcdef0123456789abcdef\"\n", "line 1")]
+    [InlineData("[[fill]]\npairing = \"laptop\"\npaired = \"2026-11-16T10:00:00Z\"\nsite = \"https://github.com:443\"\nitem = \"0123456789abcdef0123456789abcdef\"\n", "line 1")]
+    [InlineData("[[fill]]\npairing = \"laptop\"\npaired = \"2026-11-16T10:00:00Z\"\nsite = \"AAAA\"\norigin = \"https://github.com:443\"\nitem = \"0123456789abcdef0123456789abcdef\"\n", "line 1")]
     [InlineData("[[fill]]\npairing = \"laptop\"\npaired = \"yesterday\"\norigin = \"https://github.com:443\"\nitem = \"0123456789abcdef0123456789abcdef\"\n", "line 1")]
     [InlineData("[[fill]]\npairing = \"laptop\"\npaired = \"2026-11-16T10:00:00Z\"\norigin = \"https://github.com:443\"\nitem = \"0123\"\n", "line 1")]
     [InlineData("[[fill]]\npairing = \"laptop\"\npaired = \"2026-11-16T10:00:00Z\"\norigin = \"https://github.com:443\"\nitem = \"0123456789abcdef0123456789abcdef\"\n[[fill]]\npairing = \"laptop\"\npaired = \"2026-11-16T10:00:00Z\"\norigin = \"https://github.com:443\"\nitem = \"0123456789abcdef0123456789abcdef\"\n", "same allowance")]

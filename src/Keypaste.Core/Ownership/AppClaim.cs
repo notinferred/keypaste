@@ -72,8 +72,8 @@ public sealed class AppClaim : IDisposable
 
         try
         {
-            VaultClaim.CreateDirectory(directory);
-            held = new FileStream(path, VaultClaim.Options(FileMode.OpenOrCreate, FileAccess.Write, FileShare.None));
+            HomeFiles.CreateOwnerOnlyFolder(directory);
+            held = HomeFiles.Hold(path);
             claim = new AppClaim(held, endpoint);
             held = null;
             return true;

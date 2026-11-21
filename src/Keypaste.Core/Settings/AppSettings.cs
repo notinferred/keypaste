@@ -406,12 +406,7 @@ public sealed record AppSettings
 
         try
         {
-            if (Path.GetDirectoryName(Path.GetFullPath(path)) is { Length: > 0 } directory)
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            AtomicFile.Write(path, bytes);
+            HomeFiles.Replace(path, bytes);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

@@ -376,17 +376,17 @@ Out of scope, with reasons: same-user attackers reading unlocked memory, audit r
 
 ### T-24 — `recent.toml` tells anything that can read `~/.keypaste` where your vaults are
 
-**Asset.** The paths of the person's vaults and keyfiles.
+**Asset.** The paths of the person's vaults and keyfiles, and the names and sites a vault holds.
 
 **Attacker.** Anything that can read `~/.keypaste`, or a screenshot of the unlock screen.
 
-**Mitigation.** The desktop records up to ten successfully opened vault paths, each with its last keyfile's path, and no names, counts, fingerprints or key material; the file is owner-only on Linux and macOS, and rows can be removed or the list cleared. With no recent vault it reads only KeePassXC's recent-database keys, writes none of KeePassXC's files and records none until opened. The app shows only file names.
+**Mitigation.** The desktop records up to ten successfully opened vault paths, each with its last keyfile's path, and no names, counts, fingerprints or key material; the file is owner-only on Linux and macOS, and rows can be removed or the list cleared. With no recent vault it reads only KeePassXC's recent-database keys, writes none of KeePassXC's files and records none until opened. The app shows only file names. Every file keypaste writes in its home goes through one owner in Core, so no other code adds to what the home holds. A vault's agent rules name items by UUID, and keep the site of each login a browser filled encrypted under a key the vault holds, which only the process holding the unlocked vault reads; a file an earlier build wrote with sites in the clear is rewritten with them encrypted at the owner's next change.
 
-**Limit.** Anyone who can read `~/.keypaste` learns those paths, keyfile locations included (T-27), as they can read the audit log. On Windows the file inherits profile permissions, by founder decision of 2026-10-22. KeePassXC's paths add nothing a same-user process could not read, but put them on the first screen, where a screenshot captures them.
+**Limit.** Anyone who can read `~/.keypaste` learns those paths, keyfile locations included (T-27), as they can read the audit log. What the home holds in the clear, by file: `recent.toml`, vault and keyfile paths; `app.toml`, the chosen vault's path; `projects.json`, each mapping's vault path, project, directory and command, which `keypaste run` reads before any vault is open; `agents/<vault>.toml`, agents' labels, the field or attachment each kept answer names and the name an agent asked for in each kept pick, which `keypaste clients` lists without the vault, and the pairings' names; `browsers.json`, each pairing's name, build and time; `sessions/<vault>.owner`, the path of a vault held open; `recommendations.json`, entry IDs and the field, lost project or reminder reason each dismissal names; `audit.jsonl`, what each request named (T-5, T-9); `crash-reports/`, reports scrubbed of names, paths and values; `agents.id`, `save-counts/` and the lock files, a random identity, numbers or nothing. On Windows `recent.toml` inherits profile permissions, by founder decision of 2026-10-22. KeePassXC's paths add nothing a same-user process could not read, but put them on the first screen, where a screenshot captures them.
 
 **Status.** Implemented (unreleased); the desktop app has no release.
 
-**Tests.** `RecentVaultsTests`, `SecretHygieneTests`, `KeePassXcDatabasesTests`.
+**Tests.** `RecentVaultsTests`, `SecretHygieneTests`, `KeePassXcDatabasesTests`, `HomeFilesSourceRulesTests`, `SealedAgentRulesTests`.
 
 ### T-25 — A value on screen, because somebody asked to see it
 

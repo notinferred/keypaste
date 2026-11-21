@@ -1,6 +1,5 @@
 using System.Globalization;
 using Keypaste.Core.Audit;
-using Keypaste.Infrastructure;
 
 namespace Keypaste.Core.Ownership;
 
@@ -78,8 +77,7 @@ internal sealed class SeenSaveCount
     {
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            AtomicFile.Write(path, Encoding.UTF8.GetBytes(count.ToString(CultureInfo.InvariantCulture) + "\n"));
+            HomeFiles.Replace(path, Encoding.UTF8.GetBytes(count.ToString(CultureInfo.InvariantCulture) + "\n"));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

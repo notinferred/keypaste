@@ -82,6 +82,7 @@ public sealed class AgentRulesFile(string path, string homeIdPath)
     private const string _pairingKey = "pairing";
     private const string _pairedKey = "paired";
     private const string _originKey = "origin";
+    private const string _siteKey = "site";
     private const string _pairedFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'";
 
     // Room for every agent, every remembered answer, each naming a field or an attachment and a name up to a request's length, and every browser allowance.
@@ -195,8 +196,7 @@ public sealed class AgentRulesFile(string path, string homeIdPath)
         try
         {
             var made = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(16));
-            Directory.CreateDirectory(System.IO.Path.GetDirectoryName(HomeIdPath)!);
-            AtomicFile.Write(HomeIdPath, Encoding.UTF8.GetBytes(made + "\n"));
+            HomeFiles.Replace(HomeIdPath, Encoding.UTF8.GetBytes(made + "\n"));
             id = made;
             return true;
         }
@@ -264,8 +264,7 @@ public sealed class AgentRulesFile(string path, string homeIdPath)
 
         try
         {
-            Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Path)!);
-            AtomicFile.Write(Path, Encoding.UTF8.GetBytes(writer.ToString()));
+            HomeFiles.Replace(Path, Encoding.UTF8.GetBytes(writer.ToString()));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -321,7 +320,7 @@ public sealed class AgentRulesFile(string path, string homeIdPath)
             writer.BlankLine().Table(_fillTable)
                 .Text(_pairingKey, allowance.Pairing)
                 .Text(_pairedKey, allowance.Paired.UtcDateTime.ToString(_pairedFormat, CultureInfo.InvariantCulture))
-                .Text(_originKey, allowance.Origin)
+                .Text(FillSites.IsHidden(allowance.Origin) ? _siteKey : _originKey, allowance.Origin)
                 .Text(_itemKey, allowance.Item);
         }
 
@@ -593,17 +592,20 @@ public sealed class AgentRulesFile(string path, string homeIdPath)
     {
         allowance = null;
 
-        if (!TryTexts(table, [_pairingKey, _pairedKey, _originKey, _itemKey], out var texts, out error))
+        // A site an earlier keypaste kept in the clear is read, so its rules hold until the owner's next write hides it.
+        var hidden = table.TryGet(_siteKey, out _);
+
+        if (!TryTexts(table, [_pairingKey, _pairedKey, hidden ? _siteKey : _originKey, _itemKey], out var texts, out error))
         {
             return false;
         }
 
         if (Browser.PairingNames.Problem(texts[0], []) is not null
             || !DateTimeOffset.TryParseExact(texts[1], _pairedFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var paired)
-            || !Browser.WebOrigin.IsOrigin(texts[2])
+            || !(hidden ? FillSites.IsHidden(texts[2]) : Browser.WebOrigin.IsOrigin(texts[2]))
             || !AgentRules.IsItem(texts[3]))
         {
-            error = $"{At(table.Line)}: a [[{_fillTable}]] section names a pairing, when it was paired, an origin as scheme://host:port and an item's UUID";
+            error = $"{At(table.Line)}: a [[{_fillTable}]] section names a pairing, when it was paired, its site as keypaste encrypted it or as scheme://host:port, and an item's UUID";
             return false;
         }
 

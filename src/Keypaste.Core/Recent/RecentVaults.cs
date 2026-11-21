@@ -245,12 +245,7 @@ public static class RecentVaults
 
         try
         {
-            if (System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path)) is { Length: > 0 } directory)
-            {
-                Directory.CreateDirectory(directory);
-            }
-
-            AtomicFile.Write(path, Encoding.UTF8.GetBytes(writer.ToString()));
+            HomeFiles.Replace(path, Encoding.UTF8.GetBytes(writer.ToString()));
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

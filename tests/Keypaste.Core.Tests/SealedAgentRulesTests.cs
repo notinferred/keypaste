@@ -15,6 +15,9 @@ public sealed class SealedAgentRulesTests : IDisposable
 {
     private const string _agent = "claude-code";
     private const string _password = "SENTINEL-SEALED-PASSWORD";
+    private const string _site = "https://github.com:443";
+
+    private static readonly DateTimeOffset _paired = new(2026, 11, 1, 9, 30, 0, TimeSpan.Zero);
 
     private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-sealed-rules-").FullName;
     private readonly ManualClock _clock = new();
@@ -356,6 +359,66 @@ public sealed class SealedAgentRulesTests : IDisposable
         Assert.False(File.Exists(_file.Path));
         Assert.Equal(AuditMethod.Prompt, (await RequestAsync()).Method);
     }
+
+    /// <summary>A login filled on a site is kept with its site encrypted under the vault's key, so the file names no site, and the owner still fills it there at once.</summary>
+    [Fact]
+    public void A_browser_allowance_keeps_its_site_out_of_the_file_and_still_fills()
+    {
+        var item = _vault.EntryUuid(new EntryName("work", "github"))!;
+
+        Assert.True(_rules.TryChange(rules => rules.AllowingFill(new BrowserAllowance("work laptop", _paired, _site, item)), out var problem), problem);
+
+        Assert.DoesNotContain("github", File.ReadAllText(_file.Path), StringComparison.OrdinalIgnoreCase);
+        Assert.True(_file.TryRead(out var unopened, out _));
+        Assert.False(unopened.AllowsFill("work laptop", _paired, _site, item));
+        Assert.True(_rules.TryRead(out var held, out _));
+        Assert.True(held.AllowsFill("work laptop", _paired, _site, item));
+        Assert.False(held.AllowsFill("work laptop", _paired, "https://gist.github.com:443", item));
+        Assert.Null(_rules.Ignored);
+    }
+
+    /// <summary>A file an earlier keypaste sealed with its sites in the clear holds as it is, and the owner's next change keeps every rule and hides the sites.</summary>
+    [Fact]
+    public void A_file_sealed_with_sites_in_the_clear_holds_and_its_next_change_hides_them()
+    {
+        var item = _vault.EntryUuid(new EntryName("work", "github"))!;
+        Assert.True(_rules.TryChange(rules => rules.WithRun(_agent, run: true), out var problem), problem);
+        var earlier = AgentRules.Defaults.WithRun(_agent, run: true)
+            .Remembering(new RememberedAnswer(_agent, item, "password", CategoryRule.Allow), confirmed: true)
+            .AllowingFill(new BrowserAllowance("work laptop", _paired, _site, item));
+        Assert.True(_file.TryWrite(earlier, SealedAgentRules.Seal(Key(), _file.HomeId()!, 1, earlier), out problem), problem);
+        Assert.Contains("https://github.com:443", File.ReadAllText(_file.Path), StringComparison.Ordinal);
+
+        Assert.True(_rules.TryRead(out var before, out _));
+        Assert.Equal(earlier, before);
+        Assert.Null(_rules.Ignored);
+
+        Assert.True(_rules.TryChange(rules => rules.With(FieldCategory.Notes, CategoryRule.Block), out problem), problem);
+
+        Assert.DoesNotContain("github", File.ReadAllText(_file.Path), StringComparison.OrdinalIgnoreCase);
+        Assert.True(_rules.TryRead(out var after, out _));
+        Assert.Equal(earlier.With(FieldCategory.Notes, CategoryRule.Block), after);
+        Assert.Null(_rules.Ignored);
+    }
+
+    /// <summary>A hidden site swapped in the file for another the owner sealed breaks the seal, so the defaults hold and nothing fills unasked.</summary>
+    [Fact]
+    public void A_hidden_site_swapped_in_the_file_is_ignored()
+    {
+        var item = _vault.EntryUuid(new EntryName("work", "github"))!;
+        Assert.True(_rules.TryChange(rules => rules.AllowingFill(new BrowserAllowance("work laptop", _paired, "https://gitlab.com:443", item)), out var problem), problem);
+        var other = File.ReadAllLines(_file.Path).Single(line => line.StartsWith("site = ", StringComparison.Ordinal));
+        Assert.True(_rules.TryChange(rules => rules.WithoutPairing("work laptop", _paired).AllowingFill(new BrowserAllowance("work laptop", _paired, _site, item)), out problem), problem);
+        var sealedText = File.ReadAllLines(_file.Path);
+        File.WriteAllLines(_file.Path, sealedText.Select(line => line.StartsWith("site = ", StringComparison.Ordinal) ? other : line));
+
+        Assert.True(_rules.TryRead(out var held, out _));
+
+        Assert.Empty(held.BrowserAllowances);
+        Assert.Equal(SealedAgentRules.IgnoredText, _rules.Ignored);
+    }
+
+    private byte[] Key() => Convert.FromBase64String(_vault.ReadRecords(ReservedGroups.Keys, SealedAgentRules.KeyField).Single(record => record.Title == SealedAgentRules.KeyTitle).Value!);
 
     private static AgentRulesFile RulesIn(string home) => AgentRulesFile.For(home, VaultIdentity.Of(home, Path.Combine(home, "vault.kdbx")));
 
