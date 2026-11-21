@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+A new vault's first save, in `keypaste init` or the app's Create, writes a temporary file beside it and renames it into place, so a crash leaves no partial vault at the path and trying again works; the new file is readable by its owner alone on macOS and Linux. On macOS every save, backup, restore and export is flushed past the drive's cache. (F.142)
+
 A save on a full disk fails at once, naming the cause, instead of retrying for about two seconds, and removes the file it could not finish. A save or restore whose folder the system would not flush to the disk says so, in the app's notice, on stderr or in `keypaste approve`'s terminal, since a power cut before the system writes it could bring back the earlier file. Watching an open vault for another program's save reads the whole file only when its size or time changed, and once a minute regardless, rather than every five seconds, so a large or cloud-only vault is not reread or downloaded while nothing changes. (F.140)
 
 Each vault's agent settings in `~/.keypaste/agents/` keep the sites where a browser filled a login encrypted under a key the vault holds, instead of in the clear; a file an earlier build wrote is rewritten that way at the next change, with every setting kept. (F.139)

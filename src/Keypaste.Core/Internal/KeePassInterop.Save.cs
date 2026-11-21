@@ -141,14 +141,20 @@ internal sealed partial class KeePassInterop
     /// <summary>Replaces the vault, or the file its link points to, with <paramref name="bytes"/>, flushed to disk before the rename that commits them.</summary>
     /// <remarks>
     /// <paramref name="hasChangedOnDisk"/> is asked last, after the flush and immediately before the rename, and
-    /// a change it reports discards the written file and leaves the vault as the other program saved it. A
-    /// write onto a vault file that did not exist goes straight to its name, so there is nothing to ask before.
+    /// a change it reports discards the written file and leaves the vault as the other program saved it. A vault
+    /// with no file yet is created by <see cref="WriteFirstFile"/>, whose rename refuses a file that arrived meanwhile.
     /// </remarks>
     /// <exception cref="VaultChangedOnDiskException">Something else wrote to the vault; nothing was replaced.</exception>
     private void Replace(byte[] bytes, Func<bool>? hasChangedOnDisk)
     {
         // Resolved on every save, since a link can be pointed elsewhere while the vault is open.
         var target = VaultFiles.WriteTarget(_database.IOConnectionInfo.Path);
+
+        if (!File.Exists(target))
+        {
+            LastSaveFlushedItsFolder = WriteFirstFile(target, bytes);
+            return;
+        }
 
         using (FileTransactionEx transaction = new(IOConnectionInfo.FromPath(target), _database.UseFileTransactions))
         {
@@ -163,7 +169,7 @@ internal sealed partial class KeePassInterop
                     written.Write(bytes);
                     VaultFiles.KeepMode(written, target);
                     WhileWriting?.Invoke(writtenTo);
-                    written.Flush(flushToDisk: true);
+                    VaultFiles.Flush(written);
                 }
             }
             catch when (!inPlace)
@@ -183,6 +189,37 @@ internal sealed partial class KeePassInterop
         }
 
         LastSaveFlushedItsFolder = VaultFiles.SyncDirectory(Path.GetDirectoryName(Path.GetFullPath(target))!);
+    }
+
+    /// <summary>Writes a vault's first file beside its path, flushed, and renames it into place, so a crash leaves no partial vault there.</summary>
+    /// <remarks>
+    /// Not through KeePassLib, which writes a file that does not exist yet straight to its name because a temporary in
+    /// another folder would give it that folder's permissions; this one is in the vault's own folder. One a crash left is
+    /// removed first, unless another handle holds it.
+    /// </remarks>
+    /// <returns>Whether the rename reached the disk with its folder.</returns>
+    /// <exception cref="VaultChangedOnDiskException">A file arrived at the path first; it was not replaced.</exception>
+    private bool WriteFirstFile(string target, byte[] bytes)
+    {
+        var temporary = target + StrandedTemporarySuffix;
+        VaultFiles.Discard(temporary);
+        VaultFiles.WriteNew(temporary, bytes, WhileWriting);
+
+        try
+        {
+            return VaultFiles.Move(temporary, target, overwrite: false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            VaultFiles.Discard(temporary);
+
+            if (File.Exists(target))
+            {
+                throw new VaultChangedOnDiskException();
+            }
+
+            throw;
+        }
     }
 
     /// <summary>How many times a save is attempted before the failure is reported.</summary>
@@ -391,6 +428,12 @@ internal sealed partial class KeePassInterop
                 preserve(_database.IOConnectionInfo.Path);
             }
 
+            if (gated)
+            {
+                // By name, before KeePassLib opens it with truncation: a crash can leave it a hard link to the vault.
+                VaultFiles.Unlink(VaultFiles.WriteTarget(_database.IOConnectionInfo.Path) + StrandedTemporarySuffix);
+            }
+
             clock.Attempt(() =>
             {
                 duringAttempt?.Invoke(attempt);
@@ -435,7 +478,8 @@ internal sealed partial class KeePassInterop
     /// </para>
     /// <para>
     /// <b>Only an attempt over an existing file is gated.</b> KeePassLib transacts only when the
-    /// vault file exists, so a first save or one whose directory is gone never uses either name,
+    /// vault file exists, so a first save, whose temporary beside the vault the vault's claim keeps to one
+    /// writer (<see cref="WriteFirstFile"/>), or one whose directory is gone never uses the private directory,
     /// and queueing it behind other saves' key derivation was F.10's overrun. Gating an
     /// attempt that then does not transact is harmless. The residual is a vault file created
     /// between this check and KeePassLib's own, whose attempt transacts ungated

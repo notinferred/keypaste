@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using Microsoft.Win32.SafeHandles;
 
 namespace Keypaste.Core.Internal;
 
@@ -13,6 +14,11 @@ internal static class VaultFiles
 {
     private const uint _moveReplaceExisting = 0x1;
     private const uint _moveWriteThrough = 0x8;
+    private const int _fullFsync = 51;
+    private const uint _renameExclusive = 0x4;
+    private const uint _renameNoReplace = 0x1;
+    private const int _atCurrentDirectory = -100;
+    private const int _invalidArgument = 22;
 
     /// <summary>Copies <paramref name="source"/> to a new owner-only file at <paramref name="destination"/>, flushed to disk.</summary>
     /// <exception cref="IOException">The destination exists, or either file could not be used.</exception>
@@ -22,12 +28,15 @@ internal static class VaultFiles
         using var from = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         using var to = new FileStream(destination, NewOwnerOnlyFile());
         from.CopyTo(to);
-        to.Flush(flushToDisk: true);
+        Flush(to);
     }
 
     /// <summary>Writes <paramref name="bytes"/> to a new owner-only file, flushed to disk; a file it created and could not finish is removed.</summary>
+    /// <param name="destination">The file to create.</param>
+    /// <param name="bytes">Its contents.</param>
+    /// <param name="beforeFlush">Called with <paramref name="destination"/> after the bytes and before the flush, so a test can fail the write as a full disk does.</param>
     /// <exception cref="IOException">The file exists or could not be written.</exception>
-    internal static void WriteNew(string destination, byte[] bytes)
+    internal static void WriteNew(string destination, byte[] bytes, Action<string>? beforeFlush = null)
     {
         var created = false;
 
@@ -36,7 +45,8 @@ internal static class VaultFiles
             using var stream = new FileStream(destination, NewOwnerOnlyFile());
             created = true;
             stream.Write(bytes);
-            stream.Flush(flushToDisk: true);
+            beforeFlush?.Invoke(destination);
+            Flush(stream);
         }
         catch (Exception ex) when (created && ex is IOException or UnauthorizedAccessException or NotSupportedException)
         {
@@ -63,8 +73,25 @@ internal static class VaultFiles
             return true;
         }
 
-        File.Move(source, destination, overwrite);
+        if (overwrite || !RenamedWithoutReplacing(source, destination))
+        {
+            File.Move(source, destination, overwrite);
+        }
+
         return SyncDirectory(Path.GetDirectoryName(Path.GetFullPath(destination))!);
+    }
+
+    /// <summary>Removes a stale temporary by its name, so a hard link a crash left there to the vault is never written through.</summary>
+    /// <remarks>Unlinking a name leaves every other name of the file as it was; any failure leaves it.</remarks>
+    internal static void Unlink(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     /// <summary>Removes a backup.</summary>
@@ -145,9 +172,50 @@ internal static class VaultFiles
             return false;
         }
 
-        var flushed = Fsync(descriptor) == 0;
+        var flushed = (OperatingSystem.IsMacOS() && Fcntl(descriptor, _fullFsync) == 0) || Fsync(descriptor) == 0;
         _ = Close(descriptor);
         return flushed;
+    }
+
+    /// <summary>Flushes a file's bytes to the drive itself: on macOS by F_FULLFSYNC, since its fsync leaves them in the drive's cache, and by fsync where the file system refuses that.</summary>
+    /// <exception cref="IOException">The bytes could not be flushed.</exception>
+    internal static void Flush(FileStream stream) => Flush(stream, file => OperatingSystem.IsMacOS() && FullFsync(file));
+
+    /// <summary><see cref="Flush(FileStream)"/> with the F_FULLFSYNC call given, so a test can stand in for a file system that refuses it.</summary>
+    internal static void Flush(FileStream stream, Func<SafeFileHandle, bool> fullFsync)
+    {
+        if (OperatingSystem.IsMacOS())
+        {
+            stream.Flush(flushToDisk: false);
+
+            if (fullFsync(stream.SafeFileHandle))
+            {
+                return;
+            }
+        }
+
+        stream.Flush(flushToDisk: true);
+    }
+
+    /// <summary>Asks macOS to write the file's bytes past the drive's cache.</summary>
+    /// <returns>Whether it did: false where the file system does not support F_FULLFSYNC.</returns>
+    [SupportedOSPlatform("macos")]
+    internal static bool FullFsync(SafeFileHandle file)
+    {
+        var added = false;
+
+        try
+        {
+            file.DangerousAddRef(ref added);
+            return Fcntl((int)file.DangerousGetHandle(), _fullFsync) == 0;
+        }
+        finally
+        {
+            if (added)
+            {
+                file.DangerousRelease();
+            }
+        }
     }
 
     private static FileStreamOptions NewOwnerOnlyFile()
@@ -173,6 +241,48 @@ internal static class VaultFiles
         {
             // The file is encrypted either way; a mode this file system will not hold does not make it worthless (T-24).
         }
+    }
+
+    /// <summary>Renames in one step that refuses an existing destination, where .NET's no-overwrite move links and then unlinks.</summary>
+    /// <returns>False when this system or file system has no such rename, so the caller moves as .NET does.</returns>
+    /// <exception cref="IOException">The rename was refused, an existing destination among other reasons.</exception>
+    [UnsupportedOSPlatform("windows")]
+    private static bool RenamedWithoutReplacing(string source, string destination)
+    {
+        var from = System.Text.Encoding.UTF8.GetBytes(source + '\0');
+        var to = System.Text.Encoding.UTF8.GetBytes(destination + '\0');
+        int result;
+
+        try
+        {
+            result = OperatingSystem.IsMacOS() ? RenameExclusive(from, to, _renameExclusive) : RenameAt2(_atCurrentDirectory, from, _atCurrentDirectory, to, _renameNoReplace);
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return false;
+        }
+
+        if (result == 0)
+        {
+            return true;
+        }
+
+        var error = Marshal.GetLastPInvokeError();
+        var (notImplemented, notSupported) = OperatingSystem.IsMacOS() ? (78, 45) : (38, 95);
+
+        if (error == _invalidArgument || error == notImplemented || error == notSupported)
+        {
+            return false;
+        }
+
+        var message = Marshal.GetPInvokeErrorMessage(error);
+
+        throw error switch
+        {
+            2 => new FileNotFoundException(message, source),
+            1 or 13 => new UnauthorizedAccessException(message),
+            _ => new IOException(message, error),
+        };
     }
 
     [SupportedOSPlatform("windows")]
@@ -205,6 +315,16 @@ internal static class VaultFiles
 
     [DllImport("libc", EntryPoint = "fsync", ExactSpelling = true, SetLastError = true)]
     private static extern int Fsync(int descriptor);
+
+    // Declared without fcntl's variadic tail, which F_FULLFSYNC does not take, since arm64 macOS passes variadic arguments differently.
+    [DllImport("libc", EntryPoint = "fcntl", ExactSpelling = true, SetLastError = true)]
+    private static extern int Fcntl(int descriptor, int command);
+
+    [DllImport("libc", EntryPoint = "renamex_np", ExactSpelling = true, SetLastError = true)]
+    private static extern int RenameExclusive(byte[] nulTerminatedFrom, byte[] nulTerminatedTo, uint flags);
+
+    [DllImport("libc", EntryPoint = "renameat2", ExactSpelling = true, SetLastError = true)]
+    private static extern int RenameAt2(int fromDirectory, byte[] nulTerminatedFrom, int toDirectory, byte[] nulTerminatedTo, uint flags);
 
     [DllImport("libc", EntryPoint = "close", ExactSpelling = true, SetLastError = true)]
     private static extern int Close(int descriptor);

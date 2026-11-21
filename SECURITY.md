@@ -158,7 +158,7 @@ The [security laws](#security-laws) govern these guarantees, and [THREATS.md](TH
 - Notifications carry fixed words only [T-51].
 - Crash reports are sent only after consent, hold no value, name or path, and never come from the CLI or bridge [T-9].
 - A save keeps the last five copies in `<vault>.backups`, and the newest of each of the last seven days and four weeks, restorable from the unlock screen [T-26]; deletion goes to the recycle bin (v0.3.0 deletes permanently).
-- A save whose new file drops an item of the file it replaces without recording a deletion, or differs from the open vault, is refused and replaces nothing, a hardware-key vault's included; the backup and the new file are flushed to disk before the rename that replaces the vault, and the save says so when the system would not flush the vault's folder after that rename.
+- A save whose new file drops an item of the file it replaces without recording a deletion, or differs from the open vault, is refused and replaces nothing, a hardware-key vault's included; the backup and the new file, a new vault's first included, are flushed to the drive, on macOS with `F_FULLFSYNC`, before the rename that puts the file in place, and the save says so when the system would not flush the vault's folder after that rename.
 - Limit: screen capture and onlookers can read a revealed value [T-25].
 - Limit: clipboard managers can ignore keypaste's markers [T-19].
 - Limit: `recent.toml` shows where vaults and keyfiles are [T-24].

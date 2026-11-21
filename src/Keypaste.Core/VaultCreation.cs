@@ -225,17 +225,9 @@ public static class VaultCreation
             var vault = Vault.CreateWith(claim, path, password, keyfilePath, hardwareKey);
 #pragma warning restore CA2000
 
-            var pathWasFree = !File.Exists(path);
-
             try
             {
                 vault.Save();
-            }
-            catch (HardwareKeyException) when (pathWasFree)
-            {
-                vault.Dispose();
-                ForgetEmptyFile(path);
-                throw;
             }
             catch
             {
@@ -260,29 +252,6 @@ public static class VaultCreation
         {
             failure = ex.Message;
             return VaultCreationOutcome.Failed;
-        }
-    }
-
-    /// <summary>Frees the path a failed first save left an empty file at.</summary>
-    /// <remarks>
-    /// A vault with no file yet is saved straight to its path, which is opened before the key is derived, so a
-    /// hardware key that does not answer leaves the file empty, and a retry would find the path taken. Only that
-    /// failure, on a path that was free just before the save, is known to have made the file: any other can come
-    /// before the path is opened, when an empty file there would be somebody else's.
-    /// </remarks>
-    private static void ForgetEmptyFile(string path)
-    {
-        try
-        {
-            var file = new FileInfo(path);
-
-            if (file.Exists && file.Length == 0)
-            {
-                file.Delete();
-            }
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
         }
     }
 }

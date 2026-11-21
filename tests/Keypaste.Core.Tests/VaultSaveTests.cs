@@ -544,6 +544,35 @@ public sealed class VaultSaveTests : IDisposable
         Assert.Equal("p", reopened.Find("env/dev/T")?.Password, StringComparer.Ordinal);
     }
 
+    /// <summary>A temporary a crash left hard-linked to the vault is unlinked, never written through, so the vault is replaced whole.</summary>
+    [Fact]
+    public void A_temporary_hard_linked_to_the_vault_leaves_the_vault_intact_and_the_save_succeeds()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Skip("The no-overwrite move that could leave a hard link is Unix's.");
+            return;
+        }
+
+        var (vault, home) = NewVaultInItsOwnDirectory("linked");
+        using var _ = vault;
+        var path = Path.Combine(home, "vault.kdbx");
+        var before = File.ReadAllBytes(path);
+        using (var ln = Process.Start("ln", [path, path + KeePassInterop.StrandedTemporarySuffix]))
+        {
+            ln.WaitForExit();
+            Assert.Equal(0, ln.ExitCode);
+        }
+
+        vault.AddEntry(new VaultEntry { Title = "After", Password = "p" });
+        vault.WhileWriting = _ => Assert.Equal(before, File.ReadAllBytes(path));
+        vault.Save();
+
+        using var reopened = ClaimedVault.Open(path, MasterPassword);
+        Assert.NotNull(reopened.Find("After"));
+        Assert.False(File.Exists(path + KeePassInterop.StrandedTemporarySuffix));
+    }
+
     /// <summary>A full disk is not waited out: the save fails on its first attempt, names the cause, and leaves no half-written file beside the vault.</summary>
     [Fact]
     public void A_full_disk_fails_at_once_naming_it_and_leaves_no_temporary_file()

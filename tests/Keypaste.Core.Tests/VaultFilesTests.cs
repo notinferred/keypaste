@@ -44,9 +44,63 @@ public sealed class VaultFilesTests : IDisposable
     }
 
     [Fact]
+    public void A_move_that_must_not_replace_refuses_an_existing_destination_and_leaves_both_files()
+    {
+        var staged = Path.Combine(_directory, "vault.kdbx.tmp");
+        var vault = Path.Combine(_directory, "vault.kdbx");
+        File.WriteAllBytes(staged, [1]);
+        File.WriteAllBytes(vault, [2]);
+
+        Assert.ThrowsAny<IOException>(() => VaultFiles.Move(staged, vault, overwrite: false));
+
+        Assert.Equal([1], File.ReadAllBytes(staged));
+        Assert.Equal([2], File.ReadAllBytes(vault));
+        File.Delete(vault);
+        VaultFiles.Move(staged, vault, overwrite: false);
+        Assert.Equal([1], File.ReadAllBytes(vault));
+        Assert.False(File.Exists(staged));
+    }
+
+    [Fact]
     public void A_directory_says_whether_its_entries_are_on_disk()
     {
         Assert.True(VaultFiles.SyncDirectory(_directory));
         Assert.Equal(OperatingSystem.IsWindows(), VaultFiles.SyncDirectory(Path.Combine(_directory, "missing")));
+    }
+
+    [Fact]
+    public void A_flush_on_macOS_writes_past_the_drive_cache()
+    {
+        if (!OperatingSystem.IsMacOS())
+        {
+            Assert.Skip("F_FULLFSYNC is macOS's; elsewhere fsync reaches the drive.");
+            return;
+        }
+
+        using var file = new FileStream(Path.Combine(_directory, "vault.kdbx"), FileMode.CreateNew, FileAccess.Write);
+        file.Write([1, 2, 3]);
+        file.Flush();
+
+        Assert.True(VaultFiles.FullFsync(file.SafeFileHandle));
+    }
+
+    [Fact]
+    public void A_flush_the_file_system_refuses_F_FULLFSYNC_for_still_writes_the_file()
+    {
+        var path = Path.Combine(_directory, "vault.kdbx");
+        var asked = false;
+
+        using (var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write))
+        {
+            file.Write([1, 2, 3]);
+            VaultFiles.Flush(file, _ =>
+            {
+                asked = true;
+                return false;
+            });
+        }
+
+        Assert.Equal(OperatingSystem.IsMacOS(), asked);
+        Assert.Equal([1, 2, 3], File.ReadAllBytes(path));
     }
 }

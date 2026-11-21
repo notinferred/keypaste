@@ -4,8 +4,8 @@ using Keypaste.Core.Tests;
 namespace Keypaste.VaultSaver;
 
 /// <summary>
-/// Saves one vault, once, at a given retry budget, and says what happened; or saves one, or restores a
-/// backup, as far as the instant before the vault is replaced, and waits there to be killed.
+/// Saves one vault, once, at a given retry budget, and says what happened; or saves one, creates one, or
+/// restores a backup, as far as the instant before the vault is replaced, and waits there to be killed.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -50,12 +50,18 @@ internal static class Program
             return SaveAndHold(heldPath, password);
         }
 
+        if (args is ["create-hold", var newPath])
+        {
+            return CreateAndHold(newPath, password);
+        }
+
         if (args.Length != 2 || !int.TryParse(args[1], out var attempts))
         {
             Console.Error.WriteLine(
                 "usage: <vault-path> <attempts>\n" +
                 "       restore-hold <vault-path> <backup-file-name>\n" +
                 "       save-hold <vault-path>\n" +
+                "       create-hold <vault-path>\n" +
                 "the master password is read from KEYPASTE_SAVER_PASSWORD");
             return 2;
         }
@@ -95,6 +101,24 @@ internal static class Program
             using var vault = ClaimedVault.Open(vaultPath, password);
             vault.AddEntry(new VaultEntry { Title = "never written", Password = "secret" });
             vault.SaveWaiting(waitBetweenAttempts: null, duringAttempt: _ => Hold());
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"saver failed: {ex.GetType().Name}: {ex.Message}");
+            return 3;
+        }
+    }
+
+    /// <summary>Saves a new vault as far as the instant after its bytes are written and before they are flushed, says so, and waits to be killed.</summary>
+    private static int CreateAndHold(string vaultPath, string password)
+    {
+        try
+        {
+            using var vault = ClaimedVault.Create(vaultPath, password);
+            vault.AddEntry(new VaultEntry { Title = "never created", Password = "secret" });
+            vault.WhileWriting = _ => Hold();
+            vault.Save();
             return 0;
         }
         catch (Exception ex)

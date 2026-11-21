@@ -714,7 +714,7 @@ public sealed class VaultBackupTests : IDisposable
         }
     }
 
-    private static string Helper(string name)
+    internal static string Helper(string name)
     {
         var directory = AppContext.BaseDirectory;
         while (!File.Exists(Path.Combine(directory, "keypaste.slnx")))

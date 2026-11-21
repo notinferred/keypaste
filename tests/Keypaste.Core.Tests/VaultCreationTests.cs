@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using Keypaste.Core.HardwareKeys;
+using Keypaste.Core.Internal;
 using Keypaste.Core.Tests.HardwareKeys;
 using Xunit;
 
@@ -45,6 +47,7 @@ public sealed class VaultCreationTests : IDisposable
             Assert.Empty(failure);
             Assert.NotNull(created);
             Assert.True(File.Exists(path), "TryCreate reported Created without saving the file");
+            Assert.False(File.Exists(path + KeePassInterop.StrandedTemporarySuffix));
         }
 
         using var reopened = ClaimedVault.Open(path, _password);
@@ -369,6 +372,109 @@ public sealed class VaultCreationTests : IDisposable
         {
             Assert.Equal(VaultCreationOutcome.Created, outcome);
         }
+    }
+
+    [Fact]
+    public void A_first_save_that_fails_before_its_rename_leaves_the_path_free_for_the_next_attempt()
+    {
+        var path = Path.Combine(_directory, "new.kdbx");
+
+        using (var vault = ClaimedVault.Create(path, _password))
+        {
+            vault.WhileWriting = _ => throw new IOException("No space left on device", OperatingSystem.IsWindows() ? unchecked((int)0x80070070) : 28);
+
+            Assert.Throws<VaultException>(vault.Save);
+        }
+
+        Assert.Empty(Directory.EnumerateFileSystemEntries(_directory));
+        Assert.Equal(VaultDestination.Free, VaultCreation.Inspect(path));
+
+        var outcome = ClaimedVault.TryCreate(path, _password, _password, out var created, out _);
+
+        using (created)
+        {
+            Assert.Equal(VaultCreationOutcome.Created, outcome);
+        }
+    }
+
+    [Fact]
+    public void A_created_vault_on_Windows_has_the_access_its_folder_gives_a_new_file()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Skip("Only Windows files take their access rules from their folder.");
+            return;
+        }
+
+        var path = Path.Combine(_directory, "new.kdbx");
+        var sibling = Path.Combine(_directory, "sibling");
+        File.WriteAllBytes(sibling, [0]);
+
+        var outcome = ClaimedVault.TryCreate(path, _password, _password, out var created, out _);
+
+        using (created)
+        {
+            Assert.Equal(VaultCreationOutcome.Created, outcome);
+        }
+
+        Assert.Equal(Access(sibling), Access(path), StringComparer.Ordinal);
+
+        static string Access(string file) =>
+            new FileInfo(file).GetAccessControl().GetSecurityDescriptorSddlForm(System.Security.AccessControl.AccessControlSections.Access);
+    }
+
+    [Fact]
+    public void A_file_that_arrives_while_a_first_save_writes_is_not_replaced()
+    {
+        var path = Path.Combine(_directory, "new.kdbx");
+        using var vault = ClaimedVault.Create(path, _password);
+        vault.WhileWriting = _ => File.WriteAllBytes(path, [1, 2, 3]);
+
+        Assert.Throws<VaultChangedOnDiskException>(vault.Save);
+
+        Assert.Equal([1, 2, 3], File.ReadAllBytes(path));
+        Assert.False(File.Exists(path + KeePassInterop.StrandedTemporarySuffix));
+    }
+
+    [Fact]
+    public async Task A_creation_killed_before_its_rename_leaves_no_vault_and_the_next_one_succeeds()
+    {
+        var path = Path.Combine(_directory, "new.kdbx");
+        var info = new ProcessStartInfo
+        {
+            FileName = VaultBackupTests.Helper("Keypaste.VaultSaver"),
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        info.ArgumentList.Add("create-hold");
+        info.ArgumentList.Add(path);
+        info.Environment["KEYPASTE_SAVER_PASSWORD"] = _password;
+
+        using (var process = Process.Start(info) ?? throw new InvalidOperationException("the saver did not start"))
+        {
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+            deadline.CancelAfter(TimeSpan.FromSeconds(60));
+
+            Assert.Equal("holding", await process.StandardOutput.ReadLineAsync(deadline.Token));
+
+            process.Kill(entireProcessTree: true);
+            await process.WaitForExitAsync(deadline.Token);
+        }
+
+        Assert.True(File.Exists(path + KeePassInterop.StrandedTemporarySuffix), "the saver held before writing its temporary file");
+        Assert.Equal(VaultDestination.Free, VaultCreation.Inspect(path));
+
+        var outcome = ClaimedVault.TryCreate(path, _password, _password, out var created, out _);
+
+        using (created)
+        {
+            Assert.Equal(VaultCreationOutcome.Created, outcome);
+        }
+
+        Assert.False(File.Exists(path + KeePassInterop.StrandedTemporarySuffix));
+        using var reopened = ClaimedVault.Open(path, _password);
+        Assert.Empty(reopened.ReadEntries());
     }
 
     public void Dispose()
