@@ -181,6 +181,24 @@ public sealed class VaultRestoreTests : IDisposable
         Assert.Equal(bytes, File.ReadAllBytes(backup.Path));
         Assert.Equal("before", ReadToken(path, _master));
         Assert.Empty(Staged(path));
+        Assert.False(report.Unflushed);
+    }
+
+    [Fact]
+    public void ARestoreWhoseFolderIsNotFlushed_SaysSo()
+    {
+        var path = SeededVault("before");
+        Edit(path, "after");
+        var validated = VaultBackups.Inspect(path, Assert.Single(VaultBackups.List(path)), _master);
+        VaultRestoreReport report;
+
+        using (UnflushableFolder.Stage(Path.GetDirectoryName(path)!))
+        {
+            report = ClaimedVault.Restore(validated);
+        }
+
+        Assert.True(report.Unflushed);
+        Assert.Equal("before", ReadToken(path, _master));
     }
 
     [Fact]

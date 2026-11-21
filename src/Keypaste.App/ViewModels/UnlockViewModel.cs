@@ -962,8 +962,10 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
             _ => "There was no file to keep.",
         };
 
-        return $"Restored the backup from {When(report.Restored)}. {kept} " +
+        var restored = $"Restored the backup from {When(report.Restored)}. {kept} " +
             "This vault opens with the master password that backup was made under.";
+
+        return report.Unflushed ? $"{restored} {Vault.UnflushedText}" : restored;
     }
 
     /// <summary>Forgets every vault, as File › Open recent › Clear menu asks.</summary>

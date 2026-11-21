@@ -90,6 +90,26 @@ public sealed class VaultSessionTests : IDisposable
         Assert.DoesNotContain(warning, _harness.Err, StringComparison.Ordinal);
     }
 
+    /// <summary>A verb whose save the system did not flush the vault's folder for says so once, on stderr, and succeeds.</summary>
+    [Fact]
+    public void ASaveWhoseFolderIsNotFlushed_SaysSoOnStderr()
+    {
+        _harness.SeedVault(_master, ("env/dev/TOKEN", "first"));
+        _harness.Prompt.Enqueue(_master, "later");
+
+        using (UnflushableFolder.Stage(Path.GetDirectoryName(_harness.VaultPath)!))
+        {
+            _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("add", "env/dev/LATER", "--vault", _harness.VaultPath));
+        }
+
+        Assert.Single(_harness.Err.Split('\n'), line => line.StartsWith($"keypaste: warning: {Vault.UnflushedText}", StringComparison.Ordinal));
+
+        _harness.Stderr.GetStringBuilder().Clear();
+        _harness.Prompt.Enqueue(_master, "again");
+        _harness.AssertExit(CliApp.ExitSuccess, _harness.Run("add", "env/dev/AGAIN", "--vault", _harness.VaultPath));
+        Assert.DoesNotContain(Vault.UnflushedText, _harness.Err, StringComparison.Ordinal);
+    }
+
     private int Open(bool held)
     {
         _harness.Prompt.Enqueue(_master);

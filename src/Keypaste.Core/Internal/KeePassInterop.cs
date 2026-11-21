@@ -462,6 +462,9 @@ internal sealed class KeePassInterop : IDisposable
     /// <summary>What the next save counts up from: the file's count as last read or written, or after a merge the larger of both copies'; null when no keypaste save has counted it.</summary>
     internal long? SaveCount => _saveCount;
 
+    /// <summary>Whether the last save's rename reached the disk with its folder; false when the system would not flush the folder.</summary>
+    internal bool LastSaveFlushedItsFolder { get; private set; } = true;
+
     private static long? SaveCountOf(PwDatabase database) =>
         long.TryParse(database.RootGroup.CustomData.Get(_saveCountKey), NumberStyles.None, CultureInfo.InvariantCulture, out var count) ? count : null;
 
@@ -470,6 +473,9 @@ internal sealed class KeePassInterop : IDisposable
 
     /// <summary>Changes the bytes a save produced, so a test can stand in for a writer that made a bad file.</summary>
     internal Func<byte[], byte[]>? AfterSerializing { get; set; }
+
+    /// <summary>Called with the file a save writes, after its bytes and before its flush, so a test can fail the write as a full disk does.</summary>
+    internal Action<string>? WhileWriting { get; set; }
 
     /// <summary>The vault as KDBX bytes, proven to open again, under the new key for a key change, before they can replace the file.</summary>
     /// <remarks>A hardware key is asked once: the bytes open on the answer it gave the save, which <see cref="HardwareKey"/> keeps for the same challenge.</remarks>
@@ -592,17 +598,26 @@ internal sealed class KeePassInterop : IDisposable
 
         using (FileTransactionEx transaction = new(IOConnectionInfo.FromPath(target), _database.UseFileTransactions))
         {
-            string writtenTo;
-
-            using (var written = (FileStream)transaction.OpenWrite())
-            {
-                written.Write(bytes);
-                VaultFiles.KeepMode(written, target);
-                written.Flush(flushToDisk: true);
-                writtenTo = written.Name;
-            }
-
+            var written = (FileStream)transaction.OpenWrite();
+            var writtenTo = written.Name;
             var inPlace = string.Equals(writtenTo, Path.GetFullPath(target), StringComparison.Ordinal);
+
+            try
+            {
+                using (written)
+                {
+                    written.Write(bytes);
+                    VaultFiles.KeepMode(written, target);
+                    WhileWriting?.Invoke(writtenTo);
+                    written.Flush(flushToDisk: true);
+                }
+            }
+            catch when (!inPlace)
+            {
+                // KeePassLib removes only a Transactional NTFS temporary, and a half-written one on a full disk holds space the next attempt needs.
+                VaultFiles.Discard(writtenTo);
+                throw;
+            }
 
             if (!inPlace && hasChangedOnDisk is not null && hasChangedOnDisk())
             {
@@ -613,7 +628,7 @@ internal sealed class KeePassInterop : IDisposable
             transaction.CommitWrite();
         }
 
-        _ = VaultFiles.SyncDirectory(Path.GetDirectoryName(Path.GetFullPath(target))!);
+        LastSaveFlushedItsFolder = VaultFiles.SyncDirectory(Path.GetDirectoryName(Path.GetFullPath(target))!);
     }
 
     /// <summary>Adds an entry, creating any missing groups along its group path.</summary>
@@ -3407,8 +3422,9 @@ internal sealed class KeePassInterop : IDisposable
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Deliberately narrow. Anything else — a bad path, a full disk, a permission that is simply
-    /// wrong — fails on the first attempt, because retrying it would only delay the message.
+    /// Every file and access failure but a full disk or quota is retried, since a scanner holding the
+    /// file raises the same types as a bad path or a wrong permission, which take the whole budget to
+    /// be reported. A full disk fails on the first attempt: waiting does not free space.
     /// </para>
     /// <para>
     /// <b>A native failure is admitted by its code, never by <see cref="Win32Exception"/> as a
@@ -3419,10 +3435,18 @@ internal sealed class KeePassInterop : IDisposable
     /// </remarks>
     private static bool IsTransient(Exception ex) => ex switch
     {
+        IOException full when IsFullDisk(full) => false,
         IOException or UnauthorizedAccessException => true,
         Win32Exception win32 => IsATransientMoveCode(win32.NativeErrorCode),
         _ => false,
     };
+
+    /// <summary>Whether the disk or the person's quota is full: ERROR_DISK_FULL or ERROR_HANDLE_DISK_FULL on Windows, ENOSPC or EDQUOT elsewhere.</summary>
+    /// <remarks>.NET carries a Windows error as its HRESULT and a Unix one as the bare errno, and EDQUOT is 122 on Linux and 69 on macOS.</remarks>
+    internal static bool IsFullDisk(IOException ex) =>
+        OperatingSystem.IsWindows()
+            ? ex.HResult is unchecked((int)0x80070070) or unchecked((int)0x80070027)
+            : ex.HResult == 28 || ex.HResult == (OperatingSystem.IsLinux() ? 122 : 69);
 
     /// <summary>Whether a native move failure is one another attempt might get past.</summary>
     /// <remarks>
@@ -3624,8 +3648,8 @@ internal sealed class KeePassInterop : IDisposable
     /// separately from <see cref="ApplyKeypasteFormatSettings"/>. KeePassLib defaults the flag to
     /// <see langword="false"/> and <c>PwDatabase.Close()</c> — which <c>Open()</c> calls first —
     /// resets it, so an open-modify-save cycle would otherwise write in place. The format settings
-    /// cannot simply be re-applied on open instead: they re-randomise the KDF salt, which would
-    /// rewrite the key derivation of an existing vault on every save.
+    /// cannot simply be re-applied on open instead: they would replace the vault's own key derivation
+    /// with keypaste's on every save, which only an explicit strengthen may do.
     /// </remarks>
     private static void ApplyWriteSafety(PwDatabase database)
     {

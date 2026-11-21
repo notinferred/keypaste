@@ -115,12 +115,15 @@ public sealed class OpenVaultsTests : IDisposable
             other.Save();
         }
 
-        for (var tick = 0; tick < 5 && _acme.Watch.Merging.IsCompleted; tick++)
+        // A merge that started is a new task, which may already have finished when the loop looks.
+        var before = _acme.Watch.Merging;
+
+        for (var tick = 0; tick < 5 && ReferenceEquals(_acme.Watch.Merging, before); tick++)
         {
             _clock.Advance(TimeSpan.FromSeconds(1));
         }
 
-        Assert.False(_acme.Watch.Merging.IsCompleted, "the second vault's watch did not start a merge within five seconds");
+        Assert.False(ReferenceEquals(_acme.Watch.Merging, before), "the second vault's watch did not start a merge within five seconds");
         await _acme.Watch.Merging.WaitAsync(_connect, Token);
 
         Assert.NotNull(_acme.Session.Unlocked!.Find(new EntryName(string.Empty, "synced")));

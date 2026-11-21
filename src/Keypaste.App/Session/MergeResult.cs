@@ -20,6 +20,9 @@ internal sealed record MergeResult(
     /// <summary>The copy kept of the file before the merged copy's save left out another program's data, as <see cref="VaultMergeSave.ForeignDataKept"/>.</summary>
     internal VaultBackup? ForeignDataKept { get; init; }
 
+    /// <summary>Whether the merged copy's save replaced the file without the system flushing its folder, as <see cref="VaultMergeSave.Unflushed"/>.</summary>
+    internal bool Unflushed { get; init; }
+
     /// <summary>Whether the merged copy is in place, so agents are served from it.</summary>
     internal bool Merged => Outcome is VaultMergeSaveOutcome.Saved or VaultMergeSaveOutcome.Updated;
 

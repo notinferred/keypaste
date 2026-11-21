@@ -246,7 +246,7 @@ The next record starts a new file, and the archive still verifies with `keypaste
 
 ## Limits
 
-`keypaste approve` keeps the vault unlocked while it runs and has no idle lock; stop it to lock. Once another program saves the file, it refuses requests as `vault-changed` until it has merged that save, within five seconds, and says in its terminal what the merge did. A save it cannot merge, such as a file that now holds another vault, keeps requests refused until the file changes again or you restart it, and a file the password or key file you unlocked with no longer opens stops it. Locking the desktop app does not stop a terminal approver holding another vault.
+`keypaste approve` keeps the vault unlocked while it runs and has no idle lock; stop it to lock. Once another program saves the file, it refuses requests as `vault-changed` until it has merged that save, within five seconds, or a minute where the system cannot watch the folder and the save kept the file's size and time, and says in its terminal what the merge did. A save it cannot merge, such as a file that now holds another vault, keeps requests refused until the file changes again or you restart it, and a file the password or key file you unlocked with no longer opens stops it. Locking the desktop app does not stop a terminal approver holding another vault.
 
 keypaste keeps no released value between requests, but it cannot erase what the client, its transcripts or a launched process kept, and stopping the approver revokes nothing at the credential's provider. [SECURITY](../SECURITY.md) and [THREATS](../THREATS.md) set out these boundaries.
 

@@ -224,9 +224,17 @@ internal sealed partial class RecommendationsViewModel : ObservableObject, IDisp
         if (await RunMerge(row, save: true).ConfigureAwait(true) is { Outcome: VaultMergeSaveOutcome.Saved } merged)
         {
             row.Review = null;
-            Message = merged.ForeignDataKept is { } kept
-                ? $"Merged {row.Name} and moved it in with this vault's backups. {Vault.ForeignDataText(kept)}"
-                : $"Merged {row.Name} and moved it in with this vault's backups.";
+            Message = $"Merged {row.Name} and moved it in with this vault's backups.";
+
+            if (merged.ForeignDataKept is { } kept)
+            {
+                Message = $"{Message} {Vault.ForeignDataText(kept)}";
+            }
+
+            if (merged.Unflushed)
+            {
+                Message = $"{Message} {Vault.UnflushedText}";
+            }
 
             if (_session.Unlocked is { } vault)
             {

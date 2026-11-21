@@ -137,7 +137,8 @@ public static class VaultBackups
             target = Path.Combine(folder, $"{name}.{counter.ToString(CultureInfo.InvariantCulture)}{Path.GetExtension(copyPath)}");
         }
 
-        VaultFiles.Move(copyPath, target, overwrite: false);
+        // A power cut before the folder is flushed leaves the copy where it was, which the next look finds again.
+        _ = VaultFiles.Move(copyPath, target, overwrite: false);
         VaultFiles.RestrictToOwner(target);
 
         return target;
@@ -272,7 +273,8 @@ public static class VaultBackups
             VaultFiles.Copy(vaultPath, reserved);
 
             var kept = Name(directory, vaultPath, now);
-            VaultFiles.Move(reserved, kept, overwrite: false);
+            // A backup lost to a power cut leaves the vault as it is; the save that follows reports its own folder.
+            _ = VaultFiles.Move(reserved, kept, overwrite: false);
 
             var utc = now.ToUniversalTime();
             return new VaultBackup(kept, utc.AddTicks(-(utc.Ticks % TimeSpan.TicksPerSecond)));
@@ -428,9 +430,9 @@ public static class VaultBackups
 
             beforeReplacing?.Invoke(staged);
 
-            MoveIntoPlace(staged, target, live, waitBetweenAttempts);
+            var flushed = MoveIntoPlace(staged, target, live, waitBetweenAttempts);
 
-            return new VaultRestoreReport(backup, preserved, alreadyKeptAs);
+            return new VaultRestoreReport(backup, preserved, alreadyKeptAs) { Unflushed = !flushed };
         }
         catch
         {
@@ -539,29 +541,34 @@ public static class VaultBackups
         return null;
     }
 
-    /// <summary>Renames the staged file onto the vault, which must still be what was observed.</summary>
+    /// <summary>Renames the staged file onto the vault, which must still be what was observed, and says whether the rename is on disk.</summary>
     /// <remarks>
     /// The vault is looked at again before every attempt, the way a save does: a wait is where
     /// another writer lands, and the bytes replaced must be the bytes kept. A vault that appears where
     /// there was none is a change too.
     /// </remarks>
-    private static void MoveIntoPlace(
+    private static bool MoveIntoPlace(
         string staged, string vaultPath, (bool Exists, byte[]? Digest) observed, Action<int>? waitBetweenAttempts)
     {
         Exception? refusal = null;
+        var flushed = false;
 
         if (!Retrying(outcome => outcome is { Exception: null, Result: false } && (refusal is null || MayClear(refusal)), waitBetweenAttempts)
-            .Execute(() => TryMove(staged, vaultPath, observed, out refusal)))
+            .Execute(() => TryMove(staged, vaultPath, observed, out refusal, out flushed)))
         {
             throw new VaultRestoreException(
                 $"Could not replace '{vaultPath}': {refusal?.Message ?? "it could not be read"}", refusal!);
         }
+
+        return flushed;
     }
 
     /// <summary>One rename; false with the reason it was refused, or with none while the vault cannot be read.</summary>
-    private static bool TryMove(string staged, string vaultPath, (bool Exists, byte[]? Digest) observed, out Exception? refusal)
+    private static bool TryMove(
+        string staged, string vaultPath, (bool Exists, byte[]? Digest) observed, out Exception? refusal, out bool flushed)
     {
         refusal = null;
+        flushed = false;
         var now = Observe(vaultPath);
 
         if (now is (true, null))
@@ -578,7 +585,7 @@ public static class VaultBackups
 
         try
         {
-            VaultFiles.Move(staged, vaultPath, overwrite: true);
+            flushed = VaultFiles.Move(staged, vaultPath, overwrite: true);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
@@ -873,4 +880,8 @@ public sealed class VaultBackupSummary
 /// The backup that already held the replaced file's exact bytes, which is why no copy was made. Both
 /// are null when there was no file to replace.
 /// </param>
-public sealed record VaultRestoreReport(VaultBackup Restored, VaultBackup? Preserved, VaultBackup? AlreadyKeptAs);
+public sealed record VaultRestoreReport(VaultBackup Restored, VaultBackup? Preserved, VaultBackup? AlreadyKeptAs)
+{
+    /// <summary>Whether the system would not flush the vault's folder after the restore's rename (<see cref="Vault.UnflushedText"/>).</summary>
+    public bool Unflushed { get; init; }
+}

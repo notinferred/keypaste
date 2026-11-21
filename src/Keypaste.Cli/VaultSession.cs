@@ -71,6 +71,7 @@ internal static class VaultSession
             var exit = body(vault);
             Announce(vault, context);
             WarnIfForeignDataLeftOut(vault, context);
+            WarnIfUnflushed(vault, context);
             return exit;
         }
         catch (InvalidMasterPasswordException)
@@ -307,6 +308,15 @@ internal static class VaultSession
         if (vault.TakeForeignDataKept() is { } kept)
         {
             context.Stderr.WriteLine($"keypaste: warning: {Vault.ForeignDataText(kept)}");
+        }
+    }
+
+    /// <summary>Says, on stderr, that the verb's save replaced the file without the system flushing the vault's folder.</summary>
+    private static void WarnIfUnflushed(Vault vault, CliContext context)
+    {
+        if (vault.TakeUnflushedSave())
+        {
+            context.Stderr.WriteLine($"keypaste: warning: {Vault.UnflushedText}");
         }
     }
 

@@ -36,6 +36,8 @@
     <Compile Include="../Keypaste.Core.Tests/HardwareKeys/SoftwareYubiKey.cs" Link="HardwareKeys/SoftwareYubiKey.cs" />
     <!-- A vault's XML holding what another program wrote, as the core's tests make one. -->
     <Compile Include="../Keypaste.Core.Tests/ForeignXml.cs" Link="ForeignXml.cs" />
+    <!-- A folder the system cannot flush a rename into, for a save that says so. -->
+    <Compile Include="../Keypaste.Core.Tests/UnflushableFolder.cs" Link="UnflushableFolder.cs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -18,6 +18,18 @@ public sealed class VaultSaveStateTests : IDisposable
 
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 
+    /// <summary>Changes one byte of the file and puts its last-write time back, as a write within one tick of a coarse file time leaves it.</summary>
+    internal static void RewriteKeepingSizeAndTime(string path)
+    {
+        var written = File.GetLastWriteTimeUtc(path);
+        var bytes = File.ReadAllBytes(path);
+        bytes[^1] ^= 0xFF;
+        File.WriteAllBytes(path, bytes);
+        File.SetLastWriteTimeUtc(path, written);
+    }
+
+    private void RewriteKeepingSizeAndTime() => RewriteKeepingSizeAndTime(VaultPath);
+
     [Fact]
     public void AfterOpen_Saved_WithTheFilesTime()
     {
@@ -27,6 +39,55 @@ public sealed class VaultSaveStateTests : IDisposable
 
         Assert.Equal(VaultSaveStatus.Saved, state.Status);
         Assert.Equal(new DateTimeOffset(File.GetLastWriteTimeUtc(VaultPath), TimeSpan.Zero), state.SavedAt);
+    }
+
+    [Fact]
+    public void TheQuickState_ReadsTheFileAgainOnlyOnceItsSizeOrTimeChanged()
+    {
+        using var vault = ClaimedVault.Open(VaultPath, VaultHistoryTests.MasterPassword);
+        Assert.Equal(VaultSaveStatus.Saved, vault.QuickSaveState().Status);
+
+        RewriteKeepingSizeAndTime();
+
+        Assert.Equal(VaultSaveStatus.Saved, vault.QuickSaveState().Status);
+        Assert.Equal(VaultSaveStatus.ChangedOnDisk, vault.SaveState().Status);
+        Assert.Equal(VaultSaveStatus.ChangedOnDisk, vault.QuickSaveState().Status);
+    }
+
+    [Fact]
+    public void TheQuickState_SeesAWriteThatMovedTheTime()
+    {
+        using var vault = ClaimedVault.Open(VaultPath, VaultHistoryTests.MasterPassword);
+        Assert.Equal(VaultSaveStatus.Saved, vault.QuickSaveState().Status);
+
+        RewriteKeepingSizeAndTime();
+        File.SetLastWriteTimeUtc(VaultPath, File.GetLastWriteTimeUtc(VaultPath).AddSeconds(2));
+
+        Assert.Equal(VaultSaveStatus.ChangedOnDisk, vault.QuickSaveState().Status);
+    }
+
+    [Fact]
+    public void TheQuickState_SeesAWriteThatChangedTheSize()
+    {
+        using var vault = ClaimedVault.Open(VaultPath, VaultHistoryTests.MasterPassword);
+        Assert.Equal(VaultSaveStatus.Saved, vault.QuickSaveState().Status);
+        var written = File.GetLastWriteTimeUtc(VaultPath);
+
+        File.AppendAllText(VaultPath, "x");
+        File.SetLastWriteTimeUtc(VaultPath, written);
+
+        Assert.Equal(VaultSaveStatus.ChangedOnDisk, vault.QuickSaveState().Status);
+    }
+
+    [Fact]
+    public void TheQuickState_OfAFileOnlyTouched_IsSaved()
+    {
+        using var vault = ClaimedVault.Open(VaultPath, VaultHistoryTests.MasterPassword);
+        Assert.Equal(VaultSaveStatus.Saved, vault.QuickSaveState().Status);
+
+        File.SetLastWriteTimeUtc(VaultPath, File.GetLastWriteTimeUtc(VaultPath).AddSeconds(2));
+
+        Assert.Equal(VaultSaveStatus.Saved, vault.QuickSaveState().Status);
     }
 
     [Fact]

@@ -48,6 +48,8 @@
     <Compile Include="../Keypaste.Core.Tests/ForeignEdit.cs" Link="ForeignEdit.cs" />
     <!-- A vault's XML holding what another program wrote, as the core's tests make one. -->
     <Compile Include="../Keypaste.Core.Tests/ForeignXml.cs" Link="ForeignXml.cs" />
+    <!-- A folder the system cannot flush a rename into, for a save that says so. -->
+    <Compile Include="../Keypaste.Core.Tests/UnflushableFolder.cs" Link="UnflushableFolder.cs" />
     <!-- Time zones a test names on any runner, for the end of Automatic on this computer's clock. -->
     <Compile Include="../Keypaste.Core.Tests/TestZones.cs" Link="TestZones.cs" />
   </ItemGroup>

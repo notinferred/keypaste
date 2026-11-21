@@ -44,6 +44,12 @@ public sealed class HeldVault : IWatchedVault, IDisposable
     /// </summary>
     public event EventHandler<VaultBackup>? ForeignDataKept;
 
+    /// <summary>
+    /// Raised after a save of the open copy replaced the file without the system flushing its folder (<see cref="Vault.UnflushedText"/>);
+    /// a merged copy's save says so in <see cref="VaultMergeSave.Unflushed"/> instead.
+    /// </summary>
+    public event EventHandler? Unflushed;
+
     /// <summary>The open copy while the unlock is live; null once it has ended.</summary>
     public Vault? Open
     {
@@ -125,6 +131,7 @@ public sealed class HeldVault : IWatchedVault, IDisposable
         AgentSave saved;
         VaultMergeSave? merged = null;
         VaultBackup? foreignDataKept = null;
+        var unflushed = false;
 
         lock (_editGate)
         {
@@ -133,6 +140,7 @@ public sealed class HeldVault : IWatchedVault, IDisposable
             if (saved.Outcome == AgentSaveOutcome.Saved)
             {
                 foreignDataKept = Open?.TakeForeignDataKept();
+                unflushed = Open?.TakeUnflushedSave() == true;
             }
 
             if (saved.Outcome == AgentSaveOutcome.ChangedOnDisk)
@@ -150,6 +158,11 @@ public sealed class HeldVault : IWatchedVault, IDisposable
         if (foreignDataKept is not null)
         {
             ForeignDataKept?.Invoke(this, foreignDataKept);
+        }
+
+        if (unflushed)
+        {
+            Unflushed?.Invoke(this, EventArgs.Empty);
         }
 
         Finish(merged);

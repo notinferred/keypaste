@@ -52,18 +52,19 @@ internal static class VaultFiles
         }
     }
 
-    /// <summary>Renames <paramref name="source"/> to <paramref name="destination"/>, returning once the rename is on disk.</summary>
+    /// <summary>Renames <paramref name="source"/> to <paramref name="destination"/> and flushes the rename to disk.</summary>
+    /// <returns>Whether the rename is on disk: false when the system would not flush the destination's folder.</returns>
     /// <exception cref="IOException">The rename was refused; the subclasses and <see cref="UnauthorizedAccessException"/> are <see cref="File.Move(string, string, bool)"/>'s.</exception>
-    internal static void Move(string source, string destination, bool overwrite)
+    internal static bool Move(string source, string destination, bool overwrite)
     {
         if (OperatingSystem.IsWindows())
         {
             MoveWritingThrough(source, destination, overwrite);
-            return;
+            return true;
         }
 
         File.Move(source, destination, overwrite);
-        _ = SyncDirectory(Path.GetDirectoryName(Path.GetFullPath(destination))!);
+        return SyncDirectory(Path.GetDirectoryName(Path.GetFullPath(destination))!);
     }
 
     /// <summary>Removes a backup.</summary>
@@ -128,13 +129,13 @@ internal static class VaultFiles
     }
 
     /// <summary>Flushes a directory's entries, so a rename into it survives a power loss; nothing on Windows, whose renames write through.</summary>
-    /// <returns>Whether the directory was flushed; false on Windows.</returns>
-    /// <remarks>Best effort: it follows a rename that has already happened, and some file systems refuse to flush a directory.</remarks>
+    /// <returns>Whether the directory's entries are on disk: true on Windows, false when the directory could not be opened or flushed.</returns>
+    /// <remarks>It follows a rename that has already happened, so a false return reports that rename rather than undoing it.</remarks>
     internal static bool SyncDirectory(string directory)
     {
         if (OperatingSystem.IsWindows())
         {
-            return false;
+            return true;
         }
 
         var descriptor = Open(System.Text.Encoding.UTF8.GetBytes(directory + '\0'), 0);

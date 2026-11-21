@@ -471,7 +471,8 @@ public sealed class VaultSaveTests : IDisposable
 
     /// <remarks>
     /// A pipe at the temporary file's name stands in for a disk that fills during the save: each
-    /// attempt's reader takes the first kilobyte and goes away, so the rest of the write fails.
+    /// attempt's reader takes the first kilobyte and goes away, so the rest of the write fails, and
+    /// the save removes what it could not finish, so each attempt makes the pipe again.
     /// KeePassLib writes a vault under a megabyte while closing its streams and discards what that
     /// throws, so a save through it reported success and moved the pipe over the vault.
     /// </remarks>
@@ -492,19 +493,23 @@ public sealed class VaultSaveTests : IDisposable
         vault.AddEntry(new VaultEntry { Title = "Large", Password = "p", Notes = Convert.ToBase64String(RandomNumberGenerator.GetBytes(300_000)) });
 
         var temporary = path + ".tmp";
-        using (var mkfifo = Process.Start("mkfifo", [temporary]))
+        List<Thread> readers = [];
+        var failure = Record.Exception(() => vault.SaveWaiting(_ => { }, duringAttempt: _ =>
         {
-            mkfifo.WaitForExit();
-            Assert.Equal(0, mkfifo.ExitCode);
-        }
+            using (var mkfifo = Process.Start("mkfifo", [temporary]))
+            {
+                mkfifo.WaitForExit();
+                Assert.Equal(0, mkfifo.ExitCode);
+            }
 
-        List<Thread> readers = [ReadTheFirstKilobyte(temporary)];
-        var failure = Record.Exception(() => vault.SaveWaiting(attempt => readers.Add(ReadTheFirstKilobyte(temporary))));
+            readers.Add(ReadTheFirstKilobyte(temporary));
+        }));
 
         Assert.All(readers, reader => Assert.True(reader.Join(TimeSpan.FromSeconds(40)), "a reader was left waiting for a write"));
         Assert.Equal(before.Length, new FileInfo(path).Length);
         Assert.Equal(before, File.ReadAllBytes(path));
         Assert.IsType<VaultException>(failure);
+        Assert.False(File.Exists(temporary));
     }
 
     private static Thread ReadTheFirstKilobyte(string pipe)
@@ -537,5 +542,76 @@ public sealed class VaultSaveTests : IDisposable
 
         using var reopened = ClaimedVault.Open(Path.Combine(home, "vault.kdbx"), MasterPassword);
         Assert.Equal("p", reopened.Find("env/dev/T")?.Password, StringComparer.Ordinal);
+    }
+
+    /// <summary>A full disk is not waited out: the save fails on its first attempt, names the cause, and leaves no half-written file beside the vault.</summary>
+    [Fact]
+    public void A_full_disk_fails_at_once_naming_it_and_leaves_no_temporary_file()
+    {
+        var (vault, home) = NewVaultInItsOwnDirectory("full");
+        using var _ = vault;
+        var path = Path.Combine(home, "vault.kdbx");
+        var before = File.ReadAllBytes(path);
+        var attempts = 0;
+        string? written = null;
+        vault.AddEntry(new VaultEntry { Title = "New", Password = "p" });
+        vault.WhileWriting = file =>
+        {
+            attempts++;
+            written = file;
+            throw new IOException("No space left on device", OperatingSystem.IsWindows() ? unchecked((int)0x80070070) : 28);
+        };
+
+        var error = Assert.Throws<VaultException>(vault.Save);
+
+        Assert.Equal(1, attempts);
+        Assert.Equal($"Could not save '{path}': No space left on device", error.Message);
+        Assert.False(File.Exists(written));
+        Assert.Empty(Directory.GetFiles(home, "*.tmp"));
+        Assert.Equal(before, File.ReadAllBytes(path));
+    }
+
+    /// <summary>What the system raises for a write it has no space for is read as a full disk.</summary>
+    [Fact]
+    public void A_write_refused_for_space_is_a_full_disk()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            Assert.Skip("Only Linux has /dev/full, which refuses every write for space.");
+        }
+
+        var error = Assert.ThrowsAny<IOException>(() =>
+        {
+            using var full = new FileStream("/dev/full", FileMode.Open, FileAccess.Write);
+            full.Write(new byte[1]);
+            full.Flush();
+        });
+
+        Assert.True(KeePassInterop.IsFullDisk(error), $"{error.GetType().Name} 0x{error.HResult:X8}: {error.Message}");
+    }
+
+    /// <summary>A save whose folder the system will not flush is still saved, and says so once.</summary>
+    [Fact]
+    public void A_save_whose_folder_is_not_flushed_says_so_once()
+    {
+        var (vault, home) = NewVaultInItsOwnDirectory("unflushed");
+        using var _ = vault;
+        vault.AddEntry(new VaultEntry { Title = "First", Password = "p" });
+
+        using (UnflushableFolder.Stage(home))
+        {
+            vault.Save();
+        }
+
+        Assert.True(vault.TakeUnflushedSave());
+        Assert.False(vault.TakeUnflushedSave());
+        using (var reopened = ClaimedVault.Open(Path.Combine(home, "vault.kdbx"), MasterPassword))
+        {
+            Assert.NotNull(reopened.Find("First"));
+        }
+
+        vault.AddEntry(new VaultEntry { Title = "Second", Password = "p" });
+        vault.Save();
+        Assert.False(vault.TakeUnflushedSave());
     }
 }

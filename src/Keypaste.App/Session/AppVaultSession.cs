@@ -90,6 +90,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
     private OwnerMerge? _ownerMerge;
     private MergeResult? _refusal;
     private VaultBackup? _foreignDataKept;
+    private bool _unflushed;
     private byte[]? _refusedDigest;
     private ITimer? _timer;
     private ITimer? _holderWatch;
@@ -1662,6 +1663,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
             _clock.GetUtcNow())
         {
             ForeignDataKept = merged.ForeignDataKept,
+            Unflushed = merged.Unflushed,
         };
 
         lock (_gate)
@@ -1781,6 +1783,14 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
             }
         }
 
+        if (sender is Vault saved)
+        {
+            lock (_gate)
+            {
+                _unflushed = saved.TakeUnflushedSave();
+            }
+        }
+
         ForgetUnsaved();
         Saved?.Invoke(this, EventArgs.Empty);
     }
@@ -1793,6 +1803,17 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
             var kept = _foreignDataKept;
             _foreignDataKept = null;
             return kept;
+        }
+    }
+
+    /// <summary>Whether the last save replaced the file without the system flushing its folder, the first time it is asked after that save.</summary>
+    internal bool TakeUnflushedSave()
+    {
+        lock (_gate)
+        {
+            var unflushed = _unflushed;
+            _unflushed = false;
+            return unflushed;
         }
     }
 

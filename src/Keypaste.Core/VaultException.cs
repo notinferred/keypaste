@@ -117,9 +117,9 @@ public sealed class InvalidMasterPasswordException : VaultException
 /// <para>
 /// Distinct from <see cref="VaultException"/> so the save's retry cannot absorb it. A failed copy is
 /// a full disk, a read-only folder or a wrong permission, and
-/// <c>KeePassInterop.IsTransient</c> deliberately admits <see cref="IOException"/> and
-/// <see cref="UnauthorizedAccessException"/>; arriving as those would spend the whole retry budget
-/// before saying so.
+/// <c>KeePassInterop.IsTransient</c> deliberately admits <see cref="IOException"/> other than a full
+/// disk and <see cref="UnauthorizedAccessException"/>; arriving as those would spend the whole retry
+/// budget before saying so.
 /// </para>
 /// </remarks>
 public sealed class VaultBackupException : VaultException

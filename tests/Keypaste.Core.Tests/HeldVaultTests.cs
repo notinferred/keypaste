@@ -106,6 +106,20 @@ public sealed class HeldVaultTests : IDisposable
     }
 
     [Fact]
+    public void ASaveWhoseFolderIsNotFlushed_SaysSo()
+    {
+        var unflushed = 0;
+        _held.Unflushed += (_, _) => unflushed++;
+
+        using (UnflushableFolder.Stage(_directory))
+        {
+            Assert.Equal(AgentSave.Saved, _held.Save(vault => vault.UpdateEntry(new VaultEntry { GroupPath = _github.GroupPath, Title = _github.Title, Password = "mine" })));
+        }
+
+        Assert.Equal(1, unflushed);
+    }
+
+    [Fact]
     public void AFileHoldingAnotherVault_IsRefusedOnce_AndTriedAgainOnlyOnceItChanges()
     {
         var copy = _held.Open;

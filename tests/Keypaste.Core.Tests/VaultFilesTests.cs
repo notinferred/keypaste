@@ -44,9 +44,9 @@ public sealed class VaultFilesTests : IDisposable
     }
 
     [Fact]
-    public void A_directory_is_flushed_where_renames_do_not_write_through()
+    public void A_directory_says_whether_its_entries_are_on_disk()
     {
-        Assert.Equal(!OperatingSystem.IsWindows(), VaultFiles.SyncDirectory(_directory));
-        Assert.False(VaultFiles.SyncDirectory(Path.Combine(_directory, "missing")));
+        Assert.True(VaultFiles.SyncDirectory(_directory));
+        Assert.Equal(OperatingSystem.IsWindows(), VaultFiles.SyncDirectory(Path.Combine(_directory, "missing")));
     }
 }

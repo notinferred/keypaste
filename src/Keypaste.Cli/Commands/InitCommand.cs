@@ -62,6 +62,11 @@ internal static class InitCommand
                 switch (outcome)
                 {
                     case VaultCreationOutcome.Created:
+                        if (created!.TakeUnflushedSave())
+                        {
+                            context.Stderr.WriteLine($"keypaste: warning: {Vault.UnflushedText}");
+                        }
+
                         break;
 
                     case VaultCreationOutcome.PathAlreadyExists:

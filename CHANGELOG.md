@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+A save on a full disk fails at once, naming the cause, instead of retrying for about two seconds, and removes the file it could not finish. A save or restore whose folder the system would not flush to the disk says so, in the app's notice, on stderr or in `keypaste approve`'s terminal, since a power cut before the system writes it could bring back the earlier file. Watching an open vault for another program's save reads the whole file only when its size or time changed, and once a minute regardless, rather than every five seconds, so a large or cloud-only vault is not reread or downloaded while nothing changes. (F.140)
+
 Each vault's agent settings in `~/.keypaste/agents/` keep the sites where a browser filled a login encrypted under a key the vault holds, instead of in the clear; a file an earlier build wrote is rewritten that way at the next change, with every setting kept. (F.139)
 
 Security in the app suggests strengthening a vault whose password protection is weaker than keypaste's, AES-KDF or Argon2 below keypaste's settings, and `keypaste doctor` notes it; Strengthen says first that KeePass before 2.35 can no longer open the vault, while current KeePass, KeePassXC and the mobile apps can, then saves it with keypaste's Argon2 and keeps a copy of the file as it was. Nothing changes until you choose it. (F.138)

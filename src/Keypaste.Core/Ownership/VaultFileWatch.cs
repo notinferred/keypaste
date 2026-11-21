@@ -7,18 +7,24 @@ namespace Keypaste.Core.Ownership;
 /// <remarks>
 /// It watches the vault's folder, not the file alone, because another program often saves by renaming a new file over it,
 /// and compares the file a moment after the last change it sees; a folder that cannot be watched leaves the five-second
-/// poll. A save the approver refused is merged by the approver itself, and a merge it refuses waits for the file to change.
+/// poll. The poll reads the whole file only when its size or last-write time changed, and once a minute whatever they say,
+/// since a write within one tick of a coarse file time keeps both. A save the approver refused is merged by the approver
+/// itself, and a merge it refuses waits for the file to change.
 /// </remarks>
 public sealed class VaultFileWatch : IDisposable
 {
-    /// <summary>How often the file is compared with the open copy, whatever the folder watch reports.</summary>
+    /// <summary>How often the file's size and last-write time are compared with the open copy's, whatever the folder watch reports.</summary>
     public static readonly TimeSpan Poll = TimeSpan.FromSeconds(5);
+
+    /// <summary>How often the whole file is compared with the open copy, whatever its size and time say.</summary>
+    public static readonly TimeSpan FullPoll = TimeSpan.FromMinutes(1);
 
     private static readonly TimeSpan _settle = TimeSpan.FromMilliseconds(250);
 
     private readonly IWatchedVault _watched;
     private readonly Lock _gate = new();
     private readonly ITimer _poll;
+    private readonly ITimer _fullPoll;
     private readonly ITimer _settleTimer;
     private FileSystemWatcher? _folder;
     private Task _merging = Task.CompletedTask;
@@ -31,8 +37,9 @@ public sealed class VaultFileWatch : IDisposable
         ArgumentNullException.ThrowIfNull(watched);
 
         _watched = watched;
-        _poll = watched.Clock.CreateTimer(_ => CheckAndLook(), null, Poll, Poll);
-        _settleTimer = watched.Clock.CreateTimer(_ => CheckAndLook(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        _poll = watched.Clock.CreateTimer(_ => CheckAndLook(unlessUnchanged: true), null, Poll, Poll);
+        _fullPoll = watched.Clock.CreateTimer(_ => CheckAndLook(unlessUnchanged: false), null, FullPoll, FullPoll);
+        _settleTimer = watched.Clock.CreateTimer(_ => CheckAndLook(unlessUnchanged: false), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         _watched.Opened += OnOpened;
         _watched.Locked += OnLocked;
 
@@ -77,7 +84,9 @@ public sealed class VaultFileWatch : IDisposable
     }
 
     /// <summary>Compares the file with the open copy now, merging another program's save where the approver merges.</summary>
-    public void Check()
+    public void Check() => Check(unlessUnchanged: false);
+
+    private void Check(bool unlessUnchanged)
     {
         if (_watched.Open is not { } vault)
         {
@@ -88,7 +97,7 @@ public sealed class VaultFileWatch : IDisposable
 
         try
         {
-            state = vault.SaveState();
+            state = unlessUnchanged ? vault.QuickSaveState() : vault.SaveState();
         }
         catch (ObjectDisposedException)
         {
@@ -104,9 +113,9 @@ public sealed class VaultFileWatch : IDisposable
     }
 
     /// <summary>Compares the file, then looks for conflicted copies, which may take a key derivation, off the thread that unlocked.</summary>
-    private void CheckAndLook()
+    private void CheckAndLook(bool unlessUnchanged)
     {
-        Check();
+        Check(unlessUnchanged);
 
         if (_watched.Open is { } vault)
         {
@@ -255,6 +264,7 @@ public sealed class VaultFileWatch : IDisposable
         _watched.Opened -= OnOpened;
         _watched.Locked -= OnLocked;
         _poll.Dispose();
+        _fullPoll.Dispose();
         _settleTimer.Dispose();
     }
 }

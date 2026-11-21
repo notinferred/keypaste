@@ -493,6 +493,26 @@ public sealed class ShellStatusTests
         Assert.Equal(Vault.ForeignDataText(kept), shell.Notice);
     }
 
+    /// <summary>A save whose folder the system did not flush says so in the notice, and a later save that flushed it says nothing.</summary>
+    [Fact]
+    public void ASaveWhoseFolderIsNotFlushed_SaysSo()
+    {
+        using var fixture = new TempVault();
+        var clock = new ManualClock(AppClock.Start);
+        using var session = new AppVaultSession(clock, home: fixture.Home);
+        Unlock(session, fixture);
+        using var shell = new ShellViewModel(session, fixture.Home, authority: null, clock: clock);
+
+        session.Unlocked!.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "FIRST", Password = "x" });
+        using (UnflushableFolder.Stage(Path.GetDirectoryName(fixture.Path_)!))
+        {
+            session.Unlocked.Save();
+        }
+
+        Assert.Equal(Vault.UnflushedText, shell.Notice);
+        Assert.False(session.TakeUnflushedSave());
+    }
+
     /// <summary>A merge whose save leaves out data another program's save added says so after what the merge did.</summary>
     [Fact]
     public async Task AMergeLeavingOutAnotherProgramsData_SaysWhereTheCopyIs()

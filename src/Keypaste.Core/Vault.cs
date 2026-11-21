@@ -31,6 +31,8 @@ public sealed class Vault : IDisposable
     private VaultBackup? _lastKept;
     private bool _holdsForeignData;
     private VaultBackup? _foreignDataKept;
+    private bool _unflushed;
+    private FileRead? _lastRead;
     private bool _keyDerivationChanged;
     private Func<Vault, bool>? _beforeEachSave;
 
@@ -92,6 +94,22 @@ public sealed class Vault : IDisposable
             $"keypaste kept a copy of the file from before the save, with that data, at '{kept.Path}'.";
     }
 
+    /// <summary>Whether this vault's last save, if this was not asked since, replaced the file without the system flushing its folder to the disk.</summary>
+    public bool TakeUnflushedSave()
+    {
+        lock (_state)
+        {
+            var unflushed = _unflushed;
+            _unflushed = false;
+            return unflushed;
+        }
+    }
+
+    /// <summary>What a person is told when <see cref="TakeUnflushedSave"/> or a restore says its folder was not flushed.</summary>
+    public const string UnflushedText =
+        "The change is saved, but the system couldn't flush the vault's folder to the disk, so until it does, " +
+        "a power cut could bring back the file as it was before.";
+
     /// <summary>The save count of the file as this vault last read or wrote it, or after a merge the larger of both copies'; null when no keypaste save has counted it.</summary>
     internal long? SaveCount => _interop.SaveCount;
 
@@ -144,14 +162,23 @@ public sealed class Vault : IDisposable
     /// save is writing or nothing was ever read from the file; <see cref="VaultSaveStatus.Unreadable"/>
     /// when the file cannot be read; otherwise <see cref="VaultSaveStatus.Saved"/>.
     /// </returns>
-    /// <remarks>Hashes the whole file, as <see cref="ReadSaved(out IReadOnlyList{VaultEntry}?)"/> does, so a caller polls it sparingly.</remarks>
-    public VaultSaveState SaveState()
+    /// <remarks>Hashes the whole file, as <see cref="ReadSaved(out IReadOnlyList{VaultEntry}?)"/> does, so a caller polls <see cref="QuickSaveState"/> instead.</remarks>
+    public VaultSaveState SaveState() => SaveState(unlessUnchanged: false);
+
+    /// <summary>
+    /// <see cref="SaveState()"/>, reading the whole file only when its size or last-write time differs from when this vault last read
+    /// it, so a poll neither rereads a large vault nor downloads a cloud-only file that has not changed.
+    /// </summary>
+    /// <remarks>A write that keeps both the size and the time is seen only by the next <see cref="SaveState()"/>.</remarks>
+    public VaultSaveState QuickSaveState() => SaveState(unlessUnchanged: true);
+
+    private VaultSaveState SaveState(bool unlessUnchanged)
     {
         lock (_state)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
-            var status = Compare() switch
+            var status = Compare(unlessUnchanged) switch
             {
                 SavedRead.Current => VaultSaveStatus.Saved,
                 SavedRead.Unsaved => VaultSaveStatus.Unsaved,
@@ -169,25 +196,55 @@ public sealed class Vault : IDisposable
     /// a change of this vault's that no save has written, or one was refused for. Only while
     /// this vault is writing is a different file its own save in progress.
     /// </remarks>
-    private SavedRead Compare()
+    private SavedRead Compare(bool unlessUnchanged = false)
     {
         if (_writing || _stamp is not { } stamp)
         {
             return SavedRead.Unsaved;
         }
 
-        if (SourceSnapshot.Digest(Path) is not { } current)
+        var facts = FileFacts();
+        bool matches;
+
+        if (unlessUnchanged && facts is { } seen && _lastRead is { } last && ReferenceEquals(last.Stamp, stamp) && last.Facts == seen)
         {
-            return SavedRead.Unreadable;
+            matches = last.Matches;
+        }
+        else
+        {
+            if (SourceSnapshot.Digest(Path) is not { } current)
+            {
+                return SavedRead.Unreadable;
+            }
+
+            matches = CryptographicOperations.FixedTimeEquals(stamp, current);
+            _lastRead = facts is { } read ? new FileRead(stamp, read, matches) : null;
         }
 
-        if (!CryptographicOperations.FixedTimeEquals(stamp, current))
+        if (!matches)
         {
             return SavedRead.ChangedOnDisk;
         }
 
         return _pending ? SavedRead.Unsaved : SavedRead.Current;
     }
+
+    /// <summary>The size and last-write time of the file <see cref="Path"/> names, through a link; null when they cannot be read.</summary>
+    private (long Length, DateTime WrittenAt)? FileFacts()
+    {
+        try
+        {
+            var file = new FileInfo(VaultFiles.WriteTarget(Path));
+            return file.Exists ? (file.Length, file.LastWriteTimeUtc) : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>What a whole read of the file found against <paramref name="Stamp"/>, and the size and time the file had before that read.</summary>
+    private sealed record FileRead(byte[] Stamp, (long Length, DateTime WrittenAt) Facts, bool Matches);
 
     /// <summary>Opens what the file holds now with the factors this vault was opened with.</summary>
     /// <returns>A new vault over <see cref="Path"/>. This one is left as it was, for the caller to dispose.</returns>
@@ -304,7 +361,7 @@ public sealed class Vault : IDisposable
             }
 
             VaultBackups.Archive(Path, copyPath);
-            return new VaultMergeSave(VaultMergeSaveOutcome.Saved, string.Empty) { Report = report, ForeignDataKept = file.TakeForeignDataKept() };
+            return new VaultMergeSave(VaultMergeSaveOutcome.Saved, string.Empty) { Report = report, ForeignDataKept = file.TakeForeignDataKept(), Unflushed = file.TakeUnflushedSave() };
         }
         catch (InvalidMasterPasswordException ex)
         {
@@ -454,7 +511,7 @@ public sealed class Vault : IDisposable
                     file.HasFileChangedSinceOpen, waitBetweenAttempts, KeePassInterop.SaveAttempts, duringAttempt, backUp: true, applyFloor: false);
 
                 handedOver = true;
-                return new VaultMergeSave(VaultMergeSaveOutcome.Saved, string.Empty) { Copy = file, Report = report, Kept = file._lastKept, ForeignDataKept = file.TakeForeignDataKept() };
+                return new VaultMergeSave(VaultMergeSaveOutcome.Saved, string.Empty) { Copy = file, Report = report, Kept = file._lastKept, ForeignDataKept = file.TakeForeignDataKept(), Unflushed = file.TakeUnflushedSave() };
             }
             catch (VaultChangedOnDiskException)
             {
@@ -3000,6 +3057,9 @@ public sealed class Vault : IDisposable
     /// <summary>Changes the bytes a save produced, so a test can stand in for a writer that made a bad file.</summary>
     internal Func<byte[], byte[]>? AfterSerializing { set => _interop.AfterSerializing = value; }
 
+    /// <summary>Called with the file a save writes, before its flush, so a test can fail the write as a full disk does.</summary>
+    internal Action<string>? WhileWriting { set => _interop.WhileWriting = value; }
+
     /// <summary>Writes the vault to <see cref="Path"/>, discarding whatever else was written
     /// there.</summary>
     /// <remarks>
@@ -3458,6 +3518,7 @@ public sealed class Vault : IDisposable
                 _pending = false;
                 _changes++;
                 _writing = false;
+                _unflushed = !_interop.LastSaveFlushedItsFolder;
 
                 if (changesKeyDerivation)
                 {

@@ -1403,7 +1403,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
         try
         {
-            state = vault.SaveState();
+            state = vault.QuickSaveState();
         }
         catch (ObjectDisposedException)
         {
@@ -1536,7 +1536,12 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
                     said = $"{said} {Vault.ForeignDataText(kept)}";
                 }
 
-                Say(said, stays: MergeNotice.NamesAConflict(merged) || merged.ForeignDataKept is not null);
+                if (merged.Unflushed)
+                {
+                    said = $"{said} {Vault.UnflushedText}";
+                }
+
+                Say(said, stays: MergeNotice.NamesAConflict(merged) || merged.ForeignDataKept is not null || merged.Unflushed);
             }
 
             Count();
@@ -1669,6 +1674,11 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             if (session.TakeForeignDataKept() is { } kept)
             {
                 Say(Vault.ForeignDataText(kept), stays: true);
+            }
+
+            if (session.TakeUnflushedSave())
+            {
+                Say(Vault.UnflushedText, stays: true);
             }
 
             if (session.IsUnlocked)

@@ -73,6 +73,9 @@ public sealed record VaultMergeSave(VaultMergeSaveOutcome Outcome, string Reason
     /// <summary>The copy kept of the file before the merged copy's save left out data another program wrote there that keypaste can't keep (<see cref="Vault.ForeignDataText"/>).</summary>
     public VaultBackup? ForeignDataKept { get; init; }
 
+    /// <summary>Whether the merged copy's save replaced the file without the system flushing its folder (<see cref="Vault.UnflushedText"/>).</summary>
+    public bool Unflushed { get; init; }
+
     /// <summary>Whether the owner's audit line of a merge it saved was written.</summary>
     public bool Recorded { get; init; }
 
