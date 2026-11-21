@@ -1,1 +1,1 @@
-N:KeePassLib;only Keypaste.Core's Internal/KeePassInterop.cs touches KeePassLib
+N:KeePassLib;only Keypaste.Core's Internal/ touches KeePassLib

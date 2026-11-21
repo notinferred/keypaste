@@ -6,7 +6,7 @@
 
 Keep changes focused and include their documentation. Shared feature logic belongs in `Keypaste.Core`; the CLI and desktop use it. Document features available in only one front end. Secret-path changes require tests, including encryption, injection, the agent bridge and secret display. A new dependency needs its one-line reason beside it in `Directory.Packages.props`, a pinned version and regenerated lock files.
 
-Use KDBX4 through the vendored library. Do not implement cryptography. Only `src/Keypaste.Core/Internal/KeePassInterop.cs` may reference KeePassLib types outside `third_party/KeePassLib`; application code uses the core boundary. Every KDBX file keypaste writes must open in real KeePassXC, which CI checks in both directions.
+Use KDBX4 through the vendored library. Do not implement cryptography. Only the files under `src/Keypaste.Core/Internal/` may reference KeePassLib types outside `third_party/KeePassLib`; application code uses the core boundary. Every KDBX file keypaste writes must open in real KeePassXC, which CI checks in both directions.
 
 Consult [RELEASE](docs/RELEASE.md) before changing published installation claims.
 

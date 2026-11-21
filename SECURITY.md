@@ -141,7 +141,7 @@ The [security laws](#security-laws) govern these guarantees, and [THREATS.md](TH
 
 - A master password; unreleased, also a keyfile, with or without a password, in every KeePass form; keypaste never creates a keyfile that is any file at all [T-27] [T-28].
 - Unreleased: a YubiKey slot in the desktop [T-37], and Windows Hello after a lock on Windows [T-44].
-- New vaults are KDBX4 with Argon2d at 2 iterations, 64 MiB and parallelism 2, pinned in `src/Keypaste.Core/KdbxFormat.cs` rather than taken from KeePassLib's defaults; keypaste writes no cryptography of its own and reaches the format only through `src/Keypaste.Core/Internal/KeePassInterop.cs`.
+- New vaults are KDBX4 with Argon2d at 2 iterations, 64 MiB and parallelism 2, pinned in `src/Keypaste.Core/KdbxFormat.cs` rather than taken from KeePassLib's defaults; keypaste writes no cryptography of its own and reaches the format only through `src/Keypaste.Core/Internal/`.
 - Unreleased: an unlock warns, and still opens the vault, when the file carries a lower save count than the copy this computer's keypaste last opened or saved, as an older copy put back leaves it; keypaste's own restore is not warned of [T-26].
 - Limit: a copy whose count is not lower, a vault keypaste has not saved yet, a first open on a computer and a deleted home record go unnoticed [T-26].
 - Limit: a copied vault can be guessed offline without limit [T-20].

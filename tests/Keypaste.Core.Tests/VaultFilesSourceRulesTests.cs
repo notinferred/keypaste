@@ -3,16 +3,17 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>Core writes, copies, renames and removes vault files and their backups only through <c>Internal/VaultFiles.cs</c>, and replaces a vault only through KeePassLib's file transaction in <c>KeePassInterop.cs</c>.</summary>
+/// <summary>Core writes, copies, renames and removes vault files and their backups only through <c>Internal/VaultFiles.cs</c>, and replaces a vault only through KeePassLib's file transaction in <c>KeePassInterop.Save.cs</c>.</summary>
 /// <remarks>
 /// The front ends carry <c>BannedSymbols.NoFileWrites.txt</c>. Core also writes settings, audit lines and other files that are no
 /// vault, and a ban list covers a whole project and cannot tell one path from another, so this rule is read from the source of
-/// the files that handle vault paths: every <c>Vault*.cs</c> at Core's top level, <c>KeePassInterop.cs</c> and the import folder. Comments are left out.
+/// the files that handle vault paths: every <c>Vault*.cs</c> at Core's top level, the <c>KeePassInterop*.cs</c> files and the import folder. Comments are left out.
 /// </remarks>
 public sealed partial class VaultFilesSourceRulesTests
 {
     private const string _owner = "VaultFiles.cs";
     private const string _transaction = "FileTransactionEx";
+    private const string _save = "KeePassInterop.Save.cs";
 
     [Fact]
     public void The_files_that_handle_vault_paths_write_nothing_themselves() =>
@@ -20,14 +21,14 @@ public sealed partial class VaultFilesSourceRulesTests
 
     [Fact]
     public void Only_the_save_opens_a_KeePassLib_file_transaction() =>
-        Assert.Equal(["KeePassInterop.cs"], [.. Core().Where(source => Code(source.Text).Contains(_transaction, StringComparison.Ordinal)).Select(source => source.Name)]);
+        Assert.Equal([_save], [.. Core().Where(source => Code(source.Text).Contains(_transaction, StringComparison.Ordinal)).Select(source => source.Name)]);
 
     [Fact]
     public void Each_rule_finds_its_mutation()
     {
         var handling = VaultHandling();
         Assert.Contains(handling, source => source.Name == "VaultBackups.cs");
-        Assert.Contains(handling, source => source.Name == "KeePassInterop.cs");
+        Assert.Contains(handling, source => source.Name == _save);
         Assert.DoesNotContain(handling, source => source.Name == _owner);
         Assert.NotEmpty(Writes(Core().Single(source => source.Name == _owner)));
 
@@ -42,7 +43,7 @@ public sealed partial class VaultFilesSourceRulesTests
         Assert.Empty(Writes(backups with { Text = backups.Text + "\n// File.Delete(a);" }));
 
         var vault = handling.Single(source => source.Name == "Vault.cs");
-        Assert.Equal(["KeePassInterop.cs", "Vault.cs"], [.. new[] { vault with { Text = vault.Text + "\n" + _transaction } }.Concat(Core()).Where(source => Code(source.Text).Contains(_transaction, StringComparison.Ordinal)).Select(source => source.Name).Order(StringComparer.Ordinal)]);
+        Assert.Equal([_save, "Vault.cs"], [.. new[] { vault with { Text = vault.Text + "\n" + _transaction } }.Concat(Core()).Where(source => Code(source.Text).Contains(_transaction, StringComparison.Ordinal)).Select(source => source.Name).Order(StringComparer.Ordinal)]);
     }
 
     [GeneratedRegex(@"\bFile\.(Copy|Move|Delete|Replace|WriteAll\w*|AppendAll\w*|Create|OpenWrite|SetUnixFileMode)\(|\bDirectory\.(CreateDirectory|Delete|Move)\(|\bFileMode\.(Create|CreateNew|OpenOrCreate|Truncate|Append)\b|\bFileAccess\.(Write|ReadWrite)\b|\bFileOptions\.DeleteOnClose\b")]
@@ -55,7 +56,7 @@ public sealed partial class VaultFilesSourceRulesTests
         string.Join('\n', text.Split('\n').Where(line => !line.TrimStart().StartsWith("//", StringComparison.Ordinal)));
 
     private static List<Source> VaultHandling() =>
-        [.. Core().Where(source => source.Name != _owner && ((source.Folder == "Keypaste.Core" && source.Name.StartsWith("Vault", StringComparison.Ordinal)) || source.Name == "KeePassInterop.cs" || source.Folder == "Import"))];
+        [.. Core().Where(source => source.Name != _owner && ((source.Folder == "Keypaste.Core" && source.Name.StartsWith("Vault", StringComparison.Ordinal)) || source.Name.StartsWith("KeePassInterop", StringComparison.Ordinal) || source.Folder == "Import"))];
 
     private static List<Source> Core()
     {

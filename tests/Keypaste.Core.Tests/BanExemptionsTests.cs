@@ -4,7 +4,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// The architecture rules the compiler holds through each project's <c>BannedSymbols.txt</c> are switched off only where
-/// this list says, and KeePassLib is reachable only from <c>Internal/KeePassInterop.cs</c>.
+/// this list says, and KeePassLib is reachable only from Core's <c>Internal/</c>.
 /// </summary>
 /// <remarks>
 /// A <c>#pragma</c>, a <c>SuppressMessage</c>, a <c>NoWarn</c> or an <c>.editorconfig</c> severity would turn a ban off
@@ -49,8 +49,13 @@ public sealed class BanExemptionsTests
     public void Nothing_else_mentions_the_ban() => Assert.Empty(OtherMentions(Sources()));
 
     [Fact]
-    public void Only_KeePassInterop_declares_the_KeePassLib_alias() =>
-        Assert.Equal(["src/Keypaste.Core/Internal/KeePassInterop.cs"], Sources().Where(source => source.Text.Contains(_alias, StringComparison.Ordinal)).Select(source => source.Path));
+    public void Only_Core_Internal_declares_the_KeePassLib_alias()
+    {
+        var declaring = Sources().Where(source => source.Text.Contains(_alias, StringComparison.Ordinal)).Select(source => source.Path).ToList();
+
+        Assert.Contains("src/Keypaste.Core/Internal/KeePassInterop.cs", declaring);
+        Assert.All(declaring, path => Assert.StartsWith("src/Keypaste.Core/Internal/", path, StringComparison.Ordinal));
+    }
 
     [Fact]
     public void An_added_exemption_or_silencing_is_found()
