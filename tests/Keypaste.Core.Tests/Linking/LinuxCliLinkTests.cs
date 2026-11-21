@@ -8,6 +8,7 @@ namespace Keypaste.Core.Tests.Linking;
 
 /// <summary>The Linux link starts this copy with every argument unchanged, and replaces only what keypaste wrote unless the person confirms (G.5).</summary>
 [UnsupportedOSPlatform("windows")]
+[Collection(nameof(ExecutesWhatItWrote))]
 public sealed class LinuxCliLinkTests : IDisposable
 {
     private const string _unix = "The Linux link is a sh script; Windows puts the CLI on PATH from its installer.";
@@ -377,3 +378,7 @@ public sealed class LinuxCliLinkTests : IDisposable
         }
     }
 }
+
+// Linux refuses to start a file while any process holds it open for writing, and a child forked by a parallel test holds the writer's handle until its own exec.
+[CollectionDefinition(nameof(ExecutesWhatItWrote), DisableParallelization = true)]
+public sealed class ExecutesWhatItWrote;

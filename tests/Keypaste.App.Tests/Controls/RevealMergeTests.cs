@@ -56,14 +56,7 @@ public sealed class RevealMergeTests
 
         Elsewhere(fixture, what);
 
-        for (var tick = 0; tick < 5 && shell.Merging.IsCompleted; tick++)
-        {
-            clock.Advance(TimeSpan.FromSeconds(1));
-            WindowInput.Drain();
-        }
-
-        await shell.Merging.WaitAsync(_connect, TestContext.Current.CancellationToken);
-        WindowInput.Drain();
+        await Merged(shell, clock);
 
         Assert.False(cell.IsRevealed);
         Assert.Null(RevealedValue.Shown);
@@ -235,12 +228,16 @@ public sealed class RevealMergeTests
 
     private static async Task Merged(ShellViewModel shell, ManualClock clock)
     {
-        for (var tick = 0; tick < 5 && shell.Merging.IsCompleted; tick++)
+        // A merge that started is a new task, which may already have finished when the loop looks.
+        var before = shell.Merging;
+
+        for (var tick = 0; tick < 5 && ReferenceEquals(shell.Merging, before); tick++)
         {
             clock.Advance(TimeSpan.FromSeconds(1));
             WindowInput.Drain();
         }
 
+        Assert.False(ReferenceEquals(shell.Merging, before), "the watch did not start a merge within five seconds");
         await shell.Merging.WaitAsync(_connect, TestContext.Current.CancellationToken);
         WindowInput.Drain();
     }

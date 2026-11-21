@@ -1280,11 +1280,15 @@ public sealed class ShellStatusTests
 
     private static async Task MergedByThePoll(ShellViewModel shell, ManualClock clock)
     {
-        for (var tick = 0; tick < 5 && shell.Merging.IsCompleted; tick++)
+        // A merge that started is a new task, which may already have finished when the loop looks.
+        var before = shell.Merging;
+
+        for (var tick = 0; tick < 5 && ReferenceEquals(shell.Merging, before); tick++)
         {
             clock.Advance(TimeSpan.FromSeconds(1));
         }
 
+        Assert.False(ReferenceEquals(shell.Merging, before), "the watch did not start a merge within five seconds");
         await shell.Merging.WaitAsync(_connect, Token);
     }
 
