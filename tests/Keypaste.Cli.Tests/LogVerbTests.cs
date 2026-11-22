@@ -204,7 +204,7 @@ public sealed class LogVerbTests : IDisposable
 
     /// <summary>
     /// Text an agent or a vault chose reaches a terminal here, so it arrives with its mechanism
-    /// removed. THREATS.md T-1 and T-2 name this table as the place that matters.
+    /// removed (THREATS.md T-1 and T-2).
     /// </summary>
     /// <remarks>
     /// The escape is planted in the two fields that reach the reader intact — the name a client

@@ -26,8 +26,8 @@ namespace Keypaste.Mcp.Tests;
 /// The listing path is still driven through a fake source <em>here</em>, because these tests are
 /// about the bridge's own behaviour. The shipped path — names coming from a real vault through a
 /// real approver — is exercised in <see cref="SecretHygieneTests"/>, where nothing is faked but the
-/// human. That is what closes THREATS.md T-7's admission that the sanitizer and exposure filter
-/// were unreachable in the binary keypaste actually ships.
+/// human, so the sanitizer and exposure filter of THREATS.md T-7 are reached in the binary
+/// keypaste actually ships.
 /// </para>
 /// </remarks>
 public sealed class ServerToolsTests

@@ -1,35 +1,56 @@
 # Threat model
 
-This file is keypaste's threat model. For each way keypaste can be attacked or misused it says what is at stake, who the attacker is, what keypaste does about it, what stays true afterwards, which release has it and which tests hold it. [SECURITY.md](SECURITY.md) has the reporting policy and a one-line summary of each guarantee and limit. The [security laws](SECURITY.md#security-laws) govern both.
+What keypaste protects, from whom, and what stays true after each mitigation. [SECURITY](SECURITY.md) holds the [security laws](SECURITY.md#security-laws), which govern this model, and the reporting policy. Tests name the threat they hold: `git grep -nw T-5 -- tests scripts` finds T-5's.
 
-It covers every surface that exists: the vault, the `keypaste` CLI, the MCP bridge an AI tool starts (`keypaste mcp`), the process holding an unlocked vault, the desktop app, the browser relay, share links and setup. Planned surfaces, such as an end-to-end-encrypted cloud vault and team projects, get no guarantee here until they exist.
+## Assumptions and scope
 
-## How to read an entry
+The model covers every surface that exists: the vault, the `keypaste` CLI, the bridge an AI tool starts (`keypaste mcp`), the approver, the desktop app, the browser relay and extension, share links and setup. Planned surfaces, such as an end-to-end-encrypted cloud vault and team projects, get no guarantee until they exist.
 
-Each threat has one template:
+1. **The person's OS account is the trust boundary.** A same-user process can read memory, keystrokes and files, and write any file the account owns. It is outside keypaste's protection; entries say where such a process gains something specific.
+2. **Whoever starts the bridge chooses its arguments**: `--expose`, `--client-label` and the vault. They constrain a connected client, not that process (T-14).
+3. **KDBX4 and Argon2 are the cryptographic boundary.** keypaste implements no cryptography of its own (security law 6).
 
-- **Asset**: what is at stake.
-- **Attacker**: who, with what access.
-- **Mitigation**: what keypaste does; the code holds the mechanism.
-- **Limit**: what remains true after the mitigation.
-- **Status**: which release has the mitigation, in [RELEASE](docs/RELEASE.md)'s states. Published today are the CLI and MCP bridge `v0.3.0`; the desktop app has no release, and the next public release is 1.0.0. *Implemented (unreleased)* means the source build headed for 1.0.0. *Published in v0.3.0* means the download has it; where `v0.3.0` differs, the line says how. *Not in v0.3.0* means that surface did not ship in it.
-- **Tests**: the main test classes under `tests/` and scripts under `scripts/` that hold the mitigation, or "no test". *Unverified* names an observation no test has made.
+Out of scope: same-user attackers reading unlocked memory, audit records and keystrokes (T-18, T-19, T-20), and what a client does with what it was given.
 
-Words used throughout:
+## Terms
 
-- **Owner**: the process holding a vault unlocked and answering agents, the desktop app or `keypaste approve` (`keypaste agent` in `v0.3.0`). A vault has one owner at a time (T-29).
-- **Bridge**: `keypaste mcp`, which an AI tool starts. It holds no vault and forwards requests to the owner.
-- **Agent rules**: this computer's rules for each vault, in `~/.keypaste/agents/<vault>.toml`: for each category of value (password, custom field, project variable, card value, identity value, TOTP code, notes, attachment), Ask, Allow or Block, for every agent and per agent, plus whether each agent may run commands. `v0.3.0` uses a user-written `policy.toml` instead.
+- **Approver**: the process holding a vault unlocked and answering agents: the desktop app or `keypaste approve` (`keypaste agent` in `v0.3.0`). The code calls it the owner. A vault has one at a time (T-29).
+- **Bridge**: `keypaste mcp`, which an AI tool starts. It holds no vault and forwards requests to the approver.
+- **Agent settings**: this computer's rules for each vault, in `~/.keypaste/agents/<vault>.toml`. For each category of value (password, custom field, project variable, card value, identity value, one-time code, notes, attachment) they say Ask, Allow or Block, for every agent and per agent, and whether each agent may run commands. `v0.3.0` uses a user-written `policy.toml` instead.
 - **Unasked release**: a value released under an Allow, with no prompt.
 - **Same-user process**: any program running as the person's own account.
+- **Threat IDs** are permanent and grouped below by surface. T-45, T-46 and T-47 are retired.
+- **Status**: `v0.3.0` means the published CLI and bridge have the mitigation. *Unreleased* means only the source build headed for 1.0.0 has it, which includes all of the desktop app. [RELEASE](docs/RELEASE.md) defines the states.
 
-T-45, T-46 and T-47 are retired and are not reused.
+## Assets
 
-## How agent access works
+| Asset | Threats |
+|---|---|
+| Secret values: passwords, custom fields, project variables, one-time codes, attachments | T-4, T-8, T-12 to T-14, T-18, T-19, T-25, T-30, T-35, T-38, T-56 |
+| The master password and the vault's other factors: key file, YubiKey, Windows Hello's kept copy | T-7, T-20, T-22, T-27, T-28, T-37, T-44 |
+| Item titles, sites and how items connect | T-1, T-4, T-24, T-55 |
+| The person's decision at a prompt | T-2, T-11, T-41, T-56 |
+| The audit log as evidence | T-5, T-6, T-16, T-53 |
+| Agent settings and remembered browser fills | T-3, T-15, T-36, T-41, T-61 |
+| The vault's contents and its newest state | T-26, T-29, T-43, T-54, T-57 |
+| Logins released to a browser, and browser pairings | T-48 to T-50, T-58 to T-61 |
+| Scoped tokens, share links and launch passes | T-32 to T-34, T-42 |
+| That a download is its tagged source | T-9, T-21 |
 
-An agent lists the entry names its bridge's `--expose` reaches and asks for one field, one attachment, a linked set of up to four fields always put to the person (T-56), a command run with an env set in its environment, for the person to save a value, or for the person to allow a change to an item (T-57). The bridge validates the request and forwards it to the owner of the vault it names, which re-checks it, decides it by the field's category and records it before replying; the bridge records only a call no owner recorded (T-6). A Blocked category is refused unasked, an allowed one released unasked, and an asked one put to the person in the app's prompt window or `keypaste approve`'s terminal. A scoped token's run is released under the token a person made (T-32). No agent request can make a master-password prompt appear (T-7).
+## Adversaries
 
-A lock withdraws waiting requests, and the owner refuses agents while its vault differs from the file (T-29). Locking does not revoke values already delivered.
+| Adversary | What it can do | Threats |
+|---|---|---|
+| The model, and the agent it drives | Compose requests from attacker-written context, write a request's reason, use every tool its bridge offers, and with a shell run `keypaste` itself | T-2, T-4, T-8, T-11, T-35, T-41, T-54 to T-57 |
+| Anyone who can write the vault | Plant titles, fields, tags and values through a shared, synced or KeePassXC-edited copy | T-1, T-13, T-43 |
+| An impersonating MCP client | Start the bridge under any name or label | T-3, T-14, T-36 |
+| A same-user process | Everything in assumption 1 | T-14, T-15, T-30, T-34, T-42, T-48, T-50 |
+| Another local user | Bind or pre-create the approver's pipe | T-10, T-29 |
+| Someone holding a copy of the vault | Guess its password offline | T-20, T-27, T-37 |
+| Someone at or watching the screen | Walk up, look, record, read notifications | T-23, T-25, T-51 |
+| A web page | Pose as an item's site, trick a click | T-58, T-59 |
+| The supply chain | A compromised dependency, Actions runner, extension, store account or share host | T-9, T-21, T-33, T-60 |
+| No attacker | Edits, syncs, merges, cultures and duplicate titles | T-28, T-52, T-53 |
 
 ## Trust boundaries
 
@@ -37,829 +58,634 @@ A lock withdraws waiting requests, and the owner refuses agents while its vault 
 |---|---|---|
 | Person at the keyboard | Trusted | Authorizes releases. |
 | `keypaste` CLI and bridge code | Trusted | Open source and auditable under security law 8. |
-| Vault file | Trusted at rest | KDBX4 gives integrity and confidentiality; entry text stays untrusted (T-1). |
+| Vault file | Trusted at rest | KDBX4 gives integrity and confidentiality; item text stays untrusted (T-1). |
 | MCP client | Semi-trusted, unauthenticated | Starts the bridge and supplies an unverified identity (T-3). |
-| Browser and keypaste's extension | Semi-trusted, unauthenticated | Start the relay naming an extension identity any local process can name, through the manifest keypaste writes or any other, and pair only once the person confirms the code the extension shows (T-48, T-50). |
+| Browser and keypaste's extension | Semi-trusted, unauthenticated | Start the relay under an extension identity any local process can name, and pair only once the person confirms the extension's code (T-48, T-50). |
 | Model | Untrusted | Can compose requests from attacker-written context. |
-| Entry names, group paths and a request's `reason` | Untrusted data | Cannot instruct keypaste (T-1, T-2). |
-| Agent rules, `agents/<vault>.toml` | Trusted only while sealed | Followed only while the owner's seal holds; anything else reads as the defaults, which ask about every value (T-15). |
+| Item titles, group paths and a request's `reason` | Untrusted data | Cannot instruct keypaste (T-1, T-2). |
+| Agent settings, `agents/<vault>.toml` | Trusted only while sealed | Anything unsealed reads as the defaults, which ask about every value (T-15). |
 
-## Assumptions and scope
+An agent lists the item titles its bridge's `--expose` reaches and asks for a field, an attachment, a linked set (T-56), a run (T-35), a save (T-54) or an item change (T-57). The approver re-checks each request, decides it by the field's category and records it before replying. A Blocked category is refused unasked, an Allowed one released unasked, and an Ask one put to the person. No agent request can make a master-password prompt appear (T-7). A lock withdraws waiting requests but does not revoke values already delivered.
 
-The local user account is uncompromised. A same-user process can read memory, keystrokes and files and is outside keypaste's protection; entries say where such a process gains something specific. Whoever starts the bridge chooses `--expose`, `--client-label` and the vault; those settings constrain a connected client, not that process (T-14). KDBX4 and Argon2 provide the cryptographic boundary, and keypaste implements no cryptography of its own (security law 6).
-
-Out of scope, with reasons: same-user attackers reading unlocked memory, audit records and keystrokes (T-18 covers memory, T-19 the clipboard, T-20 what KDBX rather than keypaste protects), and the model's behavior, since keypaste cannot control what a client does with what it was given.
-
-## Threats
+## Agent requests and prompts
 
 ### T-1 — Prompt injection through entry names
 
-**Asset.** What the model and the person take entry names to mean.
+**Threat.** Anyone who can write the vault puts instructions in item titles, field names or tags for the model or the person to read.
 
-**Attacker.** Anyone who can write the vault (shared, synced or edited in KeePassXC), placing instructions in names, fields or tags.
+**Mitigation.** Every displayed title, field name and tag is sanitized: control, format and markup characters become spaces, titles are capped at 128 characters, and altered text is marked. Listings carry no values, wrap titles in data banners, and drop whole items past 64 KiB, saying so. keypaste never executes item text, and `env pull` imports only env-named keys.
 
-**Mitigation.** Every displayed name, field name and tag, in the bridge, the CLI and the desktop, is sanitized: control, format, private-use, separator, unpaired-surrogate and astral tag characters and `` ` < > { } [ ] | \ / `` become spaces (replaced, so `ig<NUL>nore` does not join into `ignore`); names are capped at 128 characters and group depth at 16, and altered text is marked. Lookup, editing and copying keep the stored bytes. Listings carry no value and wrap names in BEGIN/END data banners. `env pull` imports only keys matching `[A-Za-z_][A-Za-z0-9_]*`. A listing that overflows its 64 KiB frame drops whole entries and says it is partial. The Projects screen's copied run command quotes a project name for every common shell, or is withheld. keypaste never executes entry text.
+**Limit.** Plain-language instructions survive, and there is no phrase blocklist, because paraphrases bypass it. One large title can crowd others out of a listing; `keypaste ls` still works.
 
-**Limit.** Plain-language instructions survive sanitizing and stay readable to the model; there is no phrase blocklist, because paraphrases bypass it. A key `env pull` rejects can still reach the terminal in its error message. One large name can crowd others out of a listing, which denies listing, not values; `keypaste ls` still works.
-
-**Status.** Published in v0.3.0 for the CLI and bridge. Field and tag naming and the copied run command are Implemented (unreleased).
-
-**Tests.** `EntryNameSanitizerTests`, `ServerToolsTests`, `MessageFramerTests`, `ListingSizeTests`, `LargeVaultListingTests`.
+**Status.** `v0.3.0`; field and tag names unreleased.
 
 ### T-2 — Prompt injection through the agent's stated reason
 
-**Asset.** The person's decision at the prompt, and the record of why a value was asked for.
+**Threat.** The model writes `request_credential`'s free-text `reason` to persuade the person, redraw the prompt or shape the record of why a value was asked for.
 
-**Attacker.** The model, writing `request_credential`'s free-text `reason` to persuade the person or redraw the prompt.
+**Mitigation.** A reason over 2000 characters is refused, and the prompt strips control, newline and bidi characters, shows at most 400, and labels the rest as the agent's words in a fixed box. Deny has focus, and Allow or Return works only a second after the prompt gained focus, so a stray keystroke answers nothing. The audit line keeps a 200-character sanitized excerpt, the length and a SHA-256 of the raw text.
 
-**Mitigation.** The bridge and the owner each refuse a reason over 2000 characters. The prompt strips control, newline and bidi hazards, caps the shown reason at 400 characters with a notice, and has no default or deadline a reason could change; the default is no. The desktop's claim card quotes the reason under "<agent> says", apart from the requester line keypaste writes, in a box of fixed height that scrolls, cuts the agent's name in its sentences, and keeps a run's command in a block of fixed height, so nothing an agent sends moves the question or the buttons; run prompts draw the stage whole. Focus starts on Deny; Return presses Allow once only after the card has had focus for a second, never a destructive action, so a keystroke landing as the card appears answers nothing. The audit record keeps a sanitized 200-character excerpt, the original length and a SHA-256 of the raw text.
+**Limit.** A sanitized reason can still persuade, and nothing judges whether it is honest. Sanitizing does not detect sensitive text an agent put in its arguments.
 
-**Limit.** A sanitized reason can still persuade; it is labelled as the agent's words, and nothing judges whether it is honest. Sanitizing does not detect sensitive text an agent put in its arguments. A person who presses Return a second or more after the card took focus allows it once, as a click would.
-
-**Status.** Published in v0.3.0 for the terminal prompt and the audit excerpt; `v0.3.0` also records `args.ttl_seconds`, the requested lifetime rather than the effective one, and `v0.1.0` records the request argument, which can be an opaque handle. The desktop window and run prompts are Implemented (unreleased).
-
-**Tests.** `AuditLogTests`, `ApprovalPromptTests`, `TerminalApprovalChannelTests`, `DesktopApprovalTests`, `DesktopRunApprovalTests`, `SetApprovalWindowTests`, `AlwaysPromptWindowTests`, `InterfaceZoomTests`.
+**Status.** `v0.3.0` for the terminal prompt and audit excerpt; desktop prompts unreleased.
 
 ### T-3 — Confused deputy: a malicious or impersonating client
 
-**Asset.** Which agent a request, prompt and audit line are attributed to, and which agent's rules apply.
+**Threat.** A local process starts the bridge claiming to be another client, such as `claude-code`, to be credited as that agent and get its settings.
 
-**Attacker.** A local process that starts the bridge and claims to be another client, such as `claude-code`.
+**Mitigation.** The client's own name authorizes nothing; the operator's `--client-label` selects the agent's settings, and a bridge with no label gets only the every-agent settings, no Always allow and no run. No tool lets an agent change its settings. The desktop prompt says Verified only when the system shows the caller is keypaste's bridge started by the AI tool the label names, and Not verified otherwise.
 
-**Mitigation.** The client's own name, version and folder are sanitized labels that never authorize anything. What decides is the operator's `--client-label` in the MCP configuration, which selects that agent's rules, its remembered answers and whether it may run commands; a bridge with no label gets only the rules for every agent, no always answer and no run. An answer covers one request unless the person confirms Always allow for that agent and field; blocking is set on the agent's page. No tool lets an agent change the rules. Calls before `initialize` completes are refused. The desktop's prompt says Verified only when, as the system reports at the connection's accept, the program on the pipe is keypaste's own (this owner's `keypaste`, or a file of the same bytes, as a Linux AppImage's other mount is) and its parent is a program of the AI tool the label names (by its file name, its install folder or its macOS app bundle, or Node or Bun given a script inside the tool's installed npm package, such as `node_modules/@anthropic-ai/claude-code/`, with every link in the script's path followed), each parent counted only when it started before its child; it then names the first app above it. The pipe's caller comes from `LOCAL_PEERTOKEN` on macOS, `SO_PEERCRED` on Linux and `GetNamedPipeClientProcessId` on Windows, its parents and their command lines from `proc_pidinfo` and `KERN_PROCARGS2`, `/proc`, and `NtQueryInformationProcess`. Anything else, a missing or unknown label included, says Not verified.
+**Limit.** Whoever starts the bridge chooses the label, exposure and vault, so a label is no authentication (T-14, T-36). Verified decides nothing and does not hold against a same-user process, which can start the real tool with its own configuration or run its installed script. `keypaste approve` does not show Verified, and no Verified prompt from a real AI tool has been observed yet.
 
-**Limit.** The process that starts the bridge chooses the label, the exposure and the vault (`--vault`, or the one chosen in `app.toml`), so a label is no authentication against it (T-14, T-36). The handshake name is never authenticated. Verified decides nothing, and it is no authentication against the person's own account: a same-user process can start the real AI tool with a configuration of its own, inject into it (T-10), or place the tool inside an app bundle named like a terminal, which the app name repeats. Any program can start Node with the tool's installed script itself, which then counts as the tool; a script given by a relative path shows Not verified. Parents are read by id after the caller's own reading, so a parent's id reused between the two is caught only by its start time. `keypaste approve` does not show it.
-
-**Status.** Published in v0.3.0, the label selecting `policy.toml` rules. Per-agent rules, always answers and run are Implemented (unreleased).
-
-**Tests.** `ServerToolsTests`, `SessionAuthorityRecordsTests`, `LateHandshakeTests`, `SessionAuthorityRunTests`, `RequesterIdentityTests`, `scripts/verify-mcp-stdio.sh`. Unverified: a Verified prompt from a real AI tool on each system, which CI's runners do not start.
+**Status.** `v0.3.0` (the label selects `policy.toml` rules); per-agent settings, Always allow and run unreleased.
 
 ### T-4 — Over-exposure of the listing surface
 
-**Asset.** Entry names, which can reveal banks, employers and recovery accounts, and the values a wide view brings into an Allow's reach.
+**Threat.** A connected agent tries to see or reach more items than intended: titles can reveal banks, employers and recovery accounts, and a wider view brings more values into an Allow's reach.
 
-**Attacker.** A connected agent trying to see or reach more entries than intended.
+**Mitigation.** An agent sees only what its bridge's `--expose` reaches (`**` as `keypaste setup` and Connect register it, otherwise `tag:env:*`): titles, groups, tags, Website and, unless Settings hides it, the username. Every other value is decided by its category, no listing or search argument widens the view, and the approver re-checks every request. With several vaults open, a bridge reaches only the vaults its `--vault` names.
 
-**Mitigation.** An agent sees only what its bridge's `--expose` reaches: `**` as `keypaste setup` and Connect register it, or `tag:env:*` (project entries, env-named fields only) for a bridge configured by hand without one. Of each entry it sees the title, group, tags and URL, the username unless Settings hides it, and in a search, only while Settings shows hosts and references, a `Host` field's host and which items reference which (T-55); every other value is decided by its category. `list_entry_names` takes no arguments and `find_access` only what to search for, so an agent cannot widen its view or page (T-55). Patterns match raw group and title separately, so a title of slashes cannot pose as a group. A tag selector reaches only the entry's project variables, refusing a password, username, URL or notes before anyone is asked, and a malformed selector stops the bridge from starting. The owner re-checks every request. With several vaults open in the app, each is served on its own pipe, and Connect pins a tool's bridge with one `--vault` for each vault the person chose, the vault in view by default, so a tool connected earlier keeps reaching only its vault. A bridge reaches only the vaults its `--vault` names: it refuses a request naming any other before an owner hears of it, forwards each request to its vault's owner alone, under that vault's rules and prompt, and refuses a request whose item more than one of its vaults could hold rather than choose; an owner refuses an attachment or a request naming another vault.
+**Limit.** A wide view with a category set to Allow releases every such value unasked; `--expose "**"` reaches every item whole. A variable naming another field by placeholder carries that field out (T-8).
 
-**Limit.** A wide view with a category set to Allow releases every value of that category it covers without a prompt; `--expose "**"` reaches every entry whole. A variable naming another field by placeholder carries that field out (T-8). Names omitted from an overflowing listing may appear in a reply of another size.
-
-**Status.** Published in v0.3.0 for place patterns. Tag selectors, setup's `**`, the usernames switch and the hosts and references switch are Implemented (unreleased).
-
-**Tests.** `EntryExposureTests`, `ApproverHandlerTests`, `ServerToolsTests`, `SessionAuthorityRunTests`, `FieldCategoryRequestTests`, `OpenVaultsTests`, `ConnectClientViewModelTests`, `BridgeAcrossVaultsTests`.
-
-### T-5 — Audit log tampering
-
-**Asset.** The audit log as evidence of every access.
-
-**Attacker.** Anyone able to edit the audit file, which belongs to the user's account.
-
-**Mitigation.** keypaste appends at the end of the log under a sidecar lock every keypaste writer takes, opening the file for each append, so it never overwrites a record another keypaste process appended. Only the vault's owner, unlocked and holding the checkpoint key, rewrites the file, at unlock and daily while unlocked: it folds lookups (`list_entry_names`, `find_access`) older than 30 days into one summary line per agent per UTC day, removes whole UTC days older than the period Settings keeps the log for (a year by default, never under 30 days) behind one removal line, copies every other line byte for byte, and puts first a compaction record holding the previous file's line count and last hash and a digest of every line it kept or wrote, HMAC-signed with the checkpoint key. It compacts only a log that verifies under that key, never the last line's day, and replaces the file in one rename under the writers' lock after checking it still begins with the bytes it read, carrying over lines appended meanwhile. `log verify` accepts the broken links inside the sealed lines only when the digest matches, and with `--checkpoints` fails a seal the key did not sign. Linux and macOS keep the log and its directory owner-only. Every record carries the previous record's hash and its own SHA-256, so `keypaste log verify` detects an edit, removal or insertion; it prints the record count and latest hash. `--expect <hash>` requires a record whose own bytes match an anchor the person kept. The vault's owner, the desktop or `keypaste approve`, appends a checkpoint line every 64 lines it writes and when its session ends, an HMAC-SHA256 over the chain head under a random key kept in the vault's `.keypaste/keys`, and `log verify --checkpoints` opens the vault to check them, so rewriting the chain before the last checkpoint needs the unlocked vault. The writer refuses to append under a schema it cannot read, and a stray trailing line cannot disable the bridge. A line may take 64 KiB.
-
-**Limit.** The chain is tamper-evident, not tamper-proof: lines after the last checkpoint are unsigned, so a writer can recompute them; a vault without a key gets one from its next save after the owner's first line, never from a save of its own, so until then no line is signed; verify without `--checkpoints` checks no signature, and deleting the end, checkpoints included, leaves a valid file. Detecting that needs an anchor kept where the attacker cannot edit it; keypaste stores none, by founder decision of 2026-10-22. The sidecar lock that orders keypaste's writers cannot exclude an editor or `sed -i`. Windows files inherit directory permissions, with no append-only flag or ACL (same decision). Without `--checkpoints` a compaction record's signature is not checked, so a writer can recompute the chain and the seal together. A summary keeps counts by tool and decision, not a lookup's arguments, and an anchor to a folded or removed line reads as missing. Several vaults' owners write one home's log; each signs its own checkpoints, and a compaction checks every checkpoint and the seal of each vault the app holds open under that vault's key before it seals over them. A log sealed under the key of a vault no open owner holds is not compacted, and a log that does not verify is never compacted, so its lines stay until it is archived; kept forever, the log grows until a person archives it with every keypaste process closed ([archiving it](docs/mcp-setup.md#archiving-it)). `v0.3.0` and `v0.5.0-rc.1` cap a line at 4 KiB and read back 16 KiB, so after a longer line they report the chain broken and refuse to append until a newer keypaste writes the next line; this fails closed and is accepted.
-
-**Status.** Published in v0.3.0: append-only writes, the chain, `log verify` and `--expect`. The 64 KiB line, checkpoints and compaction are Implemented (unreleased).
-
-**Tests.** `AuditChainTests`, `AuditLogTests`, `AuditCompactionTests` (two owners on one log included), `LogVerbTests`, `scripts/verify-log-chain.sh`.
-
-### T-6 — Unlogged access
-
-**Asset.** [Security laws](SECURITY.md#security-laws) 3 and 7: no access without a record, and errors deny.
-
-**Attacker.** A full disk, lost permissions or an error on the decision path that would let an access go unrecorded.
-
-**Mitigation.** The bridge and `keypaste approve` refuse to start on a log they cannot open or continue, `keypaste approve` before asking for the password. The owner records every request it answers before replying, and the bridge records every call no owner recorded before returning anything. The owner checks its log opens before asking anyone and otherwise refuses at once. A failed append refuses the response on both sides: no value, name or variable leaves unrecorded. A `run --session` or `--token` set naming more than the 62 KiB of entry names one line holds, and an agent's run naming more than its 2 KiB reply carries, are refused before anyone is asked.
-
-**Limit.** A crash or lost reply after the append can record an access that never reached the client, and a reply lost after recording leaves a second line. A call has no line only if the owner's log failed during the decision and the bridge also could not write, and then nothing is released. A rules change sealed when no line could record it still holds, and the person is told it was made and not recorded. A `v0.5.0-rc.1` runner reads only replies under 64 KiB, so a larger set starts nothing while the owner records the release; this over-report is accepted.
-
-**Status.** Published in v0.3.0, exception-path auditing included (not in `v0.1.0`). Owner-side recording and run budgets are Implemented (unreleased).
-
-**Tests.** `AuditLogTests`, `ServerToolsTests`, `SessionAuthorityRecordsTests`, `OneLinePerRequestTests`, `ApproveAuditLogTests`.
-
-### T-7 — Where the master password is typed
-
-**Asset.** The master password.
-
-**Attacker.** An agent or MCP client trying to collect the password or make a password prompt appear.
-
-**Mitigation.** The password is typed only into the desktop app or the person's terminal after they start `keypaste approve`; the bridge cannot prompt through its JSON-RPC stream or ask the client, and no request can make a password prompt appear. When the app is open and locked on the vault asked about, the request is still refused and recorded, the agent is told the vault is locked in the app, and the app shows one notice per locked spell (T-51) with no field and without taking focus; only the person's press, armed a second after it appears, opens the unlock screen. Stopping `keypaste approve` takes the same lock transition as the app, withdrawing a waiting request.
-
-**Limit.** `keypaste approve` stays unlocked until stopped, with no idle lock. A same-user process can still bring the app's window and unlock screen forward through a second start (T-29).
-
-**Status.** Published in v0.3.0: the password only in the terminal approver. The locked-app notice is Implemented (unreleased).
-
-**Tests.** `SecretHygieneTests`, `LockedAppTests`, `LockedNoticeTests`, `LockedNoticeWindowTests`, `SessionLifecycleTests`. Unverified: whether a notice shown without activation stays over other windows and out of the person's typing, which headless CI displays cannot show.
+**Status.** `v0.3.0` for place patterns; tag selectors, setup's `**` and the visibility switches unreleased.
 
 ### T-8 — Only the requested field leaves, and only on one path
 
-**Asset.** Every field of an entry other than the one asked for.
+**Threat.** An agent asks for more than one field, a field it should never get, or a value carrying other fields inside it.
 
-**Attacker.** An agent asking for more than one field, a field it should never get, or a value carrying other fields inside it.
+**Mitigation.** Listing, search and credential replies are separate message kinds, and a credential reply carries one field, or the linked set the person allowed (T-56). One-time-code seeds are refused before anything is read, passkey fields are always Blocked, and `totp` releases only the current code. Placeholders fill only from the same item's releasable fields, and a value past its limits is refused whole, never truncated.
 
-**Mitigation.** Listing, search and credential replies are separate message kinds. A search's items carry names, the URL's origin and, while Settings shows it, the username, which an agent sees without asking, and, while Settings shows hosts and references, a `Host` field's origin and which items reference which (T-55), and no other value; a credential reply carries one field, and a linked set's reply the fields the person allowed together (T-56). Every TOTP seed field (`otp`, `TimeOtp-*` and the like) and a standard name in another case are refused before anything is read, and passkey fields are Blocked under every rule. Run references and `share --field` accept only env-named custom fields (`[A-Z][A-Z0-9_]{0,127}`, not `KPEX_`, `KPXC_` or `KP2A_`). `totp` releases the current code, computed after authorization; the seed never leaves. Placeholders fill in only from the same entry and only from fields that could leave by name; anything else, a loop, nesting past 10 or a value past 1 MiB refuses the value whole. An attachment is released as base64, at most 5 MiB. A value, or a linked set's values together, over the 64 KiB frame is refused whole, never truncated.
+**Limit.** A variable holding `{PASSWORD}` gives the password, under the variable's name, to whoever may get the variable. A run resolves references before its prompt, so a denial does not mean nothing was read (T-18). A one-time code with the password lets an agent sign in as the person within that period.
 
-**Limit.** A variable holding `{PASSWORD}` gives the entry's password, under the variable's name, to whoever may get the variable, and the prompt and log name only the field asked for. A value keypaste cannot fill in is refused only after it was allowed, and its field then cools down for a minute. A run resolves every reference before its prompt, and entry resolution reads standard fields, passwords included, into memory, so a denial does not mean nothing was read (T-18). A TOTP code with the password lets an agent sign in as the person within that period.
-
-**Status.** Published in v0.3.0: one field per release and oversized values refused whole (in `v0.1.0`, an approved credential too large to send costs you every other grant). Custom fields by any name, TOTP, placeholders and attachments are Implemented (unreleased).
-
-**Tests.** `SecretHygieneTests`, `FieldCategoryRequestTests`, `KeePassPlaceholdersTests`, `CustomFieldReleaseTests`, `LargeCredentialTests`.
-
-### T-9 — Exfiltration and telemetry
-
-**Asset.** Entry names, values and the audit log (security laws 3 and 5), and the code that holds them.
-
-**Attacker.** Exfiltration through keypaste's own code or dependencies, or a crash report carrying more than it should.
-
-**Mitigation.** The audit log stays local. The bridge speaks MCP only over standard input and output and reaches the owner through a local pipe; its code opens no listener and makes no network request. The bridge, the browser relay and the CLI cannot name the runtime's networking outside `keypaste share`'s upload, which goes through Core's share client (build-enforced). Its packages are pinned by content hash, none has a module initializer, and build rules keep the bridge's code from naming vault or password types. Crash reports come only from the desktop app's packages, only after the person agrees to the terms of use on the first-launch screen and says yes to reports there or in Settings, a yes apart from the terms, and stop with Settings' switch. A report holds only code identifiers, the version, system and open screen, never a message, value, name, path or identifier, is at most 16 KiB, and is shown in Diagnostics exactly as sent. The CLI, `keypaste approve` and the bridge cannot send one (build-enforced). keypaste.com keeps no address and deletes a report 90 days after last seen.
-
-**Limit.** A command the `run` tool starts may use the network (T-35). The MCP SDK carries HTTP transports, and the build rule binds keypaste's own code, not its packages, so any package in the process could use the runtime's networking: what bounds it is the pin, and a compromised pinned version would ship inside the binary that holds the vault. A name search of `v0.3.0`'s bridge suggests, without proving, that trimming removed the HTTP transports. The first-launch screen has no way to continue and refuse reports (step H-0027 checks this against EU consent law). A report shows api.keypaste.com the sender's IP address. Anyone can send a forged report in the grammar, so a count is evidence only when its frames name keypaste code. The route answers 503 until its database exists (step H-0028).
-
-**Status.** Published in v0.3.0: the stdio-only bridge with a pinned closure, and no crash reports. Crash reports are Implemented (unreleased), desktop app only.
-
-**Tests.** `BridgeClosureTests`, `DispatchOrderTests`, `CrashReportScrubbingTests`, `CrashSourceRulesTests`, `CrashSenderTests`.
-
-### T-10 — The approver channel
-
-**Asset.** Released values and terminal edits crossing the local pipe to and from the owner in plaintext.
-
-**Attacker.** Another local user binding or connecting to the pipe; a peer sending bad frames or exhausting connections.
-
-**Mitigation.** Both ends open the pipe with `PipeOptions.CurrentUserOnly`: on Windows its access list admits only the current user, and on Unix the runtime refuses a peer running as another user before anything is read. A bridge attaches by naming its vault, and the owner answers only connections attached to its current session, so a request across a lock, an unlock or another vault is refused unasked. Nothing that unlocks a vault crosses the pipe. Frames are capped at 64 KiB, except an env set or attachment reply only its asker reads, under 8 MiB; a bad frame closes only its connection, and at most 64 connections are served. As it accepts a connection the owner reads the program on it from the system, its process id, executable path and code signature state (Authenticode on Windows, the running code's signature and its team ID on macOS, none on Linux), and writes them into the line of each request that connection sends; nothing is refused for them.
-
-**Limit.** Another user can pre-create the predictable Unix socket path, so requests fail closed; the locked-app endpoint's name is predictable too, so taking it stops only the notice, and a same-user process holding it makes agents be told the app is open and locked when it is not. There is no confidentiality against root or same-user processes. Idle connections are never closed. The recorded program is advisory, and for an agent it is the `keypaste mcp` its AI tool started rather than the tool: on Windows and Linux its path is read after its process id, which can be reused in between, while macOS reads the path and signature through the connection's audit token; a same-user process can inject into or pose as a signed program, and no keypaste build is signed yet.
-
-**Status.** Published in v0.3.0 for the per-user pipe. Session binding, the connection cap, the extra endpoints and the recorded program are Implemented (unreleased).
-
-**Tests.** `ApproverListenerTests`, `MessageFramerTests`, `SessionAuthorityTests`, `SessionAuthorityRecordsTests`, `AuditLogTests`, `LaunchEndpointTests`, `LockedAppEndpointTests`. Unverified: cross-user refusal, since CI has no second user account; it rests on .NET 10's documented pipe behavior.
+**Status.** `v0.3.0` for one field per release and oversized values; custom fields, codes, placeholders and attachments unreleased.
 
 ### T-11 — Prompt fatigue, and clicking yes to make it stop
 
-**Asset.** The person's attention, and approval as a deliberate act.
+**Threat.** A retrying or malicious client floods the person with prompts, or a click aimed elsewhere lands on Allow, so approval stops being a deliberate act.
 
-**Attacker.** A retrying or malicious client flooding the person with prompts, or a click aimed elsewhere landing on Allow.
+**Mitigation.** One prompt shows at a time across every open vault; at most three wait per agent, and the rest are refused as `BUSY`. A refusal starts a 60-second cooldown for each field it covered, a prompt expires after 45 seconds, and the desktop's Allow works only a second after the prompt has focus. Linked sets, saves and item changes share the slot and cooldown.
 
-**Mitigation.** One prompt at a time, whichever vault open in the app asks, since the vaults' owners share one queue; others wait in order, at most three per agent, the rest refused as `BUSY`, and a bridge holds at most four calls. A refusal starts a 60-second cooldown for each field it covered, whichever connection or kind of request asks next, and a refused run also cools that connection's runs; refusals tell the client not to retry. A prompt expires after 45 seconds and is withdrawn when its bridge or client goes away. The desktop's Allow works only while the prompt has focus and from a second after it gained it, and Deny always works. A linked set takes the same slot, window and cooldown, and its refusal cools each of its fields (T-56); an item change's refusal cools that item for every asked change (T-57). No agent tool asks for a rules change.
+**Limit.** There is no cap across different items: twenty items can mean twenty prompts. The pause is Block, or turning an agent's run off ([approvals](docs/approvals.md#when-you-say-no)). With several vaults open, a prompt names its vault in its window title, not yet on the card.
 
-**Limit.** There is no limit across different entries and no hourly cap: twenty entries can mean twenty prompts. The pause is the agent rules: Block, or turning an agent's run off, refuses its requests unasked at once ([approvals](docs/approvals.md#when-you-say-no)). An undeliverable field can prompt again after its cooldown. A platform that never reports activation leaves a prompt answerable only by refusing, and no real window has yet shown each platform's activation order. A busy response does not say which call holds the turn. While several vaults are open a prompt names its vault in its window title and spoken opening, not yet on the card itself. Tests show no improvement in human attention.
-
-**Status.** Published in v0.3.0: one prompt at a time with `BUSY` refusals, the 60-second cooldown and expiry on wall and monotonic clocks (in `v0.1.0`, an agent can queue approval prompts and moving the clock back can revive an expired approval). The per-agent queue, the desktop's arming and run cooldowns are Implemented (unreleased).
-
-**Tests.** `ConcurrentRequestsTests`, `ApprovalGateTests`, `ApproverHandlerTests`, `DesktopApprovalTests`, `LockedNoticeTests`, `OpenVaultsTests`. No test kills `keypaste approve` during a prompt; `LockBoundaryTests` stops one with SIGTERM.
-
-### T-12 — A standing approval used under a reason nobody read
-
-**Asset.** Every value of a category set to Allow, and an entry's URL and username.
-
-**Attacker.** A client asking under an Allow for any purpose it states.
-
-**Mitigation.** Allow takes effect only once the person confirms, in the app, that every value of the category will go to every agent without asking; Ask and Block apply at once and end an Allow. Allow once keeps nothing and an Allow holds no value, so each release reads the vault and is recorded as `allowed`, with the reason's excerpt, length and hash, naming the category and saying nobody was asked; `keypaste approve` prints each one. Block, the agent's view and cooldowns are checked first. A linked set is never released unasked, whatever its fields' categories allow (T-56), and neither is a value of an entry in a protected stage, one named `prod`, `production`, `prod-…` or `production-…` by any of the entry's own tags: it is asked every time with Allow once only, as a run of its set is (T-30, T-38).
-
-**Limit.** Nobody reads the reason before an unasked release, so T-2's display controls do not apply, and reasons are not judged for meaning, since a heuristic could be bypassed or used to force prompts. A protected stage's values are protected by the entry's own tags, so an entry left untagged out of it follows its category's Allow like any other. An entry's URL, and its username unless Settings hides it, always leave unasked. Nothing revokes a released credential at its issuer or removes a client's copy.
-
-**Status.** Implemented (unreleased). `v0.3.0` releases without a prompt under a `policy.toml` rule, evaluated on each request and recorded as `policy`.
-
-**Tests.** `FieldCategoryRequestTests`, `ApproverHandlerTests`, `SessionAuthorityRecordsTests`, `AgentRulesViewModelTests`.
-
-### T-13 — An Allow covers a kind of value, not the values you pictured
-
-**Asset.** Values that come under a rule after the person set it.
-
-**Attacker.** Anything that changes the vault, the app, `env tag`, KeePassXC, a synced copy or a merge, adding a field, tagging an entry or moving one.
-
-**Mitigation.** A field's category comes from its place among KeePass's standard fields, KeePassXC's passkey format, or the entry's own project tag, never the field's name. Exposure matches raw group and title, case-sensitive. The app's organize forms say that renaming can move entries into or out of an agent's view; a tag change or history restore made in the app or by `env tag` names the stage joined and its variables. A name more than one entry answers to is put to the person (T-53). Every unasked release names its category in its audit line.
-
-**Limit.** A rule covers whatever values of its category exist when a request arrives: a custom field added later is released under that Allow, an entry tagged into a project later has its custom fields become project variables, and a field named like a card number is a custom field like any other. Moving or renaming an entry onto `env/dev/**` brings it into view, and unless a pattern ends in exactly `**` it constrains the title, so `env/dev*` misses `env/dev/` and matches `env/devops_ROOT_TOKEN`. keypaste does not prevent this: the person reorganizing the vault is the one who set the rules. A tag added in KeePassXC or by a merge says nothing, and nothing previews which values a rule covers; `keypaste log` shows only past releases.
-
-**Status.** Implemented (unreleased). In `v0.3.0` a `policy.toml` rule likewise covers the vault's current contents, and `keypaste policy ls` explains a rule without listing what it covers.
-
-**Tests.** `FieldCategoryRequestTests`, `ProjectTagChangeTests`, `EntriesOrganizeTests`, `EntryExposureTests`. No test claims to stop a vault changing under a rule.
-
-### T-14 — An Allow is a standing grant to anything that can reach the owner
-
-**Asset.** Every value the agent rules release unasked.
-
-**Attacker.** A same-user process that starts `keypaste mcp --expose "**"` under any label or none, or speaks the pipe protocol itself.
-
-**Mitigation.** Keeping categories at Ask, and Block for what agents never need, limits the standing grant; an Always allow covers one field for one label, and Remove ends it. A label gains commands only where the person turned run on, and every run is asked (T-35). The owner records each unasked release in its own log as `allowed`, which no bridge argument redirects, including a request straight to the pipe, and a direct request still meets the session check, argument limits and view re-check.
-
-**Limit.** Such a process obtains every value of each category set to Allow for every agent, except a protected stage's (T-12), and under another agent's label also that agent's Allows, Always allow answers and picks. Label and exposure come from the requester, and `CurrentUserOnly` confines the pipe to the account without authenticating the peer. A reply's `recorded` is the answering process's word. Same-user processes are outside scope, but an Allow removes the keystroke a prompt would need.
-
-**Status.** Implemented (unreleased). In `v0.3.0` a local program can likewise start a bridge under another program's label and match its `policy.toml` rules.
-
-**Tests.** `SessionAuthorityRecordsTests`, `SessionAuthorityRunTests`. They show what the owner records, not protection against a process choosing bridge arguments.
-
-### T-15 — Agent rules are a file any program of the person's can write
-
-**Asset.** The agent rules, and the browser allowances the same file keeps (T-61).
-
-**Attacker.** A same-user program writing a vault's file in `~/.keypaste/agents/`, or a synced, shared, restored or KeePassXC-edited vault carrying agent records.
-
-**Mitigation.** The owner follows the file only while its seal holds: an HMAC-SHA256 under a key the vault keeps, over this home's random identity, the vault's count of this home's sealed writes and the rules. So an older file put back, or one copied from another computer, does not hold. Anything unsealed gives the defaults (every category Ask, usernames shown, hosts and references hidden, run off), left in place, and the app says the rules were changed outside keypaste; a file keypaste cannot read refuses every agent request. Agent records inside a vault are ignored. Each vault keeps its own file, sealed under its own key and count, so two vaults open at once never reset each other's rules or browser allowances. The one `agents.toml` a home kept before moves, as it is, to the first vault whose key sealed it; one no vault's key sealed stays where it is, and every vault asks about everything. With nothing holding the vault, `keypaste clients` can only narrow, unsealed; every other change takes the owner, which seals and records it.
-
-**Limit.** The seal authenticates the process holding the unlocked vault, not the person: a same-user process holding it, or reading keypaste's memory while it does, can seal any rules, and one that can type into Settings can confirm an Allow. Two copies that each made the key before merging settle to one key, and the other home's rules then read as the defaults until set again (fails closed). Deleting the file gives the defaults, which never give more. The seal does not name its vault, so a copy of a vault, holding the same key and counts, could take the earlier shared file or a copied one if it is unlocked first.
-
-**Status.** Implemented (unreleased). `v0.3.0` reads an unsealed `policy.toml` at `keypaste agent` start, rejects one other users can write on Linux and macOS (no such check on Windows), and a `KEYPASTE_HOME` in a synced directory lets another machine change this machine's grants.
-
-**Tests.** `SealedAgentRulesTests`, `AgentRulesFileTests`, `ClientsVerbTests`, `AgentRulesViewModelTests`, `OpenVaultsTests`, `scripts/verify-policy-e2e.sh`.
-
-### T-16 — The audit vocabulary is the only evidence a person was involved
-
-**Asset.** The log's claim about who decided each release.
-
-**Attacker.** A record or agent-facing text presenting an unasked release as a person's approval.
-
-**Mitigation.** Each authority has its own method in the log: `prompt` for a person's answer, `allowed` for an Allow (URLs and shown usernames included), `blocked` for a Block, `rules-changed` for a rules change, each naming the category, and agent-facing text uses the same words. An authorized value too large to send is `undeliverable` with the authority that allowed it, decided on the reply as sent. Older methods, `v0.3.0`'s `policy` included, are still read as released by rule.
-
-**Limit.** Editing the vocabulary after writing breaks the chain unless the attacker repairs it too (T-5).
-
-**Status.** Implemented (unreleased). `v0.3.0` records policy releases as `policy`.
-
-**Tests.** `AuditLogTests`, `SessionAuthorityRecordsTests`, `ServerToolsTests`, `LogRowTests`, `LargeCredentialTests`.
-
-### T-17 — A timing oracle over Allow
-
-**Asset.** Which categories are set to Allow or Block.
-
-**Attacker.** A client timing an immediate unasked response against a human-delayed one.
-
-**Mitigation.** None. A Block refusal names no category.
-
-**Limit.** Unmitigated: an artificial delay would slow an Allow while the next prompted request still showed the difference. The client already receives what it is allowed, so learning the rules gives it nothing asking would not.
-
-**Status.** Implemented (unreleased) as described; `v0.3.0` has the same exposure over `policy.toml`.
-
-**Tests.** No test.
-
-### T-18 — Memory dumping
-
-**Asset.** Plaintext in memory during vault reads, serialization and after release.
-
-**Attacker.** A debugger, core dump, hibernation file or swap page, same-user access included.
-
-**Mitigation.** Master passwords are read into clearable buffers, and derived key material is zeroed after use. The owner keeps no released value for a later request: Allow once keeps nothing and neither an Allow nor an always answer holds a value, so each release reads the vault again. The bridge holds no vault, only the plaintext it delivers. Crash reports carry no memory and keypaste never collects a dump; on Linux and macOS every keypaste process sets its core dump limit to zero as it starts, so a crash writes no core file. The packages carry no `createdump`, so `DOTNET_DbgEnableMiniDump` writes no dump either; the desktop app started from its macOS bundle or AppImage, or on Windows by relaunching itself once with the variable set, turns off .NET's diagnostics port, Linux `keypaste approve` refuses another process's attach and `/proc` reads, and secret buffers are locked out of swap where the system allows and, on Windows, left out of error reports. A locked Windows app holds only the sealed quick-unlock copy (T-44).
-
-**Limit.** keypaste makes no claim of in-memory secrecy. Garbage collection can leave relocated copies; vault reads and MCP serialization create strings that cannot be cleared; entry resolution reads standard fields, passwords included, before approval, so a denial does not mean a secret was never read; the pipe and OS can leave copies in swap or dumps. The diagnostics port that lets a process of the same user read memory stays open in the desktop app started any other way on macOS or Linux, in a Windows app started with `DOTNET_EnableDiagnostics` already set, which it keeps, or whose relaunch could not start, and in the Windows app's first process, which holds no vault and only waits for the relaunched one; Windows Error Reporting's LocalDumps still holds all but those buffers. `SecureString` is unused because it does not encrypt on Linux or macOS. Nothing bounds the lifetime of these copies, the client's copies or the credential itself.
-
-**Status.** Implemented (unreleased). `v0.3.0` keeps each human-approved credential in a clearable buffer for its grant lifetime, at most `--max-ttl` (default 300 seconds), cleared on expiry, disconnect and disposal; stopping `keypaste agent` cannot revoke what a client already has.
-
-**Tests.** `SecretHygieneTests` checks sent bytes for planted sentinels; `DiagnosticsRelaunchTests` and `DiagnosticsPortTests` the Windows relaunch; nothing tests memory erasure.
-
-### T-19 — Clipboard scraping
-
-**Asset.** A value copied with `keypaste get` or the desktop's copy buttons.
-
-**Attacker.** Another process reading the clipboard, a clipboard manager or history, or a remote session copying it elsewhere.
-
-**Mitigation.** The bridge and `keypaste approve` never touch the clipboard. The CLI and the desktop clear a copied value after 20 seconds if the clipboard still holds it; the desktop also clears on lock, quit, Clear now and an unexpected UI-thread error. On Windows both opt out of Clipboard History and Cloud Clipboard. The desktop marks a secret as concealed and transient for macOS pasteboard managers and as a secret for KDE's Klipper.
-
-**Limit.** Managers may ignore these markers, and none stops a process reading the clipboard; RDP, Citrix or VDI can copy it to another machine. The CLI's macOS and Linux copies carry no marker, and `xclip` or `wl-copy` can keep serving the value after keypaste exits. Clearing needs a surviving process, so a crash elsewhere, forced termination, power loss or logout can leave the value. History, pasted copies and memory copies cannot be erased. A paste into a desktop secret field leaves the clipboard as it was, so a master password copied from elsewhere stays there. Copied `keypaste run` commands hold no secret and stay.
-
-**Status.** Published in v0.3.0 for `keypaste get`: the 20-second clear and the Windows opt-out. The desktop's clearing and markers are Implemented (unreleased).
-
-**Tests.** `ClipboardClearTests`, `ClipboardCountdownTests`, `ClipboardWritesDoNotOutliveTheAppTests`, `WindowsClipboardWriterTests`, `SecretMarkerTests`. Unverified: absence from Win+V for the shipped binary, and whether a given manager honours the markers.
-
-### T-20 — A stolen vault file
-
-**Asset.** The vault's contents when the file is copied away.
-
-**Attacker.** Someone holding a copy of the vault, guessing offline.
-
-**Mitigation.** KDBX4 provides content encryption (AES-256 or ChaCha20, or Twofish in a vault another program made with it), Argon2 key derivation and HMAC integrity; keypaste vendors the format implementation and adds no cryptography. A keyfile or YubiKey adds a factor a copied file lacks (T-27, T-37).
-
-**Limit.** Protection rests on the passphrase and KDF parameters; offline guessing has no rate limit, lockout or record, and keypaste cannot make up for a weak passphrase. A recovered passphrase exposes names and values, also from an older copy. The audit file stays plaintext, and names and arguments in it can be sensitive (T-5, T-9).
-
-**Status.** Published in v0.3.0 (KDBX4 and Argon2). Twofish vaults are Implemented (unreleased).
-
-**Tests.** `scripts/verify-keepassxc-compat.sh`, `scripts/verify-keepassxc-writeback.sh`, `WorkflowsTests`, `TwofishCipherTests`. None tests passphrase strength.
-
-### T-21 — The released binary is not the source you read
-
-**Asset.** That a download is its tagged source.
-
-**Attacker.** A compromised Actions runner, action, R2 credential or bucket account substituting bytes; anyone replacing an archive together with its checksum.
-
-**Mitigation.** `release.yml` tests the NativeAOT binaries it uploads, KeePassXC compatibility both ways included, refuses JIT fallbacks and stray managed files, checks the version against the tag and re-verifies checksums. Actions and tools are pinned, and releases include source. `publish-release.sh` publishes only to a positively verified empty destination. `v0.3.0` carries a Sigstore attestation over every asset, checkable with `gh attestation verify` and no GitHub account.
-
-**Limit.** A checksum from the archive's own origin cannot detect replacement of both. The attestation does not detect a compromised workflow run, action or runner, which attests what it built. Binaries are unsigned and un-notarized, and builds are not reproducible. One third-party fleet builds and tests all platforms, so a fleet compromise can evade the checks, and the publication guard does not stop a compromised credential bypassing the pipeline. Building from source moves trust to the local build chain.
-
-**Status.** Published in v0.3.0, the first advertised release with an attestation; `v0.2.0` and earlier have none. Desktop packages are unreleased (RELEASE owns their requirements).
-
-**Tests.** `release.yml`'s own assertions, `scripts/verify-provenance.sh --selftest`, `scripts/verify-release-destination.sh`. None detects substitution by the infrastructure running them.
-
-### T-22 — The desktop app's accessibility layer as a read path
-
-**Asset.** Secrets typed into the desktop app.
-
-**Attacker.** Another process querying AT-SPI or Windows UI Automation for a control's value or name.
-
-**Mitigation.** Every field that takes a secret is a `MaskedInput`, never a `TextBox` or `TextBlock`, whose automation exposes text. It keeps characters in a clearable buffer, draws from the count and exposes only a fixed name and the mask length, so two secrets of one length look the same. A paste goes into a buffer of its own; one trailing line break is dropped, and anything else a keyboard cannot type is refused, never silently stripped. The app has no webview.
-
-**Limit.** Keystrokes and pastes still arrive as immutable strings that cannot be wiped, and OS input handling, input methods and keyloggers are outside this control (T-18). A master password copied to paste it stays on the clipboard (T-19).
-
-**Status.** Implemented (unreleased); the desktop app has no release.
-
-**Tests.** `MaskedInputAutomationTests`, `SecretFieldAutomationTests`, `VaultAccessAutomationTests`. Unverified: the new-entry forms' one-time-code fields (`NewTotp`, `NewItemOneTimeCode`) and the save-value prompt's field (`ValueInput`) are `MaskedInput` but in no automation-surface test.
-
-### T-23 — What auto-lock is for, and what it is not
-
-**Asset.** An unlocked vault on an unattended desktop.
-
-**Attacker.** Someone who walks up to the unattended computer.
-
-**Mitigation.** The desktop locks after 30 minutes without input by default, settable up to 8 hours, never to "never". Optional minimize-lock and `Ctrl/Cmd+L` take the same path: dispose the vault, empty the screen, clear the copy. With several vaults open, each of these locks every one, and input in the window keeps every one open. The deadline checks wall and monotonic clocks, so a machine suspended past it wakes locked; agent requests never count as activity. Every lock denies waiting requests as `vault-locked` and refuses an uncommitted release.
-
-**Limit.** On Windows, the person's own lock, the idle lock, minimize-lock and closing into the tray can be undone with Windows Hello (T-44), so there they stop only someone who cannot pass Windows Hello, PIN included. Switching windows and macOS `Cmd+H` do not minimize. Locking cannot erase copies or undo a read (T-18). A `keypaste approve` has no idle lock and must be stopped.
-
-**Status.** Implemented (unreleased); the desktop app has no release.
-
-**Tests.** `AppVaultSessionTests`, `MinimizeLockTests`, `ActivityWatchTests`, `OpenVaultsTests`. Native minimize was observed by hand on Windows 10 and a Linux desktop and by an observer on Linux and macOS CI. Unverified: a minimize click and `Cmd+H` on a real macOS desktop.
-
-### T-24 — `recent.toml` tells anything that can read `~/.keypaste` where your vaults are
-
-**Asset.** The paths of the person's vaults and keyfiles, and the names and sites a vault holds.
-
-**Attacker.** Anything that can read `~/.keypaste`, or a screenshot of the unlock screen.
-
-**Mitigation.** The desktop records up to ten successfully opened vault paths, each with its last keyfile's path, and no names, counts, fingerprints or key material; the file is owner-only on Linux and macOS, and rows can be removed or the list cleared. With no recent vault it reads only KeePassXC's recent-database keys, writes none of KeePassXC's files and records none until opened. The app shows only file names. Every file keypaste writes in its home goes through one owner in Core, so no other code adds to what the home holds. A vault's agent rules name items by UUID, and keep the site of each login a browser filled encrypted under a key the vault holds, which only the process holding the unlocked vault reads; a file an earlier build wrote with sites in the clear is rewritten with them encrypted at the owner's next change. Each dismissed recommendation is kept as an HMAC under a key derived from the same vault key, which only the process holding the unlocked vault matches; one an earlier build wrote in the clear still holds, and is kept as its HMAC from the next dismissal or review in that vault.
-
-**Limit.** Anyone who can read `~/.keypaste` learns those paths, keyfile locations included (T-27), as they can read the audit log. What the home holds in the clear, by file: `recent.toml`, vault and keyfile paths; `app.toml`, the chosen vault's path; `projects.json`, each mapping's vault path, project, directory and command, which `keypaste run` reads before any vault is open; `agents/<vault>.toml`, agents' labels, the field or attachment each kept answer names and the name an agent asked for in each kept pick, which `keypaste clients` lists without the vault, and the pairings' names; `browsers.json`, each pairing's name, build and time; `sessions/<vault>.owner`, the path of a vault held open; `recommendations.json`, each dismissal's vault identity, and until that vault's next dismissal or review the entry ID and the field, lost project or reminder reason a dismissal an earlier build wrote names; `audit.jsonl`, what each request named (T-5, T-9); `crash-reports/`, reports scrubbed of names, paths and values; `agents.id`, `save-counts/` and the lock files, a random identity, numbers or nothing. On Windows `recent.toml` inherits profile permissions, by founder decision of 2026-10-22. KeePassXC's paths add nothing a same-user process could not read, but put them on the first screen, where a screenshot captures them.
-
-**Status.** Implemented (unreleased); the desktop app has no release.
-
-**Tests.** `RecentVaultsTests`, `SecretHygieneTests`, `KeePassXcDatabasesTests`, `HomeFilesSourceRulesTests`, `SealedAgentRulesTests`, `RecommendationDismissalsTests`.
-
-### T-25 — A value on screen, because somebody asked to see it
-
-**Asset.** A value the person revealed: a project value, an entry's password, custom field, TOTP code or past password, a generated password or a new scoped token.
-
-**Attacker.** People nearby, screenshots, recordings, screen sharing and remote desktops, and someone who walks up after the person looks away.
-
-**Mitigation.** A reveal is a toggle, so switch control, a screen reader's single activation and people who cannot hold a key can use it. One value shows at a time, for at most 30 seconds, and hides when pressed again, when its row, entry or place changes, on a merge or reload, when a menu opens over it, and when the window loses focus, minimizes, goes to the tray or locks. The value is drawn by a control with no automation entry, so nothing on the accessibility surface carries it.
-
-**Limit.** The value is readable for up to 30 seconds from one click, and hiding it cannot erase a capture. Drawing creates an immutable string, held while it shows (T-18).
-
-**Status.** Implemented (unreleased); the desktop app has no release.
-
-**Tests.** `RevealButtonTests`, `DrawnRevealTests`, `RevealedValueTests`, `HistoryRevealAutomationTests`, `CurrentPasswordRevealAutomationTests`.
-
-### T-26 — Restoring a backup while the app is locked
-
-**Asset.** The vault's newer state, and the password typed to check a backup.
-
-**Attacker.** Someone who knows an earlier master password and can write to the vault's directory; a file swapped in between check and restore; anyone, another program or a sync tool putting an older copy of the vault in its place.
-
-**Mitigation.** The unlock screen restores a whole-vault backup after opening it with the password (and keyfile) it was made under; it shows when it was taken, its counts and the file it replaces, never a name or value. The restore accepts only the checked bytes, so a file swapped in afterwards is refused, and a write between re-read and rename is detected. The restore takes the vault's claim first, so it is refused while another keypaste process, `keypaste approve` included, holds the vault, and the unlock after it opens the restored vault under that claim. The password is zeroed on every outcome. The replaced vault is kept as a backup first. Each keypaste save counts up a save count the vault's root group carries, a merged save counting past both copies, and this home remembers the count of the copy of each vault it last opened or saved, by the vault's identity alone; another program's save leaves the count as it is, and saves from several computers syncing one vault only raise it. An unlock in the app, a CLI verb or `keypaste approve` that finds a lower count than remembered, after a restart too, warns once and opens the vault: the app in its notice, the CLI on stderr and `keypaste approve` in its terminal. keypaste's own restore remembers the restored copy's count, so it is not warned of.
-
-**Limit.** Someone who knows an earlier password and can write the directory can roll the vault back. They could already read that copy, and the replaced vault is kept, so the loss is the newer state's availability, not disclosure; deleting old copies after a password change closes it. `keypaste access` keeps one more copy under the old credentials and says so; each save then keeps the five newest copies and the newest of each of the last seven days and four weeks, at most 16, and removes the rest. Detection is not a lock. KeePassXC does not notice a restore. The count warns of an older copy and refuses nothing. It misses a copy whose count is not lower: one keypaste on another computer saved until its count caught up, or one whose count someone who can open it edited; a copy older than any count, which keypaste's first save starts; a first open in a home, as on a new computer; and a home whose record was deleted or could not be written. Another computer that saw the newer copy warns once after a restore made here.
-
-**Status.** Implemented (unreleased); not in v0.3.0.
-
-**Tests.** `VaultRestoreTests`, `RestoreBackupTests`, `SecretHygieneTests`, `BackupTests`, `SaveCountTests`, `VaultSessionTests`, `ApproveCommandTests`, KeePassXC's `MergeTests`.
-
-### T-27 — Naming a keyfile tells the machine where the second factor is
-
-**Asset.** The keyfile's location.
-
-**Attacker.** Code running as the user reading the process table, shell history, environment, profiles, MCP configuration or `recent.toml`.
-
-**Mitigation.** `--keyfile <path>` and `KEYPASTE_KEYFILE` carry a location, never key material. The CLI records nothing about which keyfile a vault uses; the desktop remembers only where it is (T-24). `keypaste access` takes a new keyfile only from `--new-keyfile`, so a variable left in a profile cannot become the new key.
-
-**Limit.** All those places are readable by anything running as the user, which learns where to look, as it could by watching which file keypaste opened; `--vault` has the same exposure. A keyfile protects against someone holding the vault and not the keyfile (a stolen backup, a synced folder, a lost disk), not against someone executing on the unlocked machine. A lost keyfile cannot be reconstructed.
-
-**Status.** Implemented (unreleased); `v0.3.0` has no keyfile support.
-
-**Tests.** `KeyfileOptionTests`, `AccessCommandTests`, `UnlockKeyfileTests`, `scripts/verify-keepassxc-keyfile.sh`.
-
-### T-28 — A keyfile that is any file at all is one edit from losing the vault
-
-**Asset.** Access to a vault keyed by an arbitrary file.
-
-**Attacker.** No attacker: an edit, a re-encoding or a sync tool rewriting the file.
-
-**Mitigation.** keypaste opens all four KeePass keyfile forms, because KeePassXC wrote all four: XML, 32 raw bytes, 64 hex characters, and any other file keyed by the hash of its contents. For that last form it warns on every open (CLI on stderr, never stdout; the desktop in Recommendations) and never creates it: the only keyfile keypaste writes is a KeePass XML keyfile the desktop makes on request, never over an existing file. A build that cannot read XML keyfiles refuses them rather than key the vault with the file's hash.
-
-**Limit.** For the fourth form, any change to the file's bytes loses the vault for good, with no recovery but its exact former contents; an inherited vault keeps that form across a password change. A file of exactly 32 bytes or 64 hex characters is read as key material, by keypaste and KeePassXC alike, without a warning. A keyfile is not a password: anyone who can read it has that factor.
-
-**Status.** Implemented (unreleased); `v0.3.0` has no keyfile support.
-
-**Tests.** `VaultKeyfileTests`, `scripts/verify-keepassxc-keyfile.sh`.
-
-### T-29 — Who holds a vault
-
-**Asset.** One answer per vault: which snapshot and lock agents meet.
-
-**Attacker.** A second owner process, a second app start, a path handed to the app, a CLI verb saving behind the owner, or another local user taking the app's pipe name.
-
-**Mitigation.** The desktop and `keypaste approve` each take an exclusive claim on the vault before its password is read; a second owner is refused naming the holder, and a crash frees the claim. The app holds one claim per vault it has open, so it holds several at once, and a second place in the app for a vault it already holds is refused the same way. The app runs once per user and home: a second start only shows its window and may hand it a path, which only selects what the unlock screen offers, is shown in full if new, and is ignored while a password is typed; on Windows a path not on a drive letter is refused unread, since touching a server sends it the person's credentials. A vault opens for writing only under a claim naming it and saves nothing once that claim is released; any other open is read-only. So every saving CLI verb, `keypaste init` and the unlock screen's restore take the claim: under a held vault `access`, `import`, `token`, `share`, `init` and a restore are refused and an edit goes to the holder (T-43); reading verbs take none.
-
-**Limit.** A same-user process can make the window show and put a file named like the person's vault on the unlock screen for them to type into; the full-path line is the only protection. Another local user can take the app's pipe name or socket first, and a second start then says on stderr that keypaste did not answer, which a desktop launch does not show. A home where `app.lock` cannot be written runs without the claim. A process under another `KEYPASTE_HOME` runs beside this one. On Windows two owners of different vaults can share an explicit approver name, though a bridge reaching the wrong one is refused. KeePassXC, or keypaste under another home, can save behind the holder, which then refuses agents as `vault-changed` until merged, reloaded or restarted; both approvers merge such a save within five seconds, or within a minute when the folder cannot be watched and the save kept the file's size and last-write time, and a save refused because of it is merged and then saved. A save landing in the few milliseconds between keypaste's last read of the file and its rename is still overwritten: KeePassXC takes no claim, so keypaste detects another program's save rather than locking it out.
-
-**Status.** Implemented (unreleased). In `v0.3.0` there is no claim, and the desktop, `keypaste agent` and `keypaste run` each open the vault on their own.
-
-**Tests.** `VaultClaimTests`, `VaultSaveTests`, `HeldVaultRefusalTests`, `SessionOwnershipTests`, `SessionAuthorityTests`, `HeldSavesTests`, `AppClaimTests`, `OpenVaultsTests`, `VaultConcurrentWriteTests`. `keypaste approve`'s refusal to save a rules change over another program's save: no test. Unverified: cross-user refusal on the app's pipe (T-10).
-
-### T-30 — A run asks the session for a whole env set
-
-**Asset.** A project's whole env set, released into a child process's environment.
-
-**Attacker.** Anything running as the user that can start `keypaste run --session`, an agent with a shell included.
-
-**Mitigation.** A run is admitted only from a connection attached to the owner's current session and released only after the person allows it in the app or at `keypaste approve`, Allow once only (T-34), or on macOS under the launch pass the app's own Run confirmation issued (T-42). No agent rule releases it, and a protected stage, or a set holding an entry in one, is asked about every time. The prompt shows the project, variables, entries, command and directory, never a value, and refuses what it cannot show whole. The owner records every run request and refuses an unrecordable release (T-6); the app's own Run on Windows and Linux records before its terminal starts.
-
-**Limit.** The command and directory are the runner's claim: a same-user program can claim one command and start another, so the prompt catches a run the person can see is wrong, not a same-user adversary. Allow only a run you started. The runner holds values as strings it cannot zero, and the child keeps them after a lock. The app's Run card reads its command from `~/.keypaste/projects.json`, which any same-user program can edit, so read it before Start. The standalone `keypaste run` opens the vault itself and is not audited.
-
-**Status.** Implemented (unreleased); `v0.3.0` has only the standalone `keypaste run`.
-
-**Tests.** `SessionAuthorityEnvTests`, `ApproverEnvProtocolTests`, `EnvReleasePromptTests`, `DesktopEnvApprovalTests`, `RunSessionTests`.
-
-### T-31 — A committed reference file chooses what a run injects
-
-**Asset.** Which values a run injects, and where they are sent.
-
-**Attacker.** Whoever controls a cloned repository's `.env.keypaste`, which can name any project and add literals such as `HTTPS_PROXY` or `NODE_OPTIONS` that send injected secrets elsewhere.
-
-**Mitigation.** `run` uses `./.env.keypaste` on its own only when `projects.json` maps the directory to a project and the file names that project alone; anything else needs `--env-file`, the person naming the file. In reference mode `run` names the file, project and profile it resolved, lists every literal before opening the vault, refuses a literal it cannot show whole, and a `--session` prompt shows the final names and literals.
-
-**Limit.** A file the person names, or one naming its mapped project, can still add literals; `run` lists them, and the person must read them.
-
-**Status.** Implemented (unreleased); not in v0.3.0.
-
-**Tests.** `RunCommandTests`, `RunSessionTests`, `ProjectInferenceTests`, `EnvReferenceFileTests`.
-
-### T-32 — A scoped token is a bearer credential
-
-**Asset.** The env sets a scoped token covers.
-
-**Attacker.** Anyone who copies a token from a CI log or process list, or holds a token bundle and its token.
-
-**Mitigation.** Tokens are inject-only for `keypaste run`, scoped to project, stage and keys, and always expire. The owner records every token request before replying. `KEYPASTE_TOKEN` is stripped from the child, and a token on the command line prints a warning. A protected set is refused unless the token allows prod, then asked about live, and never goes into a bundle. A revocation survives merges: it writes a newer record with no verifier, which KeePassXC's default merge carries over an older copy, a tombstone reads as revoked, and keypaste's merge drops any token record either copy has a tombstone for.
-
-**Limit.** A bundle cannot be revoked, and its expiry is only keypaste's check against the opening machine's clock, so whoever holds the bundle and its token can read its values indefinitely: rotate each value once a bundle is retired or may have leaked. A copy whose token record someone edits after the revocation (in KeePassXC, or by restoring the verifier from history) is newer and makes the token work again until expiry. A token revoked by an earlier keypaste, or deleted in KeePassXC, left only a tombstone, which KeePassXC's merge does not carry, so a copy that never got it keeps the token working until expiry or a keypaste merge. A revoked record stays up to 365 days as an entry KeePassXC shows, its verifier (not the token) in history. `keypaste approve` refuses token requests after another program saves, until restarted.
-
-**Status.** Implemented (unreleased); not in v0.3.0.
-
-**Tests.** `TokenStoreTests`, `TokenScopeTests`, `TokenBundleTests`, `SessionAuthorityTokenTests`, `RunTokenTests`.
-
-### T-33 — Whoever holds a share link can open it
-
-**Asset.** The field or login a share link carries.
-
-**Attacker.** Anyone holding the link, a chat unfurler or forwarded message included; whoever controls the Workers serving api.keypaste.com and share.keypaste.com, their Cloudflare account or deploying branch.
-
-**Mitigation.** `keypaste share` and the app encrypt one field, or a login's username, password and URL, on this machine and upload only ciphertext; the key is in the link's fragment. Links have a view limit and expiry, open by `POST` behind a metadata-only `GET`, can carry a separately sent passphrase of at least 20 characters, can be revoked, and say when a view was spent. The share service serves them only once `SHARE_ENABLED` is set.
-
-**Limit.** Anyone holding the link can open it until its views or time run out. The metadata `GET` carries a passphrase check, so the holder can test guesses offline at PBKDF2-SHA256 (600,000) cost without spending a view; only a generated passphrase (`keypaste generate --words 6`) protects an intercepted link. End to end holds only while share.keypaste.com serves an honest viewer: whoever controls the Worker, the account or the branch can serve one that sends the key elsewhere, undetectably. A link on another host (`--endpoint`) trusts that host the same way.
-
-**Status.** Implemented (unreleased); not in v0.3.0.
-
-**Tests.** `ShareCryptoTests`, `ShareServiceTests`, `ShareClientTests`, `ShareVerbTests`, and the share service's own tests.
-
-### T-34 — A run's request is the runner's claim
-
-**Asset.** Release of an env set to a run.
-
-**Attacker.** A same-user process repeating a command a person once allowed.
-
-**Mitigation.** Every `keypaste run --session` is a new connection offered Deny and Allow once only, as the founder decided on 2026-11-07; no rule or remembered answer releases it, since a run names no agent and nobody the owner trusts resolves its command.
-
-**Limit.** What a run says it will start is its claim (T-30).
-
-**Status.** Implemented (unreleased); not in v0.3.0.
-
-**Tests.** `SessionAuthorityEnvTests`, `TerminalApprovalChannelTests`.
-
-### T-35 — A run keeps values out of the result, not out of the agent's reach
-
-**Asset.** Values given to a command an agent runs with the `run` tool.
-
-**Attacker.** An agent that names the command and can often edit what it runs (a package script, a source file).
-
-**Mitigation.** The tool exists only under `--allow-run`, and an agent runs nothing until the person turns run on for its label; an unlabelled bridge never runs (T-15). Every command is asked each time, Allow once only, showing the program, argv, resolved directory, variable names and reason. A set holding a Blocked value is refused unasked, and exposure, protected stages and refusals of `PATH` and `KEYPASTE_*` apply. The owner records every run before values leave. Output is scrubbed of each value and each part filled into one by placeholder.
-
-**Limit.** An approved run can reveal a value in a form the scrubber misses (base64, hex, reversed, split, a substring, `curl -v`'s `Authorization: Basic`), write it to a file, send it over the network or signal it by exit code and timing. While the child runs, any same-user process can read its environment, so values given only through commands give no confidentiality against an agent with its own shell. A missed value lands in the client's transcript and with the model provider. Containment has gaps: on Windows a grandchild started before the child joins its Job Object escapes, macOS kills only the tree it finds, and the directory can be swapped after approval. For a client without a shell, `run` adds approved command execution. A nested `keypaste run --session` asks separately.
-
-**Status.** Implemented (unreleased); not in v0.3.0.
-
-**Tests.** `RunRequestRulesTests`, `OutputScrubberTests`, `CapturedLaunchTests`, `SessionAuthorityRunTests`, `RunToolTests`.
-
-### T-36 — An agent's settings bind only the bridge that names them
-
-**Asset.** Each agent's rules, run permission and remembered answers.
-
-**Attacker.** An agent that can edit its client's configuration (`.mcp.json`); a same-user process running `keypaste use` or `keypaste clients`.
-
-**Mitigation.** A label gives only what the person confirmed for it, an unlabelled bridge runs nothing, and every run is asked (T-35). An unreadable rules file refuses every request, and an unsealed one reads as the defaults (T-15). The Agents screen says each agent's settings follow the name its connection was given, not the name it calls itself, and `keypaste clients` lists the rules.
-
-**Limit.** Such an agent can take another agent's label and with it that agent's run, Allows and Always allow answers, change its `--vault`, or drop an `--expose` the person added. A same-user process can point every bridge without `--vault` at another vault with `keypaste use`, or turn an agent's run off. The "in use now" mark is a claim any program can make. No setting covers `keypaste run --session` from an agent's own shell.
-
-**Status.** Implemented (unreleased). In `v0.3.0` the label selects `policy.toml` rules, with the same exposure.
-
-**Tests.** `AgentRulesFileTests`, `SealedAgentRulesTests`, `SessionAuthorityRunTests`, `RememberedAnswerRequestTests`, `ClientsVerbTests`.
-
-### T-37 — A YubiKey protects a copied vault, not an unlocked one, and a lost key locks it
-
-**Asset.** A vault that needs a YubiKey slot programmed for HMAC-SHA1 challenge-response.
-
-**Attacker.** Someone with a copy of the vault; malware driving a plugged-in key; losing the key.
-
-**Mitigation.** The desktop derives the key as KeePassXC does, so either opens the other's vault. Every save draws a fresh challenge, so the key is asked on every open and save, and a copied file needs the password and the key's secret, which never leaves the key. Settings and the create form warn about loss first.
-
-**Limit.** Nothing against a same-user process while the vault is open: the derived key and the key's last answer stay in memory until the lock. Malware that can drive the plugged-in key can get its answer for the current file. A lost or broken key locks the vault for good: only a second key programmed beforehand with the same secret opens it, keypaste cannot copy a secret out of a key, and backups made while it was required need it too. The CLI and `keypaste approve` cannot open such a vault.
-
-**Status.** Implemented (unreleased); the desktop app has no release.
-
-**Tests.** `KeePassXcChallengeResponseTests`, `HardwareKeyVaultTests`, `UnlockHardwareKeyTests`, `HardwareKeySessionTests`. Unverified: nothing has run against a physical YubiKey (real-device unlock, save and reopen, KeePassXC opening keypaste's vault, touch, timeout and slot errors).
-
-### T-38 — One secret shared by two stages
-
-**Asset.** A value one stage should not reach.
-
-**Attacker.** An agent exposed to one stage of a project, such as `tag:env:billing:dev`.
-
-**Mitigation.** An entry tagged into two stages, one of them protected, is asked about live every time. Its custom fields follow the project-variable rule whichever stage a request comes through.
-
-**Limit.** Exposure and protection are per entry, not per stage, so a dev agent can ask for a value production also uses. keypaste does not split an entry between stages; a value that must stay out of one belongs on its own entry.
-
-**Status.** Implemented (unreleased); not in v0.3.0.
-
-**Tests.** `EntryExposureTests`, `SessionAuthorityRunTests`, `SessionAuthorityTokenTests`.
-
-### T-39 — The terminal's `keypaste` is whatever its PATH entry or link names
-
-**Asset.** The program a terminal runs as `keypaste`, into which a person types a master password.
-
-**Attacker.** Whoever can change what a PATH entry or link names, or write the bundle a link points into.
-
-**Mitigation.** Each desktop install puts its own `keypaste` on PATH: the MSI's folder goes last, the Linux script quotes the AppImage's path, and on macOS a fixed root program behind the administrator dialog makes the link, taking paths only as arguments. A file keypaste did not write is replaced only after the person confirms, and is kept as `keypaste.keypaste-backup`. macOS Settings names an earlier `keypaste` in `~/.local/bin` or Homebrew that is not this bundle's. The unpublished Claude Desktop extension starts the first `keypaste` in fixed places and absolute PATH entries, skipping one another account owns.
-
-**Limit.** Known limit, accepted by the founder on 2026-10-10: the macOS link is on every account's PATH and points into a bundle the installing account can write, so that account chooses what `keypaste` runs for every account on the Mac, root included; it is the only one that crosses accounts. The MSI's folder is the account's to write and makes the app's executable and libraries findable. An earlier `keypaste` in other places goes unseen. Whoever can place a `keypaste` earlier where root or the person owns, or earlier on PATH, chooses the bridge Claude Desktop starts. Uninstalling leaves the Linux script and macOS link naming a missing path until something is put there.
-
-**Status.** Implemented (unreleased); the desktop packages have no release.
-
-**Tests.** `LinuxCliLinkTests`, `MacCliLinkTests`, `CliLinkSettingsTests`, `ClaudeDesktopExtensionTests`, `scripts/verify-macos-cli-link.sh`. Unverified: the administrator dialog itself, and the extension's macOS and Windows places.
-
-### T-40 — Setup edits another program's configuration file and starts its command
-
-**Asset.** AI tools' configuration files, which hold other servers and often their tokens (`~/.claude.json` also holds Claude Code's sign-in), and the commands setup starts.
-
-**Attacker.** A careless edit or a crash mid-write; a same-named program in the working directory or an earlier PATH entry; a program registered for `cursor:` or `vscode:` links.
-
-**Mitigation.** No vault secret enters these files (security law 4), only a path and flags. `keypaste setup` and Connect show each edit and its backup for confirmation, change only keypaste's member, leave alone a file that does not parse or changed since read, replace it by one rename and keep the first original owner-only. The Agents screen only reads configurations, keeping whether keypaste is there. Tools are found only in absolute PATH entries and documented install folders, never through `cmd.exe`. Cursor's and VS Code's install links make the tool write its own file.
-
-**Limit.** A tool writing its file between keypaste's read and rename loses that write, and a tool holding the file in memory can overwrite keypaste's entry. The backup keeps the original's tokens as long as the person keeps it. A writable earlier PATH directory can still supply the program. An install link names the person's home and vault paths wherever it is pasted, Copy link is not cleared by the countdown, and whichever program handles the link's scheme receives it.
-
-**Status.** Implemented (unreleased). `v0.3.0`'s `keypaste setup` runs Claude Code's and Codex's `mcp add` and prints configuration for Cursor and Claude Desktop.
-
-**Tests.** `McpConfigFileTests`, `McpClientConfigTests`, `McpClientProgramTests`, `SetupVerbTests`, `McpInstallLinkTests`. VS Code's, Claude Desktop's and, on Windows, Cursor's registrations are checked at file level only.
-
-### T-41 — An agent asks for more access
-
-**Asset.** The agent rules.
-
-**Attacker.** An agent with a shell running `keypaste clients`, or wearing the person down with requests.
-
-**Mitigation.** No tool lets an agent change what it gets, and a request names one value. `keypaste clients` can only turn run on or off, narrow an agent's rules, forget remembered answers or remove an agent, so it releases nothing more unasked, and with nothing holding the vault it can only narrow (T-15). An Allow takes the app and the person's confirmation. T-11 bounds repeated requests. Every rules change, made or refused, is the owner's `access_change` line naming the surface that asked.
-
-**Limit.** A person who allows without reading gives the agent that value, and one who confirms an Allow gives every agent every value of that category. A program that can type into the app as the person can confirm an Allow (outside scope).
-
-**Status.** Implemented (unreleased); not in v0.3.0.
-
-**Tests.** `ClientsVerbTests`, `SealedAgentRulesTests`, `AgentRulesViewModelTests`, `scripts/verify-policy-e2e.sh`.
-
-### T-42 — A launch pass is a bearer for one run
-
-**Asset.** The env set a macOS Run or Open terminal confirmed.
-
-**Attacker.** A same-user process that reads the launch request file or the run's environment and presents the pass first.
-
-**Mitigation.** On macOS the app hands Terminal no value: Start issues a 32-byte launch pass held only in the owner's memory and written with the run's arguments into an owner-only request file, which the bundle's launcher claims and deletes before starting `keypaste run --session` with the pass in its environment. A pass works once, for two minutes, within the unlock that issued it, and releases only the exact request the card showed. It is never on a command line and is stripped from every child. A Run is refused before the card when its set names more than 62 KiB of entries, the audit log will not open, or the launch endpoint or temporary folder is missing.
-
-**Limit.** Until the run presents it, a same-user process can present the pass first and receive the set; the person's window then says it was used, and Activity shows both requests. Whoever can write the bundle (T-39) can change the launcher, as they can the app. Terminal keeps the app's other environment variables for its windows. Only Terminal is supported. Windows and Linux hand the set to their terminal directly.
-
-**Status.** Implemented (unreleased); not in v0.3.0. Gatekeeper refuses an unsigned quarantined bundle's launcher, and Terminal runs it once the quarantine is cleared. Unverified: a signed download's launcher (after macOS signing, step 3.5b) and a Run from an installed app through real Terminal.
-
-**Tests.** `LaunchPassesTests`, `TerminalRequestsTests`, `MacTerminalLauncherTests`, `EnvLaunchTests`, `SessionAuthorityEnvTests`.
-
-### T-43 — A terminal asks the owner to change the vault
-
-**Asset.** The vault's contents, and what a planted value or tag later releases.
-
-**Attacker.** A same-user program, an agent with a shell included, asking the owner to change the vault without the master password: planting a value such as a variable holding `{PASSWORD}` (T-8), removing an entry, or tagging one into a project so its fields become project variables an Allow releases (T-13).
-
-**Mitigation.** While a vault is held, the CLI's editing verbs send their edit to the holder, which changes nothing until the person allows it in the app's prompt window (Deny focused, Allow armed after a second) or with `y` at `keypaste approve` (T-2). The prompt names the command, entry and change, never a value, says any program could have typed it, and names any placeholder a value holds. The holder checks the edit before asking and again before writing, refuses any other change, and writes nothing while its vault differs from its file or after the unlock it was asked under. It writes the edit's line before it saves the vault: when the line cannot be written, the edit is taken back out of the open vault and refused as not recorded, and when the save then fails, it is taken back and a second line says it was not made (T-6). Edits share the prompt slot and a refusal holds the next back a minute (T-11). Each is recorded without values. The verb reads no master password, and `access`, `import`, `token` and `share` stay refused.
-
-**Limit.** A person who allows without reading gets the change, and a planted value is the terminal's own. A placeholder is named by the variable's own text, so one filling from a field that itself holds `{PASSWORD}` is named as that field. A script piping only a master password to a verb that reads one value sends it as that value. The cooldown holds back the person's own next edit too. A form open on the same entry saves over the edit, which stays in history. A save queued behind another at a lock is refused. A line written before a save that a crash then interrupts records an edit the vault does not hold.
-
-**Status.** Implemented (unreleased); not in v0.3.0.
-
-**Tests.** `TerminalEditsTests`, `ProjectTagChangeTests`, `SessionAuthorityEditTests`, `RoutedEditTests`, `ApproveCommandTests`.
-
-### T-44 — Windows Hello stands in for the master password after a lock
-
-**Asset.** The vault, reopened after a lock without the master password.
-
-**Attacker.** Anyone who can pass Windows Hello as this user while the app runs; a same-user program that can ask Windows Hello to sign and read the app's memory.
-
-**Mitigation.** After each password unlock the app asks Windows Hello to keep it, as KeePassXC 2.8 does: the composite key's parts (the password's SHA-256, the keyfile's key and a YubiKey's slot, never its answer) are sealed with AES-256-GCM under a key from a Windows Hello signature, in memory only, never on disk. Windows Hello asks by face, finger or PIN on every keep and resume, and its key stays in Windows. Only a lock the person made, the idle lock, minimize-lock and closing into the tray allow a resume; quitting, `keypaste lock`, another vault, an access change or a key change elsewhere drop the copy. A resume asks a YubiKey for its touch again.
-
-**Limit.** Anyone who passes Windows Hello as this user, the Windows PIN included, can reopen the vault after those locks. A same-user program should be assumed able to obtain a signature, which shows the person a prompt, and with it and a read of the app's memory it has the parts, which open this vault and every copy under the same password and keyfile in any KeePass reader, with no keyfile on disk needed. A kept copy has no maximum age. keypaste finds Windows' prompt by window class, which a later Windows can change. The CLI cannot use Windows Hello.
-
-**Status.** Implemented (unreleased), Windows only; the desktop app has no release.
-
-**Tests.** `VaultKeyPartsTests`, `QuickUnlockTests`, `UnlockQuickUnlockTests`, `WindowsHelloTests`. Unverified: no test has met a real Windows Hello (making the key, the prompt's focus, cancelling, the PIN, a YubiKey vault resumed).
-
-### T-48 — The browser relay holds released passwords in plaintext, and anything can start it, or ask to pair
-
-**Asset.** Logins released to a browser, and the pairing that admits one.
-
-**Attacker.** A same-user process starting the relay with a browser's arguments, naming any of the three builds of keypaste's extension, or speaking the pipe as a browser.
-
-**Mitigation.** The relay ends the extension's encrypted session, KeePassXC-Browser's protocol, itself, keeping libsodium out of the processes that hold the vault; it holds no vault and cannot reach vault access or the audit log. A browser's connection may only pair, check a pairing, list a page's logins by name, release the one login picked, bring keypaste forward and lock. The relay sends typed requests, never the extension's JSON, and with a list or a release only the pairing a check proved, so the extension's other pairings go no further. It refuses a reused nonce and logs nothing. Nothing is paired without the person's confirmation in the app or at `keypaste approve`, which shows six digits derived from the key the request carries (the first four bytes of its SHA-256, modulo a million), the digits keypaste's extension shows beside Connect, and says to pair only if they match; it names the build the browser claimed. Only one request to pair is asked about at a time, and a refusal or no answer holds every request back for a minute, then two, four and on to an hour each time it happens again, starting again from a minute after an hour without one; a request held back is refused unasked and writes no line, so a program asking again and again cannot keep a confirmation in front of the person or fill the log.
-
-**Limit.** A same-user process can read the relay's memory, where a decoded login stays as strings until collected, and can start keypaste naming the extension or speak the pipe as a browser, obtaining what pairing, listing and releasing allow (T-59). With no armed window, any such program can put a confirmation in front of the person at any time, up to one an hour once refused repeatedly; it shows the code of the program's own key, which matches the extension's only if the program read the extension's key, which T-50 already gives it. A person who pairs without comparing the codes can pair that program. A program's request held up while the person presses Connect makes the real request wait or be refused, and a refusal it provokes holds the person's next Connect back too. The relay believes the browser about which extension started it.
-
-**Status.** Implemented (unreleased); not in v0.3.0.
-
-**Tests.** `RelayTests`, `BrowserCallerTests`, `SessionBrowsersTests`, `BrowserPairingTests`, `TerminalApprovalChannelTests`, `SessionAuthorityBrowserTests`, `ApproverBrowserProtocolTests`, and `BrowserHostTests`, where a fake browser starts the relay through the manifest. `verify-extension-load.sh` has Chromium and Firefox start the relay for keypaste's extension and pair it, and `verify-browser-fill.sh` has Chromium, Edge, Brave and Firefox, and with `--branded` each runner's own Chrome, Edge and Firefox, pair and fill through it.
-
-### T-49 — Another program answers keypaste's host name
-
-**Asset.** Which program a browser starts for keypaste's extension, and the pairing key the extension sends it.
-
-**Attacker.** A same-user program that writes a manifest for `com.keypaste.browser` at the user-level place each browser reads before a system one.
-
-**Mitigation.** keypaste has its own host name and answers only its own extension, so KeePassXC, which writes `org.keepassxc.keepassxc_browser`, never takes a browser from keypaste and keypaste never takes one from it. Settings › Browser fill and `keypaste browser` name the program each browser starts, another program's path included; Settings asks before turning on replaces another program's manifest, and turning off removes only a manifest keypaste wrote.
-
-**Limit.** keypaste does not watch the manifests, so one another program writes is seen only when the status is read, and until then that program receives the extension's requests and its pairing key (T-50).
-
-**Status.** Implemented (unreleased); not in v0.3.0.
-
-**Tests.** `BrowserHostsTests`, `BrowserVerbTests`, `BrowserHostSettingsTests`, `BrowserHostTests`.
-
-### T-50 — A pairing is a bearer key
-
-**Asset.** A browser pairing, which admits fill requests.
-
-**Attacker.** Whoever reads the browser profile, where the extension keeps the key it proves a pairing with, and can reach the owner's pipe; a same-user program writing `~/.keypaste/browsers.json`, adding a pairing, swapping a key or putting back an older file; anyone who can write a vault.
-
-**Mitigation.** One pairing per browser serves every vault unlocked on this computer, so it is kept on this computer in `browsers.json`, never in a vault, holding the pairing's name, build, time and the key's SHA-256, never the key; no line, prompt or output holds the key either. Any program of the person's can write that file, so a record counts only while an unlocked vault vouches for it: each record carries, per vault, an HMAC-SHA256 under a 32-byte key that vault keeps in its reserved keys group, which only a process holding the unlocked vault can read, over this home's random identity, that vault's count of this home's pairing writes and the whole record. A record written into the file, or one whose key hash, name, build or time was changed, matches no seal and proves nothing. Every pairing and removal first counts up each unlocked vault, saving it, and seals under the new count after, so a file put back from before that write matches no vault the write counted. A write seals what any unlocked vault vouches for under every unlocked vault, and a check proved by one vault seals the pairing under the others, so a vault unlocked beside one that paired keeps the pairing after that one locks. The extension's database hash is the SHA-256 of this home's identity, so it keeps one pairing for the computer whichever vaults are open. Pairings an earlier version kept inside a vault prove nothing: the browser pairs again, through the code, and that vault's first pairing write removes them. Settings lists each pairing with its last use, and Remove takes it out for every vault and unbinds its connections. A pairing releases no password by itself: it lists names, and a login fills at a pick only where that pairing filled it on that exact origin before, otherwise once the person allows it in keypaste (T-59, T-61).
-
-**Limit.** A same-user process can read the profile's key and present it under the build it claims (T-48), obtaining what a fill releases; KeePassXC's protocol has only that key as proof. The seal authenticates the process holding an unlocked vault, not the person: a process holding one, or reading keypaste's memory while it does, can seal any record. A vault locked while a pairing was removed still vouches for the older file, so putting that file back revives the pairing for that vault alone until a write counts it up; reading the profile's key, which the same program can do, gives as much. A vault that never was unlocked beside one that paired does not vouch for the pairing, and the browser pairs again when only that vault is open, its earlier pairing kept for the vaults that vouch for it. Two owner processes, the app and `keypaste approve`, take turns on the file through a lock beside it. Deleting the file, or changing its home identity, drops every pairing, which fails closed. Last use is kept in memory and restarts with each owner start.
-
-**Status.** Implemented (unreleased); not in v0.3.0.
-
-**Tests.** `SessionBrowsersTests`, `OpenVaultsTests`, `VaultMergeTests`, `SessionAuthorityBrowserTests`, `BrowserPairingTests`, `BrowserHostTests`.
-
-### T-51 — A notification is read by more than the person
-
-**Asset.** What a system notification reveals, and what pressing it does.
-
-**Attacker.** The lock screen, notification history and programs that read it; an agent timing interruptions; a late press.
-
-**Mitigation.** A notification can carry only fixed words, with no place for an entry, field, group, value, vault, agent or reason. Its one action, never an Allow, brings the prompt forward (disarmed, Deny focused) or opens the unlock screen, and answers nothing. A decision, lock, unlock or quit removes it, and a later press reaches nothing. One posts only while no keypaste window has focus, at most once every 30 seconds, after the prompt is up, so a failure changes nothing.
-
-**Limit.** Anyone who sees it learns keypaste is here and something asked then. A removal the system ignores leaves the words in history. A press of one left by a run that died can start keypaste on Windows and macOS; on Linux nothing clears it before its 45-second expiry, or until dismissed where expiry is ignored. A Windows toast's press and its stay in Notification Center are unproven. Focus and do-not-disturb modes can hide or delay a notice, which the app cannot see; the prompt still appears.
-
-**Status.** Implemented (unreleased); the desktop app has no release.
-
-**Tests.** `SystemNotificationTests`, `LockedNoticeTests`, `LinuxNotificationsTests`, `WindowsNotificationsTests`. Unverified: no notification has been shown to a person or posted to a real notification surface.
-
-### T-52 — A culture changes what a rule means
-
-**Asset.** That a name means the same to the app as to the CLI: protected stages, pipe names, audit hashes, files read back.
-
-**Attacker.** No attacker: the desktop runs in the person's culture and the CLI, bridge and relay run invariant, so casing, calendars and comparisons can differ.
-
-**Mitigation.** Every culture-sensitive call in Core, Infrastructure and the desktop states its culture, and the build fails otherwise; Core bans `ToUpperInvariant` in favor of one invariant casing; the vendored KeePassLib runs invariant. A person's culture reaches only time display, table sorting and the app's words. The audit log, its hash and access matching are ordinal and read the same everywhere.
-
-**Limit.** Letters newer than the Unicode version .NET carries, such as U+A7CE, fold differently in processes whose ICU knows them, so the app and the CLI can disagree on whether a field rename is taken, and such a path can fail to find the owner's pipe. Avalonia, Yubico's SDK and Tmds.DBus were not audited; they handle no vault, audit or rule text.
-
-**Status.** Implemented (unreleased).
-
-**Tests.** `CultureAgreementTests`, run by `scripts/verify.sh` invariant and under `tr-TR`, `de-DE` and `ar-SA`.
+**Status.** `v0.3.0` for one prompt at a time, `BUSY` and the cooldown; the per-agent queue and desktop arming unreleased.
 
 ### T-53 — What two entries of one name did is recorded under the name they share
 
-**Asset.** Which of two same-named entries a release, share or record was about.
+**Threat.** No attacker: KeePass allows two items with one title in one group, so a release, share or audit line may not say which item it concerned.
 
-**Attacker.** No attacker needed: KeePass and KeePassXC allow two entries with one title in one group, and an agent may ask for that name.
+**Mitigation.** The desktop acts on items by UUID, and share and credential lines name it. An agent's request that several visible items answer to becomes a picker showing each one's title, group, username and Website, with none picked. A run, a terminal verb or a picker over nine items is refused instead.
 
-**Mitigation.** The desktop acts on each entry by its UUID, and share and credential lines name the UUID beside the path. An agent's request that several visible entries answer to is put to the person as a picker showing each one's title, group, username and URL, never a value, with none picked; only the picked entry's field is read, while it still has the name shown, and nothing is released unasked. A picker over nine entries, a run naming such a path, a terminal verb and a typed name are refused. An entry's activity shows only lines naming its UUID.
+**Limit.** Lines written before lines named UUIDs give only the path, and count for neither item.
 
-**Limit.** Lines and Share links rows written before lines named UUIDs give only the path and count for neither entry. A release recorded before a pair existed shows on both as possibly either's.
-
-**Status.** Implemented (unreleased); not in v0.3.0.
-
-**Tests.** `SameNameItemsTests`, `ShareServiceTests`, `ItemPickerTests`, `DesktopApprovalTests`, `EntryActivityRowsTests`.
+**Status.** Unreleased.
 
 ### T-54 — An agent asks the person to save a value
 
-**Asset.** What the vault holds: a credential the person would not otherwise keep, or a working value replaced.
+**Threat.** An agent uses `request_save` to have a value saved where it names, so the vault holds a credential the person would not keep, or a working value is replaced.
 
-**Attacker.** An agent using `request_save` to have a value saved at a place it names (an entry's password or custom field, a new entry, or a project variable), persuading through its reason or looping the prompt.
+**Mitigation.** The person enters the value and saves with Save, armed after a second, or with `y` at `keypaste approve`, and a replace needs confirmation. The agent learns only whether and where it was saved, and the line never holds the value. A place outside the bridge's view is refused unasked (T-4).
 
-**Mitigation.** The person types, pastes or generates the value and saves with Save, armed a second after the prompt is up, with Cancel focused, or with `y` at `keypaste approve`. A replace needs confirmation, and a value that appeared meanwhile is not overwritten. The agent learns only whether and where it was saved, and the owner's line names the place, never the value. A place outside the bridge's view is refused unasked (T-4), a refusal holds the place back a minute, and the prompt takes the one shared slot (T-11). The owner writes the save's line, naming the place, before it saves the vault: when the line cannot be written, the value is taken back out of the open vault and the save refused as not recorded, and when the save then fails, it is taken back and a second line says it was not made (T-6).
+**Limit.** A persuaded person has stored the value, and the agent's later request for it meets its category's setting. A crash between the line and the save records a value the vault does not hold.
 
-**Limit.** A persuaded person has stored the value, and the agent's later request for it meets its category's rule, which an Allow releases unasked unless the item is in a protected stage (T-14). The reason is the agent's claim (T-2). A line written before a save that a crash then interrupts records a value the vault does not hold.
-
-**Status.** Implemented (unreleased); not in v0.3.0.
-
-**Tests.** `ValueSaveRequestTests`, `SaveValueWindowTests`, `TerminalApprovalChannelTests`, `ServerToolsTests`.
+**Status.** Unreleased.
 
 ### T-55 — A search maps the person's infrastructure
 
-**Asset.** Which hosts, accounts, projects and references the person's items connect, which a search's origins, usernames, links and projects lay out together.
+**Threat.** An agent, or its model's provider, uses `find_access` to learn which hosts, accounts, projects and references go together.
 
-**Attacker.** A connected agent, or the provider whose model it runs on, using `find_access` to learn which sites, accounts and projects go together, by host, by project or from one item's handle to the items linked to it.
+**Mitigation.** A search reaches only the bridge's `--expose`, applied to every item and both ends of every link, and a reply holds at most 25 items. An origin is the Website's scheme, host and port, never its path. Hosts and references is off by default, a referenced value is never read, and every search is recorded (T-6).
 
-**Mitigation.** A search reaches only what its bridge's `--expose` reaches, and the owner and the bridge each apply it to every item found and to both ends of every link, so a link never names an item outside it (T-4). A reply holds at most 25 items with at most 8 links each, and at most 8 projects, each with at most 8 stages: a project is named only when an item the reply shows belongs to it, and its environments and count come from the items the exposure reaches alone, so a project known only through hidden items never appears. An origin is the URL's scheme, host and port, never its path, query or credentials; a username appears only while Settings shows usernames to agents, and an item reached only through a project tag shows neither. Two items link as the same account only when both are shown whole with one username. Hosts and references, off by default, is a switch in this computer's agent rules: only while it is on does the owner read an item's `Host` field, which gives an origin by the URL's rules when the URL gives none, and every field of each item for `{REF:…@I:<uuid>}`, linking the two items when the exposure reaches both and the referencing one whole; the referenced value is never read or filled in, and the UUIDs never leave the owner. Each part of a query is at most 256 characters, and an empty query is refused before the owner is asked. Every search is recorded with what it searched for and how many items it named (T-6).
+**Limit.** Under `--expose "**"`, repeated searches can name every host, username and shared project, and with hosts and references on, every `Host` field and reference. Reading references decrypts every field of each item into the approver's memory.
 
-**Limit.** What a search shows reaches the agent's provider as names do: under `--expose "**"`, repeated searches can name every host, username, shared project and, with hosts and references on, every Host field's host and every reference the vault holds. The bridge cannot check a project's stages or count, only that an item it shows belongs to it. Turning hosts and references or usernames on asks the person to confirm what agents will then see; reading references decrypts every field of each item into the owner's memory, cleared after each is scanned.
-
-**Status.** Implemented (unreleased); not in v0.3.0.
-
-**Tests.** `AccessIndexTests`, `VaultIndexTests`, `ApproverHandlerTests`, `ApproverProtocolTests`, `AgentRulesFileTests`, `EntryExposureTests`, `FindAccessToolTests`.
+**Status.** Unreleased.
 
 ### T-56 — A linked set rides one approval
 
-**Asset.** Each value a linked set releases, and the person's judgement of each one when they are shown together.
+**Threat.** An agent uses `request_linked_set` to bundle a field it should not get with ones the person expects, so one approval carries it.
 
-**Attacker.** An agent using `request_linked_set` to bundle a field it should not get with ones the person expects, so one approval carries it: a production password beside a staging host, or an item that only looks related to the one the task needs.
+**Mitigation.** A set names two to four fields of one item and of items `find_access` links to it within the view; anything else, or any Blocked or recently refused field, refuses the whole set unasked. Otherwise the person is asked every time, in a prompt naming every item and field, with only Deny and Allow once. The fields are read, sent and recorded together, or the set is refused.
 
-**Mitigation.** A set names two to four fields, of its first item and of the items `find_access` links to it, computed by the owner over the items the bridge's `--expose` reaches and under the same Usernames and Hosts and references switches a search uses (T-55); an item outside the view, unlinked, or named ambiguously refuses the set before anybody is asked. Each field is decided by its category first: a Blocked category, a passkey's field, a field the view does not permit or one refused in the last minute refuses the whole set unasked (T-11). Otherwise the person is asked every time, whatever the categories allow, in a prompt naming every item and field with the agent's reason as its claim (T-2), with Deny and Allow once only: no answer is kept for a set, and a channel's always is a refusal. Nothing is read before Allow once, and a field that cannot be read, a reply that will not fit one frame, a lock or a reload before the commit refuses the whole set. The owner writes one line per released field under one random set id, all in one write before the reply, and a set any of whose lines cannot be written is refused whole (T-6); a refused set is one line.
+**Limit.** Four fields at once may be read less carefully than one. A link says items share a site, project, account or reference, not that they belong to one task.
 
-**Limit.** Four fields at once may be read less carefully than one: the prompt shows every item and field but cannot make the person weigh each. A link says two items share a site, a project, an account or a reference, not that they belong to one task, so a set can join items the person thinks of as separate. A person who allows a set has released each value as a single approval would, and nothing revokes them at their issuer.
-
-**Status.** Implemented (unreleased); not in v0.3.0.
-
-**Tests.** `ApproverHandlerSetTests`, `ApproverSetProtocolTests`, `SessionAuthorityRecordsTests`, `AuditLogTests`, `RequestLinkedSetToolTests`, `SetApprovalWindowTests`, `TerminalApprovalChannelTests`.
+**Status.** Unreleased.
 
 ### T-57 — An agent changes an item
 
-**Asset.** The vault's items: one the person still needs moved to Trash or marked expired, one whose `needs-update` tag warns that it is stale, or one deleted for good.
+**Threat.** An agent uses `request_item_change` to persuade the person to trash, expire or delete the wrong item, or toggles the `needs-update` tag to mislabel an item or hide a stale-item warning.
 
-**Attacker.** An agent using `request_item_change` to persuade the person, through its reason or a name chosen to look like another, to trash or expire the wrong item, or to delete one for good, and looping the prompt to wear them down; or adding and removing the `needs-update` tag, which it does without asking, to mislabel an item or hide a stale-item warning.
+**Mitigation.** A move to Trash, an expiry or a delete is asked every time, never covered by a rule, and stated in keypaste's words beside the agent's reason. A delete for good is refused unless keypaste's `acaf.agent-created` mark shows an approved save under the asking label created the item. The `needs-update` tag changes unasked at most once a minute per item, and every change is recorded before it is saved (T-6).
 
-**Mitigation.** A move to Trash, an expiry or a delete is made only once the person allows it in the app, with Deny focused and Allow armed a second after the prompt has focus, or with `y` at `keypaste approve`; it is asked every time, no rule or always answer allows one, and the prompt says the change in keypaste's words beside the agent's reason as its claim (T-2). The `needs-update` tag is added or removed without asking and takes no prompt slot, hold or cooldown, since it puts nothing to the person; its line is written like any other and its reply tells the agent the person sees it. It changes at most once a minute on each item, whichever agent asks, since a label is the bridge's own claim (T-3) and two agents could otherwise take turns: a second change within the minute is refused unasked with the time to try again after, and only the first such refusal in the minute is recorded, so refusals cannot fill the log. The bridge refuses a malformed call and a path outside its view unasked, and the owner resolves a handle and requires the bridge's `--expose` to reach the whole item: an item reached only through a project tag, and keypaste's own groups, are refused for every change, before anybody is asked (T-4). A move to Trash is refused while the vault's Trash is off, so it never deletes for good. A delete is refused unasked unless the item carries keypaste's mark in its KDBX custom data, `acaf.agent-created`, naming the item's own UUID and the label of the agent whose approved `request_save` created it, and the asking bridge has that label; a copy gets a new UUID and so no mark, items created before the mark existed have none, and an item in Trash cannot be named. The item is checked again by UUID and name before it is written, so one moved, renamed or deleted meanwhile is not changed. A refusal holds the item back a minute for every asked change, and the prompt takes the one shared slot (T-11). The owner opens its log before anybody is asked, makes the change under its claim and writes its line, naming the item and the change, before it saves the vault: when the line cannot be written, the change is taken back out of the open vault and refused as not recorded, and when the save then fails, it is taken back and a second line says it was not made, so a change never exists without its record (T-6).
+**Limit.** A persuaded person has made the change, and nothing undoes a delete for good. Labels are unauthenticated, so a bridge under the creating agent's label may delete what that agent created (T-3). An agent can hide a stale-item warning by removing the tag, though each change is logged and kept in the item's history.
 
-**Limit.** A persuaded person has made the change; Trash and the item's history undo a move, an expiry or a tag, and nothing undoes a delete for good. An agent may remove a `needs-update` tag the person or another agent set, hiding a stale-item warning, and may add and remove it once a minute on each item; each change is a line in the log and a revision in the item's history, and nothing is asked. A refusal repeated within that minute writes no line of its own. The minute is kept by the owner process, so a restart starts it again. Labels are unauthenticated (T-3), so a bridge started under the creating agent's label may delete what that agent created. A line written before a save that a crash then interrupts records a change the vault does not hold.
+**Status.** Unreleased.
 
-**Status.** Implemented (unreleased); not in v0.3.0.
+## Allow and agent settings
 
-**Tests.** `ItemChangeRequestTests`, `ItemChangeViewModelTests`, `ItemChangeWindowTests`, `TerminalApprovalChannelTests`, `ServerToolsTests`, `KeePassXC.AgentChangesTests`.
+### T-12 — A standing approval used under a reason nobody read
+
+**Threat.** A client asks under an Allow, for any purpose it states, for every value of that category, and for any item's Website and username.
+
+**Mitigation.** Allow takes effect only once the person confirms in the app that every value of the category will go to every agent unasked. Each unasked release is recorded as `allowed`, with the reason's excerpt and hash. A linked set and a value in a protected stage (an item tagged `prod`, `production`, `prod-…` or `production-…`) are asked every time (T-30, T-38).
+
+**Limit.** Nobody reads the reason before an unasked release, and reasons are not judged. An untagged item follows its category's Allow, and Websites and shown usernames always leave unasked. Nothing revokes a released credential at its issuer.
+
+**Status.** Unreleased; `v0.3.0` releases unasked under `policy.toml` rules, recorded as `policy`.
+
+### T-13 — An Allow covers a kind of value, not the values you pictured
+
+**Threat.** Something changes the vault after the person set a rule (a new field, a tag, a move, a sync or a merge), so the rule covers values the person never pictured.
+
+**Mitigation.** A field's category comes from its standard place or the item's project tag, never its name, and every unasked release names its category. The app warns when renaming moves items into or out of an agent's view, and a tag change made in keypaste names the stage joined.
+
+**Limit.** A rule covers whatever values of its category exist when a request arrives. A pattern not ending in exactly `**` constrains the title, so `env/dev*` matches `env/devops_ROOT_TOKEN`. Nothing previews which values a rule covers, and a tag added in KeePassXC or by a merge says nothing.
+
+**Status.** Unreleased; `v0.3.0`'s `policy.toml` rules behave the same.
+
+### T-14 — An Allow is a standing grant to anything that can reach the owner
+
+**Threat.** A same-user process starts `keypaste mcp --expose "**"` under any label or none, or speaks the pipe itself, to collect every value released unasked.
+
+**Mitigation.** Keep categories at Ask, and Block what agents never need. An Always allow covers one field for one label, every run is asked (T-35), and the approver records each unasked release in its own log.
+
+**Limit.** Such a process obtains every Allowed value except a protected stage's, and under another agent's label that agent's Allows and answers too. The pipe admits only the account without authenticating the peer.
+
+**Status.** Unreleased; `v0.3.0` has the same exposure over `policy.toml`.
+
+### T-15 — Agent rules are a file any program of the person's can write
+
+**Threat.** A same-user program writes a vault's file in `~/.keypaste/agents/`, or a synced or edited vault carries agent records, to change the agent settings or the remembered browser fills (T-61).
+
+**Mitigation.** The approver follows the file only while its seal holds: an HMAC under a key the vault keeps, which an older or copied file fails. Anything unsealed reads as the defaults (every category Ask, run off) and the app says so; an unreadable file refuses every request. Agent records inside a vault are ignored.
+
+**Limit.** The seal authenticates the process holding the unlocked vault, not the person, so a same-user process holding it or reading its memory can seal any settings. The seal does not name its vault, so a copy of the vault unlocked first could take the file.
+
+**Status.** Unreleased; `v0.3.0` reads an unsealed `policy.toml`, with no permission check on Windows.
+
+### T-17 — A timing oracle over Allow
+
+**Threat.** A client times unasked replies against human-delayed ones to learn which categories are set to Allow or Block.
+
+**Mitigation.** None; a Block refusal names no category.
+
+**Limit.** Unmitigated, since a delay would not hide the difference from the next prompted request. The client learns nothing it could not learn by asking.
+
+**Status.** Unreleased; `v0.3.0` has the same exposure.
+
+### T-36 — An agent's settings bind only the bridge that names them
+
+**Threat.** An agent that can edit its client's configuration (`.mcp.json`), or a same-user process running `keypaste use` or `keypaste clients`, takes or changes an agent's settings.
+
+**Mitigation.** A label gives only what the person confirmed for it, an unlabelled bridge runs nothing, and every run is asked (T-35). The Agents screen says settings follow the name the connection was given, and `keypaste clients` lists them.
+
+**Limit.** Such an agent can take another agent's label, with its run, Allows and answers, or change its `--vault` or `--expose`. No setting covers `keypaste run --session` from an agent's own shell.
+
+**Status.** Unreleased; `v0.3.0` labels select `policy.toml` rules the same way.
+
+### T-38 — One secret shared by two stages
+
+**Threat.** An agent exposed to one stage of a project reaches a value shared with a stage it should not reach.
+
+**Mitigation.** An item tagged into two stages, one of them protected, is asked about every time.
+
+**Limit.** Exposure and protection are per item, not per stage; a value that must stay out of a stage belongs on its own item.
+
+**Status.** Unreleased.
+
+### T-41 — An agent asks for more access
+
+**Threat.** An agent with a shell runs `keypaste clients`, or wears the person down with requests, to widen its settings.
+
+**Mitigation.** No tool changes what an agent gets, `keypaste clients` can only narrow (T-15), and an Allow takes the person's confirmation in the app. Every settings change, made or refused, is an `access_change` line.
+
+**Limit.** A person who confirms an Allow gives every agent every value of that category.
+
+**Status.** Unreleased.
+
+## The audit log
+
+### T-5 — Audit log tampering
+
+**Threat.** Anyone able to edit the audit file edits, removes or inserts lines, so the log no longer shows every access.
+
+**Mitigation.** Every line carries the previous line's hash, so `keypaste log verify` detects an edit, removal or insertion, and `--expect <hash>` checks an anchor the person kept. Every 64 lines the approver appends a checkpoint signed with a key the vault keeps, which `log verify --checkpoints` checks. Only the approver compacts the log, under a signed record, and only a log that verifies.
+
+**Limit.** The chain is tamper-evident, not tamper-proof: lines after the last checkpoint can be recomputed, and deleting the end leaves a valid file unless the person kept an anchor elsewhere. On Windows the log has no append-only protection. `v0.3.0` stops appending after a line longer than 4 KiB, which fails closed.
+
+**Status.** `v0.3.0` for the chain, `log verify` and `--expect`; checkpoints and compaction unreleased.
+
+### T-6 — Unlogged access
+
+**Threat.** A full disk, lost permissions or an error lets an access go unrecorded, breaking security laws 3 and 7.
+
+**Mitigation.** The bridge and `keypaste approve` refuse to start on a log they cannot write. The approver records every request before replying, the bridge records every call no approver recorded, and a failed append refuses the response.
+
+**Limit.** A crash or lost reply after the append records an access that never reached the client. A settings change sealed when no line could record it still holds, and the person is told.
+
+**Status.** `v0.3.0`; approver-side recording unreleased.
+
+### T-16 — The audit vocabulary is the only evidence a person was involved
+
+**Threat.** A line or agent-facing text presents an unasked release as a person's approval.
+
+**Mitigation.** Each authority has its own method in the log: `prompt` for a person's answer, `allowed` for an Allow, `blocked` for a Block and `rules-changed` for a settings change. Agent-facing text uses the same words.
+
+**Limit.** Editing the vocabulary later breaks the chain unless the attacker repairs it too (T-5).
+
+**Status.** Unreleased; `v0.3.0` records rule releases as `policy`.
+
+## The approver and the local machine
+
+### T-7 — Where the master password is typed
+
+**Threat.** An agent or MCP client tries to collect the master password or make a password prompt appear.
+
+**Mitigation.** The password is typed only into the desktop app or the terminal running `keypaste approve`. No request can make a password prompt appear: a request to a locked vault is refused, and the app's notice opens the unlock screen only at the person's press.
+
+**Limit.** `keypaste approve` has no idle lock. A same-user process can bring the app's unlock screen forward (T-29).
+
+**Status.** `v0.3.0` for the terminal approver; the locked-app notice unreleased.
+
+### T-10 — The approver channel
+
+**Threat.** Another local user binds or connects to the approver's pipe, which carries released values in plaintext, or a peer sends bad frames or exhausts connections.
+
+**Mitigation.** The pipe admits only the current user (`PipeOptions.CurrentUserOnly`), and the approver answers only bridges attached to its current session. Nothing that unlocks a vault crosses the pipe, frames are capped, and at most 64 connections are served.
+
+**Limit.** Another user can pre-create the Unix socket path, so requests fail closed. There is no confidentiality against root or same-user processes, and the connecting program each line records is advisory. Cross-user refusal is untested and rests on .NET's documented pipe behavior.
+
+**Status.** `v0.3.0` for the per-user pipe; session binding and the recorded program unreleased.
+
+### T-18 — Memory dumping
+
+**Threat.** A debugger, core dump, hibernation file or swap page reads plaintext from memory.
+
+**Mitigation.** Master passwords are read into clearable buffers, derived keys are zeroed, and the approver keeps no released value. Core dumps are off on Linux and macOS, the desktop app turns off .NET's diagnostics port where it can, and crash reports carry no memory.
+
+**Limit.** keypaste makes no claim of in-memory secrecy: garbage collection, strings and the OS leave copies, and resolution reads fields before approval. The diagnostics port stays open in some desktop starts, letting a same-user process read memory. Nothing tests memory erasure.
+
+**Status.** Unreleased; `v0.3.0` keeps each approved credential for its grant lifetime, at most `--max-ttl` (default 300 seconds).
+
+### T-19 — Clipboard scraping
+
+**Threat.** Another process, a clipboard manager or history, or a remote session reads a value copied with `keypaste get` or the desktop.
+
+**Mitigation.** The bridge and `keypaste approve` never touch the clipboard. The CLI and the desktop clear a copied value after 20 seconds, and the desktop also on lock and quit. Copies opt out of Windows Clipboard History, and the desktop's carry secret markers for macOS and KDE managers.
+
+**Limit.** Managers may ignore the markers, nothing stops a process reading the clipboard, and remote sessions can copy it elsewhere. A crash, forced quit or power loss skips the clear.
+
+**Status.** `v0.3.0` for `keypaste get`; desktop clearing and markers unreleased.
+
+### T-29 — Who holds a vault
+
+**Threat.** A second approver, a second app start, a path handed to the app, a CLI save behind the approver, or another user taking the app's pipe name splits which snapshot and lock agents meet.
+
+**Mitigation.** The desktop and `keypaste approve` take an exclusive claim on the vault, and a second approver is refused, naming the holder. The app runs once per user, and a path handed to it only selects what the unlock screen offers, shown in full. Under a held vault, writing verbs are refused or sent to the holder (T-43).
+
+**Limit.** A same-user process can put a file named like the person's vault on the unlock screen; the full path is the only protection. KeePassXC takes no claim, so its save in the milliseconds before keypaste's rename is overwritten; other saves are detected and merged.
+
+**Status.** Unreleased; `v0.3.0` has no claim.
+
+### T-43 — A terminal asks the owner to change the vault
+
+**Threat.** A same-user program, an agent's shell included, asks the approver to change the vault without the master password, such as planting `{PASSWORD}` in a variable (T-8) or tagging an item into a project (T-13).
+
+**Mitigation.** While a vault is held, the CLI's edits go to the holder, which changes nothing until the person allows it, with Deny focused. The prompt names the command, item and change, never a value, says any program could have typed it, and names any placeholder. Every edit is recorded before it is saved, or taken back (T-6).
+
+**Limit.** A person who allows without reading gets the change. A crash between the line and the save records an edit the vault does not hold.
+
+**Status.** Unreleased.
+
+## The desktop app
+
+### T-22 — The desktop app's accessibility layer as a read path
+
+**Threat.** Another process queries AT-SPI or Windows UI Automation for secrets typed into the desktop app.
+
+**Mitigation.** Every field that takes a secret is a `MaskedInput`, which exposes only a fixed name and the mask length. The app has no webview.
+
+**Limit.** Keystrokes and pastes arrive as strings that cannot be wiped, and keyloggers are outside this control (T-18).
+
+**Status.** Unreleased.
+
+### T-23 — What auto-lock is for, and what it is not
+
+**Threat.** Someone walks up to an unattended computer while a vault is unlocked.
+
+**Mitigation.** The desktop locks after 30 minutes idle by default, settable up to 8 hours but never off, on `Ctrl/Cmd+L`, and optionally on minimize. A lock locks every open vault, clears the copy and denies waiting requests, and agent requests never count as activity.
+
+**Limit.** On Windows, Windows Hello, PIN included, can undo these locks (T-44). Locking cannot erase copies (T-18), and `keypaste approve` has no idle lock.
+
+**Status.** Unreleased.
+
+### T-24 — `recent.toml` tells anything that can read `~/.keypaste` where your vaults are
+
+**Threat.** Anything that can read `~/.keypaste`, or a screenshot of the unlock screen, learns where the person's vaults and key files are.
+
+**Mitigation.** The desktop records up to ten vault paths, each with its key file's path, and no names or key material; the list is owner-only on Linux and macOS and can be cleared. Agent settings name items by UUID and keep filled sites and dismissals under keys the vault holds.
+
+**Limit.** Anyone who can read `~/.keypaste` reads what it holds in the clear, below. On Windows these files inherit profile permissions.
+
+| File | In the clear |
+|---|---|
+| `recent.toml` | Vault and key file paths |
+| `app.toml` | The chosen vault's path |
+| `projects.json` | Each mapping's vault path, project, directory and command |
+| `agents/<vault>.toml` | Agents' labels, the field each kept answer names, the name asked for in each kept pick, and the pairings' names |
+| `browsers.json` | Each pairing's name, build and time |
+| `sessions/<vault>.owner` | The path of a vault held open |
+| `recommendations.json` | Each dismissal's vault identity |
+| `audit.jsonl` | What each request named (T-5, T-9) |
+| `crash-reports/` | Reports scrubbed of names, paths and values |
+| `agents.id`, `save-counts/`, lock files | A random identity, numbers or nothing |
+
+**Status.** Unreleased.
+
+### T-25 — A value on screen, because somebody asked to see it
+
+**Threat.** People nearby, screen captures or remote sessions see a value the person revealed.
+
+**Mitigation.** A reveal shows one value for at most 30 seconds, and hides it when the row changes, a menu opens, or the window loses focus, minimizes or locks. The value is drawn, so the accessibility layer never carries it.
+
+**Limit.** The value is readable for up to 30 seconds, and hiding it cannot erase a capture.
+
+**Status.** Unreleased.
+
+### T-51 — A notification is read by more than the person
+
+**Threat.** The lock screen, notification history and programs that read them see what a system notification reveals, and a late press acts on something that has gone.
+
+**Mitigation.** A notification carries only fixed words, never an item, value, vault, agent or reason. Its one action brings the prompt forward disarmed or opens the unlock screen, and never allows. It posts only while no keypaste window has focus, at most once every 30 seconds.
+
+**Limit.** Anyone who sees it learns keypaste is here and something asked. A removal the system ignores leaves the words in history.
+
+**Status.** Unreleased.
+
+### T-52 — A culture changes what a rule means
+
+**Threat.** No attacker: the desktop runs in the person's culture and the CLI, bridge and relay run invariant, so a name could mean one thing to the app and another to the CLI.
+
+**Mitigation.** Every culture-sensitive call states its culture, and the build fails otherwise. The audit log, its hash and access matching are ordinal.
+
+**Limit.** Letters newer than the Unicode version .NET carries can fold differently, so the app and the CLI can disagree on such a name.
+
+**Status.** Unreleased.
+
+## The vault and its key factors
+
+### T-20 — A stolen vault file
+
+**Threat.** Someone holding a copy of the vault guesses its password offline.
+
+**Mitigation.** KDBX4 provides encryption, Argon2 key derivation and integrity, and keypaste adds no cryptography. A key file or YubiKey adds a factor a copied file lacks (T-27, T-37).
+
+**Limit.** Protection rests on the passphrase: offline guessing has no rate limit, and a recovered passphrase opens older copies too. The audit file stays plaintext (T-5, T-9).
+
+**Status.** `v0.3.0`; Twofish vaults unreleased.
+
+### T-26 — Restoring a backup while the app is locked
+
+**Threat.** Someone who knows an earlier master password and can write the vault's directory restores an old copy, or a sync tool puts one in its place.
+
+**Mitigation.** The unlock screen restores a backup only after opening it with its own credentials, restores only the checked bytes, and keeps the replaced vault first. Every keypaste save raises a count the vault carries, and an unlock that finds a lower count than this home last saw warns once.
+
+**Limit.** Such a person can roll the vault back, losing the newer state's availability without disclosing anything; delete old copies after a password change. The warning refuses nothing, and misses a copy whose count is not lower or a first open in a new home.
+
+**Status.** Unreleased.
+
+### T-27 — Naming a keyfile tells the machine where the second factor is
+
+**Threat.** Code running as the user reads the process table, shell history, environment, configuration or `recent.toml` to learn where the key file is.
+
+**Mitigation.** `--keyfile` and `KEYPASTE_KEYFILE` carry a location, never key material. `keypaste access` takes a new key file only from `--new-keyfile`.
+
+**Limit.** Anything running as the user learns where to look. A key file protects against someone holding the vault without it, not against code on the unlocked machine, and a lost key file cannot be reconstructed.
+
+**Status.** Unreleased; `v0.3.0` has no key files.
+
+### T-28 — A keyfile that is any file at all is one edit from losing the vault
+
+**Threat.** No attacker: an edit, a re-encoding or a sync tool rewrites a file used as a key file, and the vault it keys is lost.
+
+**Mitigation.** keypaste opens all four KeePass key file forms, warns on every open with the any-file form and never creates one. It writes only KeePass XML key files, never over an existing file.
+
+**Limit.** With the any-file form, any change to the file's bytes loses the vault for good. Anyone who can read a key file has that factor.
+
+**Status.** Unreleased; `v0.3.0` has no key files.
+
+### T-37 — A YubiKey protects a copied vault, not an unlocked one, and a lost key locks it
+
+**Threat.** For a vault that needs a YubiKey: someone with a copy of the vault, malware driving the plugged-in key, or losing the key.
+
+**Mitigation.** The desktop derives the key as KeePassXC does, and every save draws a fresh challenge, so a copied file needs both the password and the key's secret. Settings warn about loss first.
+
+**Limit.** Nothing protects an open vault from a same-user process, and malware driving the key can get its answer. A lost key locks the vault for good unless a second key was programmed with the same secret. The CLI cannot open such a vault, and nothing has been tested against a physical YubiKey.
+
+**Status.** Unreleased.
+
+### T-44 — Windows Hello stands in for the master password after a lock
+
+**Threat.** Anyone who can pass Windows Hello as this user reopens the vault after a lock without the master password, or a same-user program obtains a signature and reads the app's memory.
+
+**Mitigation.** After a password unlock the app keeps the composite key's parts sealed under a Windows Hello signature, in memory only. Windows Hello asks on every keep and resume, and only the person's lock, the idle lock, minimize-lock and the tray allow a resume.
+
+**Limit.** Anyone who passes Windows Hello, PIN included, can reopen the vault after those locks. A same-user program with a signature and a read of the app's memory gets parts that open every copy of the vault, and a kept copy has no maximum age. Nothing has been tested against a real Windows Hello.
+
+**Status.** Unreleased, Windows only.
+
+## Runs, tokens and share links
+
+### T-30 — A run asks the session for a whole env set
+
+**Threat.** Anything running as the user that can start `keypaste run --session`, an agent with a shell included, asks for a project's whole env set.
+
+**Mitigation.** A run is released only after the person allows it, Allow once only (T-34), or on macOS under the app's own launch pass (T-42); no agent setting releases it. The prompt shows the project, variables, items, command and directory, never a value, and every run is recorded (T-6).
+
+**Limit.** The command and directory are the runner's claim, so allow only a run you started. The child keeps its values after a lock, and the standalone `keypaste run` opens the vault itself and is not audited.
+
+**Status.** Unreleased; `v0.3.0` has only the standalone `keypaste run`.
+
+### T-31 — A committed reference file chooses what a run injects
+
+**Threat.** Whoever controls a cloned repository's `.env.keypaste` chooses what a run injects, including literals such as `HTTPS_PROXY` or `NODE_OPTIONS` that send secrets elsewhere.
+
+**Mitigation.** `run` uses `./.env.keypaste` on its own only when `projects.json` maps the directory to the one project it names; anything else needs `--env-file`. It lists every literal before opening the vault.
+
+**Limit.** A file the person names can still add literals, which the person must read.
+
+**Status.** Unreleased.
+
+### T-32 — A scoped token is a bearer credential
+
+**Threat.** Anyone who copies a scoped token from a CI log or process list, or holds a token bundle and its token, reads the env sets it covers.
+
+**Mitigation.** Tokens are inject-only, scoped to project, stage and keys, always expire, and are recorded on every request. `KEYPASTE_TOKEN` is stripped from the child, a protected set is asked about live, and a revocation survives merges.
+
+**Limit.** A bundle cannot be revoked and its expiry is a check against the local clock, so rotate its values once it is retired or may have leaked. A copy whose token record was edited after the revocation makes the token work again until expiry.
+
+**Status.** Unreleased.
+
+### T-33 — Whoever holds a share link can open it
+
+**Threat.** Anyone holding a share link, a chat unfurler included, opens what it carries, and whoever controls the share service can serve a viewer that leaks the key.
+
+**Mitigation.** `keypaste share` and the app encrypt on this machine and upload only ciphertext, with the key in the link's fragment. Links have a view limit and expiry, can be revoked, and can require a separately sent passphrase.
+
+**Limit.** Anyone holding the link opens it until it runs out, and can test passphrase guesses offline, so only a generated passphrase (`keypaste generate --words 6`) protects an intercepted link. End-to-end encryption holds only while share.keypaste.com, or the `--endpoint` host, serves an honest viewer.
+
+**Status.** Unreleased.
+
+### T-34 — A run's request is the runner's claim
+
+**Threat.** A same-user process repeats a command a person once allowed, to have an env set released again.
+
+**Mitigation.** Every `keypaste run --session` is a new request offered only Deny and Allow once, and no rule or remembered answer releases it.
+
+**Limit.** What a run says it will start is its claim (T-30).
+
+**Status.** Unreleased.
+
+### T-35 — A run keeps values out of the result, not out of the agent's reach
+
+**Threat.** An agent that names the command, and can often edit what it runs, uses the `run` tool to get at the values given to it.
+
+**Mitigation.** The tool exists only under `--allow-run`, for labels the person turned run on. Every command is asked, Allow once only, showing the program, arguments, directory, variable names and reason, and output is scrubbed of each value.
+
+**Limit.** An approved run can leak a value encoded past the scrubber, to a file or over the network, and any same-user process can read the child's environment. Runs give no confidentiality against an agent with its own shell.
+
+**Status.** Unreleased.
+
+### T-42 — A launch pass is a bearer for one run
+
+**Threat.** A same-user process reads the launch request or the run's environment and presents the launch pass first, receiving the env set a macOS Run confirmed.
+
+**Mitigation.** On macOS the app hands Terminal no value, only a 32-byte pass in an owner-only file. A pass works once, for two minutes, within its unlock, for the exact request shown, and never appears on a command line.
+
+**Limit.** A same-user process can present the pass first; the person's window then says it was used, and Activity shows both requests. Only Terminal is supported.
+
+**Status.** Unreleased; an unsigned bundle's launcher runs only once its quarantine is cleared.
+
+## Install, setup and release
+
+### T-9 — Exfiltration and telemetry
+
+**Threat.** Values, names or the audit log leave the machine through keypaste, its dependencies or a crash report (security laws 3 and 5).
+
+**Mitigation.** The audit log stays local, and the bridge speaks only over standard input and output and a local pipe. The build keeps keypaste's code off the network outside `keypaste share`, and packages are pinned by content hash. Only the desktop sends crash reports, once the person says yes, holding only code identifiers, the version and the system, shown exactly as sent.
+
+**Limit.** Any package in the process could use the network, bounded only by its pin. A report shows api.keypaste.com the sender's IP address, and the first-launch screen asks for reports as a separate choice, off by default, and has not been checked against EU consent law.
+
+**Status.** `v0.3.0` for the stdio bridge, with no crash reports; crash reports unreleased.
+
+### T-21 — The released binary is not the source you read
+
+**Threat.** A compromised Actions runner, action or storage credential substitutes a download's bytes, or replaces an archive together with its checksum.
+
+**Mitigation.** `release.yml` tests the binaries it uploads and checks the version and checksums, Actions and tools are pinned, and `publish-release.sh` publishes only to an empty destination. Every asset carries a Sigstore attestation, checkable with `gh attestation verify`.
+
+**Limit.** The attestation cannot detect a compromised workflow run, which attests what it built. Binaries are unsigned and builds are not reproducible.
+
+**Status.** `v0.3.0`, the first release with an attestation; desktop packages unreleased ([RELEASE](docs/RELEASE.md)).
+
+### T-39 — The terminal's `keypaste` is whatever its PATH entry or link names
+
+**Threat.** Whoever can change what a PATH entry or link names chooses the program a terminal runs as `keypaste`, into which the person types a master password.
+
+**Mitigation.** Each desktop install puts its own `keypaste` on PATH and replaces a file it did not write only after the person confirms, keeping it as `keypaste.keypaste-backup`. macOS Settings names an earlier `keypaste` that is not this bundle's.
+
+**Limit.** The macOS link is on every account's PATH and points into a bundle the installing account can write, so that account chooses what `keypaste` runs for every account, root included; it is the only limit that crosses accounts, and it is accepted. An earlier `keypaste` elsewhere on PATH goes unseen.
+
+**Status.** Unreleased.
+
+### T-40 — Setup edits another program's configuration file and starts its command
+
+**Threat.** Setup edits AI tools' configuration files, which hold other servers and their tokens, and starts their commands, so a bad edit or a same-named program can turn that against the person.
+
+**Mitigation.** No vault secret enters these files (security law 4). Setup shows each edit and its backup, changes only keypaste's entry, leaves alone a file that does not parse or changed since read, and replaces it by one rename. Tools are found only in absolute PATH entries and documented install folders.
+
+**Limit.** A tool writing its file during keypaste's edit loses that write, and the backup keeps the original's tokens. An install link names the person's home and vault paths wherever it is pasted.
+
+**Status.** Unreleased; `v0.3.0`'s `keypaste setup` runs Claude Code's and Codex's `mcp add`.
+
+## Browser fill
+
+### T-48 — The browser relay holds released passwords in plaintext, and anything can start it, or ask to pair
+
+**Threat.** A same-user process starts the relay as a browser would, or speaks its pipe, to get logins released to a browser or a pairing.
+
+**Mitigation.** The relay holds no vault and cannot reach vault access or the audit log, and a browser's connection may only pair, list a page's logins by name and release the one picked. Pairing needs the person to confirm a six-digit code the extension also shows. A refusal holds pairing requests back for a minute, doubling up to an hour.
+
+**Limit.** A same-user process can read decoded logins in the relay's memory and obtain what pairing and fills allow (T-59). A person who pairs without comparing the codes can pair that program.
+
+**Status.** Unreleased.
+
+### T-49 — Another program answers keypaste's host name
+
+**Threat.** A same-user program writes a manifest for `com.keypaste.browser` where a browser looks first, so the browser starts it and sends it the pairing key.
+
+**Mitigation.** Settings › Browser fill and `keypaste browser` name the program each browser starts. Settings asks before replacing another program's manifest.
+
+**Limit.** keypaste does not watch the manifests, so a replacement is seen only when the status is read (T-50).
+
+**Status.** Unreleased.
+
+### T-50 — A pairing is a bearer key
+
+**Threat.** Whoever reads the pairing key from the browser profile and can reach the approver's pipe uses the pairing, or a same-user program edits `~/.keypaste/browsers.json` to add or revive one.
+
+**Mitigation.** `browsers.json` holds each key's hash, never the key, and a pairing counts only while an unlocked vault vouches for it with an HMAC. Settings lists pairings with their last use, and Remove ends one. A pairing alone lists names; a login fills unasked only where that pairing filled it on that exact origin before (T-59, T-61).
+
+**Limit.** A same-user process can read the profile's key and use it, since KeePassXC's protocol has only that key as proof. The seal authenticates the process holding a vault, not the person.
+
+**Status.** Unreleased.
 
 ### T-58 — A page that is not the item's site
 
-**Asset.** A login filled into a page.
+**Threat.** A page made to look like the item's site gets its login filled: a lookalike domain, another tenant of a shared host, a hostile subdomain, plain `http`, or a form posting elsewhere.
 
-**Attacker.** A page made to look like the item's site: a lookalike or longer domain, another tenant of a shared host, a subdomain someone else controls, the site over `http`, or a form that posts to another site.
+**Mitigation.** The extension takes the address from the browser's tab and refuses login forms in cross-origin frames. An item matches only its own host or subdomains within one registrable domain, on the same scheme and port. The first fill on each origin is asked, and `http` pages, single-label hosts and forms posting to another site are always asked, with a warning.
 
-**Mitigation.** The extension takes the page's address from the browser's tab, never from the page, and refuses a login form in a frame from another origin before keypaste is asked. An item matches a page only on its own host or a subdomain of it at a label boundary, within one registrable domain by the vendored Public Suffix List, both sections read, and on the same scheme and port, or on a host one of its `KP2A_URL` fields names; an IP address, `localhost` and a single label such as `nas` match only themselves, and a public suffix matches nothing. What a pick remembers is the exact origin, so the first fill on each subdomain is asked in keypaste. A host that is not ASCII, a URL naming a user, a wildcard and HTTP authentication get no logins. KeePassXC's hide, HTTP-authentication-only and connection-only settings on an item or its groups, its deny list, an expired item and the Trash keep an item out, and a pick of one is refused and recorded. An `http` page, a single-label host such as `nas` and a form posting to another registrable domain are listed with a warning that says why, and every pick there is asked in keypaste, never remembered: keypaste warns rather than refuses, since a router or a home server is often only these. keypaste's confirmation names the login and emphasises the site, with the origin, the build and the pairing below it. Each list and each release is recorded with the page's origin before the reply, never its path or query.
+**Limit.** A person can fill a lookalike they misread. Whoever controls a subdomain of the item's site gets its login if the person allows the first fill there, and anyone on the network can answer for an `http` page.
 
-**Limit.** A person can fill a lookalike they misread; the confirmation names the site and cannot make them read it, and a site filled before fills at once, so a compromised page of that exact site gets the login it is picked on. Whoever controls any subdomain of the item's site has its login listed there, and gets it if the person allows its first fill. Anyone on the network can answer to an `http` page or a single-label host, so its warning and the confirmation are the only defence. The form's address is the page's own, so a page that hides where its form posts gets no warning.
-
-**Status.** Implemented (unreleased); not in v0.3.0.
-
-**Tests.** `LoginLookupTests`, `LoginCandidatesTests`, `SessionBrowsersTests`, `BrowserHostTests`, and `verify-browser-fill.sh`, where real browsers list and fill the item's site, list its logins on a subdomain and ask at its first pick there, list nothing on a lookalike name or another tenant of `github.io`, an `http` page and a form posting to another site are asked at every pick, and the extension refuses a cross-origin frame before keypaste is asked.
+**Status.** Unreleased.
 
 ### T-59 — keypaste believes the extension about which page asks, and whether the person picked
 
-**Asset.** Logins released to a browser, the names of the logins a site has, and the person's attention.
+**Threat.** A page tricks the person into a click on keypaste's list, by clickjacking as Marek Tóth showed at DEF CON 33 in 2025, or a process holding a pairing's key names any page and claims the person picked.
 
-**Attacker.** A page tricking the person into a click on keypaste's list (clickjacking: an invisible or covered list, as Marek Tóth showed against password managers' in-page menus at DEF CON 33 in 2025); a same-user process holding a pairing's key (T-50), or a compromised extension, naming any page and claiming the person picked.
+**Mitigation.** Only a trusted click on keypaste's key icon lists logins, in a list the page can neither read nor restyle. A pick counts only on a list that has been visible, topmost and unobscured for half a second. A pick fills at once only where it filled before (T-61), and otherwise once the person allows it.
 
-**Mitigation.** Nothing is asked of keypaste as a page loads: only a trusted click on keypaste's key icon lists the page's logins, by name, with no password, from every vault open here, naming the vaults that are locked. The list is drawn in a closed shadow root in the browser's top layer, so the page can neither read nor restyle it, and a pick counts only from a trusted event on a list that has been on screen half a second, is the topmost element where the pointer is, and that neither the list nor any of its ancestors has faded, filtered, masked or clipped. A pick releases one login: at once where that pairing filled it on that exact origin before (T-61), otherwise once the person allows it in keypaste's confirmation, which says the browser names the page and any program can, and to fill only where they are signing in now. Each list that names a login is one line in the log, and each release or refusal one line, before the reply. A confirmation takes the one prompt slot and never waits its turn, a refusal or no answer holds that pairing and origin back a minute, and a pick while any prompt is up gets nothing. After the person allows it the pairing is proven again and the item read again by its UUID through the same rules.
+**Limit.** keypaste sees only the extension's word, not the page or the click. A process holding a pairing's key lists any site's login names and receives unasked every login that pairing filled before.
 
-**Limit.** keypaste cannot see the page or the click, only the extension's word: a process holding a pairing's key lists the names and usernames of any site's logins, a line each, and receives unasked every login that pairing filled on a site before by naming that site and the item; it can put confirmations claiming any page in front of the person, one a minute per origin. A page cannot make a pick through the list's checks, but it can persuade a person to pick on a page of the item's exact site it controls. The relay answers one message at a time, so a browser's other tabs wait behind a confirmation.
-
-**Status.** Implemented (unreleased); not in v0.3.0.
-
-**Tests.** `SessionBrowsersTests`, `SessionAuthorityBrowserTests`, `RelayTests`, `BrowserHostTests`, and `verify-browser-fill.sh`, where real browsers open the list on a trusted click and pick with trusted keys.
+**Status.** Unreleased.
 
 ### T-60 — The extension, someone else's code, receives passwords
 
-**Asset.** Every login released to a browser.
+**Threat.** A malicious or compromised extension build, a compromised store account or the browser itself receives every login released to a browser.
 
-**Attacker.** A malicious or compromised extension build, a compromised store account publishing an update, or the browser itself.
+**Mitigation.** keypaste answers only its own extension's builds and binds each pairing to its build. A release carries only the picked item's username, password, title and UUID. The extension is keypaste's published fork and keeps no password after filling.
 
-**Mitigation.** keypaste answers only its own extension's three builds, by the ID or add-on ID the browser names, and each pairing is bound to the build that paired. A list carries only names; a release carries one item, the one picked: its username and password, placeholders filled in from the item, its title and UUID, never its group, a TOTP code, string fields or another item. The extension is keypaste's own fork, published as source; its page UI sits in closed shadow roots and it keeps no password after filling. Each release is recorded per item.
+**Limit.** Once released, the extension and the page hold the password, and an update could send it anywhere. keypaste cannot verify the code the browser runs.
 
-**Limit.** Once released, the extension and the page it fills hold the password: the page's own scripts can read a filled field, and an extension update could send it anywhere. keypaste cannot verify the code the browser runs, and the browser names the build (T-48).
-
-**Status.** Implemented (unreleased); not in v0.3.0. The extension is not yet in a store (step 8.1g).
-
-**Tests.** `RelayTests`, `SessionBrowsersTests`, `BrowserHostTests`.
+**Status.** Unreleased; the extension is not yet in a store.
 
 ### T-61 — A login filled on a site before fills there at once
 
-**Asset.** The logins the person filled on a site before.
+**Threat.** A same-user process holding a pairing's key, or one writing a vault's sealed settings, aims at the logins that fill without asking.
 
-**Attacker.** A same-user process holding a pairing's key, one writing a vault's sealed rules in `agents/<vault>.toml`, or anything that changes the vault.
+**Mitigation.** After the person allows a first fill, that login, pairing and exact origin are kept in the vault's sealed settings on this computer (T-15). It applies only to that pairing and while the item still matches the page, and Settings › Browser fill lists and forgets them.
 
-**Mitigation.** The first fill of a login on a site is asked in keypaste; once the person allows it, that login, that pairing and that exact origin, as `scheme://host:port`, are kept in the item's vault's rules on this computer, sealed with that vault's key (T-15), never in the vault, so a synced or edited vault adds none. A later pick of the login there fills at once and is recorded as `allowed`. What is kept names one pairing and when it was paired, so a later pairing of the same name inherits nothing; it applies only while that pairing exists and the item still matches the page by T-58's rules, and never where every fill is asked. Each vault keeps at most 128, forgetting the oldest first, whose next fill is asked again. Settings › Browser fill lists them and forgets one, recorded, so its next fill is asked; removing a pairing forgets its own. This replaces "Always fill", which a person ticked in the prompt.
+**Limit.** Whoever holds the pairing's key gets those logins on those origins unasked (T-50, T-59). A domain that changes hands keeps what was filled on it.
 
-**Limit.** Whoever holds the pairing's key receives those logins on those origins without anybody being asked (T-50, T-59). A domain that changes hands keeps what was filled on it. An altered or unsealed file keeps nothing, which fails closed and asks again. They do not follow the vault to another computer.
+**Status.** Unreleased.
 
-**Status.** Implemented (unreleased); not in v0.3.0.
+## Known limits
 
-**Tests.** `AgentRulesFileTests`, `SealedAgentRulesTests`, `SessionBrowsersTests`, `BrowserPairingTests`, `BrowserHostTests`.
+Each entry states its own limits. These cut across many of them.
+
+- **Same-user processes are outside protection** (assumption 1). An Allow, a pairing's key or a launch pass lets such a process take values without a keystroke (T-14, T-42, T-50).
+- **No in-memory secrecy.** keypaste makes no claim that memory is cleared (T-18).
+- **A released value stays released.** Locking does not revoke values already delivered, and nothing revokes a credential at its issuer or removes a client's copy (T-12, T-56).
+- **The audit log is tamper-evident, not tamper-proof**, and keypaste stores no anchor for it (T-5).
+- **Agent labels are not authenticated** (T-3, T-36).
+- **Binaries are unsigned and builds are not reproducible** (T-21).
+- **One threat is unmitigated**: timing shows which categories are set to Allow (T-17).

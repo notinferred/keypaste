@@ -321,8 +321,8 @@ public sealed class EntriesViewModelTests : IDisposable
     /// A write refused because something else changed the file says so, calmly, and loses nothing.
     /// </summary>
     /// <remarks>
-    /// The GUI is where this actually happens: it holds a vault for up to eight hours while somebody
-    /// alt-tabs to a terminal, which <c>docs/desktop.md</c> describes as normal. The CLI's window is
+    /// The GUI is where this actually happens: it can hold a vault unlocked for up to eight hours, the
+    /// longest idle lock <c>docs/desktop.md</c> offers, while somebody alt-tabs to a terminal. The CLI's window is
     /// milliseconds.
     /// </remarks>
     [Fact]

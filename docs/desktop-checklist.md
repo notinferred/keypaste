@@ -1,0 +1,72 @@
+# Manual desktop checklist
+
+Part of [cutting a release](RELEASE.md#cutting-a-release) that includes the desktop app.
+
+`install-desktop.yml` installs internal candidates on fresh runners and drives the installed app, and desktop tests read secret surfaces from frames Skia renders headless. Neither establishes native rendering, a browser download's SmartScreen or Gatekeeper prompt, or a person's use. Before any release that includes the app, a person runs this list on each advertised platform from the package being released, with a disposable vault holding harmless values, and records the OS name, version and build, the session type and desktop environment on Linux, the package and its hash, and each result.
+
+**First launch and opening**
+
+1. With no `recent.toml`, the first-launch screen says Agree accepts the terms of use, its links open the terms and the source, and Agree leads to the welcome with Create a vault… and Open a vault…. With KeePassXC installed and a database open when it last closed, that database is listed first and opens.
+2. Open a vault by drag and by the picker; a non-`.kdbx` file is refused before the password field. Open a `.kdbx` through the file manager's Open With, with keypaste closed and running, and KeePassXC stays the default. Drop an export, a `.env` and another file on an open vault, and drag an item onto a group.
+3. Create a vault: pick a path, type the master password twice, land on an empty Items list. Cancelling the save picker writes nothing. Create over an existing vault is refused and that vault still opens with its own password.
+4. A wrong password gives a calm message, stays locked and adds nothing to `recent.toml`; the right one opens the vault and records it there.
+5. Do launch, unlock, the four places, a project's row, Activity and `Ctrl/Cmd+L` with the keyboard alone.
+
+**Locking**
+
+6. Set a one-minute timeout: the countdown appears, typing cancels it, inactivity locks, and after quit and relaunch the timeout is still one minute. Set `idle_timeout_seconds = 137` under `[[settings]]` in `app.toml`: Settings shows it, the lock comes at 137 seconds, and the file is unchanged unless the window or a list's sort changed (`[[window]]`).
+7. Suspend the machine past the timeout: it wakes locked.
+8. Minimize-lock, with a long idle timeout so it cannot be the cause. On: minimize (the macOS yellow button, Linux's title bar or window menu, `Cmd+M`) and restore shows the unlock screen, and a password copied before no longer pastes. Off: minimize and restore leaves it unlocked with the idle countdown on time. On again, quit and relaunch without opening Settings: minimizing locks. Switching windows, and `Cmd+H` on macOS, leave it unlocked. If a window manager reports no minimize, record that, since `MinimizeLock.IsSupported` must then omit the switch. Still unobserved on a person's macOS desktop: a minimize click and `Cmd+H`.
+9. With no `app.toml` the app follows the system's light or dark setting and follows a switch while running. On a Linux desktop whose portal reports neither, choose Light, quit and relaunch: the first frame is light.
+
+**Agents**
+
+10. Agents › Activity lists the same records as `keypaste log` for the same `~/.keypaste/audit.jsonl`.
+11. Settings › Diagnostics says Yes for Answering agents while unlocked, naming this app's process and session in the row's tooltip. With `keypaste approve` holding the vault first, the unlock is refused and the unlock screen names it.
+12. A credential request from `keypaste mcp` opens the prompt over other windows. Allow once does nothing until a second after it has focus; Enter and Escape refuse; locking takes it down. Click another window: the prompt draws inactive and its allows stay disarmed until a second after you return. Agents lists the waiting request with its seconds left; Show the prompt brings it forward with focus on Deny and disarmed for a second. After Allow once, the same request prompts again.
+13. Notifications, from the installed MSI, a macOS bundle allowed to notify, or a Linux desktop whose notification server shows actions: a request made with another app in front also posts "A request is waiting for your answer" with Show the prompt, gone once answered; a second within 30 seconds posts none. Locked, an agent's first request posts "An agent asked for a locked vault" with Open keypaste on macOS and Linux; on Windows, and where notifications are unavailable, keypaste's own notice window appears. Record whether an unsigned macOS bundle can be allowed, and what a press does on Windows.
+14. In Agents, an installed tool's Connect… (such as Connect Claude Code…) opens the Connect sheet, where Add it for me's tooltip shows the vault, the tool's label, `--allow-run` and `--expose '**'`. Done before it leaves `claude mcp list` or `codex mcp list` unchanged; Add it for me adds exactly that command, which from the package is the packaged `keypaste mcp`, or from the AppImage `~/.local/bin/keypaste` with `mcp`. The sheet then says the tool can reach keypaste, and the row says Connected. Disconnect removes keypaste from the tool.
+15. In Settings › Agents, choose Allow for project variables: a confirmation says every agent will receive every project variable without asking, with Cancel first. Cancel leaves Ask. Allow, then a request is released with no prompt and Activity lists it as allowed. Back to Ask, the next request prompts.
+
+**Items, editing and history**
+
+16. Items shows two-line rows beside the chosen item. Choose a group, fold and unfold it with the chevron and Left and Right, and search part of a title or group path in another case. An item shows its username, URL and notes, and dots for the password.
+17. Search part of a username, then part of a URL: the row names the matched field and shows no value. Searching a password, or a word only in notes, finds nothing.
+18. Add, edit and delete an item, then check `keypaste ls` and `keypaste get`. Rename an item inside a group in one Save; `keypaste get <new path> --reveal` reads it in the same group and the old path is gone. The same Save onto a name its group holds is refused, says why and changes nothing.
+19. Rename the group holding a project's home items, such as `env/billing` to `env/invoicing`: the form says the items keep their tags; `keypaste run billing -- printenv` still sees the project, and `keypaste env set billing NEW_KEY` creates `env/billing/.env` again.
+20. Generate a password in the app and read it with `keypaste get --reveal`. Generate a replacement from the wand, Apply and Save: the CLI reads the new one and history holds the old. From File › Generate password…, copy one, use New item, and add one as a field. In Words, eight words show about 103 bits and a 7,776-word list; the stored value is eight words joined by full stops; a `-` separator is refused.
+21. Type an existing password over a generated one, paste one with `Ctrl/Cmd+V`, and paste one ending in a newline from a terminal: `keypaste get --reveal` returns each, with no trailing newline. Replace a password: both Show history and KeePassXC's History tab hold the old one. Paste a value over a new variable: `keypaste run <project> -- printenv` receives exactly it.
+22. Paste the master password, with a trailing newline, into the unlock field: it shows one dot per character and unlocks. Pasting something holding a tab is refused and adds nothing. Paste an imported file's password into the import dialog the same way.
+23. Open in KeePassXC a vault the app created and one it edited.
+24. In Show history, Reveal then Hide a revision's password; switching screens or locking while it shows takes it off screen. At the smallest window, the item list stays usable. Restore the oldest revision: the CLI reads it, the replaced value is the newest history item in the app and in KeePassXC, other fields stay; restore again to go back. Copy a revision: the clipboard clears after twenty seconds, on Clear now, and on lock.
+25. Delete an item and press Restore on the line that appears; it is back. Delete again: Trash lists it with its group and `keypaste ls` does not; restore it. Delete one, re-create its name, and restore: it comes back under its own title beside the new one. Delete for good takes a second confirmation, and KeePassXC no longer shows it in its Recycle Bin. Delete, lock and unlock: it is still in Trash and nothing from before the lock is on screen. Remove a variable in Environments: `keypaste run` no longer has it and the item's history keeps it.
+26. With the app open, pipe a value to `keypaste env set` for the same file: the prompt names the command, item and variable and no value. Deny: the terminal says it was not saved and the file is unchanged. Again and Allow: `keypaste get --field` reads it. `keypaste access --password` is refused, naming the app. Save from KeePassXC instead and edit here: the app merges and KeePassXC's write is still there.
+
+**Copy, reveal and screen readers**
+
+27. Copy a password: the countdown runs, it pastes before the timeout and not after. Copy then `Ctrl/Cmd+L`, and copy then quit: nothing pastes.
+28. On Windows with Clipboard History on, a harmless copied string appears in Win+V and an app password does not; check `keypaste get` the same way.
+29. On macOS, copy an app password and list the pasteboard's types (type names only, as `verify-clipboard-markers.sh` does): one item carries `org.nspasteboard.ConcealedType` and `org.nspasteboard.TransientType`, and none after the clear. With a manager that follows nspasteboard.org, such as Maccy, and with KDE's Klipper, the password stays out of its history and a copied run command appears. Record the manager and version.
+30. Reveal and Hide an item's password; switching apps, minimizing, choosing another item, 30 seconds and a lock each hide it. In Environments, a row's eye button reveals and hides, Tab reaches it, pressing the value never reveals it, and revealing another row hides the first.
+31. With VoiceOver, Narrator or Orca: Reveal reads as Reveal, then Hide, never with the value, and one activation toggles it; each masked field is announced by its purpose and the announcement does not change as you type; a mistyped master password's error is read each time; each copy's toast is read once; an agent's prompt is read once with what it asks and its time limit, its countdown quiet; fields and rows read by name and headings as headings. VoiceOver can press Allow.
+
+**Projects and runs**
+
+32. Copy a project's run command, run it in a terminal and press Allow once in the app's prompt: it runs with the project's variables.
+33. Import .env a file with one new and one changed variable: the preview names both and no value; Cancel changes nothing; Import adds and replaces, KeePassXC's History holds the old value, and the file stays.
+34. Save a directory and `printenv` (`set` on Windows), press Run: the card names the command, directory and variable names, no value. Cancel starts nothing; Start opens a terminal there listing the variables, which stays open; Open terminal does the same at a prompt. Lock while the card is up: no terminal opens.
+35. With the vault unlocked, `keypaste run --session --vault <vault> <project> -- printenv`: the prompt names project, variable names, command and directory, and no password is asked in the terminal. Allow once prints the variables; Deny, and a lock while the prompt is up, each end with a reason and print nothing. With the app quit, it says nothing holds the vault and asks for no password.
+
+**Backups, access and keys**
+
+36. Change a password, lock, Restore a backup: checking the newest copy shows a time and counts, no names; restoring opens on the earlier password, a line says the replaced vault was kept, and `<vault>.backups` has one more file, which KeePassXC opens on the later password. A wrong password, and Cancel after a good check, change nothing and leave the field empty.
+37. With the app locked, overwrite the vault with a text file, then delete it: each time it can still be selected, only Restore a backup is offered, and a restore brings it back. A checked backup left on its confirmation past the idle timeout, or through a minimize with minimize-lock on, is cleared with its password.
+38. Export an encrypted copy elsewhere and open it in KeePassXC with the master password. Exporting over the same name, the vault itself or into `<vault>.backups` is refused and writes nothing.
+39. Add a KeePassXC key file in Settings: the app stays on Settings and an edit still saves; after a lock the password alone is refused and both open it, here and in KeePassXC. Change the password: the old is refused and the new opens; restoring the newest backup with the old password and key file opens on the old one. A wrong current password, and Cancel, leave the file's modified time and `<vault>.backups` unchanged.
+40. Create a vault with a KeePassXC key file and open it in KeePassXC with both. An ordinary text file as the key file is refused and nothing is written.
+41. Program slot 2 of a YubiKey for challenge-response with touch (`ykman otp chalresp --touch --generate 2`) and a second key with the same secret. Adding it in Settings names the lost-key limit and saves on one touch. An edit shows the touch dialog and saves after it; Cancel saves nothing. After a lock the password alone is refused, the touch opens it, and the second key does too. An unplugged key, slot 1 and a touch that never comes are each named. Save it in KeePassXC with the key and open it here again.
+
+**Recommendations**
+
+42. In KeePassXC, put `STRIPE_SECRET_KEY=sk_test_1` and a sentence in an item's notes. Unlocked here, Security names the key and item, and no other screen does. Dismiss survives a lock; Review again brings it back. Move to a field leaves a protected `STRIPE_SECRET_KEY`, notes holding only the sentence, and the old notes in history, all of which KeePassXC reads.
+43. In KeePassXC, remove `env:billing:prod` from an entry and change its password in one edit: Recommendations names the tag and entry. A tag removed alone on another entry is not listed. Restore tag names what it reaches and writes only on Add tag; KeePassXC then shows the tag and one more history entry.

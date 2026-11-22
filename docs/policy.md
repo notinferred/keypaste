@@ -1,8 +1,12 @@
 # Agent settings
 
-> This guide describes the source build headed for keypaste 1.0.0, which is not yet published. The published v0.3.0 has no agent settings: it reads standing rules from `~/.keypaste/policy.toml`, which [its own guide](https://github.com/notinferred/keypaste/blob/v0.3.0/docs/policy.md) describes. [FEATURES](FEATURES.md) lists what each version has.
+Agent settings decide what each agent gets without asking you: Ask, Allow or Block for each kind of value, for every agent or for one, and whether an agent may run commands. A request that reaches you is answered as [Approvals](approvals.md) describes.
 
-Agent settings decide what each agent gets without asking you. They live on this computer, not in the vault. How a request that does reach you is asked, and what is recorded, is in [Approvals](approvals.md).
+This guide describes the unpublished 1.0.0 source build. The published v0.3.0 reads standing rules from `~/.keypaste/policy.toml` instead ([its guide](https://github.com/notinferred/keypaste/blob/v0.3.0/docs/policy.md)); 1.0.0 does not read that file or carry its rules over ([FEATURES](FEATURES.md)).
+
+## Change the settings
+
+In the app, open Agents: the general settings apply to every agent, and each agent's page sets its own. From a terminal:
 
 ```sh
 keypaste clients                                   # the rules and the agents this computer knows
@@ -12,57 +16,59 @@ keypaste clients claude-code --forget 54380d03ad11 # forget an Always allow or a
 keypaste clients claude-code --remove              # forget the agent, which turns its run off
 ```
 
-The 1.0.0 build does not read `policy.toml` and carries none of its rules over; `keypaste approve` names the file when it finds one.
+A terminal proves no person agreed, so `keypaste clients` makes only changes that release nothing more. Make an Allow, or remove an Always block, in the app. Each change is recorded in the audit log as a `rules-changed` line ([Approvals](approvals.md#the-audit-log)).
 
 ## What an agent sees
 
-An agent sees each item that its bridge's `--expose` reaches ([what it can see](mcp-setup.md#what-the-agent-can-see)): the item's title, group, tags and URL, and its username unless Agents see usernames is turned off in Settings › Agents. That switch hides the username alone, so the agent then asks for it. Listing works either way. Hosts and references, beside it and off until you turn it on, lets a search also show the host in an item's Host field and which items reference another's fields; those then reach the agent's AI provider too.
+An agent sees each item its bridge's `--expose` reaches ([what it can see](mcp-setup.md#what-the-agent-can-see)): title, group, tags, URL and, unless Settings › Agents hides it, username. Hosts and references, off by default, also shows Host fields and which items reference others; those then reach the agent's AI provider too.
 
 ## How each value is answered
 
-Every value an agent asks for falls in one kind, and each kind is Ask, Allow or Block for every agent. Ask is the default.
+Each kind is Ask, Allow or Block for every agent. Ask is the default.
 
 | Kind | What it holds |
 |---|---|
 | Passwords | An item's password |
-| Custom fields | A custom field of an item that is in no project and is not a card's or an identity's protected field |
-| Project variables | A custom field of an item tagged into a project, `env:<project>` or `env:<project>:<stage>` |
-| Card values | A protected custom field of an item tagged `Credit Card`, such as its number or security code |
-| Identity values | A protected custom field of an item tagged `Identity`, such as a passport number |
+| Custom fields | A custom field of an item in no project, other than a card's or identity's protected field |
+| Project variables | A custom field of an item tagged `env:<project>` or `env:<project>:<stage>` |
+| Card values | A protected custom field of an item tagged `Credit Card` |
+| Identity values | A protected custom field of an item tagged `Identity` |
 | One-time codes | An item's current code, never its seed |
 | Notes | An item's notes |
-| Attachments | One attachment of an item, asked for by name, at most 5 MiB |
+| Attachments | One attachment, by name, at most 5 MiB |
 
-- **Ask** puts each request to you ([Approvals](approvals.md#the-prompt)).
-- **Allow** releases without asking you and records each release. It takes effect only once you confirm, in the app, that every agent will receive every value of that kind without asking.
-- **Block** refuses without asking you.
+| Setting | What it does |
+|---|---|
+| Ask | Puts each request to you ([Approvals](approvals.md#the-prompt)). |
+| Allow | Releases without asking and records each release, once you confirm in the app. |
+| Block | Refuses without asking. |
 
-A passkey's fields are always blocked, since its private key signs in wherever it is registered. A value of an item tagged into a protected stage, such as `env:billing:prod`, is asked about every time under Allow, and its prompt offers no Always allow ([Approvals](approvals.md#runs)); Block still refuses it without asking. Whether a custom field is a project variable, a card value or an identity value depends only on its item's tags and on whether the field is protected, never on the field's name. keypaste's Bitwarden and 1Password 1PUX imports tag cards `Credit Card` and identities `Identity`, and its LastPass import tags a card `Credit Card`; tag one you made yourself the same way.
+A field's kind depends on its item's tags and whether it is protected, never on its name. A passkey's fields are always blocked.
 
-After you refuse a request, the same field is refused for a minute without asking you again. Changing that field's kind ends the wait at once.
+<a id="protected-stages"></a>
+
+### Protected stages
+
+A stage named `prod`, `production`, `prod-…` or `production-…`, such as `env:billing:prod`, is protected. Its values and runs are asked every time, even under Allow, with no Always allow. A scoped token's run is refused them. Block still refuses without asking.
 
 ## One agent's own rules
 
-An agent's page in Agents can set any kind differently for that agent, and lists the answers kept for it with Remove. An answer is kept when you choose Always allow at a prompt, for that agent and that item's field; blocking is set here, for a kind of value. The most specific setting decides: a kept answer for the item's field, then the agent's own rule, then the setting for every agent. Passkeys stay blocked whatever is set.
-
-An agent's own rules and kept answers follow the label its bridge was started with (`--client-label`, such as `claude-code`), never the name the agent calls itself.
+An agent's page in Agents can set any kind differently for that agent, and lists its kept Always allow answers with Remove. The most specific setting decides: a kept answer, then the agent's rule, then the general setting. Rules follow the bridge's `--client-label`, never the name the agent calls itself.
 
 ## Running commands
 
-An agent may ask to run a command with values in its environment only once you turn run on for it, on its row in Agents or with `keypaste clients <agent> --run on`, and only through a bridge that offers `run` ([mcp-setup](mcp-setup.md#running-a-command-with-secrets---allow-run)). Each run is put to you, with Allow once only, whatever the kinds say. A run whose set holds a blocked value is refused without asking.
+An agent may run a command with values in its environment only once you turn run on for it, in Agents or with `keypaste clients <agent> --run on`, and only through a bridge that offers `run` ([mcp-setup](mcp-setup.md#running-a-command-with-secrets---allow-run)). Every run is put to you ([Approvals](approvals.md#runs)). A run needing a blocked value is refused.
 
 ## Where they are kept
 
-Each vault's settings are kept in its own file in `~/.keypaste/agents/` on this computer, never in the vault, so a synced or edited vault gives an agent nothing more, and two vaults open at once keep theirs apart. The app or `keypaste approve` holding the vault seals each change with a key the vault holds. The one `agents.toml` an earlier build kept moves to the vault whose key sealed it the next time that vault is unlocked. `keypaste clients` works on the vault `--vault`, `KEYPASTE_VAULT` or the chosen vault names. A file whose seal does not hold, because it was edited outside keypaste, copied from another computer or put back from an earlier copy, is ignored and left as it is: every kind is asked, no agent may run commands, and the app says the rules were changed outside keypaste until you set them again. A vault synced to two computers keeps a count for each, so each computer keeps its own settings.
-
-From a terminal, which proves no person agreed, `keypaste clients` makes only changes that release nothing more without asking. An Allow, setting an agent's rule back to the general setting where that one is Allow, and removing an Always block are made on the agent's page in the app. With nothing holding the vault, `keypaste clients` can only turn run off, set Ask or Block, forget a kept answer or a pick, or forget an agent; it writes that unsealed, so the defaults hold until you set the rules again in the app. Agent records an earlier source build kept in the vault's `.keypaste/agents` group are ignored and left in place.
-
-Each change is recorded in the audit log as a `rules-changed` line ([Approvals](approvals.md#the-audit-log)).
+Each vault's settings are kept in `~/.keypaste/agents/` on this computer, never in the vault, so a synced or edited vault gives an agent nothing more. The approver seals each change with a key the vault holds. A file edited outside keypaste, copied or restored is ignored: every kind is asked and no agent may run commands until you set the rules again in the app.
 
 ## Limits
 
-A release under Allow or Always allow has nobody reading the agent's reason, and the agent keeps what it was given. Another program running as you that starts a bridge gets whatever is allowed for every agent, and under an agent's label whatever is allowed for that agent ([THREATS](../THREATS.md) T-14). An Allow covers values added later, such as an item tagged into a project afterwards (T-13).
+- Nobody reads the agent's reason for a release under Allow or Always allow, and the agent keeps what it got ([THREATS](../THREATS.md) T-12).
+- An Allow covers values added later, such as an item tagged into a project afterwards (T-13).
+- Another program running as you that starts a bridge gets whatever is allowed, for every agent or for the label it uses (T-14).
 
 ## Checking it yourself
 
-`scripts/verify-policy-e2e.sh` runs the shipped `keypaste approve`, a bridge and `keypaste clients`: an agent with no rules is asked, a hand-edited Allow in the vault's file, sealed before the edit or not, releases nothing unasked, `keypaste clients` turns run on only through the process holding the vault, which seals and records it, and an old `policy.toml` grants nothing.
+`scripts/verify-policy-e2e.sh` runs the shipped `keypaste approve`, a bridge and `keypaste clients`: an agent with no rules is asked, a hand-edited Allow releases nothing, `keypaste clients` turns run on only through the process holding the vault, and an old `policy.toml` grants nothing.

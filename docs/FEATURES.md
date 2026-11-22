@@ -1,90 +1,108 @@
-# Capabilities
+# Features
 
-Each capability by surface, with its state in [RELEASE](RELEASE.md)'s terms and the version it belongs to, reviewed against source and tests on 2026-11-12. [CHANGELOG](../CHANGELOG.md) owns each change, and [SECURITY](../SECURITY.md) and [THREATS](../THREATS.md) the guarantees and limits.
+What keypaste can do, on which surface, and in which version, reviewed against source and tests on 2026-11-12. Versions use [RELEASE](RELEASE.md)'s states:
 
-Two states appear below:
+- **`v0.3.0`**: Published, and installation-verified on runner images for all four targets ([RELEASE](RELEASE.md#published-releases)).
+- **1.0.0**: Implemented, in no download yet. Desktop capabilities are also in the internal, unsigned desktop packages.
 
-- **Published `v0.3.0`**: in the CLI and MCP bridge download, which is also installation-verified on runner images for all four targets ([RELEASE](RELEASE.md#published-releases)).
-- **Implemented (unreleased)**: in source, headed for 1.0.0, and in no download. Every desktop capability is also in the internal, unsigned desktop packages, which are Packaged, not Published.
+[SECURITY](../SECURITY.md#guarantees-and-limits) and [THREATS](../THREATS.md) own the guarantees and limits. [CHANGELOG](../CHANGELOG.md) lists each change.
 
-A source feature is not in a downloaded binary until a release publishes it.
+## Older command names in v0.3.0
+
+The guides use the 1.0.0 names.
+
+| `v0.3.0` | 1.0.0 |
+|---|---|
+| `keypaste agent` | `keypaste approve` |
+| `keypaste-mcp`, a second binary | `keypaste mcp` |
+| `keypaste get <entry> --show` | `keypaste get <entry> --reveal` |
+| `~/.keypaste/policy.toml` and `keypaste policy ls` | Agent settings for each vault in `~/.keypaste/agents/`, `keypaste clients` and the desktop's Agents |
+| A variable is an item `env/<project>/<NAME>` | A variable is a field of an item tagged `env:<project>`, by default `env/<project>/.env` |
+| `rm` deletes for good | `rm` moves to Trash |
 
 ## CLI
 
-| Capability | State | Gap |
+| Capability | Version | Note |
 |---|---|---|
-| Create and open a vault: `init`, `--vault` or `KEYPASTE_VAULT` | Published `v0.3.0` | |
-| Key files: `--keyfile` or `KEYPASTE_KEYFILE` on every verb that opens a vault, all four KeePass key file forms, a vault a key file alone protects | Implemented (unreleased) | `init` takes no key file; `access` attaches one afterwards. A vault that needs a YubiKey is refused with a pointer to the desktop app |
-| Default vault: the one chosen in the app or with `keypaste use` | Implemented (unreleased) | |
-| Change access: `keypaste access` changes the master password and adds, replaces or removes a key file, keeping the replaced file as a backup | Implemented (unreleased) | Never removes a password or attaches an arbitrary file keyed by its hash |
-| Items: `add`, `ls`, `get` (clipboard, cleared after twenty seconds, or `--show`), `rm` (permanent) | Published `v0.3.0` | |
-| Items: `get --reveal` in place of `--show`; `rm` moves to Trash; `search`, `show`, `rotate`; custom fields with `set --field`, `get --field`, `field ls`, `field rm`; `attachment` (up to 5 MiB); `get <entry> totp` | Implemented (unreleased) | No CLI verb to restore from Trash, empty it, organize groups, or restore and export backups: the desktop does these |
-| Generate a character password: `--generate`, `--length`, `--no-symbols`, `--no-lookalikes` | Published `v0.3.0` | |
-| Passphrases from the EFF word list: `--words`, `--separator`, and `keypaste generate`, which stores nothing | Implemented (unreleased) | |
-| Projects: `env pull`, `env set`, `env ls`, `env rm`, `env export --dotenv`, and `run <project> -- <command>`, each variable an item under `env/<project>` | Published `v0.3.0` | |
-| Projects by tag: a variable is an env-named field of an item tagged `env:<project>` or `env:<project>:<stage>`; `env tag`, `env untag`, `-p` for a stage, `env diff`, protected `prod` and `production` | Implemented (unreleased) | An item of the `v0.3.0` layout stays an ordinary item and is no longer a variable. No live global environment |
-| References: `env export` writes `kp://` references by default and plaintext only with `--dotenv`; `run --env-file` or a mapped directory's `.env.keypaste` | Implemented (unreleased) | Exported plaintext outlives a lock |
-| `run --session`: the app or `keypaste approve` holding the vault asks, with no password typed in the terminal | Implemented (unreleased) | |
-| Scoped tokens: `token create` for CI, `run --token`, runs without a prompt except for a protected stage | Implemented (unreleased) | A token's run asks nobody, by design ([THREATS](../THREATS.md) T-32) |
-| Edits while the vault is held: `add`, `set`, `rm`, `rotate`, `field rm` and the `env` writes go to the app or `keypaste approve`, which asks you and saves | Implemented (unreleased) | One request of at most 64 KiB, so a larger `.env` is refused while the vault is held |
-| Import: `keypaste import` of another KDBX file or another password manager's export | Implemented (unreleased) | Cannot open a file that needs a YubiKey; the desktop's import can |
-| Share links: `keypaste share` encrypts one field or a login on this machine and uploads only ciphertext to api.keypaste.com; links expire, open a set number of times and can be revoked | Implemented (unreleased) | |
-| `keypaste lock`, `status`, `doctor` | Implemented (unreleased) | |
-| Audit log: `log` with `--since`, `--denied`, `--client`; `log verify` | Published `v0.3.0` | |
-| `log --json`, `log verify --expect <hash>`, `log verify --checkpoints` | Implemented (unreleased) | A recomputed log is caught only before the last checkpoint, and a removed tail only against a hash you kept |
+| Vaults: `init`, `--vault` or `KEYPASTE_VAULT` | `v0.3.0` | 1.0.0 adds a default vault, chosen in the app or with `keypaste use` |
+| Key files: `--keyfile` or `KEYPASTE_KEYFILE`, all four KeePass forms | 1.0.0 | `init` takes none; a YubiKey vault is refused, pointing to the desktop |
+| `keypaste access`: change the master password, add, replace or remove a key file | 1.0.0 | Keeps the replaced file as a backup; never removes the password ([T-28]) |
+| Items: `add`, `ls`, `get` to a clipboard cleared after twenty seconds, `rm` | `v0.3.0` | |
+| Items: `search`, `show`, `rotate`, custom fields, `attachment` up to 5 MiB, `get <entry> totp` | 1.0.0 | Trash, groups and backups are the desktop's |
+| Passwords: `--generate`, `--length`, `--no-symbols`, `--no-lookalikes` | `v0.3.0` | |
+| Passphrases: `--words`, `--separator`, and `keypaste generate`, which stores nothing | 1.0.0 | EFF word list |
+| Projects: `env pull`, `set`, `ls`, `rm`, `export --dotenv`, and `run <project> -- <command>` | `v0.3.0` | `--dotenv` writes plaintext ([plaintext limits](../SECURITY.md#plaintext-and-file-limits)) |
+| Projects by tag: `env:<project>` or `env:<project>:<stage>`, `env tag`, `env untag`, `-p`, `env diff`, protected `prod` and `production` | 1.0.0 | A `v0.3.0`-layout item is no longer a variable |
+| References: `kp://` in `env export`, `run --env-file`, `.env.keypaste` | 1.0.0 | [T-31] |
+| `run --session`: the app or `keypaste approve` asks, with no password typed | 1.0.0 | [T-30] |
+| Scoped tokens: `token create` and `run --token` for CI | 1.0.0 | Asks nobody except for a protected stage ([T-32]) |
+| Edits while the vault is held go to its holder, which asks you | 1.0.0 | At most 64 KiB per request ([T-43]) |
+| `keypaste import` of a KDBX file or another manager's export | 1.0.0 | Not a YubiKey vault; the desktop's import can |
+| Share links: `keypaste share` uploads only ciphertext; links expire, count opens and can be revoked | 1.0.0 | [T-33] |
+| `keypaste lock`, `status`, `doctor` | 1.0.0 | |
+| Audit log: `log`, `log verify` | `v0.3.0` | 1.0.0 adds `--json`, `--expect <hash>` and `--checkpoints` ([T-5]) |
 
 ## MCP bridge and approvals
 
-| Capability | State | Gap |
+| Capability | Version | Note |
 |---|---|---|
-| Bridge: the `keypaste-mcp` binary, holding no vault and unable to ask for a master password | Published `v0.3.0` | |
-| Bridge as `keypaste mcp` inside the one `keypaste` binary; `keypaste doctor` flags a client still registered with `keypaste-mcp` | Implemented (unreleased) | |
-| Tools: `list_entry_names` (names, never a value) and `request_credential` (one field of one item) | Published `v0.3.0` | |
-| Tools: `request_attachment` (one attachment by name, up to 5 MiB), `request_save` (you save a value the agent never sees), and `run` on a bridge started with `--allow-run` | Implemented (unreleased) | A run's command can reveal a value in a form the output scrubber does not know (T-35) |
-| Terminal approver `keypaste agent`: asks `Approve? [y/N]`; a grant lasts for a time-to-live; `policy.toml` rules release without asking | Published `v0.3.0` | |
-| Terminal approver `keypaste approve` and the desktop's prompt window: Deny or Allow once, and for an agent whose bridge has a label, Always allow for that agent and that item's field, confirmed; a request waits its turn, up to three per agent, each with 45 seconds; when several items answer, you pick one | Implemented (unreleased) | An agent's label is whatever its configuration says, so answers kept for a label follow it (T-36) |
-| Runs and terminal edits are asked each time, with no standing answer: a run offers Deny and Allow once | Implemented (unreleased) | |
-| Agent settings: each kind of value (passwords, custom fields, project variables, card values, identity values, one-time codes, notes, attachments) is Ask, Allow or Block for every agent, with per-agent rules and kept answers; Allow takes effect only once confirmed; passkeys are always blocked; kept for each vault in `~/.keypaste/agents/` on this computer, sealed with a key that vault holds; `keypaste clients` | Implemented (unreleased) | A value whose kind is Allow is released with nobody asked, and recorded |
-| No timed grants: no TTL, `--max-ttl` or `keypaste grants` | Implemented (unreleased) | |
-| Exposure: `--expose` globs; by default the `env/` subtree | Published `v0.3.0` | |
-| Exposure: a bridge started by hand defaults to `tag:env:*`; `setup` and the desktop's Connect register `--expose '**'`, so an agent sees every item's title, group, tags and URL (and username unless hidden) and its agent settings decide the values | Implemented (unreleased) | |
-| Client setup: `keypaste setup` registers Claude Code and Codex through their own commands and prints configuration for Cursor and Claude Desktop | Published `v0.3.0` | |
-| Client setup for Gemini CLI, Devin, VS Code, Cursor and Claude Desktop (macOS and Windows), keeping the tool's original file beside it; the desktop's Add an agent | Implemented (unreleased) | CI checks VS Code's and Claude Desktop's registrations at the file level only, and Cursor's through its own CLI only on Linux and macOS. On Windows a tool installed with pnpm or yarn is refused; the macOS app started from Finder misses tools installed through a Node version manager |
-| One vault, one holder: the desktop or `keypaste approve` claims the vault before its password is read, and the second is refused naming the first | Implemented (unreleased) | `keypaste approve` has no idle lock. KeePassXC can still save behind the holder, which then refuses agents until it has merged or been restarted |
-| Audit log: every call, allowed or refused, is a line in `~/.keypaste/audit.jsonl`, hash-chained, never holding the released value; a failed write refuses the release | Published `v0.3.0` | Agent-written arguments can hold sensitive text; unreleased, the vault's owner folds lookups older than 30 days into a summary per agent per day and removes days past the period kept |
+| Bridge, holding no vault and never asking for a master password | `v0.3.0` | `keypaste mcp` in 1.0.0; `doctor` flags a client still on `keypaste-mcp` |
+| Tools: `list_entry_names` and `request_credential`, one field of one item | `v0.3.0` | |
+| Tools: `request_attachment`, `request_save`, and `run` with `--allow-run` | 1.0.0 | [T-35], [T-54] |
+| Terminal approver `keypaste agent`, with time-limited grants and `policy.toml` rules | `v0.3.0` | |
+| Approvals: Deny, Allow once, and Always allow for a labelled agent's field, in `keypaste approve` or the desktop | 1.0.0 | Up to three waiting per agent, 45 seconds each ([T-36]) |
+| Runs and terminal edits asked each time | 1.0.0 | No standing answer |
+| Agent settings: each kind of value is Ask, Allow or Block, with per-agent rules; passkeys always blocked | 1.0.0 | Allow releases with nobody asked ([T-13], [T-14]) |
+| Exposure: `--expose` globs | `v0.3.0` | 1.0.0: `setup` and Connect register `--expose '**'` ([T-4]) |
+| Client setup: `keypaste setup` for Claude Code and Codex, printed configuration for Cursor and Claude Desktop | `v0.3.0` | |
+| Client setup for Gemini CLI, Devin, VS Code, Cursor and Claude Desktop; the desktop's Add an agent | 1.0.0 | On Windows, pnpm or yarn installs are refused; the macOS app opened from Finder misses Node version manager installs ([T-40]) |
+| One vault, one holder: a second desktop or `keypaste approve` is refused | 1.0.0 | `keypaste approve` has no idle lock; a KeePassXC save behind the holder stops agents until it merges ([T-29]) |
+| Audit log: every call in `~/.keypaste/audit.jsonl`, hash-chained, without the released value | `v0.3.0` | 1.0.0 summarizes lookups older than 30 days ([T-5]) |
 
 ## Desktop app
 
-Every row is Implemented (unreleased) and in the internal packages; none is Published. [The desktop guide](desktop.md) describes the app.
+Every row is 1.0.0. [The desktop guide](desktop.md) describes the app. Screens are checked headless, and installed packages were driven on runners, not by a person ([RELEASE](RELEASE.md#installation-verification)).
 
-| Capability | Gap |
+| Capability | Note |
 |---|---|
-| Open and create: password, key file, both, or a YubiKey slot programmed for HMAC-SHA1; the databases KeePassXC last opened are listed first; on Windows, Windows Hello unlocks again after a lock | Not run against a physical YubiKey, so real-device unlock, save and KeePassXC interoperability are unverified. One key per vault |
-| Change access in Settings: password, key file and YubiKey, with what the change costs the backups stated first | A key-file-only vault's change is guarded by the key file alone |
-| Items: New item's templates (Login, API key, Environment, Card, Note, Identity, SSH key, Server, Database, Wi-Fi, Blank item), saved in any open vault, their kinds kept as KeePass icons, custom fields, tags, URL links, one-time codes (TOTP) with the live code, attachments, duplicate, rename, undo of the last delete, rename or duplicate; each vault one flat list, the groups a file holds kept untouched | No auto-type editor |
-| Find: search over titles, group paths, usernames, URLs and tags, never reading a password, note or protected field | |
-| Copy and reveal: the clipboard clears after twenty seconds, on lock and on quit; a reveal hides after 30 seconds, on leaving the item, on losing focus and on lock; copies carry the Windows, macOS and KDE password-manager clipboard markers | The CLI's copies on macOS and Linux carry no marker; whether a clipboard manager honours one is a manual check |
-| Generator: character passwords with length, character kinds and lookalikes, and passphrases; rotate replaces a password and keeps the old one in history | Rotation changes the vault, not the credential at its provider |
-| History: list, reveal and restore a revision, as KeePass and KeePassXC restore it | History is in the same file, not a backup |
-| Trash: delete into the KDBX recycle bin, restore, erase, empty | |
-| Save safely: a stale copy refuses to overwrite; each save first keeps a copy in `<vault>.backups` (the last five and one a day for a week and one a week for four weeks, at most every fifteen minutes unless the file holds data another program wrote that keypaste can't keep or is older than KDBX 4, which that save keeps in its copy and names); a save that would lose an item nobody deleted is refused; another program's save is merged with the open copy, field by field; a vault file that vanishes can be saved back | A file the app will not merge, such as another vault, waits for a reload. XML elements, attributes and header fields another program or a newer KDBX version adds that KeePassLib does not know are left out of keypaste's save, as KeePassXC leaves it out, and kept only in that copy until the backups rotate it away |
-| Restore and export: from the unlock screen, restore a backup over the vault; from Settings, export an exact encrypted copy | Nothing recovers a forgotten password or a lost key file |
-| Lock: manual, idle (30 minutes by default) and optional on minimize; a lock stops answering agents | Cannot remove values already delivered to a child process, clipboard consumer or agent |
-| Security: secrets found in notes, a project tag a merge dropped, weak, reused and expired passwords, items expiring soon or tagged `needs-update` with a link to make a new credential, a vault's key derivation weaker than keypaste's with Strengthen, a conflicted copy from Syncthing, Dropbox, Nextcloud, OneDrive or iCloud Drive | YAML-style or multi-line values in notes are not found; a reminder changes nothing at the provider |
-| Environments: a project's stages as a segmented control marking one missing a value, the selected stage's variables masked with the item each comes from, import and export, and Run or Open terminal with the set after a confirmation naming the command, directory and variables | Opens only Terminal on macOS, `cmd.exe` on Windows and the first Linux terminal emulator found; locking does not stop a terminal already started |
-| Agents: Add an agent, connections, each agent's settings and kept answers, the waiting request, and Activity, the log of what agents and tokens asked for | |
-| Prompt window for credentials, attachments, saves, runs and terminal edits, saying Verified when keypaste checked who is asking | Verified has been drawn only from recorded process trees in tests; no real AI tool's request has shown it |
-| Share links, scoped tokens and browser fill: turn keypaste on for each browser in Settings and pair keypaste's own extension by choosing Pair this browser… in it and confirming the same code in keypaste, once for every open vault; a click on keypaste's key icon in a login field lists the site's logins from every open vault by name, and the one you pick fills at once where that browser filled it on that site before, or once you allow its first fill there in keypaste, listed in Settings | keypaste's extension pairs and fills in real Chrome, Edge, Brave and Firefox on Windows, macOS and Linux under test IDs, and is not in any store yet (8.1g) |
-| Import from another app: KeePass files and other password managers' exports, with a plan you edit | Checked in headless tests, not observed in an installed app |
-| System notifications for a request while keypaste is in the background | No person has seen one; macOS posts them only from a signed build, which does not exist yet |
-| Drag and drop, and Open With for `.kdbx` | No real drag or Open With has been run |
-| Crash reports: off unless you check Send crash reports on the first-launch screen, apart from accepting the terms; Settings' Send crash reports turns them on or off | The terms are a draft until approved |
+| Open and create with a password, key file, both or a YubiKey; Windows Hello after a lock | Not run against a physical YubiKey ([T-37], [T-44]) |
+| Change access in Settings: password, key file and YubiKey | [T-28] |
+| Items: templates, custom fields, tags, URLs, one-time codes, attachments, duplicate, rename, undo | No auto-type editor |
+| Find over titles, groups, usernames, URLs and tags | Never reads a password, note or protected field |
+| Copy and reveal, cleared or hidden on a timer, on lock and on quit, with clipboard markers | The CLI's macOS and Linux copies carry no marker ([T-19]) |
+| Generator and rotate | Rotation changes the vault, not the provider ([T-12]) |
+| History: list, reveal and restore a revision | History is in the same file, not a backup |
+| Trash: delete, restore, erase, empty | |
+| Safe saves: backups in `<vault>.backups`, merges with another program's save, refusal of a stale or lossy save | Data KeePassLib doesn't know, such as a newer KDBX version's, is left out of the save and kept only in its backup |
+| Restore a backup from the unlock screen; export an encrypted copy | Nothing recovers a forgotten password or lost key file ([T-26], [T-37]) |
+| Lock: manual, idle (30 minutes by default), optionally on minimize | Delivered values stay delivered ([T-23]) |
+| Security: secrets in notes, dropped project tags, weak, reused or expiring passwords, weak key derivation, sync conflicts | YAML-style or multi-line values in notes are not found |
+| Environments: stages, masked variables, import, export, Run and Open terminal | Locking does not stop a started terminal ([T-23]) |
+| Agents: Add an agent, settings, kept answers, the waiting request, Activity | |
+| Prompt window, saying Verified when keypaste checked who asks | Verified never shown for a real AI tool ([T-3]) |
+| Share links and scoped tokens | |
+| Import from KeePass and other managers, with an editable plan | Not observed in an installed app |
+| System notifications while in the background | No person has seen one ([T-51]) |
+| Drag and drop, and Open With for `.kdbx` | Never run for real |
+| Crash reports, off unless chosen | The terms are a draft |
 
-Each screen is checked in headless tests and frames rendered without a display; the installed packages were driven on Windows, macOS and Linux runners, not on a person's computer ([RELEASE](RELEASE.md#installation-verification)).
+## Browser extension
+
+1.0.0, with the desktop app.
+
+| Capability | Note |
+|---|---|
+| Browser fill: pair keypaste's extension once per browser, then fill a site's logins from every open vault | Tested in Chrome, Edge, Brave and Firefox under test IDs; not in any store (8.1g) ([T-48], [T-61]) |
 
 ## KeePassXC compatibility
 
-`Keypaste.Core.Tests.KeePassXC.WorkflowsTests` runs the workflows below on vaults KeePassXC makes behind a password, a password and a key file, and a key file alone, and after every write KeePassXC reads the whole vault back. Every `ci` run checks it against Ubuntu 24.04's packaged KeePassXC 2.7.6, a push to `main` also against the pinned Windows KeePassXC, and dispatch and release runs against the pinned Windows and macOS KeePassXC 2.8.0. `FieldsTests`, `MergeTests` and `ProjectsTests` in the same namespace check field protection, `otp` and attachments, a KeePassXC save merged with the app's, and projects KeePassXC tagged. These tests run against source; `v0.3.0` passed the compatibility gate of its own release.
+These tests run against source; `v0.3.0` passed its own release's gate. This is a supported subset, not KeePassXC parity. `Keypaste.Core.Tests.KeePassXC.WorkflowsTests` runs the workflows below on vaults KeePassXC made behind a password, a password and key file, and a key file alone, and KeePassXC reads the whole vault back after every write.
+
+| Run | Against |
+|---|---|
+| Every `ci` run | Ubuntu 24.04's packaged KeePassXC 2.7.6 |
+| A push to `main` | Also the pinned Windows KeePassXC |
+| Dispatch and release runs | The pinned Windows and macOS KeePassXC 2.8.0 |
 
 | Workflow | CLI | Desktop |
 |---|---|---|
@@ -95,21 +113,34 @@ Each screen is checked in headless tests and frames rendered without a display; 
 | History, organize, delete and recover | `rm` | Restore a revision; rename and move; Trash |
 | Backup, restore, change access, create | `init`, `access` | Restore panel, export, Settings, Create |
 
-After each write, KeePassXC still finds the custom data, custom fields, tags and auto-type on the entries, exports both attachments byte for byte, keeps its cipher and key derivation, and reads KDBX 4. A KDBX 3.1 vault is saved as KDBX 4.0 with its original kept as the backup, a Twofish vault stays Twofish, and KeePassXC-Browser's data survives every write.
+**Kept after each write:** custom data, custom fields, tags, auto-type, attachments byte for byte, cipher and key derivation, and KeePassXC-Browser's data. A KDBX 3.1 vault is saved as KDBX 4.0, its original kept as the backup.
 
-Refused with the vault left byte-identical: a wrong password or key file; attaching an arbitrary file keyed by its hash; writing a field named `Password` or one of KeePassXC's own attributes such as `otp` from the CLI; a malformed project tag; removing the only factor of a key-file-only vault; `add` over an existing item; a move or Trash restore onto a taken name; restoring a backup with a wrong password; creating over an existing vault.
+**Refused, with the vault left byte-identical:** a wrong password or key file; a key file keyed by its hash; a `Password` or `otp` field written from the CLI; a malformed project tag; removing a key-file-only vault's only factor; `add` over an existing item; a move or restore onto a taken name; restoring a backup with a wrong password; creating over an existing vault.
 
-Not exercised: a real YubiKey, ChaCha20, an Argon2 vault made by KeePassXC (`keepassxc-cli` cannot choose the key derivation), custom icons. This is a supported subset, not KeePassXC parity.
+**Not exercised:** a real YubiKey, ChaCha20, an Argon2 vault made by KeePassXC, custom icons.
 
-## Older command names in v0.3.0
-
-The guides use the 1.0.0 names. `v0.3.0` has these instead:
-
-| `v0.3.0` | 1.0.0 |
-|---|---|
-| `keypaste agent` | `keypaste approve` |
-| `keypaste-mcp`, a second binary | `keypaste mcp` |
-| `keypaste get <entry> --show` | `keypaste get <entry> --reveal` |
-| `~/.keypaste/policy.toml` and `keypaste policy ls` | Agent settings for each vault in `~/.keypaste/agents/`, `keypaste clients` and the desktop's Agents |
-| A variable is an item `env/<project>/<NAME>` | A variable is a field of an item tagged `env:<project>`, by default `env/<project>/.env` |
-| `rm` deletes for good | `rm` moves to Trash |
+[T-3]: ../THREATS.md#t-3--confused-deputy-a-malicious-or-impersonating-client
+[T-4]: ../THREATS.md#t-4--over-exposure-of-the-listing-surface
+[T-5]: ../THREATS.md#t-5--audit-log-tampering
+[T-12]: ../THREATS.md#t-12--a-standing-approval-used-under-a-reason-nobody-read
+[T-13]: ../THREATS.md#t-13--an-allow-covers-a-kind-of-value-not-the-values-you-pictured
+[T-14]: ../THREATS.md#t-14--an-allow-is-a-standing-grant-to-anything-that-can-reach-the-owner
+[T-19]: ../THREATS.md#t-19--clipboard-scraping
+[T-23]: ../THREATS.md#t-23--what-auto-lock-is-for-and-what-it-is-not
+[T-26]: ../THREATS.md#t-26--restoring-a-backup-while-the-app-is-locked
+[T-28]: ../THREATS.md#t-28--a-keyfile-that-is-any-file-at-all-is-one-edit-from-losing-the-vault
+[T-29]: ../THREATS.md#t-29--who-holds-a-vault
+[T-30]: ../THREATS.md#t-30--a-run-asks-the-session-for-a-whole-env-set
+[T-31]: ../THREATS.md#t-31--a-committed-reference-file-chooses-what-a-run-injects
+[T-32]: ../THREATS.md#t-32--a-scoped-token-is-a-bearer-credential
+[T-33]: ../THREATS.md#t-33--whoever-holds-a-share-link-can-open-it
+[T-35]: ../THREATS.md#t-35--a-run-keeps-values-out-of-the-result-not-out-of-the-agents-reach
+[T-36]: ../THREATS.md#t-36--an-agents-settings-bind-only-the-bridge-that-names-them
+[T-37]: ../THREATS.md#t-37--a-yubikey-protects-a-copied-vault-not-an-unlocked-one-and-a-lost-key-locks-it
+[T-40]: ../THREATS.md#t-40--setup-edits-another-programs-configuration-file-and-starts-its-command
+[T-43]: ../THREATS.md#t-43--a-terminal-asks-the-owner-to-change-the-vault
+[T-44]: ../THREATS.md#t-44--windows-hello-stands-in-for-the-master-password-after-a-lock
+[T-48]: ../THREATS.md#t-48--the-browser-relay-holds-released-passwords-in-plaintext-and-anything-can-start-it-or-ask-to-pair
+[T-51]: ../THREATS.md#t-51--a-notification-is-read-by-more-than-the-person
+[T-54]: ../THREATS.md#t-54--an-agent-asks-the-person-to-save-a-value
+[T-61]: ../THREATS.md#t-61--a-login-filled-on-a-site-before-fills-there-at-once

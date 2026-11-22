@@ -12,7 +12,7 @@
 #   verify-install.sh <os> --negative     corrupt the download and require the block to reject it
 #
 # Environment:
-#   KEYPASTE_INSTALL_DOC   document to read the block out of  (default: README.md)
+#   KEYPASTE_INSTALL_DOC   document to read the block out of  (default: docs/install.md)
 #   KEYPASTE_EXPECT_VERSION  version the installed binary must print (default: from the csproj)
 #
 # NEGATIVE CONTROL: --negative runs the block twice - once untouched, which must succeed, and once
@@ -23,7 +23,7 @@
 # failing for an unrelated reason.
 set -euo pipefail
 
-readonly DOC="${KEYPASTE_INSTALL_DOC:-README.md}"
+readonly DOC="${KEYPASTE_INSTALL_DOC:-docs/install.md}"
 
 die() { echo "::error::$*" >&2; exit 1; }
 
@@ -39,7 +39,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-# linux-arm64 is not a fourth block. README publishes ONE Linux block, naming linux-x64, and tells
+# linux-arm64 is not a fourth block. The install page publishes ONE Linux block, naming linux-x64, and tells
 # an arm64 reader to substitute the filename - so the arm64 instruction IS that block plus that
 # substitution, and testing anything else would be testing a page nobody reads. BLOCK_OS is which
 # block to extract; OS stays what is being checked.
@@ -95,21 +95,21 @@ fi
 # Both substitutions below change the text a stranger reads, which is this script's whole subject,
 # so each is announced rather than applied quietly.
 #
-#   --version   retargets an UNADVERTISED candidate. README correctly names the advertised release;
+#   --version   retargets an UNADVERTISED candidate. The install page correctly names the advertised release;
 #               a candidate has no page of its own by design, so the only way to exercise its assets
 #               through the documented shape is to rewrite the version in the block. That is a
 #               narrower claim than a verbatim run and the output says so.
-#   arm64       exactly the substitution README instructs, and nothing else.
+#   arm64       exactly the substitution the install page instructs, and nothing else.
 if [ -n "$RETARGET" ] && [ "$RETARGET" != "$EXPECT" ]; then
   die "--version $RETARGET disagrees with KEYPASTE_EXPECT_VERSION $EXPECT; the binary would be checked against the wrong number"
 fi
 if [ -n "$RETARGET" ]; then
-  README_VERSION="$(grep -oE 'keypaste-[0-9][0-9A-Za-z.-]*-(linux|osx|win)-[a-z0-9]+\.(tar\.gz|zip)' "$BLOCK" \
+  DOC_VERSION="$(grep -oE 'keypaste-[0-9][0-9A-Za-z.-]*-(linux|osx|win)-[a-z0-9]+\.(tar\.gz|zip)' "$BLOCK" \
     | head -1 | sed -E 's/^keypaste-(.*)-(linux|osx|win)-[a-z0-9]+\.(tar\.gz|zip)$/\1/')"
-  [ -n "$README_VERSION" ] || die "could not read a version out of the $BLOCK_OS block to retarget it"
-  if [ "$README_VERSION" != "$RETARGET" ]; then
-    subst_in_block "s/$README_VERSION/$RETARGET/g"
-    echo "!!! CANDIDATE RUN: $DOC's block, with $README_VERSION rewritten to $RETARGET."
+  [ -n "$DOC_VERSION" ] || die "could not read a version out of the $BLOCK_OS block to retarget it"
+  if [ "$DOC_VERSION" != "$RETARGET" ]; then
+    subst_in_block "s/$DOC_VERSION/$RETARGET/g"
+    echo "!!! CANDIDATE RUN: $DOC's block, with $DOC_VERSION rewritten to $RETARGET."
     echo "!!! This tests the documented install SHAPE against an unadvertised release's assets."
     echo "!!! It is not evidence that $DOC is correct - verify-release-matrix.sh owns that."
   fi
@@ -216,7 +216,7 @@ exercise() {
   [ -s "$KEYPASTE_VAULT" ] || die "$OS: init reported success and left no vault file"
   echo "  vault created: $(wc -c < "$KEYPASTE_VAULT") bytes"
 
-  # 2. A value in, and out again through env injection - the workflow the README leads with. The
+  # 2. A value in, and out again through env injection - the workflow the install page leads to. The
   #    child prints the variable it was given, so this fails if injection silently does nothing,
   #    which a check that only looked at keypaste's own exit code would not catch.
   printf '%s\n' "$pw" | "$bin" env set proj TOKEN=injected-ok >/dev/null 2>&1 \

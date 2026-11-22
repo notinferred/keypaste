@@ -210,7 +210,7 @@ public sealed class DotEnvTests
     /// The sharp edge of supporting <c>\t</c> at all, pinned rather than discovered: inside double
     /// quotes <c>C:\temp</c> is <c>C:</c> followed by a tab, exactly as it would be in C, Python,
     /// or a shell's <c>$'...'</c>. The other two quoting styles are literal and are the fix, so
-    /// this is documented in the README rather than special-cased in the scanner — a path-shaped
+    /// this is documented in docs/replace-dotenv.md rather than special-cased in the scanner — a path-shaped
     /// exception to an escape rule would be a worse surprise than the escape rule itself.
     /// </summary>
     [Fact]

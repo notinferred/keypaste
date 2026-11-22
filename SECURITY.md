@@ -2,7 +2,9 @@
 
 ## Reporting a vulnerability
 
-Email `security@keypaste.com` with the affected version or commit, a description, reproduction steps or proof of concept, and the expected impact. Reports in any language and anonymous reports are welcome. Do not use public issues, discussions or pull requests for vulnerabilities.
+Email <security@keypaste.com>. Don't use public issues, discussions or pull requests, and note that GitHub private vulnerability reporting is off.
+
+Include the affected version or commit, a description, reproduction steps or a proof of concept, and the expected impact. Any language is welcome, and so are anonymous reports.
 
 | Response | Target |
 |---|---|
@@ -11,13 +13,17 @@ Email `security@keypaste.com` with the affected version or commit, a description
 | Fix or mitigation plan | Communicated when available, with a timeline |
 | Coordinated disclosure | Up to 90 days, shortened by agreement or active exploitation |
 
-Security reports receive the highest priority. Credit in advisories and the changelog is optional; there is no bug bounty. Breaches and serious shipped bugs receive prompt, full disclosure covering the incident, exposure and changes, as [law 10](#security-laws) requires. All security-relevant fixes are disclosed.
+**In scope:** this repository, its build and release pipeline, dependencies on the secret path, and keypaste.com's signup endpoint, because it stores email addresses. The endpoint's source is in the site's own repository.
 
-Reports cover this repository, its build and release pipeline, and dependencies on the secret path. keypaste.com's signup endpoint, whose source is in the site's own repository, is also in scope because it stores email addresses. Static site content and third-party deployments are outside this reporting scope. Report upstream dependency vulnerabilities upstream and here; vendored patches must be merged manually.
+**Out of scope:** static site content and third-party deployments.
+
+Report a dependency's vulnerability both upstream and here, since neither report reaches the other and vendored patches are merged by hand. [UPSTREAM.md](third_party/KeePassLib/UPSTREAM.md) records KeePassLib's provenance and local changes, and [its own](third_party/KeePassLib/bouncycastle-twofish/UPSTREAM.md) those of the BouncyCastle Twofish code it compiles in to encrypt Twofish vaults.
+
+Security reports get the highest priority. Credit in the advisory and changelog is your choice, and there is no bug bounty. Every security-relevant fix is disclosed, and a breach or serious shipped bug gets prompt, full disclosure of the incident, the exposure and the changes ([law 10](#security-laws)).
 
 ## Supported versions
 
-The published release is the CLI and MCP bridge `v0.3.0`. The desktop app has no release; the next public release, 1.0.0, is its first. [RELEASE.md](docs/RELEASE.md) records distribution status.
+The published release is the CLI and MCP bridge `v0.3.0`. The desktop app has no release yet; 1.0.0 will be its first. [RELEASE](docs/RELEASE.md) records distribution status.
 
 | Version | Supported | Status |
 |---|---|---|
@@ -26,7 +32,7 @@ The published release is the CLI and MCP bridge `v0.3.0`. The desktop app has no
 | `0.2.x` | No | Superseded; affected by the defects below |
 | `0.1.x` | No | Superseded; affected by the defects below |
 
-There is no long-term support line before 1.0. Fixes enter `main` and the next release; older tags remain unchanged. Published archives are immutable, so old downloads keep their defects.
+There is no long-term support line before 1.0. Fixes go to `main` and the next release. Published archives never change, so an old download keeps its defects.
 
 **If you installed `v0.1.0` or `v0.2.0`, replace it with `v0.3.0`** ([changelog](CHANGELOG.md#030)). These are the recorded defects of the superseded versions:
 
@@ -47,13 +53,23 @@ There is no long-term support line before 1.0. Fixes enter `main` and the next r
 
 ## Verifying a release
 
-CLI/MCP downloads at `https://dl.keypaste.com/v<version>/` include `SHA256SUMS`, per-asset `.sha256` files and corresponding source; `v0.3.0` adds a manifest, `keypaste-0.3.0-manifest.json`, and an attestation bundle, `keypaste-0.3.0-provenance.sigstore.jsonl`; `v0.2.0` and earlier have neither. `release.yml` tests the NativeAOT binaries it uploads, including KeePassXC compatibility in both directions. `ci.yml` runs the unit suites against an ordinary build of the same commit.
+Each version's downloads at `https://dl.keypaste.com/v<version>/` include:
 
-The binaries are unsigned and un-notarized, so Gatekeeper and SmartScreen may warn; README documents the macOS quarantine workaround, and its install blocks preserve quarantine.
+- `SHA256SUMS`, a `.sha256` file per asset, and the corresponding source.
+- From `v0.3.0`, a manifest, `keypaste-<version>-manifest.json`, and an attestation bundle, `keypaste-<version>-provenance.sigstore.jsonl`. `v0.2.0` and earlier have neither.
+- In a version that publishes the desktop packages, a second manifest and bundle, `keypaste-app-<version>-manifest.json` and `keypaste-app-<version>-provenance.sigstore.jsonl`.
 
-Checksums detect corrupted or truncated downloads. Because the archive and checksum share an origin, an attacker who replaces both defeats that check.
+The binaries are unsigned and un-notarized, so Gatekeeper and SmartScreen may warn. [Install](docs/install.md) shows the macOS quarantine workaround, and its install blocks keep quarantine in place.
 
-`v0.3.0` also carries a GitHub build attestation, signed through Sigstore by `release.yml` running in `notinferred/keypaste` for the release tag, covering every asset and the manifest. `v0.2.0` and earlier have none. Checking one needs [GitHub CLI](https://cli.github.com/) (established with 2.86.0) and no GitHub account:
+`release.yml` tests the NativeAOT binaries it uploads, including KeePassXC compatibility in both directions. `ci.yml` runs the unit suites against an ordinary build of the same commit.
+
+### Checksums
+
+A checksum catches a corrupted or truncated download. The archive and its checksum come from the same origin, so an attacker who replaces both defeats the check.
+
+### Build attestation
+
+From `v0.3.0`, every asset and the manifest carry a GitHub build attestation, signed through Sigstore by `release.yml` running in `notinferred/keypaste` for the release tag. Checking one needs [GitHub CLI](https://cli.github.com/) (tested with 2.86.0) and no GitHub account:
 
 ```sh
 v=<version>
@@ -66,13 +82,17 @@ gh attestation verify "keypaste-$v-linux-x64.tar.gz" \
   --source-ref "refs/tags/v$v"
 ```
 
-Substitute any other asset name. A changed byte, another repository or another workflow fails the check. A version that publishes the desktop packages carries a second manifest and bundle, `keypaste-app-<version>-manifest.json` and `keypaste-app-<version>-provenance.sigstore.jsonl`, in the same prefix; an MSI or AppImage is checked with the same command against its own bundle, and the signer workflow is still `release.yml`, which attests what it publishes rather than what compiled it. The command fetches Sigstore's public trust root; to check offline, run `gh attestation trusted-root > trusted_root.jsonl` on a connected machine and add `--custom-trusted-root trusted_root.jsonl`. Without `--bundle`, `gh` fetches the attestation from GitHub and requires `gh auth login`. [verify-provenance.sh](scripts/verify-provenance.sh) `<version>` downloads a whole release and checks the manifest and every asset this way; `--component app` does the same for the desktop packages.
+Substitute any other asset name. An MSI or AppImage is checked the same way against the app's bundle, and the signer workflow is still `release.yml`, which attests what it publishes rather than what compiled it. A changed byte, another repository or another workflow fails the check.
 
-An attestation shows which repository, workflow, tag and commit produced the bytes. It does not show that the source is safe, that the build is reproducible (it is not) or that the release workflow was uncompromised ([THREATS.md](THREATS.md) [T-21]). README documents building from source with dependencies pinned by content hash in `packages.lock.json`.
+- **Offline:** the command fetches Sigstore's public trust root. Run `gh attestation trusted-root > trusted_root.jsonl` on a connected machine, then add `--custom-trusted-root trusted_root.jsonl`.
+- **Without `--bundle`:** `gh` fetches the attestation from GitHub and needs `gh auth login`.
+- **A whole release:** [verify-provenance.sh](scripts/verify-provenance.sh) `<version>` downloads it and checks the manifest and every asset; `--component app` does the same for the desktop packages.
+
+An attestation shows which repository, workflow, tag and commit produced the bytes. It doesn't show that the source is safe, that the build is reproducible (it isn't) or that the release workflow was uncompromised [T-21]. To run only code you have read, [build from source](docs/install.md#building-from-source); dependencies are pinned by content hash in `packages.lock.json`.
 
 ## Security laws
 
-These laws stand above every other rule of keypaste's and change only by the founder's dated re-ratification. Laws 1 to 10 keep their earlier numbers, so an older citation of §3.4 means law 4.
+These laws stand above every other rule of keypaste's and change only by the founder's dated re-ratification.
 
 1. The vault master key never leaves the local process, including through telemetry or an encrypted server backup. There are no exceptions.
 2. Agents never get the vault. Each release contains one credential with one scope, or a linked set the person approves whole in one prompt, following explicit human approval or a pre-approved policy the human wrote, of which a category's Allow the human confirmed on this computer is one. A set is never released by a rule alone. Default is deny. A browser gets one login at a time, and only at the person's pick in keypaste's own in-page list, drawn apart from the page, which lists names and no password: the pick counts as their answer for a login already filled through that browser's pairing on that exact site, and a first fill of a login on a site, and every fill on a site keypaste asks about each time, is asked in keypaste.
@@ -91,111 +111,129 @@ These laws stand above every other rule of keypaste's and change only by the fou
 
 ## Guarantees and limits
 
-The [security laws](#security-laws) govern these guarantees, and [THREATS.md](THREATS.md) holds each one's detail and tests. **v0.3.0** marks what the published CLI and bridge have (the source build keeps it); **unreleased** marks the source build headed for 1.0.0, which includes all of the desktop app. A line with neither mark holds for both.
+What keypaste holds to under the [laws](#security-laws), and what it can't prevent. [THREATS](THREATS.md) has each one's detail and tests. **v0.3.0** marks what the published CLI and bridge do, which the source build keeps. **Unreleased** marks the source build headed for 1.0.0, which includes the whole desktop app. A line with neither mark holds for both.
 
 ### Agent access
 
-- A release needs a person's answer or a rule the person set: per-category Ask, Allow or Block, Ask by default, each Allow confirmed in the app (unreleased); a `policy.toml` rule (v0.3.0) [T-12] [T-15].
-- One approval releases one field or attachment to an agent (v0.3.0: one field), or a linked set of up to four fields the person allows together, asked every time and recorded one line per field (unreleased) [T-56]; a whole env set to a child process for `keypaste run --session` and the `run` tool, asked every time (unreleased) [T-30] [T-35].
+- A value is released only on your answer or a rule you set: per-category Ask, Allow or Block, Ask by default, with each Allow confirmed in the app (unreleased), or a `policy.toml` rule (v0.3.0) [T-12] [T-15].
+- One approval releases one field (v0.3.0), or one field or attachment (unreleased).
+- A linked set of up to four fields is allowed together, asked every time, and logged one line per field (unreleased) [T-56].
+- `keypaste run --session` and the `run` tool get a whole env set for a child process, asked every time (unreleased) [T-30] [T-35].
 - A scoped token releases its sets to `keypaste run --token` with no prompt, except protected sets (unreleased) [T-32].
-- An entry's title, group, tags and URL, and its username unless Settings hides it, reach agents unasked (unreleased) [T-4].
-- The bridge holds no vault and makes no network request (v0.3.0) [T-9].
-- Every answered request is recorded before the reply, and an unrecordable release is refused (v0.3.0) [T-6].
+- Agents see an item's title, group, tags and website unasked, and its username unless Settings hides it (unreleased) [T-4].
 - An agent sees only what its bridge's `--expose` reaches (v0.3.0) [T-4].
-- A search names at most 25 items it reaches, with their origins, usernames while Settings shows them and the links among them, never a value (unreleased) [T-55].
-- An agent may ask the person to save a value at a place it names and never receives it (unreleased) [T-54].
-- An agent may ask the person to move an item it sees whole to Trash or mark it expired, and to delete for good only an item it created through an approved save; each of these is asked every time and made only once the person allows it. It may add or remove the item's `needs-update` tag without asking. Every change's line is written before the vault is saved, and a change whose line cannot be written is not made (unreleased) [T-57].
-- Names and reasons are sanitized, and the reason is shown as the agent's (v0.3.0) [T-1] [T-2].
-- One prompt at a time, across every vault open in the app (unreleased); 45-second expiry; 60-second hold after a refusal (v0.3.0) [T-11].
+- A search names at most 25 items it reaches, with their origins, the usernames Settings shows and the links among them, never a value (unreleased) [T-55].
+- An agent may ask you to save a value at a place it names, and never receives that value (unreleased) [T-54].
+- An agent may ask you to move an item it sees whole to Trash or mark it expired, and to delete for good only an item it created through an approved save. Each is asked every time and made only once you allow it. It may add or remove the item's `needs-update` tag without asking. Each change's line is written before the vault is saved, and a change whose line can't be written isn't made (unreleased) [T-57].
+- Every answered request is logged before the reply, and a release that can't be logged is refused (v0.3.0) [T-6].
+- Titles and reasons are sanitized, and the reason is shown as the agent's (v0.3.0) [T-1] [T-2].
+- One prompt at a time across every vault open in the app (unreleased). A prompt expires after 45 seconds, and a refusal holds the next for 60 seconds (v0.3.0) [T-11].
 - No agent request can make a password prompt appear (v0.3.0) [T-7].
+- The bridge holds no vault and makes no network request (v0.3.0) [T-9].
 - The local pipe admits only the current user (v0.3.0) [T-10].
-- One owner per vault; CLI edits go to it and wait for the person (unreleased) [T-29] [T-43].
-- Agent rules hold only while sealed, each vault's apart and under its own key; anything else asks about every value (unreleased) [T-15].
-- A tool Connect sets up reaches only the vaults it was connected to, through one bridge that asks each vault's own owner (unreleased) [T-4].
-- The app's prompt says Verified only when the system shows keypaste's own program on the pipe, started by the AI tool its label names; otherwise Not verified. It decides nothing (unreleased) [T-3].
-- Limit: client labels are unauthenticated, so whoever starts a bridge gets what an Allow gives, also under another agent's label; Verified does not stop a process of the same user [T-3] [T-14] [T-36].
-- Limit: a rule covers the vault's current contents, so a new field or tag changes what an Allow releases [T-13].
-- Limit: nobody reads the reason behind an unasked release, and timing reveals which categories are Allow [T-12] [T-17].
-- Limit: a run's command is the runner's claim, and a run can leak values its scrubber misses [T-30] [T-35].
-- Limit: a token bundle cannot be revoked; rotate its values [T-32].
-- Limit: there is no prompt limit across entries [T-11].
-- Limit: nothing recalls a client's copies or revokes a credential at its issuer [T-12].
+- Each vault has one approver; CLI edits go to it and wait for you (unreleased) [T-29] [T-43].
+- Agent settings hold only while sealed, each vault's apart under its own key; otherwise every value is asked (unreleased) [T-15].
+- A tool Connect sets up reaches only the vaults it was connected to, through one bridge that asks each vault's own approver (unreleased) [T-4].
+- The app's prompt says Verified only when the system shows keypaste's own program on the pipe, started by the AI tool its label names, and Not verified otherwise. It decides nothing (unreleased) [T-3].
+
+**Limits**
+
+- Client labels are unauthenticated, so whoever starts a bridge gets what an Allow gives, even under another agent's label. Verified doesn't stop a process of the same user [T-3] [T-14] [T-36].
+- A rule covers the vault's current contents, so a new field or tag changes what an Allow releases [T-13].
+- Nobody reads the reason behind an unasked release, and timing reveals which categories are Allow [T-12] [T-17].
+- A run's command is the runner's claim, and a run can leak values its scrubber misses [T-30] [T-35].
+- A token bundle can't be revoked; rotate its values [T-32].
+- There is no prompt limit across items [T-11].
+- Nothing recalls a client's copies or revokes a credential at its issuer [T-12].
 
 ### Browser fill (unreleased)
 
 - keypaste answers only its own extension's three builds, under its own host name, and never writes KeePassXC's [T-48] [T-49] [T-60].
-- A browser pairs only once you confirm it in keypaste, which shows the code the extension shows beside Connect; one request is asked about at a time, and a refusal holds the next back from a minute up to an hour [T-48].
-- One pairing per browser serves every vault unlocked on this computer. It is kept on this computer with only a hash of the extension's key, and counts only while an unlocked vault's seal holds it, so a program writing that file adds no pairing [T-50].
-- Nothing is asked of keypaste as a page loads: a click on keypaste's key icon in a login field lists the page's logins from every open vault by name, with no password, and names the vaults that are locked [T-59].
-- A login fills only when you pick it in that list: at once where that browser filled it on that exact site before, otherwise once you allow it in keypaste, which asks "Fill this login on this site?" naming the site; every login filled is recorded with the page's origin before it leaves keypaste [T-59] [T-61].
-- The list is drawn in a closed shadow root in the browser's top layer; a pick counts only from a trusted click or key, on a list that has been on screen half a second, that the page has not faded, filtered or covered. The extension takes the site from the browser's tab, never from the page [T-59].
-- An item matches a page only on its own host or a subdomain, on the same scheme and port, within one registrable domain by the Public Suffix List, and the first fill on each subdomain is asked; a lookalike or another tenant of a shared host gets nothing. An `http` page, a single-label host and a form posting to another site are listed with a warning and asked in keypaste at every pick [T-58].
+- A browser pairs only once you confirm, in keypaste, the code its extension shows. One pairing request is asked at a time, and a refusal holds the next back for a minute up to an hour [T-48].
+- One pairing per browser serves every vault unlocked on this computer. keypaste keeps only a hash of the extension's key, and the pairing counts only while an unlocked vault's seal holds it [T-50].
+- Nothing is asked of keypaste as a page loads. Clicking keypaste's key icon in a login field lists the page's logins from every open vault by title, with no password [T-59].
+- A login fills only when you pick it in that list: at once if that browser filled it on that exact site before, otherwise once you allow it in keypaste, which names the site. Every fill is logged with the page's origin before it leaves keypaste [T-59] [T-61].
+- A pick counts only from a trusted click or key on a list the page hasn't faded, filtered or covered. The extension takes the site from the browser's tab, never from the page [T-59].
+- An item matches a page only on its own host or a subdomain, with the same scheme and port, within one registrable domain, and the first fill on each subdomain is asked. An `http` page, a single-label host and a form posting to another site get a warning and are asked at every pick [T-58].
 - The extension refuses a login form in a frame from another origin before keypaste is asked [T-58].
-- A release carries one item's username and password, title and UUID, nothing else [T-60].
+- A release carries one item's username, password, title and UUID, and nothing else [T-60].
 - Checked in real Chrome, Edge, Brave and Firefox on Windows, macOS and Linux with keypaste's test build (8.3a3).
-- Limit: whoever holds a pairing's key can list the names of the logins of any site it names and gets the logins that browser filled on a site before, unasked, by naming that site; anything able to start keypaste as the browser can put a pairing confirmation in front of you at any time, whose code differs from your browser's [T-48] [T-50] [T-59] [T-61].
-- Limit: a filled password belongs to the page and the extension, whose scripts or updates can send it anywhere [T-60].
-- Limit: a page that fools a person into picking from a list it did not tamper with, or a page of the site itself that is compromised, gets the login it is picked on; whoever controls a subdomain of an item's site has its login listed there [T-58] [T-59].
+
+**Limits**
+
+- Whoever holds a pairing's key can list the login titles of any site it names, and gets the logins that browser filled on a site before, unasked, by naming that site. Anything that can start keypaste as the browser can put a pairing confirmation in front of you at any time, with a code that differs from your browser's [T-48] [T-50] [T-59] [T-61].
+- A filled password belongs to the page and the extension, whose scripts or updates can send it anywhere [T-60].
+- A page that fools you into picking from a list it didn't tamper with, or a compromised page of the site itself, gets the login picked on it. Whoever controls a subdomain of an item's site has its login listed there [T-58] [T-59].
 
 ### What unlocks a vault
 
-- A master password; unreleased, also a keyfile, with or without a password, in every KeePass form; keypaste never creates a keyfile that is any file at all [T-27] [T-28].
-- Unreleased: a YubiKey slot in the desktop [T-37], and Windows Hello after a lock on Windows [T-44].
-- New vaults are KDBX4 with Argon2d at 2 iterations, 64 MiB and parallelism 2, pinned in `src/Keypaste.Core/KdbxFormat.cs` rather than taken from KeePassLib's defaults; keypaste writes no cryptography of its own and reaches the format only through `src/Keypaste.Core/Internal/`.
-- Unreleased: an unlock warns, and still opens the vault, when the file carries a lower save count than the copy this computer's keypaste last opened or saved, as an older copy put back leaves it; keypaste's own restore is not warned of [T-26].
-- Limit: a copy whose count is not lower, a vault keypaste has not saved yet, a first open on a computer and a deleted home record go unnoticed [T-26].
-- Limit: a copied vault can be guessed offline without limit [T-20].
-- Limit: after a password or keyfile change, older copies and backups still open with the old credentials; delete them.
-- Limit: a lost keyfile or YubiKey cannot be recovered [T-27] [T-37].
-- Limit: whoever passes Windows Hello as the person, PIN included, can reopen the vault while the app runs [T-44].
+- A master password. Unreleased: also a key file, with or without a password, in every KeePass form; keypaste never creates a key file that is any file at all [T-27] [T-28].
+- Unreleased: a YubiKey slot in the desktop app [T-37], and Windows Hello after a lock on Windows [T-44].
+- New vaults are KDBX4 with Argon2d at 2 iterations, 64 MiB and parallelism 2, pinned in `src/Keypaste.Core/KdbxFormat.cs` rather than taken from KeePassLib's defaults. keypaste writes no cryptography of its own and reaches the format only through `src/Keypaste.Core/Internal/`.
+- Unreleased: unlocking warns, and still opens the vault, when the file has a lower save count than the copy this computer's keypaste last opened or saved, as putting an older copy back leaves it. keypaste's own restore doesn't warn [T-26].
+
+**Limits**
+
+- A copy whose count isn't lower, a vault keypaste hasn't saved yet, a first open on a computer and a deleted home record go unnoticed [T-26].
+- A copied vault can be guessed offline without limit [T-20].
+- After a password or key file change, older copies and backups still open with the old credentials; delete them.
+- A lost key file or YubiKey can't be recovered [T-27] [T-37].
+- Whoever passes Windows Hello as you, PIN included, can reopen the vault while the app runs [T-44].
 
 ### The desktop app (unreleased)
 
-- Secret fields show automation only their length [T-22]; a revealed value shows at most 30 seconds [T-25].
+- Secret fields show automation only their length [T-22]. A revealed value shows for at most 30 seconds [T-25].
 - Copies clear after 20 seconds if unchanged, as `keypaste get` does in v0.3.0 [T-19].
-- Several vaults can be open at once, each with its own claim and pipe; the idle lock, `Ctrl/Cmd+L` and quitting lock them all [T-23] [T-29].
-- Idle lock after 30 minutes by default, at most 8 hours [T-23].
+- Several vaults can be open at once, each with its own claim and pipe. The idle lock, `Ctrl/Cmd+L` and quitting lock them all [T-23] [T-29].
+- The idle lock comes after 30 minutes by default, and at most 8 hours [T-23].
 - Notifications carry fixed words only [T-51].
-- Crash reports are sent only after consent, hold no value, name or path, and never come from the CLI or bridge [T-9].
-- A save keeps the last five copies in `<vault>.backups`, and the newest of each of the last seven days and four weeks, restorable from the unlock screen [T-26]; deletion goes to the recycle bin (v0.3.0 deletes permanently).
-- A save whose new file drops an item of the file it replaces without recording a deletion, or differs from the open vault, is refused and replaces nothing, a hardware-key vault's included; the backup and the new file, a new vault's first included, are flushed to the drive, on macOS with `F_FULLFSYNC`, before the rename that puts the file in place, and the save says so when the system would not flush the vault's folder after that rename.
-- Limit: screen capture and onlookers can read a revealed value [T-25].
-- Limit: clipboard managers can ignore keypaste's markers [T-19].
-- Limit: `recent.toml` shows where vaults and keyfiles are [T-24].
-- Limit: an earlier master password and write access to the directory roll the vault back [T-26]; keep backups off the disk too.
+- Crash reports are sent only after you agree, hold no value, name or path, and never come from the CLI or bridge [T-9]. [PRIVACY](PRIVACY.md#crash-reports) lists what a report holds.
+- Each save keeps the last five copies in `<vault>.backups`, plus the newest of each of the last seven days and four weeks, restorable from the unlock screen [T-26]. Deleting moves an item to Trash; v0.3.0 deletes permanently.
+- A save is refused, and replaces nothing, when the new file drops an item without recording a deletion or differs from the open vault, a hardware-key vault's included. The backup and the new file are flushed to the drive (on macOS with `F_FULLFSYNC`) before the rename that puts the file in place, and the save says so when the system won't flush the vault's folder after the rename.
+
+**Limits**
+
+- Screen capture and onlookers can read a revealed value [T-25].
+- Clipboard managers can ignore keypaste's markers [T-19].
+- `recent.toml` shows where vaults and key files are [T-24].
+- An earlier master password and write access to the directory roll the vault back [T-26]; keep backups off the disk too.
 
 ### Memory
 
-- Limit: no in-memory secrecy; immutable strings, swap, dumps and any process running as you can expose values, resolving a request reads passwords into memory, and keypaste cannot defend a compromised local account [T-18].
-- Limit: v0.3.0 keeps an approved value for its `--max-ttl`; unreleased keeps none [T-18].
-- Limit: `keypaste approve` has no idle lock [T-7].
+**Limits**
+
+- There is no in-memory secrecy. Immutable strings, swap, dumps and any process running as you can expose values, resolving a request reads passwords into memory, and keypaste can't defend a compromised local account [T-18].
+- v0.3.0 keeps an approved value for its `--max-ttl`; unreleased keeps none [T-18].
+- `keypaste approve` has no idle lock [T-7].
 
 ### Plaintext and file limits
 
 - `keypaste run` passes values only in the child's environment and writes no environment file, which `verify-run-injection.sh` checks (v0.3.0) [T-30].
-- Limit: the child keeps those values after a lock, and process inspection and logs can expose them.
-- Limit: `env set project KEY=value` puts the value in shell history; the command warns (v0.3.0).
-- Limit: a variable's earlier values stay in the vault's encrypted history, up to ten.
-- Limit: `env export --dotenv` writes plaintext, owner-only except on Windows, where it inherits directory permissions (founder decision, 2026-10-22) (v0.3.0).
-- Limit: `attachment save` writes an attachment unencrypted to a file keypaste cannot take back (unreleased).
-- Limit: deleting a file does not erase storage; rotate credentials that were committed or shared.
-- Limit: a share link opens for anyone holding it, and only a generated passphrase protects an intercepted link (unreleased) [T-33].
-- Limit: a reference file chooses what a run injects [T-31].
+
+**Limits**
+
+- The child keeps those values after a lock, and process inspection and logs can expose them.
+- `env set project KEY=value` puts the value in shell history; the command warns (v0.3.0).
+- A variable's earlier values, up to ten, stay in the vault's encrypted history.
+- `env export --dotenv` writes plaintext, owner-only except on Windows, where the file inherits directory permissions (v0.3.0).
+- `attachment save` writes an attachment unencrypted to a file keypaste can't take back (unreleased).
+- Deleting a file doesn't erase storage; rotate credentials that were committed or shared.
+- A share link opens for anyone holding it, and only a generated passphrase protects an intercepted link (unreleased) [T-33].
+- A reference file chooses what a run injects [T-31].
 
 ### Audit
 
-- The log is hash-chained and appended to; `keypaste log verify --expect <hash>` checks it against an anchor you kept (v0.3.0) [T-5].
-- Only the vault's owner rewrites it: lookups older than 30 days become one summary line per agent per day, days older than the period you keep it for (a year by default) are removed whole, every other line keeps its bytes, and a first line signed with the vault's key seals the result, which another open vault's owner checks under that key before it seals over it (unreleased) [T-5].
-- The vault's owner signs the chain with a key the vault holds every 64 lines and when its session ends, and `keypaste log verify --checkpoints` checks those signatures, so a rewrite before the last one needs the unlocked vault (unreleased) [T-5].
-- Each line the vault's owner writes for a connection names the program on it, its process id, executable path and code signature state, as advice it refuses nothing on (unreleased) [T-10].
-- Entries are sanitized; a reason is kept as a 200-character excerpt, its length and hash (v0.3.0) [T-2]; `v0.1.0` records the request argument, which can be an opaque handle.
-- Limit: lines after the last checkpoint are unsigned, and the tail can be deleted without trace unless you kept an anchor; keypaste keeps none (founder decision, 2026-10-22) [T-5].
-- Limit: a browser fill's line names the site, as its origin, where each item was filled or refused (unreleased).
-- Limit: kept forever, the log grows until archived ([archiving it](docs/mcp-setup.md#archiving-it)); it can hold sensitive agent-written text.
+- The log is hash-chained and appended to. `keypaste log verify --expect <hash>` checks it against an anchor you kept (v0.3.0) [T-5].
+- Only the vault's approver rewrites it: lookups older than 30 days fold into one summary line per agent per day, and days past the period you keep it for (a year by default) are removed whole. Every other line keeps its bytes, and a line signed with the vault's key seals the result (unreleased) [T-5].
+- The approver signs the chain every 64 lines and when its session ends, and `keypaste log verify --checkpoints` checks those signatures, so rewriting before the last one needs the unlocked vault (unreleased) [T-5].
+- Each line written for a connection names the program on it, its process id, executable path and code signature state, as advice that refuses nothing (unreleased) [T-10].
+- Item titles are sanitized. A reason is kept as a 200-character excerpt, its length and its hash (v0.3.0) [T-2]. `v0.1.0` records the request argument, which can be an opaque handle.
 
-## Maintainer note
+**Limits**
 
-The reporting mailbox has been tested from an external address. GitHub private vulnerability reporting is currently disabled. KeePassLib provenance and local changes are recorded in [UPSTREAM.md](third_party/KeePassLib/UPSTREAM.md), and those of the BouncyCastle Twofish code it compiles in, which encrypts a Twofish vault, in [its own](third_party/KeePassLib/bouncycastle-twofish/UPSTREAM.md). Reports to this project and upstream do not automatically reach one another.
+- Lines after the last checkpoint are unsigned, and the tail can be deleted without trace unless you kept an anchor; keypaste keeps none [T-5].
+- A browser fill's line names the site, as its origin, where each item was filled or refused (unreleased).
+- Kept forever, the log grows until archived ([archiving it](docs/mcp-setup.md#archiving-it)), and it can hold sensitive text agents wrote.
 
 [T-1]: THREATS.md#t-1--prompt-injection-through-entry-names
 [T-2]: THREATS.md#t-2--prompt-injection-through-the-agents-stated-reason
@@ -239,8 +277,9 @@ The reporting mailbox has been tested from an external address. GitHub private v
 [T-51]: THREATS.md#t-51--a-notification-is-read-by-more-than-the-person
 [T-54]: THREATS.md#t-54--an-agent-asks-the-person-to-save-a-value
 [T-55]: THREATS.md#t-55--a-search-maps-the-persons-infrastructure
-[T-57]: THREATS.md#t-57--an-agent-asks-the-person-to-change-an-item
+[T-56]: THREATS.md#t-56--a-linked-set-rides-one-approval
+[T-57]: THREATS.md#t-57--an-agent-changes-an-item
 [T-58]: THREATS.md#t-58--a-page-that-is-not-the-items-site
-[T-59]: THREATS.md#t-59--keypaste-believes-the-extension-about-which-page-asks-and-whether-the-person-clicked
+[T-59]: THREATS.md#t-59--keypaste-believes-the-extension-about-which-page-asks-and-whether-the-person-picked
 [T-60]: THREATS.md#t-60--the-extension-someone-elses-code-receives-passwords
-[T-61]: THREATS.md#t-61--an-allowance-is-a-standing-rule
+[T-61]: THREATS.md#t-61--a-login-filled-on-a-site-before-fills-there-at-once

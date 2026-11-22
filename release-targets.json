@@ -31,14 +31,14 @@
           "3.6a"
         ],
         "disclosed_in": [
-          "README.md",
+          "docs/install.md",
           "CHANGELOG.md",
           "SECURITY.md",
           "docs/RELEASE.md"
         ]
       },
       "defects_disclosed_in": [
-        "README.md",
+        "docs/install.md",
         "SECURITY.md"
       ],
       "upgrade_notice_on": [
@@ -55,7 +55,7 @@
           "floor_evidence": "container-check",
           "install_check": "linux",
           "advertised_on": [
-            "README.md"
+            "docs/install.md"
           ],
           "install_runner": "ubuntu-24.04"
         },
@@ -70,11 +70,11 @@
           "floor_caveat": "the equivalent container check is not implemented for arm64",
           "install_check": "linux-arm64",
           "advertised_on": [
-            "README.md"
+            "docs/install.md"
           ],
           "install_runner": "ubuntu-22.04-arm",
           "install_block": "linux",
-          "install_block_reason": "README publishes one Linux block naming linux-x64 and tells an arm64 reader to substitute the filename. A second block would be a second thing to keep correct, so the page is checked for that instruction and for this rid rather than for an arm64 archive name it deliberately does not print."
+          "install_block_reason": "The install page publishes one Linux block naming linux-x64 and tells an arm64 reader to substitute the filename. A second block would be a second thing to keep correct, so the page is checked for that instruction and for this rid rather than for an arm64 archive name it deliberately does not print."
         },
         {
           "rid": "osx-arm64",
@@ -86,7 +86,7 @@
           "floor_evidence": "cited",
           "install_check": "macos",
           "advertised_on": [
-            "README.md"
+            "docs/install.md"
           ],
           "install_runner": "macos-15",
           "floor_citation": "https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md",
@@ -102,7 +102,7 @@
           "floor_evidence": "cited",
           "install_check": "windows",
           "advertised_on": [
-            "README.md"
+            "docs/install.md"
           ],
           "install_runner": "windows-2025",
           "floor_citation": "https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md",

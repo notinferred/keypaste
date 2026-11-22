@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Proves docs/demo.md and README.md still describe the binaries as they actually are.
+# Proves docs/demo.md and docs/keepass-and-agents.md still describe the binaries as they actually are.
 #
 # Everything else in the suite checks behaviour. This checks a document against that behaviour, and
 # nothing in-process can: what goes stale is a Markdown transcript, which no unit test reads, and
@@ -7,12 +7,6 @@
 # supposed to be looking at. docs/demo.md is the marketing, and the first thing a
 # stranger does with a demo page is type it in - so a page that has quietly drifted costs more than
 # no page at all.
-#
-# README.md is held to the same standard for the parts it reproduces. The approval dialog is the
-# first thing on it - it stands in for the demo GIF and it is the single block a stranger judges the
-# project by - and an ungated copy of a transcript is a transcript that drifts. It carries the
-# dialog and the log table's header row, so those are what it is checked against; docs/demo.md
-# carries the whole demo and is checked against all of it.
 #
 # It stands in for Claude with the same scripted JSON-RPC client verify-approval-e2e.sh uses. That
 # is a transport, not an agent: it decides nothing and chooses no wording, it sends exactly the
@@ -48,12 +42,12 @@ readonly FIXTURE='scripts/demo/deploy.sh'
 
 # Every page that reproduces the approval dialog and the log table, and is therefore held to what
 # the binaries print. Adding a page here costs nothing; leaving one out is how a transcript rots.
-# The README is here because a public page is exactly where a stale transcript survives longest,
-# and docs/keepass-and-agents.md is here for the same reason again.
+# docs/keepass-and-agents.md is here because a public page is exactly where a stale transcript
+# survives longest.
 #
 # The dialog extraction below is a sed range, so a page in this list must carry exactly one copy of
 # the block: a second, shortened one would be extracted too and the diff would fail.
-readonly TRANSCRIPT_PAGES='docs/demo.md README.md docs/keepass-and-agents.md'
+readonly TRANSCRIPT_PAGES='docs/demo.md docs/keepass-and-agents.md'
 
 . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 DIE_FILES='AGENT_ERR OUT ERR DIFF'
@@ -327,9 +321,8 @@ for opt in --vault --client-label --expose; do
   grep -q -- "$opt" "$WORK/mcp-help.txt" || die "keypaste mcp no longer offers $opt, which $DOC tells you to configure"
 done
 
-# The generator options docs/FEATURES.md names, `--generate` among them on README.md, and the verb
-# FEATURES says prints a passphrase and stores nothing. The README is in TRANSCRIPT_PAGES for the
-# dialog; this is the same principle applied to the options the public pages spell out.
+# The generator options docs/FEATURES.md names, and the verb FEATURES says prints a passphrase and
+# stores nothing: the same principle as TRANSCRIPT_PAGES, applied to the options the pages spell out.
 "$CLI" add --help      >"$WORK/add-help.txt"      2>&1 || true
 "$CLI" generate --help >"$WORK/generate-help.txt" 2>&1 || true
 

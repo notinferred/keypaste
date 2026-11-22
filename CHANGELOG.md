@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+The README is now a short introduction, installation moved to [docs/install.md](docs/install.md), and every guide and reference is rewritten to be shorter and organised by task.
+
 The browser extension's list of logins on a page is shown and placed only once its fonts and colours have loaded, so it no longer opens a little too large and then shifts. (F.146)
 
 `recommendations.json` no longer names the items, fields, projects or reminders you dismissed: each dismissal is kept as a digest under a key the vault holds, which the first dismissal in a vault without one saves into it. Dismissals an earlier build wrote still hold and are rewritten that way at your next dismissal or review in that vault. (F.145)

@@ -68,7 +68,7 @@ public sealed class SecretMarkerTests
     /// <remarks>
     /// O-0008 records KeePassXC shipping one of these names with a trailing space for three releases, 2.7.10 to 2.7.12, which
     /// silently turned the opt-out off while the code looked right. Whether anything honours them needs a real Windows session
-    /// or a pasteboard manager, which docs/desktop.md's manual checklist and <c>verify-clipboard-markers.sh</c> hold.
+    /// or a pasteboard manager, which docs/desktop-checklist.md's manual checklist and <c>verify-clipboard-markers.sh</c> hold.
     /// </remarks>
     [Fact]
     public void The_secret_marker_names_carry_no_stray_whitespace()

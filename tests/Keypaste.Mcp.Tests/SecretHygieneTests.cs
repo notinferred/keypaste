@@ -25,9 +25,8 @@ namespace Keypaste.Mcp.Tests;
 /// person is not automatable.
 /// </para>
 /// <para>
-/// <b>Why four sentinels and not one.</b> THREATS.md T-8 is explicit that
-/// this repository has already rejected a "no secret leaked" test whose sentinel was never present
-/// anywhere it could leak — that test proved the type system and nothing else. Here every one of
+/// <b>Why four sentinels and not one.</b> A "no secret leaked" test whose sentinel is never present
+/// anywhere it could leak proves the type system and nothing else (THREATS.md T-8). Here every one of
 /// the entry's four fields carries a different, searchable value. The requested one has to come
 /// back; the other three have to appear nowhere at all. A source that returned the whole entry, a
 /// result builder that included one field too many, or a log line that recorded the value would
@@ -742,8 +741,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
             var text = TextOf(result);
 
             // First, that the listing actually listed something. Without this the sweep below would
-            // pass for a listing that refused, which proves nothing at all - the exact trap
-            // THREATS.md T-8 says this repository has already fallen into once.
+            // pass for a listing that refused, which proves nothing at all.
             Assert.False(result.IsError, text);
             Assert.Contains("STRIPE_KEY", text, StringComparison.Ordinal);
 

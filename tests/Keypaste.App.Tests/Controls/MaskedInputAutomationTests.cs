@@ -22,8 +22,8 @@ namespace Keypaste.App.Tests.Controls;
 /// </summary>
 /// <remarks>
 /// <para>
-/// THREATS.md T-22 said in as many words that this test did not exist: <c>MaskedInput</c> was the
-/// mitigation and <c>OnCreateAutomationPeer</c> was the only evidence for it. An implementation
+/// Without this test, THREATS.md T-22's mitigation, <c>MaskedInput</c>, had only
+/// <c>OnCreateAutomationPeer</c> as evidence. An implementation
 /// detail is not evidence — <c>TextBox</c> would have published the password one keystroke at a
 /// time through <c>TextBoxAutomationPeer.Value</c>, and the thing that stops it here is a choice
 /// somebody could undo in one line.

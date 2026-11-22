@@ -1,96 +1,235 @@
 # Code map
 
-Where the code is, so a task starts from the right files instead of a search of the whole tree. [SECURITY](../SECURITY.md#security-laws) owns the security laws; this map changes only when a project, entry point or process boundary changes.
+Where each part of keypaste lives, so a change starts from the right files. Paths under `Core/`, `Cli/`, `Mcp/`, `Browser/` and `App/` are in `src/Keypaste.<Project>/`. [SECURITY](../SECURITY.md#security-laws) owns the security laws.
 
 ## Projects
 
-| Project | Role | Start at |
+| Project | Owns | Start at |
 |---|---|---|
-| `src/Keypaste.Core` | Every vault, env, generation, agent access, approval, audit and release rule. Front ends adapt it and add none of their own. Core references KeePassLib under the `KeePass` extern alias, which only the files under `Internal/` declare, so only they touch KeePassLib types. | the concern table below |
-| `src/Keypaste.Infrastructure` | The pieces that know nothing about vaults: the strict TOML reader and the writer that writes only what it reads, the strict CSV reader the CSV export readers share, newline-delimited frames, the command-line syntax every verb and the bridge share over System.CommandLine, with the help and parse errors it draws from their declarations, replacing a file in one rename and ordering release versions. It references no project, so it cannot reach Core. A submodule of [keypaste-infrastructure](https://github.com/notinferred/keypaste-infrastructure). | `Toml.cs`, `Syntax.cs` |
-| `src/Keypaste.Cli` | The `keypaste` command. One class per verb in `Commands/`, each declaring its arguments as a `CliVerb` in `Keypaste.Infrastructure`'s `Syntax`, as the bridge does; `CliApp` holds the tree of verbs, parses and dispatches, and owns streams and exit codes, `VaultLocator` resolves `--vault`, `KEYPASTE_VAULT` and the vault chosen in `app.toml`, and `VaultSession` owns prompts, `--keyfile` and opening a vault, or, for a verb that edits items while the app or `keypaste approve` holds the vault, handing the edit to it through `OwnerEdit`. `keypaste approve` is the terminal approver. `Styling/` decides colour and glyph fallbacks for every verb, and `Output/CliJson.cs` is the one `--json` shape. | `Program.cs`, `CliApp.cs` |
-| `src/Keypaste.Mcp` | The vault-free MCP bridge over stdio, built as a library and entered by `Keypaste.Cli` through `BridgeEntry.RunAsync`. `BridgeVaults.cs` holds a route to each vault its `--vault`s name, each an `ApproverConnection.cs` to that vault's own owner: a search or listing asks every route at once and names each item's vault, and a request goes to the vault its `vault` argument names or, without one, the one the bridge's searches or a listing of each vault showed its item in, refusing an item more than one vault could hold. Its tools are in `Tools/`, `find_access` (`FindAccessTool`) searching what the bridge exposes, `request_save` asking the person to save a value at a place it names, `request_item_change` (`RequestItemChangeTool`) asking the person to allow a change to an item, `request_attachment` being `RequestCredentialTool` for one attachment by name, `request_linked_set` (`RequestLinkedSetTool`) asking for up to four linked fields in one prompt; `run` is offered only under `--allow-run`, which setup registers, and starts the approved command through `Keypaste.Core/Launch/` once the owner has decided. It writes an audit line only for a call no owner recorded: one it refused itself, could not send, got no answer to or was told was not recorded, naming the caller `McpAudit.cs` reads. The vault's owner writes the line of every request it answers, and `keypaste share` and `keypaste token bundle` write their own. | `BridgeEntry.cs` |
-| `src/Keypaste.Browser` | The vault-free relay a browser starts as keypaste's extension's native messaging host, `com.keypaste.browser`, speaking KeePassXC-Browser's protocol, and its NaCl box. `BrowserCaller.cs` reads the browser's arguments, `RelayOptions.cs` finds the vaults whose owners it may reach, the one `keypaste mcp` with no arguments finds first and then the local account's others, `NativeMessages.cs` frames messages, `NonceLedger.cs` keeps the session's nonces, and `Relay.cs` speaks the extension's protocol, answering what keypaste refuses itself and sending the owner only typed requests over `Core/Ipc/BrowserLink.cs`. The box is a key pair, a seal and an open over libsodium's `crypto_box_keypair`, `crypto_box_easy` and `crypto_box_open_easy`, called from `Sodium.cs` alone. [build-libsodium.sh](../scripts/build-libsodium.sh) builds libsodium from its signed release; the NativeAOT `keypaste` links its static archive, and a build in the .NET runtime, the tests', loads its shared library by full path from beside the binary. `KnownAnswers.cs` holds libsodium's box vectors and a box TweetNaCl.js sealed, which `keypaste --selftest` checks. `BrowserEntry` is the project's one public type. It references Core, and only `Keypaste.Cli` references it, with the unshipped fake browser through its internals. | `BrowserEntry.cs`, `Relay.cs` |
-| `src/Keypaste.App` | The Avalonia desktop. `Session/OpenVaults.cs` holds the vaults open at once, each a `Session/AppVaultSession.cs` owning one unlocked vault; `ViewModels/` has one view model per screen, whose properties and commands CommunityToolkit.Mvvm generates, and `Views/` its XAML; `ShellViewModel` disposes every screen on lock. `Theme/` holds the design tokens, the control styles by class, the Lucide icon geometry (generated by `scripts/lucide-to-axaml.py`) and the marks' outlines (generated by `scripts/outline-brand-marks.py`). `HardwareKeys/YubiKeyHardware.cs` reaches YubiKeys through Yubico's SDK, which only the desktop references. It builds twice: the Windows package is its `net10.0-windows10.0.19041.0` target, whose `Session/WindowsHello.cs` reaches Windows Hello through the Windows SDK's WinRT projection, and Linux and macOS are its `net10.0` one; `Session/QuickUnlockCopies.cs` keeps each password unlock's key parts sealed under Windows Hello, in memory, for a quick unlock. `Notifications/` holds the system's notifications behind `ISystemNotifications`: `SystemNotice.cs` is every word they may say, `RaisedNotice.cs` one notice's life, and `MacNotifications.cs`, `WindowsNotifications.cs` and `LinuxNotifications.cs` reach UserNotifications, a toast and `org.freedesktop.Notifications` (Q.14). `SystemAppearance.cs` asks a Linux desktop's settings portal whether it reports light or dark, and `SystemScrollBars.cs` reads each platform's scroll bar setting. It is the one program with a real culture and ICU, which `Globalization/` holds: `IcuFallback.cs` runs first in `Main`, `PersonTime.cs` is every time a person reads and `ReadingDirection.cs` which way windows run. Its labels are in `Resources/Strings.resx`, which `scripts/generate-strings.py` turns into `Strings.cs`, and a view reads them with `x:Static`, so a missing one fails the build (Q.16). | `Program.cs`, `App.axaml.cs` |
-| `extension` | keypaste's browser extension, a separate GPL-3.0 program forked from KeePassXC-Browser 1.10.4.1 and speaking its protocol to the relay, which [UPSTREAM.md](../extension/UPSTREAM.md) records. `src/background/` holds the native messaging client, the NaCl session and pairing, and `src/content/` the field icon, the in-page list of logins by name and the fill of the one picked. `build.js` makes byte-identical zips for Chromium and Firefox into `artifacts/extension/`, and `keys/` the Chrome Web Store item's public key, which gives the Chromium build the store's ID, and the test key that gives the Edge build its ID until Edge Add-ons gives its own. A submodule of [keypaste-extension](https://github.com/notinferred/keypaste-extension). | `src/background/keepass.js`, `build.js` |
-| `third_party/KeePassLib` | The vendored KDBX engine, with BouncyCastle's Twofish from its `bouncycastle-twofish/` compiled in. Each one's UPSTREAM.md, [KeePassLib's](../third_party/KeePassLib/UPSTREAM.md) and [BouncyCastle's](../third_party/KeePassLib/bouncycastle-twofish/UPSTREAM.md), owns its provenance and local changes. A submodule of [keypaste-keepasslib](https://github.com/notinferred/keypaste-keepasslib). | — |
+| `src/Keypaste.Core` | Every rule about vaults, env sets, generation, agent access, approval, audit and release | [Where each concern lives](#where-each-concern-lives) |
+| `src/Keypaste.Infrastructure` | What knows nothing about vaults: strict TOML and CSV, newline-delimited frames, the shared command-line syntax over System.CommandLine, atomic file replacement, version ordering. References no project. Submodule of [keypaste-infrastructure](https://github.com/notinferred/keypaste-infrastructure). | `Toml.cs`, `Syntax.cs` |
+| `src/Keypaste.Cli` | The `keypaste` command. The binary also carries the bridge and the browser relay, which `Program.cs` dispatches to before any vault access. | `Program.cs`, `CliApp.cs` |
+| `src/Keypaste.Mcp` | The bridge, `keypaste mcp`: a vault-free MCP server over stdio, a library whose one public type is `BridgeEntry` | `BridgeEntry.cs` |
+| `src/Keypaste.Browser` | The vault-free relay a browser starts as native messaging host `com.keypaste.browser`, speaking KeePassXC-Browser's protocol. One public type, `BrowserEntry`. | `BrowserEntry.cs`, `Relay.cs` |
+| `src/Keypaste.App` | The Avalonia desktop app | `Program.cs`, `App.axaml.cs` |
+| `extension` | The browser extension, a GPL-3.0 fork of KeePassXC-Browser 1.10.4.1 ([UPSTREAM.md](../extension/UPSTREAM.md)). Submodule of [keypaste-extension](https://github.com/notinferred/keypaste-extension). | `src/background/keepass.js`, `build.js` |
+| `third_party/KeePassLib` | The vendored KDBX engine, with BouncyCastle's Twofish compiled in. [KeePassLib's](../third_party/KeePassLib/UPSTREAM.md) and [BouncyCastle's](../third_party/KeePassLib/bouncycastle-twofish/UPSTREAM.md) UPSTREAM.md own provenance. Submodule of [keypaste-keepasslib](https://github.com/notinferred/keypaste-keepasslib). | — |
 
-Each submodule has its own repository and history. The product pins each to a commit, builds and tests it at that commit, and moves a pin only by a commit of its own, which Dependabot proposes monthly. The lock files of KeePassLib and Infrastructure are the product's, in `locks/`, which the build props name.
+Each submodule is pinned to a commit, and a pin moves only in a commit of its own, which Dependabot proposes monthly. KeePassLib's and Infrastructure's lock files are in `locks/`.
 
-`keypaste.slnx` builds Core, Infrastructure, CLI, MCP, the browser relay, their tests, the fake browser and KeePassLib; `keypaste.app.slnx` builds Core, Infrastructure, the desktop and its tests. Both write into `artifacts/`. `tests/Keypaste.Consistency.Tests` references both front ends and belongs to neither solution; [its README](../tests/Keypaste.Consistency.Tests/README.md) says why. `Keypaste.Cli` references `Keypaste.Mcp` as a library whose one public type is `BridgeEntry`, and `Keypaste.Browser`, whose one is `BrowserEntry`; the `keypaste` binary carries all three and dispatches to the bridge, the browser relay or the box's `--selftest` in `Program.cs` before any vault access.
+| Solution | Builds |
+|---|---|
+| `keypaste.slnx` | Core, Infrastructure, CLI, MCP, the relay, their tests, the fake browser and KeePassLib |
+| `keypaste.app.slnx` | Core, Infrastructure, the desktop and its tests |
+| `tests/Keypaste.Consistency.Tests` | References both front ends, in neither solution ([README](../tests/Keypaste.Consistency.Tests/README.md)) |
 
-The compiler holds the architecture rules. Each `src` project's `BannedSymbols.txt`, and the shared `src/BannedSymbols.*.txt` lists `src/Directory.Build.props` gives it, name what its code may not use, such as the network outside the share and crash clients or a vault in the bridge and the relay; a use is allowed only under a `#pragma` that `BanExemptionsTests` lists. Core, Infrastructure and the desktop share one process with a culture, so `.editorconfig` makes every culture-sensitive call in them say ordinal, invariant or current, Meziantou.Analyzer catching what the SDK's rules do not, such as an interpolated number; `src/Directory.Build.props` lifts `InvariantGlobalization` in those two libraries for that alone, as the SDK's rules stay silent under it, and `verify.sh backend` runs Core's tests under Turkish, German and Arabic (Q.16). `Directory.Build.targets` holds which project may reference which, who references `Keypaste.Browser` and that only the CLI links libsodium. The rules the compiler cannot see stay as tests that read the source: `SavingVerbSourceRulesTests`, `DoctorSourceRulesTests`, `CrashSourceRulesTests`, `PassphraseSourceRulesTests`, `AttachmentSourceRulesTests`, `SodiumSourceRulesTests` and `DispatchOrderTests`, each saying why.
+Both solutions write into `artifacts/`.
 
-## Processes today
+## Rules the build holds
 
-Four processes can hold vault data. One vault has one owner, the approver: the desktop and `keypaste approve` take its claim (`Core/Ownership/VaultClaim.cs`) before reading the password, and serve it on a per-user, per-vault named pipe (`Core/Ipc/ApproverEndpoint.cs`) while unlocked. Either owner's `Core/Ownership/SessionAuthority.cs` records every listing, search, credential, run, `run --session` and token request it answers in its own home's audit log before replying, through `Core/Ownership/RequestRecorder.cs`, and refuses a release whose line it cannot write. Only a claim's holder writes: `Vault` opens or creates a vault for writing, and `VaultBackups` restores one, only under a claim naming it, refusing to save once it is released, and `Vault.OpenReadOnly` never saves, so the saving CLI verbs, `keypaste init` and the unlock screen's restore take the claim too.
+- **The one-core rule.** Every rule lives once, in Core. The CLI, the desktop, the bridge and the relay adapt it and add none of their own.
+- **Only `Core/Internal/` touches KeePassLib.** Core references it under the `KeePass` extern alias, which only `Internal/` files declare ([law 6](../SECURITY.md#security-laws)).
+- **Banned symbols.** Each `src` project's `BannedSymbols.txt`, plus the shared `src/BannedSymbols.*.txt`, bans the network outside the share and crash clients, file writes in the front ends, and a vault in the bridge and the relay ([law 11](../SECURITY.md#security-laws)). An exception needs a `#pragma` that `BanExemptionsTests` lists.
+- **Project references.** `Directory.Build.targets` holds which project may reference which, and that only the CLI links libsodium.
+- **Culture.** In Core, Infrastructure and the desktop, `.editorconfig` and Meziantou.Analyzer require every culture-sensitive call to say ordinal, invariant or current. `verify.sh backend` runs Core's tests under Turkish, German and Arabic.
+- **Source rule tests** (`*SourceRulesTests`, `DispatchOrderTests`) hold what the compiler cannot see, each saying why.
 
-- The desktop app holds several vaults open at once (`App/Session/OpenVaults.cs`), each its own session (`App/Session/AppVaultSession.cs`) with its own claim, lifetime, authority on its own pipe, locked notice and quick unlock copies, and the window lists them all, built on one unlocked vault and again on another when that one locks alone. It locks them all together on idle, on `Ctrl/Cmd+L`, on quitting, on closing its window into the menu bar or tray (`App/AppTray.cs`) and, when that setting is on, on minimize, and one alone for `keypaste lock`, an access change or a refused reload; every vault it unlocks joins the local account in `app.toml` (`Core/Settings/LocalAccount.cs`); on Windows, Windows Hello can undo a lock from the key parts the last password unlock sealed (`Session/QuickUnlockCopies.cs`). It runs once per user and `KEYPASTE_HOME`: `Program.Run` takes the home's claim (`Core/Ownership/AppClaim.cs`), and a second start, or a file the system opens with the app (`Core/Ownership/HandedFile.cs`), is handed to the running copy over its same-user pipe; `--background`, which the login entry `Core/Login/` writes, opens no window. Each unlock is a `Core/Ownership/SessionLifetime.cs`, which every lock ends before the vault is disposed, withdrawing what agents have waiting. `App/Session/SessionHost.cs` serves each unlocked vault to agents under that vault's rules (`Core/Agents/`), putting a request to the person through `App/Session/WindowApprovalChannel.cs`, whose screen and turn every open vault shares (`Core/Approval/PromptTurns.cs`), so one prompt is up at a time, in `Views/ApprovalWindow.axaml`, `Views/SetApprovalWindow.axaml`, `Views/SaveValueWindow.axaml`, `Views/ItemChangeWindow.axaml`, `Views/FillWindow.axaml`, `Views/EnvApprovalWindow.axaml` or `Views/TerminalEditWindow.axaml`, and `App/Session/AppAuthority.cs` is the session and its host as launch composes them. While locked, `App/Session/LockedNotice.cs` listens on `Core/Ownership/LockedAppEndpoint.cs` and tells the person when a bridge finds the vault locked. A Run starts a project's terminal through `App/ViewModels/ProjectLaunchViewModel.cs` and `Core/Launch/`, on macOS by a launch pass (`App/Session/ProjectLaunching.cs`, flow below). `App/CrashReporting.cs` composes the run's crash reports under the terms `Views/FirstLaunchView.axaml` records (`App/Terms/`). Agents' Connect registers an AI tool through `Core/Clients/`, pinned with a `--vault` for each vault the person chose in its pane, the vault in view by default, and Settings puts `keypaste` on a terminal's PATH through `Core/Linking/`. The [desktop guide](desktop.md) describes what the person sees.
-- `keypaste approve` is started by a person in a terminal. It opens its home's audit log before its claim and the password, refusing to start without it, then holds the unlocked vault, listens on the vault's pipe and asks that person through `Cli/Approval/TerminalApprovalChannel.cs`, under that vault's rules (`agents/<vault>.toml`); the channel also confirms a change that gives an agent more, asked for by `keypaste clients` or the prompt's `[a]`, and a terminal's edit to the vault's items, before `keypaste approve` saves it in the vault under its claim. Ctrl+C, SIGTERM and SIGHUP end its lifetime the same way.
-- `keypaste mcp` is started by the MCP client, never opens a vault, serves every vault its `--vault`s name, or the chosen one, as one MCP connection, forwards each request to the owner of the vault it is for over that vault's pipe, so each vault's rules and prompts decide and a locked one answers as locked without holding up another, and writes an audit line only for a call no owner recorded. Under `--allow-run` it also starts a command an agent names, after the owner's approval, with the approved set in its environment (`Mcp/Tools/RunTool.cs`). Before it refuses a request for want of an owner, `Mcp/LockedApp.cs` connects to an app locked on the vault, and when one answers the refusal says so. `Program.StartsBridge` in `Keypaste.Cli` decides from the arguments alone, before any vault access: `mcp serve`, `mcp setup` and `mcp policy` go to `CliApp.Run`, which refuses them as removed spellings, and every other `keypaste mcp`, its help included, to `BridgeEntry.RunAsync`.
-- The browser relay is `keypaste` as a browser starts it for keypaste's extension, through the manifest Settings › Browser fill or `keypaste browser` wrote (`Core/Browser/BrowserHosts.cs`), with the caller's origin or add-on ID as its arguments, which `Program.cs` hands to `BrowserEntry.RunAsync` before any vault access. It never opens a vault: it reaches the owner of the vault `keypaste mcp` with no arguments finds or, when that one does not attach, of another vault the local account holds in `app.toml`, each through its own pipe, so one locked vault leaves it on an owner with a vault unlocked; it ends the extension's NaCl box session, answers each action keypaste refuses itself with KeePassXC's error code, and sends the owner only typed pairing, pairing-check, list, release, show and lock requests, as a browser's attachment naming the build the browser named, which the owner admits for those alone. It holds its link to the owner with a read pending, so the owner's lock is told to the extension as `database-locked`; with nothing holding the vault unlocked it answers error 1, knocking on the locked app's pipe when the extension asks to unlock. It writes no audit line. The owner tells a browser's attachment a database hash naming this computer, and pairs a browser as soon as its extension asks, once the person confirms the six digits it shows, derived from the extension's key, in the app's `Views/PairingWindow.axaml` or at `keypaste approve`'s terminal, one request at a time and held back after a refusal, through `Core/Ownership/SessionBrowsers.cs`. One pairing per browser serves every vault unlocked in the owner process, which in the app `Session/OpenVaults.cs` composes: `Core/Browser/BrowserPairings.cs` keeps it in keypaste's home as `browsers.json`, sealed under each unlocked vault's own key. A list carries the names of the items `Core/Browser/LoginCandidates.cs` matches in every vault unlocked in the owner process, each unlock's `SessionBrowsers` serving through the shared `OwnerPairings`, and the names of the open vaults that are locked; a release fills the one item the person picked, at once where that pairing filled it on that exact origin before, kept sealed in the item's vault's agent rules as a browser allowance, otherwise once the person allows it in the app's `Views/FillWindow.axaml` or at `keypaste approve`'s terminal; a show brings the app's window forward, with a locked vault's unlock form or a new login for the page's origin in the vault the list named. Each list that names an item and each release or refusal is recorded before the reply.
-- `keypaste run` opens the vault, reads an env set, closes the vault and starts the child with the values in its environment through the same `Core/Launch/EnvLaunch.cs` as the app. It takes no claim. With `--session` it opens nothing: it attaches to the owner's endpoint as the bridge does and sends an env request, which `SessionAuthority` resolves through `SessionEnvResolver` under the attached session, asking through the owner's own `ApprovalGate` and channel, and starts the child with the whole set the reply carries. The run Terminal starts for the app on macOS asks the app's launch endpoint rather than the vault's and carries the app's launch pass in `KEYPASTE_LAUNCH`, which the owner takes in place of asking and no child inherits. With `--token` it sends a token env request the owner verifies against `Core/Tokens/` instead of asking, and with `--bundle` it opens a token bundle with no vault or pipe.
-- `keypaste lock` attaches to the owner as the bridge does and locks it. `keypaste doctor` attaches the same way, naming no AI tool, only to learn whether the owner answers and its version, which every attach reply carries; it never connects to a locked app's pipe, opens no vault, writes nothing, and starts only the `keypaste` each AI tool registers, with `--version` and `mcp --help`, and the one PATH finds, with `--version` (`Core/Health/`). `keypaste` alone on a terminal reads the vault's header, the AI tools' files and the owner's answer the same way and starts nothing (`Commands/StatusCommand.cs`). `keypaste share` opens the vault under its claim, seals one field and uploads the ciphertext to api.keypaste.com's `/v1/share`.
+## Processes
 
-A credential request runs: MCP client → `Mcp/Tools/RequestCredentialTool.cs` → `Mcp/BridgeVaults.cs`, which picks the item's vault → that vault's `Mcp/ApproverConnection.cs`, which attaches to the owner's session naming its vault → `Core/Ipc/ApproverClient.cs` → pipe → `Core/Ipc/ApproverListener.cs` in the owner → `Core/Ownership/SessionAuthority.cs`, which refuses a request not from its current session → `Core/Approval/ApproverHandler.cs`, which resolves the entry, re-checks exposure, refuses a Blocked category, honours a recent refusal, releases under an Allow or asks the person, and only then reads one field → the authority commits the release only while the session's lifetime is live → the authority records the line in its home's log, refusing a release it cannot record → reply naming the session and saying it was recorded.
+| Process | Started by | Vault | Entry |
+|---|---|---|---|
+| Desktop app | The person, or the login entry with `--background` | Holds several unlocked, as their approver | `App/Program.cs` |
+| `keypaste approve` | The person, in a terminal | Holds one unlocked, as its approver | `Cli/Commands/ApproveCommand.cs` |
+| `keypaste mcp`, the bridge | The AI tool | Never opens one ([law 11](../SECURITY.md#security-laws)) | `Mcp/BridgeEntry.cs` |
+| Browser relay | The browser, for keypaste's extension | Never opens one | `Browser/BrowserEntry.cs` |
+| `keypaste run` | The person, or Terminal for the app's Run | Opens, reads and closes it, or asks the approver | `Cli/Commands/RunCommand.cs`, `Core/Launch/EnvLaunch.cs` |
+| Other verbs | The person | Saving verbs take the vault's claim | `Cli/CliApp.cs` |
 
-A save request runs the same way to `SessionAuthority`, then `Core/Ownership/SessionSaver.cs`, which checks the place with `Core/Editing/ValueSaves.cs` and what the agent can see, asks the person for the value through the gate, and writes it with the terminal's edits under the owner's claim; the reply says only whether it was saved. A save that creates an item marks it with the agent's label in its KDBX custom data (`Vault.MarkAgentCreated`).
+### Ownership
 
-An item change request runs the same way to `SessionAuthority`, then `Core/Ownership/SessionItemChanger.cs`, which resolves the item, requires the agent to see it whole, checks the change with `Core/Editing/ItemChanges.cs`, a delete only of an item that agent's save created, asks the person through the gate, and writes it with the terminal's edits under the owner's claim; the reply says only whether it was made.
+- One vault has one approver, which the code calls its owner. It takes the vault's claim (`Core/Ownership/VaultClaim.cs`) before reading the password, then serves the vault on a per-user, per-vault pipe (`Core/Ipc/ApproverEndpoint.cs`).
+- `Core/Ownership/SessionAuthority.cs` records every request in the audit log before replying, and refuses a release it cannot record ([law 3](../SECURITY.md#security-laws)).
+- Each unlock is a `SessionLifetime.cs`; a lock ends it, withdrawing what agents have waiting.
+- Only a claim's holder writes. `Vault.OpenReadOnly` never saves.
 
-A browser's request runs: keypaste's extension → the browser, which starts `keypaste` with its caller's identity → `Program.cs` → `Browser/Relay.cs`, which opens the extension's box and checks its nonce → `Core/Ipc/BrowserLink.cs`, attached as a browser → pipe → `Core/Ipc/ApproverListener.cs` → `Core/Ownership/SessionAuthority.cs`, which admits it only on a browser's attachment to its current session and has the `Core/Browser/IBrowserRequests.cs` it was given, `Core/Ownership/SessionBrowsers.cs` in both owners, decide a pairing, check, list, release or show, binding the connection to the pairing a pairing or a check proved and refusing a list, release or show under any other, or locks for a lock → reply → the relay seals the answer under the request's nonce incremented.
+### Desktop app
 
-On macOS a Run confirmed in the app runs: `App/ViewModels/ProjectLaunchViewModel.cs` → the app's `SessionAuthority.IssueLaunch`, which keeps the pass in `Core/Approval/LaunchPasses.cs` → a request file → `/usr/bin/open -b com.apple.Terminal` on the launcher → Terminal → the launcher, which claims and deletes the request → the bundle's `keypaste run --session` → pipe → the app's launch endpoint, `Core/Ownership/LaunchEndpoint.cs` → `SessionAuthority`, which takes the pass and releases the set the card named without asking → the authority records the line in its home's log → reply.
+- `App/Session/OpenVaults.cs` holds the open vaults, each an `AppVaultSession.cs` with its own claim, lifetime and pipe.
+- One copy runs per user and `KEYPASTE_HOME` (`Core/Ownership/AppClaim.cs`). A second start or a handed file (`HandedFile.cs`) goes to the running copy.
+- `App/Session/SessionHost.cs` serves each vault to agents. `WindowApprovalChannel.cs` asks the person, one prompt at a time across all vaults, in a window under `Views/`.
+- While locked, `App/Session/LockedNotice.cs` tells the person when a bridge finds the vault locked.
+- All vaults lock together on idle, `Ctrl/Cmd+L`, quitting and closing into the tray (`App/AppTray.cs`). One locks alone for `keypaste lock`, an access change or a refused reload.
+- Windows Hello quick unlock: `Session/QuickUnlockCopies.cs`, `Session/WindowsHello.cs`.
+- Agents › Connect registers an AI tool through `Core/Clients/`. `App/CrashReporting.cs` sends crash reports only under the terms the person accepted (`App/Terms/`).
 
-## Where each concern lives in Core
+The [desktop guide](desktop.md) describes what the person sees.
+
+### keypaste approve
+
+It refuses to start without its audit log. It then holds the unlocked vault and asks the person through `Cli/Approval/TerminalApprovalChannel.cs`, under the vault's `agents/<vault>.toml`. Ctrl+C, SIGTERM and SIGHUP end its lifetime as a lock does.
+
+### The bridge
+
+- `Mcp/BridgeVaults.cs` holds a route to each `--vault`'s owner, each an `ApproverConnection.cs`. A search asks every route at once; a request goes to the item's vault, and an item more than one vault could hold is refused.
+- A locked vault answers as locked without holding up another (`Mcp/LockedApp.cs`).
+- It writes an audit line only for a call no owner recorded (`McpAudit.cs`).
+- `Program.StartsBridge` decides from the arguments alone.
+
+| MCP tool | Class in `Mcp/Tools/` | Does |
+|---|---|---|
+| `find_access` | `FindAccessTool` | Searches what the bridge exposes |
+| `list_entry_names` | `ListEntryNamesTool` | Lists exposed items' titles, groups, askable fields and project tags, never a value |
+| `request_credential` | `RequestCredentialTool` | Asks for one field |
+| `request_attachment` | `RequestCredentialTool` | Asks for one attachment by name |
+| `request_linked_set` | `RequestLinkedSetTool` | Asks for up to four linked fields in one prompt |
+| `request_save` | `SaveValueTool` | Asks the person to save a value |
+| `request_item_change` | `RequestItemChangeTool` | Asks the person to allow a change to an item |
+| `run` | `RunTool` | Starts an approved command with the set in its environment; only under `--allow-run` |
+
+### The browser relay
+
+- `Relay.cs` speaks the extension's protocol; `NativeMessages.cs` frames messages and `NonceLedger.cs` keeps nonces. It sends the owner only typed requests over `Core/Ipc/BrowserLink.cs` and writes no audit line.
+- `RelayOptions.cs` picks the owners it may reach from `app.toml`'s local account.
+- The NaCl box is `Sodium.cs` alone, over libsodium, which [build-libsodium.sh](../scripts/build-libsodium.sh) builds from its signed release. `KnownAnswers.cs` holds the vectors `keypaste --selftest` checks.
+- On the owner's side, `Core/Ownership/SessionBrowsers.cs` handles pairing, list, release and show. `Core/Browser/BrowserPairings.cs` keeps pairings in `browsers.json`, sealed under each unlocked vault's key.
+
+### keypaste run
+
+It opens the vault, reads an env set, closes the vault and starts the child through `Core/Launch/EnvLaunch.cs`. It takes no claim.
+
+| Flag | What it does instead |
+|---|---|
+| `--session` | Opens nothing; sends an env request to the owner, which asks the person |
+| `--token` | Sends a token env request the owner verifies against `Core/Tokens/` |
+| `--bundle` | Opens a token bundle with no vault or pipe |
+
+The app's Run on macOS carries a launch pass in `KEYPASTE_LAUNCH`, which the owner takes in place of asking and no child inherits.
+
+### Other verbs
+
+- `keypaste lock` and `keypaste doctor` attach to the owner as the bridge does. `doctor` (`Core/Health/`) opens no vault and writes nothing.
+- `keypaste` alone reports status and starts nothing (`Commands/StatusCommand.cs`).
+- `keypaste share` seals one field and uploads the ciphertext to api.keypaste.com's `/v1/share`.
+
+## Request paths
+
+A credential request:
+
+1. `Mcp/Tools/RequestCredentialTool.cs` → `Mcp/BridgeVaults.cs` picks the vault.
+2. `Mcp/ApproverConnection.cs` → `Core/Ipc/ApproverClient.cs` → pipe → `Core/Ipc/ApproverListener.cs`.
+3. `SessionAuthority` refuses a request not from its current session.
+4. `Core/Approval/ApproverHandler.cs` checks exposure and rules, asks the person if needed, then reads one field.
+5. `SessionAuthority` records the line, or refuses the release.
+
+A save takes the same path to `Core/Ownership/SessionSaver.cs` (`Core/Editing/ValueSaves.cs`). An item change goes to `Core/Ownership/SessionItemChanger.cs` (`Core/Editing/ItemChanges.cs`).
+
+A browser request:
+
+1. Extension → browser → `keypaste` → `Browser/Relay.cs` opens the box and checks the nonce.
+2. `Core/Ipc/BrowserLink.cs` → pipe → `SessionAuthority`, which admits only a browser attachment to its current session.
+3. `Core/Ownership/SessionBrowsers.cs` decides, bound to the proven pairing.
+4. The relay seals the reply.
+
+A Run from the app on macOS: `App/ViewModels/ProjectLaunchViewModel.cs` → `SessionAuthority.IssueLaunch` (`Core/Approval/LaunchPasses.cs`) → Terminal → `keypaste run --session` → `Core/Ownership/LaunchEndpoint.cs`, which takes the pass and releases the set without asking, then records it.
+
+## Where each concern lives
+
+### Core
+
+Paths are in `src/Keypaste.Core/`.
 
 | Concern | Files |
 |---|---|
-| Open, save, entries, custom fields, history, recycle bin | `Vault.cs`, `VaultEntry.cs`, `EntryField.cs` and `FieldNameRules.cs` (which custom fields keypaste writes), `EntryName.cs`, `EntryHandle.cs`, `EntryRevision.cs`, `RecycledEntry.cs` |
-| Organize and search; an agent's search of what it may see, linking items that share a site, a project or an account or that reference each other | `VaultOrganization.cs`, `VaultNameRules.cs`, `VaultSearch.cs`, `AccessIndex.cs`, `IndexedEntry.cs`, `FieldReferences.cs` |
-| An item's attachments: listed by name and size, added and replaced under the 5 MiB cap and saved once where the person chooses, the names keypaste gives one in `VaultNameRules.cs` | `EntryAttachment.cs`, through `Vault`'s attachment methods and `Internal/KeePassInterop.Attachments.cs` |
-| A terminal's edit to items: the check and write each CLI verb that edits items and the vault's holder share, the holder asking and saving it, and taking one back whose save failed | `Editing/` (`TerminalEdit.cs`, `TerminalEdits.cs`), `Ownership/SessionEditor.cs`, `VaultCheckpoint.cs` |
-| An agent's save of a value the person enters, and its change to an item: moving it to Trash, KeePass's expiry, the `needs-update` tag and a delete for good of an item its save created, which `Vault.MarkAgentCreated` marks | `Editing/ValueSaves.cs`, `Editing/ItemChanges.cs`, `Approval/SaveRequestRules.cs`, `Approval/ItemChangeRules.cs`, `Ownership/SessionSaver.cs`, `Ownership/SessionItemChanger.cs` |
-| Recommendations: keys left in notes, the token prefixes it knows, project tags another app dropped, weak, reused and expired passwords, items expiring soon or tagged `needs-update` with where to make a new credential, and dismissals kept on this machine | `Recommendations/` (`NoteKeyCheck.cs`, `TokenPrefixes.cs`, `LostProjectTag.cs`, `PasswordHealth.cs`, `ItemReminders.cs`, `NewCredentialPages.cs`, `RecommendationDismissals.cs`); the move is `Vault.MoveNoteKeys`, a dropped tag is read from each entry's versions by `KeePassInterop.ReadLostProjectTags`, and each password is rated and compared by `KeePassInterop.ReadPasswordHealth`, both in `Internal/KeePassInterop.Recommendations.cs` |
-| Creation, unlock factors and access changes | `VaultCreation.cs`, `VaultKeyfile.cs`, `VaultAccess.cs`, `VaultLocation.cs`; a hardware key's challenge-response factor in `HardwareKeys/` |
-| Backups, restore and export; every write, copy, rename and removal of a vault file, its export or its backups, flushed to disk, which `VaultFilesSourceRulesTests` and the front ends' `BannedSymbols.NoFileWrites.txt` hold, but the save's own replacement through KeePassLib's file transaction in `KeePassInterop.Replace` (`Internal/KeePassInterop.Save.cs`) | `VaultBackups.cs`, `Internal/VaultFiles.cs` |
-| Merging another program's save with the open vault: the base each open and save takes, the merge built inside a fresh parse of the file, and the report the notice and the audit line draw on; the file read once, merged and saved over itself by `Vault.MergeAnotherSave`, and the owner's withdrawal, swap and line by `SessionAuthority.Merge`; each approver merges through it on its open vault's folder watch and five-second poll (`Ownership/VaultFileWatch.cs`, over `Ownership/IWatchedVault.cs`) and on a refused save: the desktop in `App/Session/AppVaultSession.cs` under `SessionHost`, saying so through `App/ViewModels/MergeNotice.cs`, and `keypaste approve` in `Ownership/HeldVault.cs`, saying so in its terminal; the same watch finds the conflicted copies a sync tool left beside the vault (`ConflictedCopies.cs`), which the app's Security lists and `keypaste approve` names in its terminal | `VaultMerge.cs`, through `Vault.MergeInto` and `KeePassInterop.TakeBase` and `MergeFrom` (`Internal/KeePassInterop.Merge.cs`, the content digests it compares in `Internal/KeePassInterop.ContentDigests.cs`); `Ownership/SessionAuthority.cs` |
-| KDBX boundary, save retries and timing, and the native libargon2 KeePassLib derives keys with | `Internal/KeePassInterop.cs` (opening, creating and format settings) and its parts by concern: `KeePassInterop.Keys.cs` (keys, key changes and key derivation, with `ChallengeResponseKey.cs`), `KeePassInterop.Save.cs` (the save, its proof, retries and gate), `KeePassInterop.Entries.cs`, `KeePassInterop.History.cs`, `KeePassInterop.Groups.cs`, `KeePassInterop.RecycleBin.cs`, `KeePassInterop.Fields.cs`, `KeePassInterop.Attachments.cs`, `KeePassInterop.Tags.cs`, `KeePassInterop.Records.cs` (reserved records), `KeePassInterop.Snapshots.cs` (record snapshots and checkpoints), `KeePassInterop.Reads.cs` (listing, search and index reads), `KeePassInterop.Browser.cs` (browser items), `KeePassInterop.Recommendations.cs`, `KeePassInterop.Merge.cs`, `KeePassInterop.ContentDigests.cs` and `KeePassInterop.Import.cs`; `Internal/NativeArgon2.cs` (the library `scripts/build-argon2.sh` builds), `Internal/SaveClock.cs`, `KdbxFormat.cs`, `VaultKeyDerivation.cs` (whether a vault's key derivation is weaker than keypaste's, which Security and `keypaste doctor` report and `Vault.StrengthenKeyDerivation` fixes), `ProcessTemporaryDirectory.cs`, `PathIdentity.cs` |
-| Env sets and dotenv | `EnvStore.cs` (where a key is written and removed, planned in `EnvWritePlan.cs`), `EnvConvention.cs`, `EnvNameRules.cs`, `EnvResolution.cs` (what may leave for a child), `EnvImport.cs`, `DotEnv.cs`, `DotEnvWriter.cs`, `SourceSnapshot.cs` |
-| Project tags: which tags keypaste writes, the `env:<project>[:<stage>]` grammar, the projects a vault holds and what a tag change reaches | `TagRules.cs`, `ProjectTag.cs`, `ProjectCatalog.cs`, `ProjectTagChange.cs` |
-| Profiles, the profile matrix and diffs | `EnvProfileNames.cs` (which profile names resolve and which are protected), `EnvMatrix.cs`, `EnvDiff.cs` |
-| `kp://` references and reference files | `KpReference.cs`, `EnvReferenceFile.cs`, `EnvReferenceResolution.cs` |
-| KeePass placeholders such as `{PASSWORD}`, filled in from a value's own item wherever the value leaves keypaste, and what refuses it | `KeePassPlaceholders.cs`, `PlaceholderFill.cs`; the item's fields are read through `Vault.FillPlaceholders` and `KeePassInterop.ReadPlaceholderFields` |
-| Auto-Type: an item's and its groups' settings read as KeePassXC 2.8 reads them, the sequence a window's title chooses, KeePassXC's grammar with keypaste's refusals, and the plan of keys and filled text the app types, which shows no value; nothing here types | `AutoType/` (`AutoTypeSettings.cs`, `WindowPattern.cs`, `AutoTypeSequence.cs`, `AutoTypePlan.cs`), resolved by `Vault.PlanAutoType` from `KeePassInterop.ReadAutoType`; fields fill in through `KeePassPlaceholders` |
-| keypaste's own groups in the vault, hidden from every listing | `ReservedGroups.cs` |
-| An item's TOTP: reading KeePassXC's `otp` URI or KeePass 2's `TimeOtp-*` fields and computing RFC 6238 codes, the decoded seed held only there and zeroed on disposal | `Totp/` (`TotpSpec.cs`), read through `Vault.ReadTotp` |
-| Scoped tokens and token bundles | `Tokens/` |
-| Share links: sealing, the client of the share service at api.keypaste.com and the vault's records | `Sharing/` |
-| Browser fill: the three builds of keypaste's extension keypaste answers; the manifest each browser reads for `com.keypaste.browser`, where it is, which `keypaste` it names, turning it on and off, re-pointing it at each start and whether the extension is in the browser's profiles; what decides a browser's pairing, check and fill once the owner admits it, this computer's pairings in `browsers.json`, sealed under each vault's key, the names they may have and the code both sides show, and which items a page's request for logins matches by registrable domain, scheme and port, from the vendored Public Suffix List, embedded and refreshed by `scripts/update-public-suffix.sh`, and which of them KeePassXC's browser settings, an expiry or the Trash keep out; the items read through `Vault.ReadSavedBrowserItems` and a released login by UUID through `Vault.ReadSavedLogin` | `Browser/` (`BrowserIdentity.cs`, `HostPlaces.cs`, `HostManifest.cs`, `HostProgram.cs`, `BrowserHosts.cs`, `HostRegistry.cs`, `ExtensionPresence.cs`, `IBrowserRequests.cs`, `BrowserPairings.cs`, `LoginLookup.cs`, `WebOrigin.cs`, `PublicSuffixList.cs`, `BrowserItem.cs`, `LoginCandidates.cs`) |
-| Crash reports: the scrubber, the only code that reads an exception for a report or writes one, the outbox in `~/.keypaste/crash-reports/` that keeps only what the scrubber wrote and the run marker, and the sender to api.keypaste.com's `/v1/crash`, which only the desktop app starts, once the person agreed to the terms and while the switch is on | `CrashReports/` (`CrashScrubber.cs`, `CrashOutbox.cs`, `CrashSender.cs`) |
-| Probing a KDBX header and copying another vault in (`Internal/KeePassInterop.Import.cs` does the clone and attach); another password manager's export, read by one reader per format (`ExportReading.cs`, `ExportImport.cs`), previewed with where each item lands and what does not, and committed all or none (`ExportSource.cs`) | `Import/` |
-| Starting a program with an env set: the environment merge, the platform's terminal and the launchers, and on macOS the request files Terminal's launcher reads (`TerminalRequests.cs`); for `run`, resolving the program, containing the child, capturing its output and scrubbing the values from it | `Launch/` (`RunProgram.cs`, `ChildContainment.cs`, `CapturedLaunch.cs`, `OutputScrubber.cs`) |
-| Where a project runs on this machine (`projects.json`), and which project a directory is | `Projects/` |
+| Open, save, items, fields, history, Trash | `Vault.cs`, `VaultEntry.cs`, `EntryField.cs`, `FieldNameRules.cs`, `EntryName.cs`, `EntryHandle.cs`, `EntryRevision.cs`, `RecycledEntry.cs` |
+| Organize, search, an agent's search, linked items | `VaultOrganization.cs`, `VaultNameRules.cs`, `VaultSearch.cs`, `AccessIndex.cs`, `IndexedEntry.cs`, `FieldReferences.cs` |
+| Attachments (5 MiB cap) | `EntryAttachment.cs`, `Internal/KeePassInterop.Attachments.cs` |
+| A terminal's edit to items | `Editing/TerminalEdit.cs`, `Editing/TerminalEdits.cs`, `Ownership/SessionEditor.cs`, `VaultCheckpoint.cs` |
+| An agent's save or item change | `Editing/`, `Approval/SaveRequestRules.cs`, `Approval/ItemChangeRules.cs`, `Ownership/SessionSaver.cs`, `Ownership/SessionItemChanger.cs` |
+| Recommendations | `Recommendations/`, `Internal/KeePassInterop.Recommendations.cs` |
+| Creation, unlock factors, access changes | `VaultCreation.cs`, `VaultKeyfile.cs`, `VaultAccess.cs`, `VaultLocation.cs`, `HardwareKeys/` |
+| Backups, restore, export, every vault file write | `VaultBackups.cs`, `Internal/VaultFiles.cs` |
+| Merging another program's save; sync conflicted copies | `VaultMerge.cs`, `Internal/KeePassInterop.Merge.cs`, `Ownership/VaultFileWatch.cs`, `ConflictedCopies.cs` |
+| The KDBX boundary | `Internal/KeePassInterop.cs` and `KeePassInterop.<Concern>.cs` |
+| Key derivation | `Internal/NativeArgon2.cs`, `KdbxFormat.cs`, `VaultKeyDerivation.cs` |
+| Env sets and dotenv | `EnvStore.cs`, `EnvResolution.cs`, `EnvImport.cs`, `DotEnv.cs`, `DotEnvWriter.cs` |
+| Project tags, `env:<project>[:<stage>]` | `TagRules.cs`, `ProjectTag.cs`, `ProjectCatalog.cs` |
+| Profiles, matrix, diffs | `EnvProfileNames.cs`, `EnvMatrix.cs`, `EnvDiff.cs` |
+| `kp://` references | `KpReference.cs`, `EnvReferenceFile.cs`, `EnvReferenceResolution.cs` |
+| KeePass placeholders such as `{PASSWORD}` | `KeePassPlaceholders.cs`, `PlaceholderFill.cs` |
+| Auto-Type planning (nothing here types) | `AutoType/` |
+| keypaste's hidden groups | `ReservedGroups.cs` |
+| One-time codes | `Totp/` |
+| Scoped tokens and bundles | `Tokens/` |
+| Share links | `Sharing/` |
+| Browser fill: manifests, pairings, login matching | `Browser/` |
+| Crash reports: scrubber, outbox, sender | `CrashReports/` |
+| Import | `Import/`, `Internal/KeePassInterop.Import.cs` |
+| Starting a program with an env set | `Launch/` |
+| Where a project runs (`projects.json`) | `Projects/` |
 | Password and passphrase generation | `PasswordGenerator.cs`, `PassphraseRecipe.cs`, `WordList.cs` |
 | Secret input and display | `SecretBuffer.cs`, `SecretInput.cs`, `DisplayTextSanitizer.cs`, `EntryNameSanitizer.cs`, `Clipboard/` |
 | What an agent may name | `EntryExposure.cs` |
-| Approval and credential release; the `run` request's rules and prompt; a browser's pairing confirmation with its code, and its fill prompt; the single-use pass a Run confirmed in the app issues on macOS | `Approval/` (`RunRequestRules.cs`, `RunPrompt.cs`, `PairingPrompt.cs`, `FillPrompt.cs`, `LaunchPasses.cs`) |
-| Approver pipe protocol, a browser's attachment and its requests among them (`ApproverProtocol.Browser.cs`, `BrowserMessages.cs`), and the browser relay's link to the owner, which notices the owner end it between requests (`BrowserLink.cs`), and the program on each connection and those that started it, which a prompt checks its requester against (`PipeCaller.cs`, `PeerLineage.cs`, `ProcessTree.cs`, `KeypasteBinaries.cs`, `Approval/RequesterIdentity.cs`) | `Ipc/` |
-| Who holds a vault, which session a request belongs to, env sets released under that session (`SessionEnvResolver.cs`, and to a runner through `SessionEnvironments.cs`), the owner's record of each request it answers (`RequestRecorder.cs`), a browser's pairing, one request at a time, and its check (`SessionBrowsers.cs`), the app's launch endpoint for its own Runs on macOS (`LaunchEndpoint.cs`), and the same-user pipes where a connection is the request, a second start's to the app (`AppClaim.cs`), which may also name a file (`HandedFile.cs`), and a bridge's to a locked app (`LockedAppEndpoint.cs`), which share one accept loop (`KnockListener.cs`) | `Ownership/` |
-| Each field's category (`FieldCategory.cs`), each vault's rules for every agent and its browser allowances in `agents/<vault>.toml` (`AgentRules.cs`, `AgentRulesFile.cs`), and their seal under that vault's key in `ReservedGroups.Keys`, which also moves a home's earlier shared `agents.toml` to the vault whose key sealed it (`SealedAgentRules.cs`) and keeps the allowances' sites encrypted under that key (`FillSites.cs`) | `Agents/` |
-| Audit log, the line each kind of agent request is recorded with, by the owner and the bridge alike, the owner's checkpoints signed under a key in `ReservedGroups.Keys` (`Audit/AuditCheckpoint.cs`, written by `Ownership/AuditCheckpoints.cs`), the owner's compaction of old lookups and expired days under a seal signed with that key, checked under the other open vaults' keys first (`Audit/AuditCompaction.cs`, run at unlock and daily by `Ownership/AuditCompactions.cs`), `~/.keypaste` paths, and every write under it, which `HomeFilesSourceRulesTests` holds | `Audit/`, `Audit/RequestRecords.cs`, `Audit/KeypasteHome.cs`, `HomeFiles.cs` |
-| `recent.toml`, `app.toml`, the local account's vaults kept there (`Settings/LocalAccount.cs`), and the databases KeePassXC last opened (read from its `keepassxc.ini`) | `Recent/`, `Settings/` |
-| Opening the desktop at login: the Windows Run value, the macOS LaunchAgent and the XDG autostart entry | `Login/` |
-| Putting the app's `keypaste` where a terminal finds it: the Linux script and when a newer copy re-points it, the macOS link and its administrator dialog, and replacing a file keypaste did not write | `Linking/` |
-| Connecting MCP clients: the catalogue, setup plans, Cursor's and VS Code's install links, finding the bridge, editing a tool's configuration file, reading whether a tool holds keypaste and what it starts, finding and starting a tool's command, an npm launcher on Windows included, the connection check, which tools are installed and connected, and the rows Agents lists, tools and agents merged | `Clients/` |
-| What `keypaste doctor` checks, reading only: whether the copies of keypaste are one version, which Argon2 derives vault keys, from one small derivation, the vault's header, each AI tool's registration and whether it survives an upgrade, whether the vault's owner answers, the settings files and PATH, each finding saying what to fix | `Health/` (`HealthCheck.cs`, and one reader per check: `Argon2Reading.cs`, `VaultReading.cs`, `ToolReading.cs`, `OwnerReading.cs`, `SettingsReading.cs`, `PathReading.cs`) |
-| Last used and in use per entry, from audit lines, and the owner's release ledger | `Activity/` |
-| Running another program and capturing what it printed | `Processes/` |
+| Approval and release | `Approval/` |
+| The pipe protocol and caller identity | `Ipc/`, `Approval/RequesterIdentity.cs` |
+| Who holds a vault, sessions, owner endpoints | `Ownership/` |
+| Agent settings (`agents/<vault>.toml`) | `Agents/` |
+| Audit log and every write under `~/.keypaste` | `Audit/`, `Ownership/AuditCheckpoints.cs`, `HomeFiles.cs` |
+| `recent.toml`, `app.toml`, the local account | `Recent/`, `Settings/` |
+| Opening at login | `Login/` |
+| `keypaste` on a terminal's PATH | `Linking/` |
+| Connecting AI tools | `Clients/` |
+| `keypaste doctor` checks | `Health/` |
+| Last used and release ledger | `Activity/` |
+| Running a program and capturing output | `Processes/` |
 
-## Tests, gates and delivery
+### Front ends
 
-- `tests/Keypaste.<Project>.Tests` mirror the projects; `Keypaste.App.Windows.Tests` runs against the app's Windows target. The helper projects `TxfContender`, `PoolStarver`, `VaultSaver`, `MinimizeObserver`, `AppDriver`, `FakeMcpClient`, `FakeBrowser` and `EnvReporter` are unshipped processes that particular probes and gates drive; `AppDriver` performs one desktop act through the screen's view model, or holds a vault unlocked and served as the app does, with the app's prompt window drawn on a headless display and clicked, or runs the app's own start there, or stands in for keypaste.com's crash route on loopback, or reports the sequence the unlocked session would type into a window of a given title, typing nothing. `FakeMcpClient` builds as `claude` and answers Claude Code's `mcp add`, `remove` and `list`, so the connect gate never writes a real client's configuration. `EnvReporter` is the child the app's Run starts in its tests, reporting its own environment over a pipe. `FakeBrowser` stands in for keypaste's extension: its `ExtensionClient` speaks the extension's protocol to a host's standard input and output, which the relay's tests drive in their own process, and its program starts a host with each browser's arguments, or finds the manifest where a browser looks under given folders and starts it as that browser does, and prints each answer, which `Keypaste.Processes.Tests.BrowserHostTests` reads.
-- `scripts/verify.sh`, or `verify.ps1` in PowerShell, is the local verification entry point ([CONTRIBUTING](../CONTRIBUTING.md#verification)). `Keypaste.Core.Tests.KeePassXC` holds the permanent KeePassXC compatibility checks, every workflow on vaults KeePassXC made read back by real `keepassxc-cli`, and the `scripts/verify-keepassxc-*.sh` left check the shipped binaries; `Keypaste.Processes.Tests` drives the built `keypaste`, `keypaste mcp`, `keypaste-app` and the desktop driver as separate processes, for what only crosses a process boundary, and `verify-mcp-stdio.sh`, `verify-approval-e2e.sh`, `verify-policy-e2e.sh`, `verify-log-chain.sh`, `verify-run-injection.sh` and `verify-run-signals.sh` drive the shipped processes; `verify-real-tools.sh`, run only by ci's `tools` jobs, connects the built `keypaste` to the real AI tools; `verify-demo.sh` checks published transcripts against the binaries; `verify-extension-load.sh`, in app's `extension` job, loads both extension builds in Chromium and Firefox, has each start the built `keypaste` through the manifest the driver turned on, and pairs it with a held vault, and `verify-browser-fill.sh` after it has Chromium, Edge, Brave and Firefox, or with `--branded` a runner's own browsers through `dev.yml`, pair and fill on pages a local HTTPS server serves. The gates share `scripts/lib/common.sh`, and the KeePassXC gates also `scripts/lib/kpxc.sh`.
-- Packaging and release: `release-targets.json` defines targets; `build-*.sh`, `publish-desktop-bridge.sh`, `sign-windows.sh`, `publish-release.sh`, `release-completion.sh` and `require-*.sh` implement [RELEASE](RELEASE.md). `packaging/claude-desktop/` is the Claude Desktop extension, whose Node launcher starts the installed `keypaste mcp` with setup's arguments and carries no copy of keypaste; ci's checks job packs and checks it with `build-claude-desktop-extension.sh`, and nothing publishes it yet (G.6b).
-- `.github/workflows/`: `ci.yml` (backend), `app.yml` (desktop), `release.yml`, `install*.yml`, `upgrade-desktop.yml`, `dco.yml`, `dependency-notices.yml`, which completes a Dependabot NuGet branch with regenerated lock files and THIRD_PARTY_NOTICES, and `dev.yml`, which runs one verify.sh profile on one hosted runner, or installs an app run's packages and performs R.1a's acts. Every job that builds or tests checks out the submodules.
-- keypaste.com's pages are in the private `keypaste-site` repository, and the share, crash-report and signup services at `api.keypaste.com` and `share.keypaste.com` in the private `keypaste-services`. The product builds, tests and releases without it: the vectors the site's routes and the core both check are the product's, in `tests/vectors/`, and the site's tests read byte-identical copies.
+| Concern | Files |
+|---|---|
+| CLI verbs, one class each | `Cli/Commands/` |
+| Verb tree, dispatch, exit codes | `Cli/CliApp.cs` |
+| Resolving the vault | `Cli/VaultLocator.cs` |
+| Prompts, opening a vault, edits through the owner | `Cli/VaultSession.cs`, `Cli/OwnerEdit.cs` |
+| Styling and `--json` | `Cli/Styling/`, `Cli/Output/CliJson.cs` |
+| Desktop screens and view models | `App/ViewModels/`, `App/Views/` |
+| Design tokens, styles, icons | `App/Theme/` |
+| Labels (`Strings.resx`, generated by `scripts/generate-strings.py`) | `App/Resources/` |
+| Culture and ICU | `App/Globalization/` |
+| System notifications | `App/Notifications/` |
+| YubiKeys | `App/HardwareKeys/YubiKeyHardware.cs` |
+| Desktop targets (Windows, and Linux and macOS) | `App/Keypaste.App.csproj` |
+| Extension: native messaging, NaCl, pairing | `extension/src/background/` |
+| Extension: field icon and fill | `extension/src/content/` |
+| Extension builds and their keys | `extension/build.js`, `extension/keys/` |
+
+## Tests and gates
+
+| What | Where |
+|---|---|
+| Tests per project | `tests/Keypaste.<Project>.Tests` |
+| Local verification | `scripts/verify.sh` or `verify.ps1` ([CONTRIBUTING](../CONTRIBUTING.md#verification)) |
+| KeePassXC compatibility | `Keypaste.Core.Tests.KeePassXC`, `scripts/verify-keepassxc-*.sh` |
+| Across process boundaries | `Keypaste.Processes.Tests` |
+| Shipped processes end to end | `verify-mcp-stdio.sh`, `verify-approval-e2e.sh`, `verify-policy-e2e.sh`, `verify-log-chain.sh`, `verify-run-injection.sh`, `verify-run-signals.sh` |
+| Real AI tools | `verify-real-tools.sh`, ci's `tools` jobs only |
+| Published transcripts | `verify-demo.sh` |
+| Extension and browser fill | `verify-extension-load.sh`, `verify-browser-fill.sh` |
+| Gate helpers | `scripts/lib/common.sh`, `scripts/lib/kpxc.sh` |
+| Test vectors shared with keypaste.com | `tests/vectors/` |
+
+Unshipped helpers the tests and gates drive:
+
+| Helper | Stands in for |
+|---|---|
+| `AppDriver` | The desktop: one act, a served vault, a clicked prompt, the crash route on loopback |
+| `FakeMcpClient` | Claude Code, so the connect gate never writes a real client's configuration |
+| `FakeBrowser` | keypaste's extension talking to a host |
+| `EnvReporter` | The child of the app's Run, reporting its environment |
+| `TxfContender`, `PoolStarver`, `VaultSaver`, `MinimizeObserver` | Processes particular probes drive |
+
+## Packaging, workflows and services
+
+- `release-targets.json` defines the release targets; the `build-*.sh`, `publish-*.sh`, `sign-windows.sh`, `release-completion.sh` and `require-*.sh` scripts implement [RELEASE](RELEASE.md).
+- `packaging/claude-desktop/` is the Claude Desktop extension, a launcher for the installed `keypaste mcp`. Nothing publishes it yet.
+- `.github/workflows/` holds `ci.yml` (backend), `app.yml` (desktop), `release.yml`, `install*.yml`, `upgrade-desktop.yml`, `dco.yml`, `dependency-notices.yml` and `dev.yml`. [CONTRIBUTING](../CONTRIBUTING.md#ci) says what each covers.
+- keypaste.com and the services at `api.keypaste.com` and `share.keypaste.com` live in private repositories. The product builds and releases without them; the shared vectors are the product's, in `tests/vectors/`.

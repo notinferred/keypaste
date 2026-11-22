@@ -1,6 +1,6 @@
 name: install
 
-# Runs the install instructions from README.md on the operating system they are written for, against
+# Runs the install instructions from docs/install.md on the operating system they are written for, against
 # the real published assets. The commands are not copied into this workflow or into the script it
 # calls: scripts/verify-install.sh extracts them from between sentinel comments in the document and
 # executes them, so what is tested is the text a stranger reads and not a second copy of it.
@@ -74,7 +74,7 @@ jobs:
         include:
           - os: ubuntu-24.04
             target: linux
-          # linux-arm64 has no block of its own: README publishes one Linux block and tells an arm64
+          # linux-arm64 has no block of its own: the install page publishes one Linux block and tells an arm64
           # reader to substitute the filename, so that substitution is what verify-install.sh makes
           # and what is tested. Unlike the x64 row this installs on the SAME image it was built on,
           # so it shows the binary working, not the binary working above its floor - the arm64
@@ -98,11 +98,11 @@ jobs:
       # passed in for the same reason - the script's fallback reads VersionPrefix with msbuild, which
       # would quietly reintroduce the dependency this job exists to disprove.
       #
-      # The expected version comes from release-targets.json, not from README.md. It used to be
-      # scraped out of the README's own URLs, which made this job circular: a README naming the
+      # The expected version comes from release-targets.json, not from docs/install.md. It used to be
+      # scraped out of the page's own URLs, which made this job circular: a page naming the
       # wrong version would have been checked against the wrong version and passed. The definition
       # records what was actually published, and verify-release-matrix.sh separately holds the
-      # README to it - so the two claims are made by two different things.
+      # page to it - so the two claims are made by two different things.
       - name: Read the version to install
         id: v
         shell: bash
@@ -128,7 +128,7 @@ jobs:
             if [ "$v" = "$adv" ]; then
               echo "installing $v, which is also the advertised release"
             else
-              echo "::notice::installing $v, an UNADVERTISED release. README names $adv and still should."
+              echo "::notice::installing $v, an UNADVERTISED release. docs/install.md names $adv and still should."
             fi
           fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
@@ -158,7 +158,7 @@ jobs:
           KEYPASTE_EXPECT_VERSION: ${{ steps.v.outputs.version }}
         run: |
           set -euo pipefail
-          # --version is always passed and is a no-op when README already names it; the script
+          # --version is always passed and is a no-op when the page already names it; the script
           # substitutes only when the two differ, and says so loudly when it does.
           if [ "${{ matrix.target }}" = "windows" ]; then
             scripts/verify-install.sh windows --version "$KEYPASTE_EXPECT_VERSION"

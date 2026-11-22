@@ -28,7 +28,7 @@ internal static class Program
     /// A CI runner has no display, so what a three-OS job can honestly assert about a published
     /// binary is that it starts, that its own code runs there, and that the KDBX path it wraps
     /// works on that operating system. That is what this does; it is not a substitute for the
-    /// manual checklist in <c>docs/desktop.md</c>, and the workflow comment says so.
+    /// manual checklist in <c>docs/desktop-checklist.md</c>, and the workflow comment says so.
     /// </remarks>
     internal const string SelfTestFlag = "--selftest";
 

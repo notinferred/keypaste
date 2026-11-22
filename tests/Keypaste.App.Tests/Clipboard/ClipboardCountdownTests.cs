@@ -10,10 +10,9 @@ namespace Keypaste.App.Tests.Clipboard;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Every row of the promise table in docs/desktop.md and THREATS.md T-19 that CI can hold is held
-/// here. The rows it cannot hold — a process killed with <c>kill -9</c>, a machine losing power, a
-/// third-party clipboard manager — are stated in those documents as things nothing protects,
-/// because a promise with no test behind it is a sentence (D-0043).
+/// Every clipboard guarantee of THREATS.md T-19 that CI can hold is held here. What it cannot hold
+/// — a crash or forced quit, a machine losing power, a third-party clipboard manager — T-19 states
+/// as a limit, because a promise with no test behind it is a sentence.
 /// </para>
 /// <para>
 /// The pair that matters most is

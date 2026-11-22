@@ -1,122 +1,152 @@
 # Running agents safely
 
-> This guide describes the source build headed for keypaste 1.0.0, which is not yet published. With the published `v0.3.0` the same advice applies to its files: `policy.toml` in place of `agents/`, and the separate `keypaste-mcp` binary as the program the tools start. [FEATURES](FEATURES.md) lists what each version has.
+keypaste asks you before an agent gets a value, but only while the agent cannot change what keypaste reads or reach around the bridge. An agent's shell commands run as you. Unconfined, they could rewrite the tool's MCP configuration to take another agent's name or vault (T-36), replace the `keypaste` the tool starts, change keypaste's settings, or read a running program's environment (T-35).
 
-keypaste asks you before an agent gets a value and records what it gives, but that holds only while the agent cannot change what keypaste reads or reach around the bridge. An agent's shell commands run as you, so on their own they could rewrite the tool's MCP configuration to take another agent's name or vault (T-36), replace the `keypaste` the tool starts, change keypaste's settings, or read a running program's environment (T-35). Claude Code, Codex and Cursor can each confine the commands their agent runs. This guide says how to set them so that the confinement covers keypaste, and what it leaves open. Each tool's behavior comes from its documentation as read on 2026-10-21, listed under [Sources](#sources); where neither that documentation nor keypaste's own check establishes something, the guide says so.
+Claude Code, Codex and Cursor can each confine their agent's commands. Set your tool's sandbox as its section shows. Each tool's behavior comes from its documentation as read on 2026-10-21 ([Sources](#sources)).
 
-## What the agent's commands must not write
+This guide describes the unpublished 1.0.0 source build. For `v0.3.0`, protect `policy.toml` in place of `agents/`, and the `keypaste-mcp` binary as the program the tools start ([FEATURES](FEATURES.md)).
+
+## What to protect
+
+The agent's commands must not write these paths:
 
 | Path | Why |
 |---|---|
-| `~/.keypaste`, or `%USERPROFILE%\.keypaste` on Windows, or the folder `KEYPASTE_HOME` names: `agents/`, `app.toml`, `audit.jsonl`, `sessions/` | `agents/` holds this computer's rules for agents, one file per vault, each sealed with a key that vault holds, `app.toml` the vault every bridge without `--vault` asks for, `audit.jsonl` the log `keypaste log` reads, and `sessions/` the claims that say which process holds a vault. |
-| Every tool's MCP configuration: `~/.claude.json` and a project's `.mcp.json` for Claude Code, `~/.codex/config.toml` (or `$CODEX_HOME/config.toml`) and a project's `.codex/config.toml` for Codex, `~/.cursor/mcp.json` and a project's `.cursor/mcp.json` for Cursor | It names the program the tool starts as keypaste, with its label, vault and reach (T-36). A project's `.codex/config.toml` can also set Codex's `sandbox_mode`. |
-| The vault and the `<vault>.backups` folder beside it | Replacing or deleting the vault loses your items, and the backups are how you get them back. |
-| The `keypaste` the tools start: the path on the `keypaste mcp` line `keypaste setup` prints, the app it belongs to (`/Applications/keypaste.app` on macOS, the AppImage on Linux, `%LOCALAPPDATA%\Programs\keypaste` on Windows) and `~/.local/bin/keypaste` on Linux | Whatever is at that path is the bridge every tool starts, with your approvals behind it. |
+| `~/.keypaste` (`%USERPROFILE%\.keypaste`, or the folder `KEYPASTE_HOME` names) | [Agent settings](policy.md#where-they-are-kept), the vault bridges ask for, the [audit log](approvals.md#the-audit-log), and which process holds a vault |
+| Each tool's MCP configuration: `~/.claude.json` and `.mcp.json`; `~/.codex/config.toml` (or `$CODEX_HOME/config.toml`) and `.codex/config.toml`; `~/.cursor/mcp.json` and `.cursor/mcp.json` | It names the program the tool starts as keypaste, with its label, vault and reach (T-36) |
+| The vault and its `<vault>.backups` folder | Your items and how you get them back |
+| The `keypaste` the tools start: the path `keypaste setup` prints, `/Applications/keypaste.app`, the AppImage, `%LOCALAPPDATA%\Programs\keypaste`, `~/.local/bin/keypaste` | Whatever is there is the bridge every tool starts |
 
-The bridge itself needs some of these. `keypaste mcp` writes `audit.jsonl` and will not start without it (T-6), reads `app.toml`, and reaches the app or `keypaste approve` over a pipe that is a socket in the temporary folder on macOS and Linux and a named pipe on Windows (T-10). Claude Code's documentation says it starts MCP servers outside the sandbox it gives the agent's commands, and Codex's that its sandbox settings do not govern them, so the settings below leave the bridge that access; Cursor's documentation does not say where it starts them. For the same reason, do not run a whole tool inside a sandbox that keeps these paths from it, such as Claude Code started under the standalone `srt` with its default settings: its bridge would not start.
+The bridge itself must write `audit.jsonl` and reach the approver's pipe (T-6, T-10). Claude Code and Codex start MCP servers outside the agent's sandbox, so the settings below leave the bridge working. Do not run a whole tool inside a sandbox that keeps these paths from it, such as the standalone `srt`: its bridge would not start.
 
 ## For every tool
 
-- Start the agent in the project's folder. Each tool lets its agent write the folder it starts in, so starting it in your home folder, or in any folder that holds the vault or `~/.keypaste`, hands it those files.
-- Keep the vault, the folder `KEYPASTE_HOME` names and any clients or audit-log path you pin out of the project and out of temporary folders, which Codex and Cursor let commands write by default.
-- Each tool's sandbox protects only its own project configuration. Claude Code's protects `.mcp.json` and `.claude` but not `.codex` or `.cursor`, Codex's protects `.codex` but not `.mcp.json` or `.cursor`, and Cursor's protects `.cursor/*.json`, `.claude/*.json` and `.vscode/` but not `.mcp.json` or `.codex`. None of the settings below closes this, so where you use more than one of these tools in a project, check that `.mcp.json`, `.codex/` and `.cursor/` are unchanged, with your version control's status or a diff, before you start another tool there.
-- Add no writable folder that holds a path in the table, and let no shell, interpreter or `keypaste` run outside the sandbox through an exclusion, rule or allowlist.
-- Do not use the modes that skip these checks: Claude Code's `--dangerously-skip-permissions`, which also skips its protected-path checks, Codex's `--yolo` or `danger-full-access`, which use no sandbox, and Cursor's Run Everything, which uses none either.
-- Read a repository's own settings for the tool before you open or trust it, since a project's settings join yours as each section says.
+- Start the agent in the project's folder, never your home folder or one holding the vault or `~/.keypaste`.
+- Keep the vault, `KEYPASTE_HOME` and any pinned paths out of the project and out of temporary folders.
+- Add no writable folder holding a path above, and let no shell, interpreter or `keypaste` run outside the sandbox through an exclusion or allowlist.
+- Do not use modes that skip the sandbox: Claude Code's `--dangerously-skip-permissions`, Codex's `--yolo` or `danger-full-access`, Cursor's Run Everything.
+- Read a repository's own tool settings before you open or trust it.
+- Using more than one tool in a project, check `.mcp.json`, `.codex/` and `.cursor/` are unchanged before starting another. Each sandbox protects only its own:
+
+| Tool | Protects | Leaves writable |
+|---|---|---|
+| Claude Code | `.mcp.json`, `.claude` | `.codex`, `.cursor` |
+| Codex | `.codex` | `.mcp.json`, `.cursor` |
+| Cursor | `.cursor/*.json`, `.claude/*.json`, `.vscode/` | `.mcp.json`, `.codex` |
 
 ## Claude Code
 
-The sandbox covers the Bash, PowerShell and Monitor commands Claude runs and every process they start. Claude's own file tools follow permission rules instead, and MCP servers and hooks run outside the sandbox with your access. Sandboxed commands can write the working folder, a per-user temporary folder and folders you added, but never Claude Code's own configuration, `~/.claude.json` and a `.mcp.json` included, whatever an allow entry says. The sandbox is off by default and runs on macOS, Linux and WSL2.
+The sandbox is off by default and runs on macOS, Linux and WSL2. It never lets commands write Claude Code's own configuration. Claude's file tools follow permission rules instead.
 
-Put this in `~/.claude/settings.json`, which applies to every project, with `~/Vaults` replaced by the folder that holds your vault and its key file:
+1. Put this in `~/.claude/settings.json`, with `~/Vaults` replaced by the folder holding your vault and key file:
 
-```json
-{
-  "sandbox": {
-    "enabled": true,
-    "failIfUnavailable": true,
-    "allowUnsandboxedCommands": false,
-    "filesystem": {
-      "denyWrite": ["~/.keypaste", "~/Vaults"],
-      "denyRead": ["~/.keypaste", "~/Vaults"]
-    }
-  },
-  "permissions": {
-    "deny": ["Edit(~/.keypaste/**)", "Edit(~/Vaults/**)", "Read(~/.keypaste/**)", "Read(~/Vaults/**)"]
-  }
-}
-```
+   ```json
+   {
+     "sandbox": {
+       "enabled": true,
+       "failIfUnavailable": true,
+       "allowUnsandboxedCommands": false,
+       "filesystem": {
+         "denyWrite": ["~/.keypaste", "~/Vaults"],
+         "denyRead": ["~/.keypaste", "~/Vaults"]
+       }
+     },
+     "permissions": {
+       "deny": ["Edit(~/.keypaste/**)", "Edit(~/Vaults/**)", "Read(~/.keypaste/**)", "Read(~/Vaults/**)"]
+     }
+   }
+   ```
 
-Then start Claude Code as `claude --settings '{"sandbox": {"allowUnsandboxedCommands": false}}'`, through an alias if you like. With user settings alone, a repository's `.claude/settings.json` or `.claude/settings.local.json` ranks above yours: it can set `enabled` or `failIfUnavailable` to `false`, add `excludedCommands`, `filesystem.allowWrite` and `network.allowUnixSockets` entries, and turn on `network.allowAllUnixSockets` or `enableWeakerNestedSandbox`. Setting `allowUnsandboxedCommands` to `false` with `--settings`, or in managed settings, makes the sandbox admin-required, and Claude Code then ignores those repository settings while yours still apply. `failIfUnavailable` makes Claude Code exit rather than run commands unsandboxed when the sandbox cannot start, and `allowUnsandboxedCommands: false` makes it ignore Claude's request to retry a command outside the sandbox. `denyWrite` holds where the working folder or an added folder would otherwise allow the write. Sandboxed commands can read the whole computer by default, so `denyRead` keeps the vault, its key file and backups, and keypaste's home out of what a command can print into the transcript. The `Edit` and `Read` rules keep Claude's file tools, which the sandbox does not cover, out of the same folders. Where your account can write the `keypaste` the tools start, add it to both lists, in `Edit` rules with `//` before an absolute path: `~/.local/bin/keypaste` and the AppImage on Linux, `/Applications/keypaste.app` on macOS. On Linux and WSL2 a `denyWrite` entry must be a concrete path, and one holding `*`, `?` or `[` is skipped. Keep shells, interpreters and `keypaste` out of `sandbox.excludedCommands`, since an excluded command runs with your access.
+2. Where your account can write the `keypaste` the tools start, add it to both lists, in `Edit` rules with `//` before an absolute path: `~/.local/bin/keypaste` and the AppImage on Linux, `/Applications/keypaste.app` on macOS.
+3. Start Claude Code as `claude --settings '{"sandbox": {"allowUnsandboxedCommands": false}}'`, through an alias if you like.
 
-- **macOS.** The sandbox is Seatbelt and needs no setup. It blocks every Unix socket that `sandbox.network.allowUnixSockets` does not list, so by Claude Code's documentation a `keypaste run --session` or `keypaste clients` change the agent runs cannot reach the app or `keypaste approve`, while the bridge outside the sandbox still does. Keep keypaste's socket off that list and `allowAllUnixSockets` off. The documentation does not say whether a sandboxed command can read another process; the sandbox runtime's policy in its 0.0.79 source gives process information only for processes in the same sandbox, which keypaste has not tested in Claude Code.
-- **Linux and WSL2.** Install `bubblewrap` and `socat`, and on Ubuntu 24.04 and later add the AppArmor profile Claude Code's sandboxing page gives. Unix sockets are blocked only by the optional seccomp filter, which `/sandbox` lists under Dependencies when it is missing; without it the agent's commands can reach keypaste's pipe. The sandbox mounts a fresh `/proc`, which hides other processes' information from a sandboxed command; `enableWeakerNestedSandbox` gives that up, so leave it off outside a container.
-- **Windows.** Claude Code runs commands unsandboxed on native Windows, and its documentation points to WSL2 instead. A Claude Code in WSL2 starts a Linux `keypaste mcp`, which needs a `keypaste approve` holding the vault inside WSL2, a setup keypaste has not tested. On native Windows the agent's commands are held back only by Claude Code's permission prompts and rules, which judge a command by its text rather than by what it does.
+| Setting | Why |
+|---|---|
+| `--settings` | Without it, a repository's `.claude/settings.json` outranks yours and can weaken the sandbox; with it, Claude Code ignores those settings. |
+| `failIfUnavailable` | Exit rather than run commands unsandboxed. |
+| `allowUnsandboxedCommands: false` | Refuse retries outside the sandbox. |
+| `denyWrite` | Holds inside allowed folders. On Linux an entry with `*`, `?` or `[` is skipped. |
+| `denyRead` | Keeps the vault and keypaste's home out of the transcript. |
+| `Edit` and `Read` rules | Cover Claude's file tools, which the sandbox does not. |
+
+- **macOS.** Seatbelt, no setup. Keep keypaste's socket off `allowUnixSockets` and `allowAllUnixSockets` off. Process visibility: undocumented.
+- **Linux and WSL2.** Install `bubblewrap` and `socat`, and on Ubuntu 24.04+ the AppArmor profile from Claude Code's sandboxing page. Without the optional seccomp filter (`/sandbox` lists it), commands can reach keypaste's pipe. Leave `enableWeakerNestedSandbox` off outside a container; it exposes other processes.
+- **Windows.** No native sandbox; only permission rules, which judge a command by its text. A WSL2 setup needs `keypaste approve` inside WSL2, untested.
 
 ## Codex
 
-Codex sandboxes the commands its agent runs and the processes they start, on macOS, Linux, WSL2 and native Windows. Its permission settings do not govern MCP servers, which run as processes of their own, so the bridge keeps its access. Under `workspace-write`, commands can write the folder Codex works in, `/tmp`, `$TMPDIR` and any writable root you add, while `.git`, `.agents`, `.codex` and `.aws` inside a writable root stay read-only; anything else needs your approval.
+Codex sandboxes the agent's commands on macOS, Linux, WSL2 and Windows, and not MCP servers. Under `workspace-write`, commands can write the working folder, `/tmp`, `$TMPDIR` and added roots, while `.git`, `.agents`, `.codex` and `.aws` inside them stay read-only.
 
-In `~/.codex/config.toml`:
+1. In `~/.codex/config.toml`:
 
-```toml
-sandbox_mode = "workspace-write"
-approval_policy = "on-request"
-approvals_reviewer = "user"
+   ```toml
+   sandbox_mode = "workspace-write"
+   approval_policy = "on-request"
+   approvals_reviewer = "user"
 
-[sandbox_workspace_write]
-writable_roots = []
-```
+   [sandbox_workspace_write]
+   writable_roots = []
+   ```
 
-`on-request` makes the agent ask you before a command leaves the sandbox, and approving one that touches a path in the table undoes the rest. `approvals_reviewer = "user"` keeps those questions with you rather than Codex's reviewer agent. Add no `--add-dir` or writable root that holds a path in the table, and no rule that lets a shell, an interpreter or `keypaste` run outside the sandbox. Codex reads a project's `.codex/config.toml` only once you trust the project, so read it before you do. These settings cannot keep a path read-only inside a writable folder, so never start Codex in your home folder. Codex's beta permission profiles can (`"~/.keypaste" = "read"` in a profile that extends `:workspace`), but they replace the settings above and keypaste's check does not exercise them.
+2. Never start Codex in your home folder. These settings cannot keep a path read-only inside a writable folder.
+3. Check that the sandbox refuses a write, from the project folder:
 
-To see the sandbox refuse a write, run these from the project folder. `codex sandbox` ignores the `sandbox_mode` in `config.toml` and runs read-only unless `-c` sets it, while it still takes `writable_roots` from the file, so pass the mode on the command line:
+   ```sh
+   codex -c 'sandbox_mode="workspace-write"' sandbox -- /bin/sh -c 'touch ./sandbox-probe'
+   codex -c 'sandbox_mode="workspace-write"' sandbox -- /bin/sh -c 'touch ~/.keypaste/sandbox-probe'
+   ```
 
-```sh
-codex -c 'sandbox_mode="workspace-write"' sandbox -- /bin/sh -c 'touch ./sandbox-probe'
-codex -c 'sandbox_mode="workspace-write"' sandbox -- /bin/sh -c 'touch ~/.keypaste/sandbox-probe'
-```
+   The first must succeed, or the second proves nothing. The second must fail with "Operation not permitted" on macOS, or "Read-only file system" or "Permission denied" on Linux, and leave no file. Use your `KEYPASTE_HOME` if set; the folder must exist. `codex sandbox` ignores `sandbox_mode` in `config.toml`, so the mode goes on the command line. Where your Codex refuses this form, use `sandbox macos` or `sandbox linux`.
 
-This is the form Codex 0.162.1 takes, with no platform word after `sandbox`; where yours refuses it, use the one its documentation shows, `sandbox macos` or `sandbox linux`. The first must succeed, or the second proves nothing, and the second must fail with "Operation not permitted" on macOS, or "Read-only file system" or "Permission denied" on Linux, and leave no file behind. Use the folder `KEYPASTE_HOME` names in place of `~/.keypaste` if you set it; the folder must exist, since any other error, such as "No such file or directory", proves nothing.
+| Setting | Why |
+|---|---|
+| `on-request` | The agent asks before a command leaves the sandbox. Approving one that touches a protected path undoes the rest. |
+| `approvals_reviewer = "user"` | You answer, not Codex's reviewer agent. |
+| `writable_roots = []` | No added writable folder; add no `--add-dir` either. |
 
-- **macOS.** The sandbox is Seatbelt and needs no setup. Codex's documentation does not say whether a sandboxed command can read another process; the Seatbelt policy in its 0.162.1 source gives process information only within the sandbox. It treats Unix sockets as an allowlist and calls them an escape hatch, so keep keypaste's pipe off that list. Whether the agent's commands can reach keypaste's pipe without it is not documented, and keypaste has not tested it.
-- **Linux and WSL2.** Install `bubblewrap`, and on Ubuntu 24.04 load the AppArmor profile Codex's sandbox page gives. Codex's bubblewrap call in its 0.162.1 source starts each command in a process namespace of its own with a fresh `/proc`, so it does not see other processes, unless mounting `/proc` fails, as in some unprivileged containers, when Codex silently leaves the host's `/proc` visible; the documentation does not say either.
-- **Windows.** The native sandbox is MXC where Windows 11 offers it, `elevated`, which runs commands as separate lower-privilege users once an administrator approves its setup, or `unelevated`, a restricted token with weaker isolation. Only the desktop app prefers MXC on its own, for consumer accounts; the CLI uses it with `prefer_mxc = true` under `[features]` in `config.toml`, which falls back to the others where the device or policy does not support MXC, or with `sandbox = "mxc"` under `[windows]`, which fails there instead. Prefer MXC, then `elevated`. The documentation does not say whether a sandboxed command can read your processes or open keypaste's named pipe, and keypaste's check does not run on Windows.
+Codex reads a project's `.codex/config.toml` only once you trust the project. Its beta permission profiles can keep `~/.keypaste` read-only inside a writable folder, but keypaste's check does not cover them.
+
+- **macOS.** Seatbelt, no setup. Keep keypaste's pipe off the Unix socket allowlist. Process and pipe visibility: undocumented, untested.
+- **Linux and WSL2.** Install `bubblewrap`, and on Ubuntu 24.04 the AppArmor profile from Codex's sandbox page. Process visibility: undocumented.
+- **Windows.** Prefer MXC (`prefer_mxc = true` under `[features]`, or `sandbox = "mxc"` under `[windows]` to fail without it), then `elevated` over `unelevated`. Process and pipe visibility: undocumented, unchecked.
 
 ## Cursor
 
-Cursor's sandbox covers the terminal commands its agent runs on macOS and Linux; its documentation describes none on Windows. Sandboxed commands can write the workspace and temporary folders but never Cursor's protected paths, which include `.cursor/*.json`, a project's `.cursor/mcp.json` among them, `.claude/*.json` and `.vscode/`. A command that cannot run in the sandbox runs outside it once approved.
+Cursor sandboxes its agent's terminal commands on macOS and Linux. Commands can write the workspace and temporary folders, never `.cursor/*.json`, `.claude/*.json` or `.vscode/`. A command that cannot run sandboxed runs outside once approved.
 
-Choose the Allowlist run mode with sandboxing on, in Settings › Agents › Approvals & Execution, keep shells, interpreters and `keypaste` off the allowlist, and keep External-File Protection on, which stops the agent changing files outside the workspace without asking. Auto-review instead sends a command that cannot use the sandbox, and a rerun outside it after a sandbox failure, to a classifier on Cursor's servers, which Cursor says is not a security boundary, and Run Everything uses no sandbox. In `~/.cursor/sandbox.json`:
+1. In Settings › Agents › Approvals & Execution, choose the Allowlist run mode with sandboxing on, keep shells, interpreters and `keypaste` off the allowlist, and keep External-File Protection on.
+2. In `~/.cursor/sandbox.json`:
 
-```json
-{
-  "type": "workspace_readwrite",
-  "additionalReadwritePaths": []
-}
-```
+   ```json
+   {
+     "type": "workspace_readwrite",
+     "additionalReadwritePaths": []
+   }
+   ```
 
-A project's `.cursor/sandbox.json` takes priority over yours and its paths join yours, so read it before you open a repository that has one. For Cursor's Agent CLI, set `approvalMode` to `allowlist` in `~/.cursor/cli-config.json` and start it with `--sandbox enabled`.
+3. For Cursor's Agent CLI, set `approvalMode` to `allowlist` in `~/.cursor/cli-config.json` and start it with `--sandbox enabled`.
 
-- **macOS.** The sandbox is Seatbelt and needs Cursor 2.0 or later, with no setup.
-- **Linux.** The sandbox needs a kernel 6.2 or later with Landlock and unprivileged user namespaces; without them Cursor asks before every command instead. The desktop package carries the AppArmor profile it needs; the Agent CLI does not, and where AppArmor restricts user namespaces it needs Cursor's AppArmor package.
-- **Windows.** No sandbox is documented, so the agent's commands are held back only by what you approve.
+Avoid Auto-review: it sends unsandboxed commands to a classifier Cursor says is not a security boundary. A project's `.cursor/sandbox.json` outranks yours, so read it first.
 
-Cursor's documentation does not say whether a sandboxed command can read other processes or reach a Unix socket, or whether a stdio MCP server you configure runs inside the sandbox. A team's MCP allowlist can give a local server a network mode, No sandbox among them; if your team sandboxes keypaste's entry, check that an agent's request still reaches keypaste.
+- **macOS.** Seatbelt, Cursor 2.0 or later.
+- **Linux.** Kernel 6.2+ with Landlock and unprivileged user namespaces; the Agent CLI may need Cursor's AppArmor package.
+- **Windows.** No sandbox; only what you approve.
+
+Process, socket and MCP server confinement: undocumented. If your team sandboxes keypaste's MCP entry, check that requests still reach keypaste.
 
 ## What a sandbox does not change
 
-A sandbox confines the agent's own commands. Everything outside it still runs as you, and keypaste's limits there stand:
+Everything outside the sandbox still runs as you ([THREATS](../THREATS.md)):
 
-- Anything that can reach the vault's holder through a bridge gets every kind of value you allowed for every agent without a prompt, and under an agent's label what you allowed or always allowed for that agent (T-14).
-- A command an agent runs through keypaste's `run` tool receives the values, and the agent often wrote what that command does (T-35).
+- Anything that reaches the approver through a bridge gets what you allowed ([agent settings](policy.md#limits), T-14).
+- A command run through keypaste's `run` tool receives the values, and the agent often wrote it (T-35).
 - An agent's settings bind only the bridge that names them (T-36).
-- A process running as you outside the sandbox can read memory, files and keystrokes and talk to keypaste's pipe (T-10, T-18).
-- Under the Codex and Cursor settings above, the agent's commands can still read the vault, its backups, a key file and keypaste's home, and whatever they print reaches the agent's transcript and its model provider. That leaves only the master password between whoever holds the transcript and an offline attack on the vault (T-20, T-27). Codex's permission profiles and Cursor's `readBoundary` can limit reads, but keypaste has not set or checked them.
+- A process outside the sandbox can read memory, files and keystrokes and reach keypaste's pipe (T-10, T-18).
+- Under the Codex and Cursor settings, commands can still read the vault, backups, key file and keypaste's home into the transcript, leaving only the master password against an offline attack (T-20, T-27).
 
 ## How keypaste checks this
 
-ci's `tools` jobs on Linux and macOS run Codex 0.162.1's `codex sandbox` with `sandbox_mode = "workspace-write"` from a project folder: a write in that folder succeeds, appends to `~/.keypaste/agents.toml` and to Codex's `config.toml` are refused and leave both unchanged. It does not try a project's `.mcp.json` or `.cursor/mcp.json`, which Codex's sandbox does not protect. That the bridge keeps its access rests on each tool's documentation. Nothing else in this guide is checked by keypaste: Claude Code has no command that runs a shell command in its sandbox without a model, Cursor's Agent CLI lists one only as hidden, and Codex's Windows sandbox is not driven (L.3).
+CI's `tools` jobs on Linux and macOS run Codex 0.162.1's `codex sandbox` with `sandbox_mode = "workspace-write"` from a project folder: a write in that folder succeeds, and appends to `~/.keypaste/agents.toml` and to Codex's `config.toml` are refused and leave both unchanged. Nothing else here is checked by keypaste: not Claude Code, Cursor, Codex's Windows sandbox, or a project's `.mcp.json` (L.3).
 
 ## Sources
 
@@ -125,4 +155,3 @@ Read on 2026-10-21:
 - Claude Code: [Configure the sandboxed Bash tool](https://code.claude.com/docs/en/sandboxing), [All settings](https://code.claude.com/docs/en/settings-reference), [Choose a sandbox environment](https://code.claude.com/docs/en/sandbox-environments), [Configure permissions](https://code.claude.com/docs/en/permissions), [Permission modes](https://code.claude.com/docs/en/permission-modes).
 - Codex: [Sandbox](https://learn.chatgpt.com/docs/sandboxing), [Agent approvals & security](https://learn.chatgpt.com/docs/agent-approvals-security), [Permissions](https://learn.chatgpt.com/docs/permissions), [Windows sandbox](https://learn.chatgpt.com/docs/windows/windows-sandbox), [Configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference), [Developer commands](https://learn.chatgpt.com/docs/developer-commands), [Model Context Protocol](https://learn.chatgpt.com/docs/extend/mcp).
 - Cursor: [Run Modes](https://cursor.com/docs/agent/security/run-modes), [sandbox.json reference](https://cursor.com/docs/reference/sandbox), [Agent Security](https://cursor.com/docs/agent/security), [MCP](https://cursor.com/docs/mcp), [CLI parameters](https://cursor.com/docs/cli/reference/parameters), [CLI configuration](https://cursor.com/docs/cli/reference/configuration).
-- Source, where the documentation is silent: Codex `rust-v0.162.1`'s [`seatbelt_base_policy.sbpl`](https://github.com/openai/codex/blob/rust-v0.162.1/codex-rs/sandboxing/src/seatbelt_base_policy.sbpl) [`bwrap.rs`](https://github.com/openai/codex/blob/rust-v0.162.1/codex-rs/linux-sandbox/src/bwrap.rs), [`linux_run_main.rs`](https://github.com/openai/codex/blob/rust-v0.162.1/codex-rs/linux-sandbox/src/linux_run_main.rs) and [`debug_sandbox.rs`](https://github.com/openai/codex/blob/rust-v0.162.1/codex-rs/cli/src/debug_sandbox.rs), and `@anthropic-ai/sandbox-runtime` 0.0.79's `dist/sandbox/macos-sandbox-utils.js` on npm.

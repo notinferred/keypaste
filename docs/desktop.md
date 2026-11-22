@@ -1,224 +1,246 @@
 # The desktop app
 
-> This guide describes the desktop app as built from source for keypaste 1.0.0, its first desktop release, which is not yet published. The published v0.3.0 is the CLI and MCP bridge only and has no desktop app. [FEATURES](FEATURES.md) lists what each version has.
+The desktop app opens the same `.kdbx` vaults as the CLI and KeePassXC. While a vault is unlocked, the app also answers your AI agents for it: an agent asks through `keypaste mcp`, the app shows you the request, and nothing is released unless you allow it or an agent setting you confirmed allows it.
 
-The desktop app opens the same `.kdbx` vaults as the CLI and KeePassXC. While it holds a vault unlocked, it is also what answers your AI agents for that vault: an agent connected through `keypaste mcp` asks, the app shows you the request, and nothing is released unless you allow it or an agent setting you confirmed allows it.
+The app arrives with keypaste 1.0.0, which is not published yet; until then you can [build it from source](#build-it-from-source). [FEATURES](FEATURES.md) lists what each version has.
 
-<a id="what-it-is-not-yet"></a>
+## Install
 
-## Current limits
+The packages are a Windows MSI, a Linux AppImage and a macOS DMG holding `keypaste.app`. They include the .NET runtime. [RELEASE](RELEASE.md) owns what is packaged, signed, published and installation-verified.
 
-The app has no public release. CI builds internal candidates (an unsigned Windows MSI and Linux AppImage, and a macOS DMG holding `keypaste.app`, which CI signs with keypaste's Developer ID and a later dispatched run notarizes) and installs them on fresh runners; [RELEASE](RELEASE.md) owns what is packaged, signed, published and installation-verified.
-
-One vault has one holder at a time. When `keypaste approve` already holds the vault in a terminal, the unlock screen names it and the app leaves it running; while the app holds the vault, `keypaste approve` is refused the same way.
-
-<a id="what-the-screens-show"></a>
-
-## What the screens show
-
-### Layout
-
-The window is laid out as a mail app's. The rail at its left holds four places, also on `Ctrl/Cmd+1` to `4`: Items, Agents, Security and, at its foot, Settings, with Access's slot dimmed for later and Lock just above Settings. On Items the sidebar beside it holds New, Favorites and the vault's places: All items, Logins, API keys, Environments, Cards, Notes, Server and Database with their counts, and Trash. Each vault is one flat list of its items, organized by vaults and tags; the app shows no group, and the groups a file already holds stay in it untouched, for KeePassXC and the phone apps. Once you open a second vault, the sidebar adds All Accounts and the local account, On this Mac or On this PC, with each open vault and its places under it. Environments lists the vault's projects under it while it is open. The title bar holds, while a lock is near, the idle countdown, and the save state of the vault in view only while the file does not hold what is open; and with several vaults each one's heading in the sidebar says merging or unsaved while it is. Everything else opens under a place, with a Back button: Activity under Agents. Settings lists all its sections in one column, General, This vault, Browser, Agents, Share links, Scoped tokens and Diagnostics. Agents shows a mark that differs by shape: a filled dot while the app answers agents for this vault, a ring while it does not, a diamond while it refuses them, and a badge counting requests waiting; Security's badge counts what needs review. Add vault… at the sidebar's foot adds a vault to the account, one you open from its file or create, as File › Add vault… opens one, and shows its unlock form; it has its own connection for agents and its own rules, and keypaste lists it there after each unlock until you close it. A vault's heading menu (right-click, Control-click, or Shift+F10) has Lock this vault, which leaves the other open vaults unlocked, and Close vault, which takes it out of the account and leaves its file where it is. A locked vault shows a lock and no places; choosing it shows its unlock form, with its key file or YubiKey as its unlock needs, while the others stay open. All Accounts and Favorites list the items of every unlocked vault, each row naming its vault, and the search covers them all; an item's pane, Delete and Duplicate act on the item's own vault. Settings' This vault and Agents show the vault in view, with a picker at the top while several vaults are unlocked, and Security lists every unlocked vault's findings under its title, with a filter for one vault. Lock, the idle lock and `Ctrl/Cmd+L` lock every vault. The star on an item's header, or Add to Favorites in its menu, tags it `favorite` in the vault, so the mark travels with the file and KeePassXC shows it as a tag; Favorites lists those items.
-
-Items, Agents and Trash show a list beside the chosen thing; Items' list runs newest change first in sections of Today, This week and Older until another order is chosen; a row shows the item's tile, title and username or kind, with the time it changed as its tooltip and in the item's Modified line. An item's tile shows the mark of a popular service its website belongs to, from icons keypaste carries and never downloads, or an icon for its kind or for a `localhost`, IP address or home-network host, and otherwise its first letter. Under 900 wide the sidebar hides and View › Show sidebar opens it over the content. View › Hide sidebar hides it in a wide window, and the rail stays at every width. On macOS the rail and the sidebar show the desktop through them; Settings › General's Reduce transparency draws them solid. The window reopens where you left it, at its size and with the sidebar as it was. New item and the password generator open as sheets over the window.
-
-### Items
-
-Each row shows the item's kind as its icon, its title, one line under it and, at the right, when an agent last received it ("in use" while a waiting request names it). The list never shows a password, a note or a custom field's value. A menu in the list's header sorts it; View › Reset list order undoes that.
-
-The search at the top of the list covers what the list's header names, such as All items; Find reaches it from any place, and typing in it from another place searches Items. It matches titles, group paths, usernames, URLs and an item's own tags, case-insensitively, and a row says which field or tag matched. Passwords, notes and protected custom fields are never read for matching.
-
-Selecting an item shows its fields in grouped rows; pressing a row copies it. The password is dots until you press Reveal, and it hides again on Hide, after 30 seconds, on leaving the item, when the window loses focus or is minimized, and on lock. A URL that is a web address (`http`, `https`, or no scheme, opened as `https`) is a link to your browser; any other scheme is plain text. The item's `kp://` reference is in its ⋯ menu. Edit turns the fields into inputs, with Cancel and Save.
-
-The pane also lists custom fields by name, each marked protected, plain or KeePassXC's own; every value is dots until revealed. Add field takes a name, a masked value and a Protected switch that starts on. A field's ⋯ menu replaces, generates, renames, switches protection or removes it, each as one revision. Renaming a field a project reads as a variable first lists what the rename breaks. KeePassXC's own attributes can be copied but not edited as fields; a one-time code is set by pasting a site's setup key or `otpauth://` link, kept in the protected `otp` field as KeePassXC 2.8 reads it, and the item shows the live code. Tags are chips you add and remove; a project tag such as `env:billing:prod` reads as its project and stage, and adding or removing one first names what it reaches.
-
-Each item shows its Created and Rotated dates and, when agents can see it, an Agent access card naming each client that received it. Rotate replaces the password with a generated one, keeping the old one in history and never showing the new one; it changes the vault only, not the credential at its provider. `keypaste rotate <entry>` does the same.
-
-### New item and the generator
-
-The sidebar's New, or File › New item from template… (`Shift+Ctrl/Cmd+N`), opens a grid of templates: Login, API key, Environment, Card, Note, Identity, SSH key, Server, Database, Wi-Fi and Blank item. A tile opens its form, titled "New login" and so on, with Save in at its top naming the account and vault the item goes in: the vault in view, or any other open vault. A new item goes to the vault's top level. A template only presets fields: Add field… adds username, password, website, one-time code, notes, tags and project, a custom field or a protected field, every field's × removes it, and every form has Custom fields. A login, server, database or Wi-Fi network gets a generated password as the form opens, which typing or pasting replaces. An API key is kept as a protected field named like a variable, such as `OPENAI_API_KEY`. A card and an identity start with the `Credit Card` or `Identity` tag, which makes their protected fields card or identity values in agent settings and, whatever an item's icon, lists it in Cards or as an identity, as a Bitwarden or 1Password import's are, and a preset field left empty is not written. Any item with a username, a password and a website fills in your browser, whatever its template, and the form says so. Save writes the item in one change and refuses, writing nothing, an empty title, a title an item at the top level already has, a key name that is not a variable's, or a tag KeePass would split. Item › Change kind changes the icon without touching fields. A username box suggests usernames the vault already uses.
-
-New in the sidebar offers Login, API key, Environment, Card and Note in the vault in view, and More templates…, which opens the grid. `Ctrl/Cmd+N` opens the form of the list's kind, and a login's where the list holds every kind.
-
-The generator is the same sheet everywhere, and File › Generate password… opens it alone. Characters takes a length, by slider or number, and letters, digits, symbols and Leave out lookalikes; Words takes six to thirty-two words from the EFF long list and a separator. The sheet states the bits the choice gives. Apply alone puts the value in the field.
-
-### Organizing
-
-Rename… in an item's ⋯ menu changes its title in one write and leaves it in the group the file holds it in, so the item keeps its identity, history, attachments and the data keypaste does not model. A refusal writes nothing and says why: a name already taken, two items answering to one path, or a name no vault could address. The app makes, moves and deletes no group; KeePassXC and the CLI still do.
-
-Patterns in an agent's settings and a bridge's `--expose` match group paths and titles, so renaming can take an item out of an agent's view or bring it in; the form says so. A project row in an agent's settings follows tags and is unaffected.
-
-Edit › Undo (`Cmd/Ctrl+Z`) reverses the last delete, rename or duplicate, until the next write.
-
-### History
-
-Show history lists earlier revisions, newest first, beside the item, and shows what each changed. A revision's password reveals and hides like the item's. Restore this revision makes that revision current and keeps the replaced state as the newest revision, so a restore can be undone by restoring again. As in KeePass and KeePassXC, the item becomes that revision whole: attachments, custom fields and custom data added since are dropped, as the caption says. When the revision's project tags differ, the app first says which stages the item leaves and joins, and restores only when you confirm. KeePass keeps a bounded number of revisions.
-
-### Trash
-
-Deleting moves an item, with its fields and history, to the vault's Trash (the KDBX Recycle Bin, which KeePassXC reads as its own), and the line that appears offers Restore. Trash lists each item's title, its group and when it went, never a value. Restore puts it back where it was, under its own title even if another item took the name. Delete for good and Empty Trash each ask first. A vault whose Trash is switched off deletes permanently after asking. A vault that has used Trash is saved as KDBX 4.1, which KeePassXC 2.7 and KeePass 2.48 and later read.
-
-### Environments
-
-A project, chosen under its vault's Environments in the sidebar, is headed by its two-letter tile, its name and how many stages it has in which vault. Its stages, `dev` first, are a segmented control, and a dot on a stage marks a variable another stage has and it lacks. The selected stage's variables are a table of the name, the value masked and the item it comes from, by title; a name missing from a stage is drawn in the warning colour with "Missing in prod" under it, a value that repeats another stage's says "Same as staging" in place of its dots, and a variable the stage lacks offers Set value. Values copy when pressed and reveal only on the row's eye button, which shows with Replace and Remove while the row is hovered or focused and which Tab, Space, Enter and screen readers reach; one value shows at a time and hides as an item's password does. Add variable, Replace and Generate work as for fields, and + beside the stages adds one. Choosing a stage sends every add, replace, remove, import, Run and Open terminal to it.
-
-Edit › Items in each stage lists each stage's items. Add item tags another item into the stage and Remove takes the tag off, each after naming what joins or leaves; neither deletes anything. A tag that starts `env:` but makes no project, such as `env:billing:Prod`, is listed at the top.
-
-Edit › Import .env… reads a file through the same checks as `keypaste env pull`, previews each name as new, replacing or unchanged, and writes only on Import; a file with any problem imports nothing, and the file stays where it is unless you then choose Delete. Edit › Export .env.keypaste… writes the references the stage would export, never a value.
-
-Under the table, Run with keypaste shows the command for the selected stage, such as `keypaste run --session -p dev <project> -- npm start`, with a button that copies it. Its `--session` asks this app instead of opening the vault, so no password is typed in the terminal and nothing starts while the app is locked. It names no vault, so add `--vault <this vault>` where the terminal would find another. Running it opens a prompt naming the project, the variable names, the item each comes from, the command and the directory; the set is released only on Allow once, which is the only allow a run offers.
-
-Run… saves a directory and command on this machine the first time, as Edit › Where it runs… does, and from then on opens a terminal there running the command; Edit › Open terminal opens one at a prompt: `cmd.exe` on Windows, the first of `x-terminal-emulator`, `gnome-terminal`, `konsole` and `xterm` on Linux, and Terminal on macOS through a launcher inside `keypaste.app` that hands Terminal no value. For another terminal, copy the run command. Each first shows a card naming the command, directory, variable names and their items, and starts nothing until Start. The values go into that terminal's environment, so everything run there can read them, and locking the app does not stop it or take them back.
-
-### Share links
-
-Share… on an item makes a link: pick a field, an expiry (1 hour, 24 hours or 7 days), a number of views (1, 3 or 10) and optionally a passphrase of at least 20 characters. The field is encrypted on this machine and only ciphertext goes to api.keypaste.com; the key is in the link. Settings › Advanced › Share links lists, checks and revokes the links made from this vault. Whoever holds a link can open it until its views or time run out ([THREATS](../THREATS.md)).
-
-### Import from another app
-
-File › Import…, or Import on an empty vault's Items screen, takes another KeePass file or another password manager's export and previews where each group or item will land, under a group named after the file. A KeePass file needs its password and key file, and a switch keeps editing that file in place instead. An export's preview lists what will not land and why, and an item whose name exists is kept beside it as `title (2)` or skipped; nothing is replaced. Either import copies everything or nothing. After an export import, delete the export: it holds your passwords unencrypted, and keypaste leaves it where it is. An encrypted export is refused with how to make one keypaste reads.
-
-### Agents
-
-Agents lists the AI tools found on this computer and every agent that asked this vault in the last 30 days, each saying whether it is connected, in use or when it last asked. Add an agent offers a setup prompt to copy, an app to connect, or MCP to add by hand. Connect shows the exact command it will register and runs it only when you press it; a tool's Disconnect removes keypaste again ([MCP setup](mcp-setup.md)).
-
-An agent's page sets what it gets of each kind of value and whether it may run commands, each run still asked; Settings › Agents sets the defaults for the rest, and an Allow takes effect once you confirm it. These agent settings are kept on this computer, not in the vault ([agent settings](policy.md)). Agents also lists a request waiting in the prompt with its time left, and Show the prompt brings the prompt forward.
-
-When an agent asks, the app shows a card naming who is asking, Verified when keypaste checked it, the question, the item and the agent's own words. It offers Deny and Allow once and, for an agent whose bridge has a label, Always allow, confirmed in the same card. The allows, and Return with them, arm a second after the prompt has focus; Deny and Escape work at once. [Approvals](approvals.md) owns the prompt, what each answer keeps and the log.
-
-### Activity
-
-Agents › Activity shows `~/.keypaste/audit.jsonl` as a table, newest first in day sections, filtered to All, Agents, You or Denied, with resizable columns; a record the hash chain does not vouch for says Edited in its result. Check log integrity, in the Agents menu, shows the chain's verdict and copies the latest hash for `keypaste log verify --expect`. The app shows Activity only while unlocked; `keypaste log` reads the log at any time. [Approvals](approvals.md) explains what each line records.
-
-### Security
-
-Security, on the rail, lists, never by value, keys left in notes (`KEY=value` lines, and lines that are exactly a GitHub, GitLab, Stripe, Anthropic, OpenAI, AWS, Slack or npm token), a project tag a later save dropped along with other changes, weak, reused and expired passwords, an item expiring within Settings › Remind me before an item expires (14 days by default) or tagged `needs-update`, a key file keyed by its exact bytes, a vault whose password protection is weaker than keypaste's (AES-KDF, or Argon2 below 64 MiB, 2 iterations or parallelism 2), and a conflicted copy Syncthing, Dropbox, Nextcloud, OneDrive or iCloud Drive left beside the vault, to review and merge. An expiring or `needs-update` item's row opens, in the browser and only when pressed, the provider's page for a new key on the few hosts keypaste knows, a login's `/.well-known/change-password`, or its URL; keypaste changes nothing at the provider. Move to a field writes each value to a protected field and removes that line in one revision, refusing, with nothing written, when the notes or the field changed. Restore tag names what it reaches first. Strengthen, once you confirm that KeePass before 2.35 can no longer open the vault, saves it with keypaste's Argon2, keeping Argon2id and any higher setting, and keeps a copy of the file as it was in its backups; keypaste never changes it unasked. Dismiss hides a finding on this machine.
-
-### Copying
-
-Copied secrets clear after twenty seconds, with a countdown and Clear now, and sooner on lock or quit, unless something else has replaced the clipboard. Each copy also asks clipboard managers not to keep it: Windows' Clipboard History and Cloud Clipboard, macOS managers that honour the nspasteboard.org types, and KDE's Klipper. Nothing clears it if the app is killed or the machine loses power, and whether a given clipboard manager honours the markers is outside keypaste's control ([THREATS](../THREATS.md)). A copied run command holds no secret and stays.
-
-<a id="editing-your-vault"></a>
-
-## Editing your vault
-
-Everything the app writes goes through the same core as the CLI, so a fresh `keypaste ls`, `get` or `run` reads the saved change, and agents are answered from the vault as saved. An item's form open in the app shows another device's or a terminal's change once the form closes; saving it writes only the fields you changed.
-
-While the app holds the vault, `keypaste add`, `set`, `rm`, `rotate`, `field rm` and the `env` verbs that edit send their change to the app, which names it, never its value, in its prompt and saves it once you allow it. `keypaste access`, `import`, `token` and `share` are refused instead: make the change in the app or run `keypaste lock` first.
-
-If another program saves the vault while it is open, such as KeePassXC or a sync tool, the app merges that save with its own copy within five seconds, or a minute where the system cannot watch the folder and the save kept the file's size and time, whichever open vault it is, matching items by identity and keeping both sides' changes to different fields of one item. Where both changed the same field the newer version is current and the other is in its history; an item one side deleted after the other changed it is kept, in Trash. A merge that carried your changes saves them, keeps the replaced file in `<vault>.backups` and says what it did; agents are refused as `vault-changed` until it is saved. A file the app will not merge, such as one now holding another vault, is named above the screen with Reload, which discards an edit the app could not save. If the other program changed the password or key file, the app locks and you unlock with the new ones.
-
-Saving keeps the file it replaces: the first save after each unlock, no more often than every fifteen minutes, copies the vault into `<vault>.backups` beside it, keeping the last five and the newest of each of the last seven days and four weeks, and a save whose copy cannot be written does not happen. A save that leaves out data another program wrote in the file, which keypaste can't keep, makes that copy whenever it happens and says where it is, and so does the first save of a vault in a format older than KDBX 4, which KeePass before 2.35 can't open once keypaste saves it. Every save opens what it wrote before replacing the vault, refuses one that would lose an item nobody deleted, and keeps the file's permissions.
-
-### Restoring a backup
-
-With the vault selected on the unlock screen, choose File › Restore a backup…, or Restore a backup… under a refused unlock. Choose a copy by when it was taken; a damaged one is marked. Type the master password that copy was made under and choose its key file, and Check this backup shows when it was taken and how many items and projects it holds, never names or values. Restore replaces the vault with that copy byte for byte, keeping the file it replaces as a backup. A damaged or missing vault can still be selected for restoring when backups sit beside it. Close KeePassXC first: it keeps its own copy and does not notice a restore. While `keypaste approve` or another keypaste process holds the vault, the restore is refused and names it. A backup cannot recover a forgotten master password or a lost key file.
-
-### Changing what unlocks the vault
-
-Settings › This vault › Vault access, behind Change…, changes the master password, adds, makes, replaces or removes a key file, and adds, re-slots or removes a YubiKey. It asks the current master password even though the vault is open. The confirmation says what the change costs: the vault as it was is kept in `<vault>.backups`, and every earlier copy still opens with the old password and key file, so delete them if those were exposed. The app stays unlocked on the changed vault. A vault that loses its key file keeps or gets a password. Adding a YubiKey means a lost or broken key locks the vault, unless a second key holds the same secret in the same slot, which YubiKey Manager makes and keypaste cannot. A `keypaste approve` holding the vault under another `KEYPASTE_HOME` stops once the changed file reaches it, since what it unlocked with no longer opens the file.
-
-Settings also says where the backups are kept, and Export an encrypted copy writes the vault's exact bytes to a new file; keep one on another disk, since copies beside the vault do not survive losing it.
-
-## Opening a vault
-
-Open a vault by dragging a `.kdbx` onto the window, with Open a vault… or `Ctrl/Cmd+O`, from the recent list, or by passing its path to `keypaste-app`. The packages offer keypaste as an Open With choice for `.kdbx` without taking the default from KeePassXC (an AppImage only through an integration tool); a file opened this way is only selected. The file's header is read first, so a file that was never a vault is refused before you type.
-
-The first start shows one screen, Terms of use: Agree accepts the terms of use for keypaste's online services, Quit leaves, and Read the terms and Source code link the terms and the app's source. Crash reports are a separate choice on that screen, Send crash reports, off unless you check it; nothing is sent without that yes. Settings' Send crash reports turns them on or off later, and turning it off deletes reports waiting to be sent. An earlier build counted its Continue as that yes, so a home it set up sees the screen once more. After it comes the unlock screen. With no vault, it offers Create a vault… and Open a vault…, with What's a vault? explaining one. With KeePassXC databases, it lists the ones KeePassXC last opened on this machine above them, read from KeePassXC's local settings, which keypaste never writes. The vaults this computer opened are listed at its left as locked rows; choosing one shows its unlock form, and Add vault… opens or creates another.
-
-A vault that needs a key file takes it from Key file… under Unlock, which then names the file. All four KeePass key file forms work, and a vault a key file alone protects opens with the password empty. An unusable file is refused when you choose it. A vault keyed to an ordinary file, rather than a KeePass key file, opens with a warning that editing that file loses the vault. The app remembers each vault's key file location.
-
-A vault that also needs a YubiKey opens with YubiKey… beside Key file…, on slot 2 unless its menu switches to slot 1, programmed for HMAC-SHA1 challenge-response as `ykman otp chalresp` programs it. Unlock says Touch your YubiKey while it waits, and every save asks the key again. The CLI cannot ask a YubiKey, so it reaches such a vault only through the app while the app holds it. No physical YubiKey has been tested.
-
-On Windows, after a lock you made, the idle lock, minimize-lock or closing into the tray, Unlock with Windows Hello can reopen the vault once Windows Hello has kept your last unlock; Use master password shows the password instead. `keypaste lock`, opening another vault, a changed password or key file, and quitting need the master password.
-
-<a id="creating-a-vault"></a>
-
-## Creating a vault
-
-Create a vault asks where the file goes and for a master password twice. Nothing can recover that password. Key file… › Choose… attaches one you have, and Create… makes a new KeePass XML key file where you choose, never over an existing file; the vault then needs both. keypaste never makes a vault a key file alone opens. Keep a copy of the key file away from the vault. YubiKey… makes the vault need a key slot as well, and is refused, writing nothing, when no connected key has the slot programmed.
-
-The refusals are `keypaste init`'s: a path already in use, an empty password, a confirmation that does not match, or a key file keypaste will not attach. Nothing is written until every check passes. The new vault opens on an empty Items list, which offers Import from another app.
-
-## Locking
-
-The vault locks after thirty minutes without keyboard or mouse input by default; Settings accepts one minute to eight hours, and idle locking cannot be turned off. Thirty seconds before, the title bar shows a countdown that any key or click cancels. An agent's request never counts as activity. A machine that sleeps past the timeout wakes locked.
-
-`Ctrl/Cmd+L` or Lock locks at once. Settings can also lock on minimize, off by default; switching windows and macOS `Cmd+H` do not count as minimizing.
-
-Locking ends the session agents are answered through: a request still waiting is refused as locked, and later requests are refused until you unlock. Values already released to an agent, a terminal or the clipboard's consumers are not recalled, and a separate `keypaste approve` holding another vault is unaffected. [SECURITY](../SECURITY.md) states the memory and clipboard limits.
-
-## Keyboard and menus
-
-Most commands are in the menus: the menu bar on macOS (keypaste, File, Edit, Item, Project, Agents, View, Window, Help) and a Dock menu with Lock and Open vault…; on Windows and Linux the same menus open from the menu button at the window's top left. On macOS the modifier is Cmd; everywhere else, Ctrl.
-
-| | |
+| Platform | What it needs |
 |---|---|
-| `Ctrl/Cmd+1` … `4` | Items, Agents, Security, Settings |
-| `Ctrl/Cmd++`, `Ctrl/Cmd+-`, `Ctrl/Cmd+0` | Zoom in, out and actual size, up to 200%, kept in `app.toml` |
-| `Ctrl/Cmd+,` | Settings |
-| `Ctrl+B`, `Ctrl+Cmd+S` on macOS | Hide or show the sidebar |
-| `Ctrl/Cmd+N` | New item of the kind the list shows, or a login |
-| `Shift+Ctrl/Cmd+N` | New item from a template |
-| `Ctrl/Cmd+F`, `Ctrl/Cmd+K` | Search, from any place; also `Option+Cmd+F` on macOS |
-| `Ctrl/Cmd+O` | Open a vault; with one open, it locks first |
-| `Ctrl/Cmd+L` | Lock |
-| `Ctrl/Cmd+W` | Close the window, which locks and leaves the app in the menu bar or tray, or quits where that is off |
-| `Ctrl/Cmd+Q` | Quit |
-| `Ctrl/Cmd+C` | Outside a text field, copy the chosen item's password |
-| `Delete`, `Cmd+Delete` on macOS | Outside a text field, delete the chosen item |
-| `Ctrl/Cmd+Z` | Outside a text field, undo the last delete, rename or duplicate |
-| `Cmd+M`; `F11` or `Ctrl+Cmd+F` | Minimize on macOS; full screen |
-| `Enter` | Unlock, or confirm the form in focus unless its confirm is a danger one |
-| `Escape` | Cancel the form in focus, asking first if it holds what you typed |
-| `Ctrl/Cmd+V` | Paste into a secret field, the master-password fields included |
-
-<a id="what-you-should-know-about-the-master-password"></a>
-
-## Secret input
-
-Every field that takes a secret uses one control that keeps what you type out of accessibility tools and undo history; a screen reader hears the field's purpose and a row of dots. Pasting works in every secret field; a pasted value loses one trailing line break, and anything else a keyboard cannot type is refused. keypaste clears only what it put on the clipboard, so a master password you copied elsewhere to paste stays there until you copy something else. [SECURITY](../SECURITY.md) describes the memory and input limits.
-
-## What it needs on each platform
-
-The packages include the .NET runtime and embed no browser engine; the app draws with Skia.
-
-| Platform | Native prerequisites |
-|---|---|
-| Windows | None |
-| macOS | None |
+| Windows | Nothing more |
+| macOS | Nothing more |
 | Linux | `libx11-6 libice6 libsm6 libfontconfig1`, and an X11 or XWayland session: the app has no Wayland backend of its own, so a Wayland desktop without XWayland cannot start it. The AppImage also needs FUSE: `/dev/fuse` and a setuid-root `fusermount3`, which `fuse3` provides; its runtime carries libfuse 3, so `libfuse2` is not needed |
+| YubiKey on Linux | `libpcsclite1`, and access to the key's `/dev/hidraw*` device, which Yubico's udev rules grant |
 
-A YubiKey on Linux also needs `libpcsclite1` and access to the key's `/dev/hidraw*` device, which Yubico's udev rules grant.
-
-The internal macOS `keypaste.app` is unsigned and unnotarized. A copy downloaded through a browser carries `com.apple.quarantine`, and macOS then says "“keypaste” is damaged and can’t be opened" with no Open Anyway, and refuses to let Terminal run the bundle's launcher. Removing the attribute from the whole bundle lets both run:
+The internal macOS `keypaste.app` is signed with keypaste's Developer ID but not notarized, so macOS refuses a copy downloaded through a browser. Remove the quarantine from the whole bundle:
 
 ```sh
 xattr -dr com.apple.quarantine /Applications/keypaste.app
 ```
 
-The Windows MSI upgrades in place: a higher version replaces the lower one only once the new install commits, and a lower version is refused over a higher one. An AppImage or `keypaste.app` is upgraded by replacing the copy. No package holds your data: the vault, `~/.keypaste` and its files are untouched by an upgrade or an uninstall.
+To upgrade, install a newer MSI, or replace the AppImage or `keypaste.app`. Upgrading or uninstalling never touches your vault or `~/.keypaste`.
 
-## Files it keeps, and how to delete them
+## Get started
 
-The app keeps this computer's settings in `~/.keypaste` (or `KEYPASTE_HOME`), beside the audit log and `agents/`, each vault's agent settings. None of it travels with the vault.
+### First start
 
-| | |
+The first start shows Terms of use, with Send crash reports as a separate choice that stays off unless you check it. The unlock screen then offers Create a vault… and Open a vault…, and lists the databases KeePassXC last opened.
+
+<a id="creating-a-vault"></a>
+
+### Create a vault
+
+Choose Create a vault…, pick where the file goes and type a master password twice. Nothing can recover that password.
+
+- **Key file.** Key file… attaches one you have or makes a new one. The vault then needs both the password and the key file. Keep a copy of the key file away from the vault.
+- **YubiKey.** YubiKey… makes the vault also need a programmed key slot.
+
+Nothing is written until every check passes.
+
+### Open and unlock a vault
+
+Drag a `.kdbx` onto the window, choose Open a vault…, or pick it from the recent list.
+
+- **Key file.** Choose it with Key file… under Unlock.
+- **YubiKey.** Choose YubiKey… (slot 2 by default), programmed for HMAC-SHA1 challenge-response, and touch the key when asked. Every save asks again. The CLI reaches such a vault only through the app while the app holds it. No physical YubiKey has been tested.
+- **Windows Hello.** After an idle lock or a lock you made, Unlock with Windows Hello reopens the vault. Quitting, `keypaste lock` or a changed password or key file needs the master password.
+
+One vault has one approver at a time: while `keypaste approve` holds it in a terminal, the app cannot, and the other way round.
+
+### Use several vaults
+
+Add vault…, at the foot of the sidebar or in the File menu, opens or creates another vault. Each vault has its own connection and settings for agents.
+
+Search covers every unlocked vault. Settings, Agents and Security act on the vault you pick at their top. A vault's heading menu locks or closes just that vault; Lock locks them all.
+
+<a id="what-the-screens-show"></a>
+<a id="layout"></a>
+
+## Find and use items
+
+The rail at the left holds Items, Agents, Security and Settings. On Items, the sidebar lists New, Favorites, the vault's places and Trash.
+
+A vault is one flat list of items, organized by tags. The app shows no groups, and leaves the groups a file already holds untouched for KeePassXC.
+
+### Search
+
+Find searches titles, group paths, usernames, websites and tags. Passwords, notes and protected fields are never searched. A row never shows a secret value.
+
+### Copy and reveal
+
+Select an item, then press a field's row to copy it; `Ctrl/Cmd+C` copies the password. A password stays hidden until you press Reveal, and hides again after 30 seconds, when you leave the item or the window, and on lock.
+
+A copied secret clears after twenty seconds, and sooner on lock or quit. Each copy asks clipboard managers not to keep it. Nothing clears it if the app is killed, and keypaste cannot make a clipboard manager honour the request ([THREATS](../THREATS.md) T-19).
+
+<a id="new-item-and-the-generator"></a>
+
+### Add an item
+
+New in the sidebar offers Login, API key, Environment, Card and Note, and More templates… (`Shift+Ctrl/Cmd+N`) opens the full grid. Save in, at the top of the form, picks the vault.
+
+- A template only presets fields; Add field… adds any field.
+- An API key is kept as a protected field named like a variable, such as `OPENAI_API_KEY`.
+- A card or identity is tagged so agent settings treat its protected fields as card or identity values.
+- Any item with a username, a password and a website fills in your browser.
+
+The password generator, opened from a password field, makes random characters or an EFF word-list passphrase.
+
+### Edit an item
+
+Edit, change the fields, then Save.
+
+- **Custom fields.** Add field takes a name, a value and a Protected switch that starts on. Renaming a field a project reads as a variable first lists what the rename breaks.
+- **One-time code.** Paste a site's setup key or `otpauth://` link, and the item shows the live code.
+- **Tags.** A project tag such as `env:billing:prod` shows as its project and stage.
+- **Rotate.** Replaces the password with a generated one and keeps the old one in history. It changes the vault only, not the credential at its provider.
+
+### Rename, delete and undo
+
+Rename… in an item's ⋯ menu changes its title. Agent settings and a bridge's `--expose` match titles, so a rename can take an item out of an agent's view or bring it in; the form says so.
+
+Delete moves an item to the vault's Trash, which KeePassXC reads as its Recycle Bin. Restore puts it back. A vault that has used Trash is saved as KDBX 4.1, which KeePassXC 2.7 and KeePass 2.48 and later read.
+
+Edit › Undo (`Ctrl/Cmd+Z`) reverses the last delete, rename or duplicate, until the next write.
+
+### Restore an earlier version
+
+Show history lists an item's earlier revisions, and Restore this revision makes one current. As in KeePass, the item becomes that revision whole, so attachments and fields added since are dropped.
+
+### Share a field
+
+Share… makes a link to one field, with an expiry, a number of views and an optional passphrase. The field is encrypted on this machine and only ciphertext goes to api.keypaste.com; the key is in the link. Whoever holds the link can open it until its views or time run out ([THREATS](../THREATS.md)).
+
+### Import from another app
+
+File › Import… takes another KeePass file or another password manager's export and previews where each item will land. Nothing is replaced, and the import copies everything or nothing. An encrypted export is refused with how to make one keypaste reads.
+
+After importing an export, delete it: it holds your passwords unencrypted.
+
+<a id="environments"></a>
+
+## Projects and environments
+
+Environments lists the vault's projects. Pick a stage, such as `dev` or `prod`, and everything you do goes to it.
+
+- **Variables.** The stage's table shows each name, its masked value and the item it comes from, and flags "Missing in prod" or "Same as staging".
+- **Items in each stage.** Edit › Items in each stage adds or removes another item's stage tag, after naming what changes.
+- **`.env` files.** Edit › Import .env… reads a file through the same checks as `keypaste env pull` and previews each name before writing. Edit › Export .env.keypaste… writes references, never a value.
+
+### Run a command with a project's variables
+
+Run with keypaste shows the stage's command, such as `keypaste run --session -p dev <project> -- npm start`, to copy. `--session` asks the app instead of opening the vault, so you type no password in the terminal. Add `--vault <this vault>` where the terminal would find another vault. The app asks before releasing the variables.
+
+Run… opens a terminal running the command in a directory you save.
+
+The values go into that terminal's environment, so everything run there can read them. Locking the app does not take them back.
+
+## Answer an agent's request
+
+When an agent asks, the app shows who is asking, the item and the agent's own words.
+
+| Answer | What it does |
 |---|---|
-| `recent.toml` | The vaults opened here (at most ten, recorded only after one opens), where each one's key file is, and its YubiKey slot. Paths and slot numbers only |
-| `app.toml` | Idle timeout, theme, lock-on-minimize, whether closing the window keeps the app in the menu bar or tray, the vault agents and the CLI use when nothing names one, the window's place and size, zoom, and your answer on crash reports with the date of the terms you agreed to |
-| `crash-reports/` | Reports waiting to be sent while Send crash reports is on, each as Settings › Diagnostics lists it. Turning the switch off deletes the folder |
-| `projects.json` | Each project's saved directory and command. No variable names or values |
-| `recommendations.json` | Dismissed recommendations, each by its vault and a digest under a key the vault holds, so only that vault unlocked can tell which it hides. No entry IDs, names or values |
-| `save-counts/` | For each vault, by its identity rather than its path, the save count of the copy last opened or saved here, so an older copy is noticed. One number each |
+| Deny | Refuses; works at once, as does `Escape` |
+| Allow once | Releases this one value |
+| Always allow | For an agent whose bridge has a label: keeps allowing that field to that agent |
 
-An unreadable settings file makes the app use defaults without overwriting it. Open keypaste at login is kept only as your login's own entry, which switching it off in Settings removes: a `keypaste` value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, `~/Library/LaunchAgents/com.keypaste.app.plist`, or `~/.config/autostart/keypaste.desktop`.
+The allows arm a second after the prompt has focus. [Approvals](approvals.md) owns the prompt, what each answer keeps and the log.
+
+## Set up agents
+
+Agents lists the AI tools on this computer and the agents that asked this vault recently.
+
+- **Connect an AI tool.** Add an agent offers a setup prompt to copy, an app to connect, or MCP to add by hand. Connect shows the command it will register and runs it only when you press it ([MCP setup](mcp-setup.md)).
+- **Choose what an agent gets.** An agent's page sets what it gets of each kind of value and whether it may run commands. Settings › Agents sets the defaults. Agent settings are kept on this computer, not in the vault ([agent settings](policy.md)).
+- **See what happened.** Agents › Activity shows the audit log, newest first; a record the hash chain does not vouch for says Edited. `keypaste log` reads the log at any time.
+
+## Review security findings
+
+Security, on the rail, lists what needs attention, never by value:
+
+- keys left in notes
+- weak, reused, expired and soon-expiring passwords
+- a vault whose password protection is weaker than keypaste's
+- a conflicted copy a sync tool left beside the vault
+
+Each finding offers its fix, and keypaste changes nothing unasked. Move to a field writes a note's key to a protected field. Strengthen upgrades the vault's protection once you confirm that KeePass before 2.35 can no longer open it, and keeps a copy of the file as it was. Dismiss hides a finding on this machine.
+
+<a id="editing-your-vault"></a>
+
+## Working beside the CLI and KeePassXC
+
+The app and the CLI write through the same core, so a fresh `keypaste` command reads the app's saved change. A form open in the app saves only the fields you changed, so the last save of a field wins and the other stays in history.
+
+While the app holds the vault, CLI commands that edit it send their change to the app, which saves it once you allow it. `keypaste access`, `import`, `token` and `share` are refused instead: make the change in the app, or run `keypaste lock` first.
+
+When another program such as KeePassXC or a sync tool saves the vault, the app merges that save within a minute. Where both changed the same field, the newer version wins and the other goes to history. If the other program changed the password or key file, the app locks and you unlock with the new ones.
+
+### Backups
+
+The first save after each unlock copies the vault into `<vault>.backups` beside it, keeping recent, daily and weekly copies. Every save checks what it wrote before replacing the vault.
+
+Copies beside the vault do not survive losing the disk. Settings › Export an encrypted copy writes the vault to a new file; keep one on another disk.
+
+### Restore a backup
+
+1. Select the vault on the unlock screen and choose File › Restore a backup….
+2. Choose a copy by when it was taken.
+3. Type the master password that copy was made under, and choose its key file.
+4. Restore replaces the vault with that copy, keeping the replaced file as a backup.
+
+Close KeePassXC first: it does not notice a restore. A backup cannot recover a forgotten master password or a lost key file.
+
+### Change the master password, key file or YubiKey
+
+Settings › This vault › Vault access › Change… changes the master password, key file or YubiKey. It asks the current master password first.
+
+- Earlier copies in `<vault>.backups` still open with the old password and key file. Delete them if those were exposed.
+- A lost or broken YubiKey locks the vault, unless a second key holds the same secret in the same slot, which YubiKey Manager makes and keypaste cannot.
+
+## Lock and settings
+
+The vault locks after thirty minutes without keyboard or mouse input; Settings accepts one minute to eight hours, and idle locking cannot be turned off. An agent's request never counts as activity. `Ctrl/Cmd+L` locks at once, and Settings can also lock on minimize.
+
+Locking refuses waiting and later agent requests until you unlock. Values already released to an agent, a terminal or the clipboard are not recalled. [SECURITY](../SECURITY.md) states the memory and clipboard limits.
+
+Settings also holds Open keypaste at login, crash reports and where backups are kept.
+
+### Files it keeps
+
+The app keeps this computer's settings in `~/.keypaste` (or `KEYPASTE_HOME`), beside the audit log and each vault's agent settings in `agents/`. None of it travels with the vault.
+
+| File | Holds |
+|---|---|
+| `recent.toml` | Recent vaults, their key file paths and YubiKey slots |
+| `app.toml` | App settings and your answer on crash reports |
+| `crash-reports/` | Reports waiting to be sent while Send crash reports is on |
+| `projects.json` | Each project's saved directory and command |
+| `recommendations.json` | Dismissed findings |
+| `save-counts/` | Each vault's last seen save count, so an older copy is noticed |
+
+## Keyboard shortcuts
+
+Every command is also in the menus.
+
+| Keys | Action |
+|---|---|
+| `Ctrl/Cmd+1` … `4` | Items, Agents, Security, Settings |
+| `Ctrl/Cmd+F`, `Ctrl/Cmd+K` | Search |
+| `Ctrl/Cmd+N` | New item |
+| `Ctrl/Cmd+C` | Outside a text field, copy the chosen item's password |
+| `Ctrl/Cmd+O` | Open a vault |
+| `Ctrl/Cmd+L` | Lock |
+| `Ctrl/Cmd+W` | Close the window, which locks |
+| `Ctrl/Cmd+Q` | Quit |
 
 <a id="removing-keypaste"></a>
 
 ## Removing keypaste
 
-First run `keypaste setup --remove`, or Disconnect each tool in Agents, so no AI tool keeps starting keypaste; switch off Open at login; and quit the app.
+First run `keypaste setup --remove`, or Disconnect each tool in Agents, so no AI tool keeps starting keypaste. Then switch off Open at login and quit the app.
 
 On macOS, delete the app and the LaunchAgent, and the link at `/usr/local/bin/keypaste` only while it names an app bundle's `keypaste`, so one you put there yourself stays:
 
@@ -242,11 +264,11 @@ rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/autostart/keypaste.desktop"
 grep -q 'wrote this; a newer keypaste re-points it' ~/.local/bin/keypaste && rm ~/.local/bin/keypaste
 ```
 
-A `keypaste` that Link replaced waits beside it as `keypaste.keypaste-backup`, and an AI tool's configuration file that setup or Connect edited keeps its first original as `<name>.keypaste-backup`. None of this touches your vault, `<vault>.backups` or `~/.keypaste`; delete `~/.keypaste` (`rm -rf ~/.keypaste`, or `Remove-Item -Recurse "$HOME\.keypaste"`) only when you want keypaste to forget this computer's settings and log.
+An AI tool's configuration file that setup or Connect edited keeps its original as `<name>.keypaste-backup`. None of this touches your vault, `<vault>.backups` or `~/.keypaste`. Delete `~/.keypaste` (`rm -rf ~/.keypaste`, or `Remove-Item -Recurse "$HOME\.keypaste"`) only when you want keypaste to forget this computer's settings and log.
 
-## Building and running it
+## Build it from source
 
-For contributors: install the .NET SDK that `global.json` selects, then
+Install the .NET SDK that `global.json` selects, then:
 
 ```
 dotnet restore keypaste.app.slnx --locked-mode
@@ -258,4 +280,4 @@ If a build fails with `Access to the path 'artifacts\...' is denied`, close the 
 
 <a id="checking-a-build-by-hand"></a>
 
-The manual checklist a person runs on each platform before a desktop release is in [RELEASE](RELEASE.md#installation-verification).
+The manual checklist a person runs on each platform before a desktop release is in [desktop-checklist](desktop-checklist.md).

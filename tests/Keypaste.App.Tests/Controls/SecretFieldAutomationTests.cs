@@ -32,7 +32,7 @@ namespace Keypaste.App.Tests.Controls;
 /// <b>The gesture is driven through the window rather than through
 /// <see cref="ISecretSink.Paste"/>.</b> Calling the view model directly would prove nothing about
 /// the binding, the modifier or <see cref="MaskedInput.AllowsPaste"/> — and it is those three that
-/// decide whether the unlock field can be pasted into, which SECURITY.md makes a claim about.
+/// decide whether the unlock field can be pasted into.
 /// </para>
 /// </remarks>
 public sealed class SecretFieldAutomationTests

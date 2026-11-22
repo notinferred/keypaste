@@ -1,10 +1,12 @@
 # Approving an agent's request
 
-> This guide describes the source build headed for keypaste 1.0.0, which is not yet published. In the published v0.3.0 the approver is `keypaste agent`, the bridge is the separate `keypaste-mcp` binary, the prompt asks `Approve? [y/N]` and a yes keeps a timed grant, `policy.toml` rules release without asking, and there is no desktop prompt. [FEATURES](FEATURES.md) lists what each version has.
+When an agent asks for a value, keypaste asks you. You keep the vault unlocked in the desktop app or with `keypaste approve`, answer each request, and check the audit log for what was released. [Agent settings](policy.md) decide which requests reach you; [Connecting keypaste to Claude](mcp-setup.md) covers connecting a tool.
 
-This guide owns the approval prompt, at the terminal and in the desktop app, and the audit log. What an agent gets without asking is set in [agent settings](policy.md); connecting a tool is [Connecting keypaste to Claude](mcp-setup.md).
+This guide describes the unpublished 1.0.0 source build. In `v0.3.0` the approver is `keypaste agent`, its prompt asks `Approve? [y/N]`, and there is no desktop prompt ([FEATURES](FEATURES.md)).
 
 <a id="the-short-version"></a>
+
+## How it works
 
 ```
   your terminal or the app             your MCP client
@@ -15,173 +17,105 @@ This guide owns the approval prompt, at the terminal and in the desktop app, and
    • writes the audit line                • returns one field, or a set
 ```
 
-Your MCP client starts `keypaste mcp`, which holds no vault. You hold the vault unlocked, either in the desktop app or with `keypaste approve` in a terminal you opened, and that process decides each request under your agent settings: it asks you, releases without asking, or refuses. An agent cannot trigger a master-password prompt, so you are never taught to trust a password window another program could imitate.
+Your AI tool starts the bridge, `keypaste mcp`, which holds no vault. The approver, the app or `keypaste approve`, holds the vault unlocked and decides each request under your agent settings: ask you, release, or refuse. An agent cannot trigger a master-password prompt, so you never learn to trust a password window another program could imitate.
 
-One vault has one holder. While the app has a vault unlocked, `keypaste approve` on that vault is refused, naming the app, and the app asks about that vault's requests itself.
+One vault has one approver. While the app has a vault unlocked, `keypaste approve` on that vault is refused, naming the app.
 
-## Starting the approver
+## Start the approver
+
+In the desktop app, unlock the vault. In a terminal:
 
 ```sh
 keypaste approve --vault ~/vaults/personal.kdbx
 ```
 
-It asks for your master password, then waits:
-
-```
-Master password:
-keypaste: watching /home/you/vaults/personal.kdbx
-keypaste: listening on keypaste-vault-9f3a1c02b7d54e60 for unlock 5d0c8e1a4b7f2c936e0a1d4b8c7f3e21, 45 seconds to answer.
-keypaste: every value waits for you to say yes; agents see each item's URL, and its username unless Settings hides it. Press Ctrl+C to stop.
-```
-
-When your settings allow a kind of value, a line before `listening` names it, and a `~/.keypaste/policy.toml` left from v0.3.0 is named as no longer read. Leave it running in its own terminal. Ctrl+C, SIGTERM and closing the terminal lock the vault again, and a request waiting at the prompt is withdrawn and denied as `vault-locked`.
+It asks for your master password, then waits. Leave it running in its own terminal. Ctrl+C, SIGTERM and closing the terminal lock the vault, and a request waiting at the prompt is denied as `vault-locked`.
 
 | Option | What it does |
 |---|---|
-| `--vault <path>` | Which vault to unlock. Or set `KEYPASTE_VAULT`; with neither, the vault chosen in the app or with `keypaste use`. |
-| `--keyfile <path>` | The vault's key file, if it has one. Or set `KEYPASTE_KEYFILE`. |
+| `--vault <path>` | Which vault to unlock. Or `KEYPASTE_VAULT`; with neither, the vault chosen in the app or with `keypaste use`. |
+| `--keyfile <path>` | The vault's key file. Or `KEYPASTE_KEYFILE`. |
 | `--approval-timeout <seconds>` | How long you get to answer. Default 45, range 5–55. |
-| `--approver <name>` | Which pipe to listen on. Or set `KEYPASTE_APPROVER`. Needed only if you run two. |
+| `--approver <name>` | Which pipe to listen on, needed only if you run two. Or `KEYPASTE_APPROVER`. |
 
-The pipe name is derived per user and per vault, so the vault the bridge names must be the vault the approver holds.
+The pipe name is derived per user and per vault, so the bridge must name the vault the approver holds.
 
-## The prompt
+<a id="the-prompt"></a>
 
-At the terminal, `keypaste approve` draws the request between two rules: who is asking, the item and field, the agent's reason under a line saying the agent wrote it, and the choice line `[d] deny  [o] once  [a] always` with a countdown. [The demo](demo.md#review-the-request) shows it exactly as the shipped binaries print it, which CI checks.
+## Answer a request
 
-- `agent` is the name the connecting program gave itself, which nothing checks, then in brackets the label its bridge was started with (`--client-label`). Agent settings follow the label, never the name.
-- `item` names the item by its title, `group` the group it is in, and `field` the value. A `/` inside an item's title is shown as a space, so a title such as `../../prod/ROOT_TOKEN` cannot pass for another group path. A run's and a project's prompts name the stage, such as `dev` or `prod`.
-- The reason is the agent's text. keypaste removes control characters, line breaks, invisible characters and right-to-left controls and cuts it to 400 characters. It cannot change the prompt, its default or its deadline.
+One prompt shows at a time. Up to three requests per agent wait their turn; a fourth gets `BUSY`.
 
-The answers:
+### At the terminal
 
-- `o` allows this request once and keeps nothing.
-- `a` (Always allow) appears only for an agent whose bridge has a label. It asks you to confirm with `y`, then keeps that answer for that agent and that item's field until you remove it on the agent's page in Agents or with `keypaste clients <agent> --forget <key>` ([agent settings](policy.md#one-agents-own-rules)). It is not offered once an agent has 128 kept answers and picks, nor for an item in a protected stage, which is asked about every time.
-- Anything else, Enter included, is a no, and so is no answer within 45 seconds. The countdown shows the seconds left.
+`keypaste approve` shows the request with the choice line `[d] deny  [o] once  [a] always` and a countdown. [The demo](demo.md#review-the-request) shows it exactly.
 
-An allow counts only once the choices have been on screen for a second, and keys typed before they appeared are discarded, so a key meant for the last prompt cannot answer this one.
+- `agent` is the name the program gave itself, which nothing checks, then in brackets its bridge's `--client-label`. Settings follow the label, never the name.
+- `item`, `group` and `field` say what is asked for. A `/` in a title shows as a space, so a title cannot pass for another group path.
+- The reason is the agent's own text, stripped of control and invisible characters and cut to 400 characters ([THREATS](../THREATS.md) T-2).
 
-When more than one item answers to the name an agent asked for, such as two logins for one site, you are asked to pick one: each shows its title, group, username and URL, none is picked for you, and only the picked item's field is sent.
+| Key | Answer |
+|---|---|
+| `o` | Allow once and keep nothing. |
+| `a` | Always allow. Confirm with `y`, and keypaste keeps the answer for that agent and that item's field ([agent settings](policy.md#one-agents-own-rules)). Not offered without a label, past 128 kept answers, or in a [protected stage](policy.md#protected-stages). |
+| Anything else | No, Enter included. So is the countdown ending. |
 
-<a id="linked-sets"></a>
-
-### Linked sets
-
-An agent's `request_linked_set` asks for two to four fields together, of one item and of items `find_access` links to it. The prompt lists every item and field under the agent's reason and offers only Deny and Allow once; at the terminal, `y` allows the set once and anything else denies it. A set is asked about every time, even when your settings allow each of its fields, and a field you block, one refused in the last minute or an item the agent cannot see or that is not linked refuses the whole set without asking. Allow once sends every value; Deny sends none, and holds each of its fields back for a minute.
-
-<a id="item-changes"></a>
-
-### Item changes
-
-An agent's `request_item_change` asks you to allow one change to an item its bridge shows whole, never one it reaches only through a project tag: moving it to Trash or marking it expired with KeePass's own expiry date, now or on a day it names. The prompt says the change in keypaste's words, such as "Move work/github to Trash" or "Mark cloud/aws-prod as expired on 2026-12-01", under the agent's reason, and offers only Deny and Allow; at the terminal, `y` allows it and anything else denies it. A change is asked about every time and no setting allows one. An agent may also ask to delete an item for good, which only an item that same agent created through a `request_save` you approved can be; the prompt says "Delete work/scratch-token for good. An agent created it on 2026-11-15", and its Allow reads Delete for good. A change is refused without asking when the item already carries it, when Trash is off for a move, and for a delete of any other item. Deny changes nothing and holds the item back for a minute, whatever change the agent asks for next. The same agent may add or remove the tag `needs-update` on an item it sees whole without asking you, whether or not the item is held back; the tag shows on the item and in a search for it, and each change is a line in the agent log, as every change is. An expired item and a weak or reused password appear in Security. keypaste writes a change's line before it saves the vault, so a change it cannot record is not made.
+An allow counts only after the choices have been on screen for a second, so a key meant for the last prompt cannot answer this one.
 
 <a id="approving-in-the-desktop-app"></a>
 
 ### In the desktop app
 
-When the app has the vault unlocked, a request opens a keypaste card over whatever you are doing. It says who is asking, then the question, such as "Give claude-code STRIPE_SECRET_KEY?", the item by its title and vault, the agent's own words under "claude-code says", and what allowing does; Details holds the tool, the label, the item's group and the process. It offers Deny and Allow once, and for an agent whose bridge has a label, Always allow, which asks once to confirm. An item in a protected stage says "Protected · asked every time" and offers no Always allow, and neither does a command or a linked set. No prompt offers Always block; block a kind of value on the agent's page in Agents ([agent settings](policy.md#one-agents-own-rules)).
+A card opens over whatever you are doing, such as "Give claude-code STRIPE_SECRET_KEY?", with the item, its vault and the agent's own words. It offers Deny, Allow once and, for a labelled agent, Always allow, which asks once to confirm. Protected stages, commands and linked sets offer no Always allow. To block a kind of value, use the agent's page in Agents.
 
-- The requester line says **Verified** only when keypaste checked with the system that the program asking is keypaste's own `keypaste`, started by the AI tool the label names, such as Claude Code, or by Node running that tool's installed npm package; it then names the app it runs in, such as Terminal. Otherwise it says **Not verified**: the name is the agent's own claim. Verified changes no rule ([THREATS](../THREATS.md) T-3).
-- Allow once works from a second after the prompt has focus. While another window has focus the prompt is drawn inactive and its allows stay disarmed; click into it, or press Show the prompt on Agents, and they work a second later.
-- Focus starts on Deny. Return presses Allow once, or confirms Always allow, once it works; before that it does nothing, and it never deletes an item for good. Deny, Escape, closing the window, 45 seconds without an answer (the bar along the card's bottom edge drains as they pass), a lock, quitting and the client giving up each refuse; on the Always allow confirmation, Escape goes back.
-- Agents lists the request under Waiting for you, with the agent, the item, the field and the seconds left, never the reason. You answer only in the prompt window.
-- While keypaste is in the background, a request may also post a system notification that names no item, vault or agent; it never answers a request.
+- **Verified** means keypaste checked with the system that the asker is keypaste's own `keypaste`, started by the tool the label names. Otherwise it says **Not verified**. Verified changes no rule ([THREATS](../THREATS.md) T-3).
+- Focus starts on Deny, and the allows arm a second after the card gains focus.
+- Deny, Escape, closing the card, the timer, a lock or quitting each refuse.
+- Agents lists waiting requests under Waiting for you; you answer only in the card.
 
-A request for an attachment, made by name with `request_attachment`, shows `attachment` and the name as its field, and Allow once releases that one attachment, at most 5 MiB.
+### Several matches, attachments
 
-## Repeat and waiting requests
+When several items match the name asked for, you pick one, and only its field is sent. A `request_attachment` releases one attachment by name, at most 5 MiB.
 
-Each request is asked about unless your agent settings or a kept answer decide it, or it is an item's URL, or its username while Agents see usernames is on. A release without asking shows no reason; the audit log keeps it ([THREATS](../THREATS.md) T-12). `keypaste approve` prints a line for it:
+<a id="linked-sets"></a>
 
-```
-keypaste: released env/billing/.env to claude-code without asking (project variables allowed)
-```
+### Linked sets
 
-One prompt is shown at a time. A request that arrives meanwhile waits its turn, at most three for each agent; a fourth gets `BUSY`, and so does a call beyond what one bridge carries at once. A request whose client gives up, and every waiting request when the vault locks, leaves the queue.
+A `request_linked_set` asks for two to four fields from one item and the items `find_access` links to it. It is asked every time, even when your settings allow each field, with Deny and Allow once only (`y` at the terminal). Deny sends nothing and holds each field back for a minute. A set holding a blocked or recently refused field, or an item out of reach, is refused without asking.
 
-## When you say no
+<a id="item-changes"></a>
 
-An explicit refusal tells the agent not to retry, and the same field is refused for a minute without asking again. A timeout allows a retry, because nobody decided.
+### Item changes
 
-There is no pause button for an agent that keeps asking; your settings are the pause. Block a kind of value and every request for it is refused before anything in the vault is read, and `keypaste clients <agent> --run off` stops its commands the same way.
+A `request_item_change` asks to move an item to Trash, mark it expired, or delete it for good. Delete is offered only for an item that same agent created through a `request_save` you approved. The change is asked every time, and no setting allows one. Deny holds the item back for a minute. Adding or removing the tag `needs-update` is not asked ([the tools](mcp-setup.md#the-tools)).
 
 <a id="runs-that-ask-for-a-projects-variables"></a>
 
-## Runs
+### Runs
 
-`keypaste run --session <project> -- <command>` asks the process holding the vault for the project's whole set instead of opening the vault itself ([replace-dotenv](replace-dotenv.md#run-your-app)). An agent's `run` tool, through a bridge started with `--allow-run`, asks the same way ([mcp-setup](mcp-setup.md#running-a-command-with-secrets---allow-run)).
+`keypaste run --session <project> -- <command>` asks the approver for the project's env set ([replace-dotenv](replace-dotenv.md#run-your-app)). An agent's `run` tool asks the same way once you turn run on ([agent settings](policy.md#running-commands)).
 
-The prompt names the project, the variable names, the item each value comes from, the command and the directory, and for an agent's run the exact program and command line and the agent's reason; a loader such as `NODE_OPTIONS` is marked as changing how programs start. It never shows a value. A run offers Deny and Allow once only, every time, and no setting releases a set without asking. Allow once, or `o`, starts the command once. Refusing a run refuses the same project, command and directory for a minute. An agent runs nothing until you turn run on for it, and a run whose set holds a blocked value is refused without asking.
+The prompt names the project, variable names, source items, command, directory and, for an agent, its reason, never a value. A run is asked every time, with Deny and Allow once only. Refusing it refuses the same run for a minute. Approve only a run you started or a command you understand ([THREATS](../THREATS.md) T-30, T-34, T-35).
 
-An item tagged into a protected stage, one named `prod`, `production`, `prod-…` or `production-…` such as `env:billing:prod`, is asked about at every run that names it and refused to a scoped token's run. A single request for one of its values is asked about every time too, whatever Agents allows, with Deny and Allow once only.
+## When you say no
 
-The command shown is what the run says it will start; approve only a run you started or a command whose behaviour you know ([THREATS](../THREATS.md) T-30, T-34, T-35).
+A refusal tells the agent not to retry, and that field is refused for a minute without asking. Changing that kind in agent settings ends the wait. A timeout allows a retry.
 
-## When nothing holds the vault
+To stop an agent that keeps asking, block the kind of value, or turn its commands off with `keypaste clients <agent> --run off`.
 
-Everything is denied, and the agent is told how to fix it:
+## Requests that don't reach you
 
-```
-keypaste: DENIED. Nobody can approve this right now: nothing holds this vault unlocked, neither
-the keypaste desktop app nor keypaste approve, and keypaste releases nothing until one does,
-whatever this agent's settings say.
+[Agent settings](policy.md) and kept answers release or refuse some requests without asking, and `keypaste approve` prints a line for each. Nobody reads the reason of a release without asking; the audit log keeps it ([THREATS](../THREATS.md) T-12).
 
-Ask the person you are working with to unlock this vault in the keypaste desktop app, or to
-run `keypaste approve --vault <their vault>` in a terminal, and then try again. Until then,
-every request will be refused. This call was recorded in the audit log as denied.
-```
-
-When the app is open with this vault locked, the agent is told to ask you to unlock it there. On macOS and Linux the first such request after a lock also posts a notification, "An agent asked for a locked vault", which names no vault; its Open keypaste shows the unlock screen with that vault selected. On Windows, and where the system cannot post one, the app shows a small notice of its own, which names the vault, has no password field and does not take the keyboard. No other notice appears until you have unlocked and the app has locked again.
+When nothing holds the vault unlocked, every request is denied and the agent is told to ask you to unlock it. When the app is open with the vault locked, it tells you an agent asked.
 
 ## The audit log
 
-The app or `keypaste approve` appends one JSON line to `~/.keypaste/audit.jsonl` for every call it answers, granted, denied or abandoned. The bridge writes one only for a call it refused itself, a malformed one included, or that nothing holding the vault answered. `KEYPASTE_HOME` moves the directory for the process it is set for; a bridge's `--audit-log` moves only that bridge's own lines. In the app the log is Activity, at the foot of the agents list in Agents.
+The approver appends one JSON line to `~/.keypaste/audit.jsonl` for every call it answers. The bridge writes one only for a call it refused itself or that no approver answered. `KEYPASTE_HOME` moves the folder; a bridge's `--audit-log` moves only its own lines. In the app the log is Activity, in Agents.
 
-```json
-{"v":2,"ts":"2026-07-26T14:03:11.482Z","seq":1,"pid":48122,
- "client":{"name":"claude-code","version":"1.2.3","label":"claude-code","transport":"stdio"},
- "tool":"request_credential",
- "args":{"entry":"env/demo/.env","entry_kind":"path","field":"STRIPE_KEY",
-         "reason_excerpt":"deploy the billing service to staging","reason_len":37,
-         "reason_sha256":"..."},
- "decision":"granted","method":"prompt",
- "reason":"a person approved this one request",
- "prev":"0000...0000","hash":"0c806dbd...14b3c7"}
-```
+A call whose line cannot be written is refused. A line never holds a value, but item names and reasons are logged, so treat the log as sensitive. On Windows it inherits its folder's permissions, so keep `KEYPASTE_HOME` in a folder only you can read.
 
-A linked set writes one `request_linked_set` line per field it released, each with `"set":{"id":…,"position":…,"of":…}` in `args` under one id, and one line, without `position`, for a set refused. A line never holds the released value. It records the item, the field, the client and its label, the agent's reason, the decision and how it was reached, and also `vault`, the identity of the vault that answered, and `entries`, the items a release or run used. A `run` line carries the first 256 characters of the command line as `command` and the SHA-256 of the whole argument list as `command_sha256`. Item names and reasons are logged, so keep secret values out of them, and treat the log as sensitive.
-
-A call is refused when its line cannot be written. The log is never rotated or trimmed. On Linux and macOS keypaste creates it owner-readable and tightens looser permissions with a notice; on Windows it inherits its folder's permissions, so keep `KEYPASTE_HOME` in a folder only you can read.
-
-`decision` is `granted` or `denied`. `method` says how:
-
-| `method` | What happened |
-|---|---|
-| `prompt` | A person was shown this request and answered it, including a run and a confirmed change to an agent's settings. |
-| `allowed` | Released without asking: its kind is Allow, an Always allow was kept for it, or it is an item's URL, or its username while Agents see usernames is on. The reason says which. |
-| `blocked` | Refused without asking: its kind is Block, an Always block was kept for it, or it is a passkey's field. |
-| `exposure` | A listing, naming only what the agent can see. |
-| `out-of-scope` | The item was outside what the agent can see, or absent; one answer for both, so nothing outside can be probed. |
-| `run-off` | A run from an agent whose run is off, refused before anything was looked up. |
-| `rules-changed` | A change to agent settings, on an `access_change` line naming the agent. |
-| `narrowing` | On an `access_change` line: a change to an agent's settings that gave it nothing more, applied at once. |
-| `no-approver` | Nothing held the vault unlocked. |
-| `no-session` | The request did not reach the current unlock of the vault's holder: no vault named or chosen, another vault answered, or the vault was locked or unlocked again in between. |
-| `vault-locked` | The vault was locked, or locked while the request waited. |
-| `vault-changed` | The holder's copy no longer matched the file, because another program saved it, a change was still being saved, or the vault was reloaded or merged while the request waited. Nothing was read. |
-| `merged` | On a `vault_merge` line: the app or `keypaste approve` merged another program's save with its own changes, naming the items both changed, never a value. |
-| `timed-out` / `cancelled` | Nobody answered in time / the client stopped waiting, or a lock or reload took a confirmation down. |
-| `busy` / `cooldown` | Too many requests already waiting / the same field was refused a moment ago. |
-| `undeliverable` | Authorized, but too large to send in one reply. Nothing was released. |
-| `unfillable` | A placeholder in the value could not be filled from its field. |
-| `unchanged` | A terminal edit the holder needed to write nothing for. |
-| `token`, `share-created`, `share-revoked` | A scoped token's release, a share link made, a share link revoked. |
-| `not-armed`, `not-paired`, `removed` | A browser asked to pair while an earlier version's pairing was off, presented a pairing no unlocked vault vouches for, or had its pairing removed. |
-| `invalid-request` / `failed` / `not-initialized` | Wrong arguments / something went wrong / a tool called before the MCP handshake finished. |
-
-**Older logs.** The log is append-only, so old lines keep the words they were written with. v0.3.0 wrote `grant-cache` (a live approval on the same connection served the request), `policy` and `policy-limit` (a `policy.toml` rule released it, or had spent its hourly allowance). Earlier source builds wrote `automatic`, `automatic-commands`, `always-allowed`, `inject-only` and `granted_seconds`, and the earliest build wrote `not-implemented`. Nothing in the 1.0.0 build writes them.
-
-### Reading it
+### Read it
 
 ```sh
 keypaste log
@@ -190,47 +124,29 @@ keypaste log --client claude-code --since 2h
 keypaste log --json
 ```
 
-`--since` takes a span (`30m`, `2h`, `7d`) or a timestamp, and `--client` matches part of a label or name. A narrowed view shows both the selected and the total count. `--json` writes the records and whether the chain vouches for each.
+<a id="knowing-it-has-not-been-edited"></a>
 
-### Knowing it has not been edited
-
-Each record holds its predecessor's hash in `prev` and its own in `hash`, so changing one breaks the next one's link.
+### Check it has not been edited
 
 ```sh
 keypaste log verify
+keypaste log verify --checkpoints
+keypaste log verify --expect <hash>
 ```
 
-```
-3 records verified in /home/you/.keypaste/audit.jsonl.
-Latest: seq 3, hash 651f0392457b29f80f3168584758418c71734077577a9c100e83225e1783dde8
-```
+Each line holds its predecessor's hash, so `keypaste log verify` finds an edited line and exits 5. Whoever can write the file can recompute the chain, so the approver signs a checkpoint every 64 lines and at lock with a key the vault holds; `--checkpoints` asks for the master password and checks them. Lines after the last checkpoint are unsigned, and deleting the last lines leaves a valid chain. To catch that, keep the `Latest` hash elsewhere and pass it to `--expect` ([THREATS](../THREATS.md) T-5).
 
-`keypaste log verify` exits 5 for a broken chain and names the line and the problem; `keypaste log` runs the same check and marks a row the chain does not vouch for with `?`. The chain alone has no secret key, so whoever can write the file can recompute it. The app and `keypaste approve` therefore add a checkpoint every 64 lines they write and when the vault locks, signed with a key the vault holds; `keypaste log verify --checkpoints` asks for the master password and fails when a checkpoint naming the vault is not signed by its key:
+### How long lines stay
 
-```
-2 checkpoints found, 2 signed by this vault's key.
-Unsigned tail: 5 records after the last signed checkpoint.
-```
-
-Records after the last checkpoint are unsigned, and deleting the last records leaves a valid chain; both limits are printed on every pass. To detect a lost record, keep a hash somewhere else and supply it later:
-
-```sh
-keypaste log verify --expect 651f0392457b29f80f3168584758418c71734077577a9c100e83225e1783dde8
-```
-
-**How long lines stay.** A request for a value, a command, a save or a change to an item keeps its own line. An agent's lookups, a listing or a search, keep theirs for 30 days; then the app or `keypaste approve`, while the vault is unlocked, folds them into one `log_summary` line per agent per day with counts by tool and decision. Settings › Keep the agent log for sets how long the log is kept, 90 days, 1 year (the default), 2 years or forever; older days are removed whole behind one `log_removed` line saying which days and how many requests. The rewritten file starts with a `log_compaction` line signed with the vault's checkpoint key, so `keypaste log verify` reports `Compacted: …` and `--checkpoints` checks that signature. A vault with no checkpoint key yet is not compacted until a save gives it one. An anchor to a line that was folded or removed is reported missing.
-
-[THREATS](../THREATS.md) T-5 covers these limits. Records from a newer keypaste stop new lines being appended, so the chain does not fork; upgrade, or move the file aside to start a new log.
+Requests for values, runs, saves and changes keep their own lines. Lookups are folded after 30 days into one `log_summary` line per agent per day. Settings › Keep the agent log for sets how long anything is kept: 90 days, 1 year (default), 2 years or forever.
 
 <a id="archiving-it"></a>
 
-### Archiving it
+### Archive it
 
-keypaste never moves the log; it shortens it only as [how long lines stay](#the-audit-log) says. To start a new one:
-
-1. Quit the app, stop `keypaste approve` and quit every AI tool that runs keypaste's bridge, so nothing has the file open. Windows cannot move a file in use.
-2. Run `keypaste log verify` and keep the `Latest` hash somewhere other than this computer.
-3. Move the file aside, in `KEYPASTE_HOME` if you set one:
+1. Quit the app, `keypaste approve` and every AI tool running the bridge.
+2. Run `keypaste log verify` and keep the `Latest` hash off this computer.
+3. Move the file aside:
 
 ```sh
 mv ~/.keypaste/audit.jsonl ~/.keypaste/audit-2026-10.jsonl
@@ -240,16 +156,48 @@ mv ~/.keypaste/audit.jsonl ~/.keypaste/audit-2026-10.jsonl
 Move-Item "$HOME\.keypaste\audit.jsonl" "$HOME\.keypaste\audit-2026-10.jsonl"
 ```
 
-The next record starts a new file, and the archive still verifies with `keypaste log verify --audit-log ~/.keypaste/audit-2026-10.jsonl --expect <hash>`. Activity reads only `audit.jsonl`; `keypaste log --audit-log <file>` still lists an archive.
+The next record starts a new file. Check the archive with `keypaste log verify --audit-log <file> --expect <hash>`.
+
+### What a line holds
+
+| Field | Holds |
+|---|---|
+| `ts`, `seq`, `pid` | When, its place in the log, the process |
+| `client` | The agent's name, version, label and transport |
+| `tool`, `args` | The tool and the item, field and the agent's reason; a run's `command` and `command_sha256` |
+| `vault`, `entries` | The vault that answered and the items used |
+| `decision` | `granted` or `denied` |
+| `method` | How it was decided, below |
+| `prev`, `hash` | The chain |
+
+| `method` | Meaning |
+|---|---|
+| `prompt` | You answered |
+| `allowed` / `blocked` | Released or refused without asking by a setting or kept answer |
+| `exposure` | A listing |
+| `out-of-scope` | Out of reach or absent, one answer for both |
+| `run-off` | A run from an agent with run off |
+| `rules-changed` / `narrowing` | A settings change on an `access_change` line |
+| `no-approver` / `no-session` / `vault-locked` | Nothing held the vault, or not this unlock |
+| `vault-changed` / `merged` | Another program saved the vault |
+| `timed-out` / `cancelled` / `busy` / `cooldown` | No answer, withdrawn, queue full, refused a moment ago |
+| `undeliverable` / `unfillable` / `unchanged` | Too large, a placeholder unfilled, nothing to write |
+| `token`, `share-created`, `share-revoked` | A scoped token's release, a share link made or revoked |
+| `not-armed`, `not-paired`, `removed` | Browser pairing refusals and removal |
+| `invalid-request` / `failed` / `not-initialized` | Bad arguments, an error, a call before the handshake |
+
+v0.3.0 lines may carry `grant-cache`, `policy` or `policy-limit`, which 1.0.0 never writes.
 
 <a id="the-honest-limits"></a>
 
 ## Limits
 
-`keypaste approve` keeps the vault unlocked while it runs and has no idle lock; stop it to lock. Once another program saves the file, it refuses requests as `vault-changed` until it has merged that save, within five seconds, or a minute where the system cannot watch the folder and the save kept the file's size and time, and says in its terminal what the merge did. A save it cannot merge, such as a file that now holds another vault, keeps requests refused until the file changes again or you restart it, and a file the password or key file you unlocked with no longer opens stops it. Locking the desktop app does not stop a terminal approver holding another vault.
+- `keypaste approve` keeps the vault unlocked while it runs and has no idle lock; stop it to lock. Locking the desktop app does not stop a terminal approver holding another vault.
+- After another program saves the vault, `keypaste approve` refuses requests as `vault-changed` until it merges that save; a save it cannot merge keeps them refused until you restart it.
+- keypaste keeps no released value, but cannot erase what the client or a launched process kept, and stopping the approver revokes nothing at the provider.
 
-keypaste keeps no released value between requests, but it cannot erase what the client, its transcripts or a launched process kept, and stopping the approver revokes nothing at the credential's provider. [SECURITY](../SECURITY.md) and [THREATS](../THREATS.md) set out these boundaries.
+[SECURITY](../SECURITY.md) and [THREATS](../THREATS.md) set out the guarantees.
 
 ## Checking it yourself
 
-`scripts/verify-approval-e2e.sh` runs the real CLI and bridge against a test vault on Linux, macOS and Windows: an approval returns the value, a refusal does not, and neither writes it to the audit log. `scripts/verify-demo.sh` checks the prompt in [the demo](demo.md) and four other public pages against the built binaries; it does not read this page.
+`scripts/verify-approval-e2e.sh` runs the real CLI and bridge against a test vault on Linux, macOS and Windows: an approval returns the value, a refusal does not, and neither writes it to the audit log. `scripts/verify-demo.sh` checks [the demo](demo.md)'s prompt against the built binaries.

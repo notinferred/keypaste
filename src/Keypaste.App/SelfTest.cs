@@ -18,7 +18,7 @@ namespace Keypaste.App;
 /// works on this operating system, end to end, on disk. It does NOT prove the Skia and HarfBuzz
 /// natives link — those load lazily on first render, and the package job asserts only that the
 /// files are present beside the binary. Everything visual is on the manual checklist in
-/// <c>docs/desktop.md</c>.
+/// <c>docs/desktop-checklist.md</c>.
 /// </para>
 /// </remarks>
 internal static class SelfTest

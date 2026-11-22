@@ -4,7 +4,7 @@
 #
 # Before this file there was no such answer. The four CLI targets were written down independently in
 # release.yml's build matrix, its post-transport asset count, its publication allowlist, four
-# csprojs' RuntimeIdentifiers, verify-release-destination.sh's fixture, the README install blocks,
+# csprojs' RuntimeIdentifiers, verify-release-destination.sh's fixture, the install page's blocks,
 # keypaste.com's download page and docs/RELEASE.md's table. Adding one was five edits with nothing holding
 # them together, and nothing at all could fail when they disagreed.
 #
@@ -15,8 +15,8 @@
 #   .published             an append-only record of releases that actually happened.
 #
 # The download pages advertise `.published`, never the tag. That is what stops a release candidate
-# demanding rc filenames in the README: a candidate carries -rc.1 through binaries, archives and the
-# changelog while README keeps naming 0.1.0, because nothing has been published. docs/RELEASE.md
+# demanding rc filenames on the install page: a candidate carries -rc.1 through binaries, archives and the
+# changelog while the install page keeps naming 0.1.0, because nothing has been published. docs/RELEASE.md
 # requirement 5's "keep the last verified release advertised until its replacement passes" is the
 # same rule seen from the other side, and it falls out of the shape rather than being a case here.
 #
@@ -540,7 +540,7 @@ validate_projects() {
 }
 
 # Floor-shaped claims a download page can make. Anything matching one of these must be a value the
-# definition holds - which is how "macOS 14 or later" appearing in the README turns this red rather
+# definition holds - which is how "macOS 14 or later" appearing on the install page turns this red rather
 # than becoming true by being written down.
 readonly FLOOR_PATTERNS="glibc [0-9]+\.[0-9]+|macOS [0-9]+(\.[0-9]+)? or (later|newer)|Windows [0-9]+ or (later|newer)"
 
@@ -552,8 +552,8 @@ validate_documents() {
 
   # Every advertised target with an install check has a block naming its archive, on each page the
   # definition says carries that target. Which pages carry which target is a recorded fact rather
-  # than an assumption: a page may deliberately publish some targets and send readers to the README
-  # for the rest, and a check that demanded every block there would be wrong about the product
+  # than an assumption: a page may deliberately publish some targets and send readers to the install
+  # page for the rest, and a check that demanded every block there would be wrong about the product
   # rather than about the page.
   for c in $(jqr '.components | keys[]' "$def"); do
     for rid in $(json_array "$def" ".components.\"$c\".targets | map(select(.advertised == true) | .rid)"); do
@@ -567,7 +567,7 @@ validate_documents() {
       carried="$(json_array "$def" "[$target] | map(.advertised_on // []) | add")"
       [ -n "$carried" ] || note "$c/$rid: advertised with an install check and no page recorded as carrying it"
 
-      # A target may be installed from ANOTHER target's block. linux-arm64 is: README prints one
+      # A target may be installed from ANOTHER target's block. linux-arm64 is: the install page prints one
       # Linux block naming linux-x64 and tells an arm64 reader to substitute the filename, so
       # demanding an arm64 archive name on the page would be demanding a second block, and demanding
       # an arm64 sentinel would be demanding one that must not exist. What is required instead is
@@ -601,7 +601,7 @@ validate_documents() {
   done
 
   # A floor claim on a page is a value in the definition or it is not made.
-  for page in README.md docs/RELEASE.md; do
+  for page in docs/install.md docs/RELEASE.md; do
     [ -f "$root/$page" ] || continue
     while IFS= read -r claim; do
       [ -n "$claim" ] || continue
@@ -1329,9 +1329,9 @@ echo "== fixtures: a definition the repository contradicts"
 FAKE="$WORK/root"
 mkdir -p "$FAKE/.github/workflows"
 cp "$DEFINITION" "$FAKE/release-targets.json"
-cp README.md CHANGELOG.md SECURITY.md "$PROPS" Directory.Packages.props "$FAKE/"
+cp CHANGELOG.md SECURITY.md "$PROPS" Directory.Packages.props "$FAKE/"
 mkdir -p "$FAKE/docs"
-cp docs/RELEASE.md docs/desktop.md "$FAKE/docs/"
+cp docs/RELEASE.md docs/desktop.md docs/install.md "$FAKE/docs/"
 cp .github/workflows/release.yml .github/workflows/app.yml "$FAKE/.github/workflows/"
 mkdir -p "$FAKE/scripts"
 cp scripts/require-changelog-section.sh scripts/build-linux-appimage.sh scripts/build-windows-installer.sh scripts/sign-windows.sh \
@@ -1379,23 +1379,23 @@ sed_inplace() {
   sed "$expr" "$file" > "$tmp" && mv "$tmp" "$file"
 }
 
-cp README.md "$FAKE/README.md"
-printf '\nmacOS 15 or later is required.\n' >> "$FAKE/README.md"
+cp docs/install.md "$FAKE/docs/install.md"
+printf '\nmacOS 15 or later is required.\n' >> "$FAKE/docs/install.md"
 expect_repo_refusal "doc-claims-a-floor-nothing-holds" "no target in the definition holds that floor" \
   "$FAKE/release-targets.json" "$FAKE"
-cp README.md "$FAKE/README.md"
+cp docs/install.md "$FAKE/docs/install.md"
 
 # A page that stops mentioning a floor and a page that never had one look identical to a check that
 # only reads what is written. These two are why the presence rule is required rather than conditional.
-sed_inplace '/^\*\*macOS 14 or later\.\*\*/d' "$FAKE/README.md"
+sed_inplace '/^\*\*macOS 14 or later\.\*\*/d' "$FAKE/docs/install.md"
 expect_repo_refusal "doc-drops-a-floor" "no longer states its floor" \
   "$FAKE/release-targets.json" "$FAKE"
-cp README.md "$FAKE/README.md"
+cp docs/install.md "$FAKE/docs/install.md"
 
-sed_inplace 's/no run backs this floor/it has been checked/g' "$FAKE/README.md"
+sed_inplace 's/no run backs this floor/it has been checked/g' "$FAKE/docs/install.md"
 expect_repo_refusal "doc-drops-the-caveat" "without the caveat that qualifies it" \
   "$FAKE/release-targets.json" "$FAKE"
-cp README.md "$FAKE/README.md"
+cp docs/install.md "$FAKE/docs/install.md"
 
 # The vocabulary lives in docs/RELEASE.md and the values live in the definition. Deleting a row
 # from the table is how one of them silently stops meaning anything.
@@ -1404,10 +1404,10 @@ expect_repo_refusal "release-doc-drops-a-floor-value" "which docs/RELEASE.md doe
   "$FAKE/release-targets.json" "$FAKE"
 cp docs/RELEASE.md "$FAKE/docs/RELEASE.md"
 
-sed_inplace 's/unsigned/perfectly ordinary/g' "$FAKE/README.md"
+sed_inplace 's/unsigned/perfectly ordinary/g' "$FAKE/docs/install.md"
 expect_repo_refusal "signing-disclosure-deleted" "no longer says the cli binaries are unsigned" \
   "$FAKE/release-targets.json" "$FAKE"
-cp README.md "$FAKE/README.md"
+cp docs/install.md "$FAKE/docs/install.md"
 
 sed_inplace 's/| \.packages\[\] | select(\.kind == "msi")/| .installer | select(.kind == "msi")/' "$FAKE/scripts/build-windows-installer.sh"
 expect_repo_refusal "installer-name-not-read-from-the-definition" "builds an msi package without reading its name from the definition" \
@@ -1530,10 +1530,10 @@ expect_repo_refusal "borrowed-block-with-no-reason" "records no reason it has no
   "$(mutate borrowed-block-with-no-reason '(.components.cli.targets[] | select(.rid == "linux-arm64") | .install_block_reason) |= ""')" \
   "$FAKE"
 
-sed_inplace 's/For arm64, substitute `linux-arm64`/For arm64, substitute the other one/' "$FAKE/README.md"
+sed_inplace 's/For arm64, substitute `linux-arm64`/For arm64, substitute the other one/' "$FAKE/docs/install.md"
 expect_repo_refusal "borrowed-block-and-the-rid-is-not-named" "cannot find the substitution it needs" \
   "$FAKE/release-targets.json" "$FAKE"
-cp README.md "$FAKE/README.md"
+cp docs/install.md "$FAKE/docs/install.md"
 
 # A page that drops one defect from the list still looks complete to a reader, which is why the
 # check reads the list from the definition rather than counting what it finds.
@@ -1550,11 +1550,11 @@ expect_repo_refusal "defect-not-disclosed" "does not say that" \
 # move with it. Nothing about the pages changes here - only which release the definition advertises -
 # so this is the case a warning written by hand cannot fail. It is the MARKER that is wrong, not the
 # presence of an old defect's words, which an upgrade notice is supposed to keep saying.
-printf '\n<!-- defects:0.0.1 -->\n' >> "$FAKE/README.md"
+printf '\n<!-- defects:0.0.1 -->\n' >> "$FAKE/docs/install.md"
 expect_repo_refusal "defect-block-marks-a-version-that-is-not-advertised" \
   "which is not the advertised" \
   "$FAKE/release-targets.json" "$FAKE"
-cp README.md "$FAKE/README.md"
+cp docs/install.md "$FAKE/docs/install.md"
 
 # An upgrade notice that keeps the version number and drops what the version does is a changelog
 # entry, not a warning, so it is refused as one. The defect is supplied by the fixture for the same

@@ -150,7 +150,7 @@ public sealed class MacCliLink : ICliLink
     /// <summary>Where a terminal may find another <c>keypaste</c> before <see cref="DefaultLinkPath"/>, looked at directly rather than by starting a shell.</summary>
     /// <param name="home">The person's home directory.</param>
     /// <returns>
-    /// <c>~/.local/bin/keypaste</c>, where README installs the CLI, and Homebrew's <c>/opt/homebrew/bin/keypaste</c>: a shell
+    /// <c>~/.local/bin/keypaste</c>, where docs/install.md installs the CLI, and Homebrew's <c>/opt/homebrew/bin/keypaste</c>: a shell
     /// profile commonly puts either folder before <c>/usr/local/bin</c>.
     /// </returns>
     internal static IReadOnlyList<string> EarlierPlaces(string home)

@@ -61,7 +61,7 @@ jobs:
         shell: bash
         env:
           BEFORE: ${{ github.event.before }}
-          UNREAD: '^(docs/(ARCHITECTURE|FEATURES|mcp-setup|replace-dotenv|policy|approvals|desktop|safe-agents)\.md|docs/(screenshots|demo)/.*|(CHANGELOG|THREATS|SECURITY|THIRD_PARTY_NOTICES|CONTRIBUTING)\.md|LICENSE|\.claude/.*|extension|extension/.*)$'
+          UNREAD: '^(docs/(ARCHITECTURE|FEATURES|mcp-setup|replace-dotenv|policy|approvals|desktop|desktop-checklist|safe-agents)\.md|docs/(screenshots|demo)/.*|(README|CHANGELOG|THREATS|SECURITY|THIRD_PARTY_NOTICES|CONTRIBUTING)\.md|LICENSE|\.claude/.*|extension|extension/.*)$'
         run: |
           set -euo pipefail
           code=true

@@ -303,8 +303,8 @@ public sealed class GuiEditIsVisibleToTheCliTests
     /// </summary>
     /// <remarks>
     /// The reason the lost-write guard exists, asserted from the direction it actually happens in:
-    /// the app holds the vault for up to eight hours while somebody alt-tabs to a terminal, which
-    /// <c>docs/desktop.md</c> describes as normal.
+    /// the app can hold the vault unlocked for up to eight hours, the longest idle lock
+    /// <c>docs/desktop.md</c> offers, while somebody alt-tabs to a terminal.
     /// </remarks>
     [Fact]
     public void A_cli_write_during_a_gui_session_is_not_clobbered_by_the_next_gui_save()
