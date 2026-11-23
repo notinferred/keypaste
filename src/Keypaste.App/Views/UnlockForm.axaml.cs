@@ -1,8 +1,10 @@
 using System.ComponentModel;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Keypaste.App.Controls;
+using Keypaste.App.Resources;
 using Keypaste.App.ViewModels;
 
 namespace Keypaste.App.Views;
@@ -20,7 +22,7 @@ internal sealed partial class UnlockForm : UserControl
         password.CharacterTyped += (_, c) => Model?.Type(c);
         password.BackspacePressed += (_, _) => Model?.Backspace();
         password.ClearRequested += (_, _) => Model?.ClearPassword();
-        // Enter on an empty field asks Windows Hello where it can unlock the vault, so the keyboard path stays launch, Enter.
+        // Enter on an empty field asks Windows Hello or Touch ID where it can unlock the vault, so the keyboard path stays launch, Enter.
         password.Submitted += (_, _) => (Model is { MaskedLength: 0, OffersQuickUnlock: true } model ? model.ResumeCommand : Model?.UnlockCommand)?.Press();
         password.Pasting = () => Model?.PasteAsync() ?? Task.CompletedTask;
 
@@ -61,7 +63,17 @@ internal sealed partial class UnlockForm : UserControl
             {
                 _watched.PropertyChanged += OnModelChanged;
             }
+
+            LabelQuickUnlock();
         };
+    }
+
+    // Set, not bound, so the button is announced by one of the screen's literal labels (F.25).
+    private void LabelQuickUnlock()
+    {
+        var label = Model?.QuickUnlockLabel ?? Strings.UnlockWithWindowsHello;
+        AutomationProperties.SetName(this.FindControl<Button>("QuickUnlock")!, label);
+        this.FindControl<TextBlock>("QuickUnlockLabel")!.Text = label;
     }
 
     private UnlockViewModel? Model => DataContext as UnlockViewModel;

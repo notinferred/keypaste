@@ -38,6 +38,8 @@ namespace Keypaste.App;
 internal sealed partial class App : Application, IDisposable
 {
     private AppVaultSession? _session;
+    private IQuickUnlockKeys? _quickUnlockKeys;
+    private bool _quickUnlockComposed;
     private AppAuthority? _authority;
     private OpenVaults? _vaults;
     private Task? _ending;
@@ -579,19 +581,33 @@ internal sealed partial class App : Application, IDisposable
     {
         ArgumentNullException.ThrowIfNull(preferences);
 
+        var home = KeypasteHome.Resolve(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable));
+
         return new AppVaultSession(
             clock,
             preferences.IdleTimeout,
-            KeypasteHome.Resolve(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable)),
+            home,
             HardwareKeys(),
-            QuickUnlockSigner is { } signer ? signer() : QuickUnlockSigners.ForThisMachine(Unexpected));
+            QuickUnlockKeys is { } keys ? keys() : MachineKeys(home));
+    }
+
+    // One for the process, since Touch ID deletes what an earlier run under this home left when it is made.
+    private IQuickUnlockKeys? MachineKeys(string home)
+    {
+        if (!_quickUnlockComposed)
+        {
+            _quickUnlockKeys = MachineQuickUnlock.Keys(home, Unexpected);
+            _quickUnlockComposed = true;
+        }
+
+        return _quickUnlockKeys;
     }
 
     /// <summary>What reaches hardware keys; the connected YubiKeys unless a test gives another.</summary>
     internal Func<IChallengeResponseDevice> HardwareKeys { get; init; } = () => new YubiKeyHardware();
 
-    /// <summary>What a quick unlock asks; Windows Hello in the Windows build on Windows and none elsewhere, unless a test gives another.</summary>
-    internal Func<IQuickUnlockSigner?>? QuickUnlockSigner { get; init; }
+    /// <summary>What a quick unlock asks; Windows Hello in the Windows build on Windows, Touch ID on macOS and none elsewhere, unless a test gives another.</summary>
+    internal Func<IQuickUnlockKeys?>? QuickUnlockKeys { get; init; }
 
     /// <summary>Keeps a report of an exception a catch-everything block caught, when crash reports are composed and on.</summary>
     /// <param name="exception">The exception.</param>

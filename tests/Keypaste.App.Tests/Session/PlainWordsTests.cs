@@ -175,7 +175,7 @@ public sealed partial class PlainWordsTests
     /// <summary>
     /// The screens a person meets before the shell (N.6's limit, done in 4.10a): the first-launch screen
     /// and the terms it links, the welcome with and without KeePassXC's databases, the lock screen with a YubiKey chosen, with
-    /// Windows Hello offered, and after an access change, the create form, each step of the KeePass database import dialog,
+    /// Windows Hello and Touch ID offered, and after an access change, the create form, each step of the KeePass database import dialog,
     /// and each of the export import dialog's (9.1f).
     /// </summary>
     [Fact]
@@ -218,7 +218,7 @@ public sealed partial class PlainWordsTests
         using var fixture = new TempVault();
         fixture.RememberSelf();
         using var vaultSession = new AppVaultSession(
-            new ManualClock(AppClock.Start), home: fixture.Home, hardwareKeys: new SoftwareYubiKey(new byte[20]), quickUnlock: new FakeQuickUnlockSigner());
+            new ManualClock(AppClock.Start), home: fixture.Home, hardwareKeys: new SoftwareYubiKey(new byte[20]), quickUnlock: new FakeQuickUnlockKeys());
 
         using (var locked = new UnlockViewModel(vaultSession, fixture.Home, picker, () => { }, lockedBy: VaultLockReason.Idle))
         {
@@ -248,6 +248,21 @@ public sealed partial class PlainWordsTests
         {
             Assert.True(resumable.OffersQuickUnlock);
             said.AddRange(Seen(new UnlockView { DataContext = resumable }, "the lock screen offering Windows Hello"));
+        }
+
+        using (var touchIdSession = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home, quickUnlock: new FakeQuickUnlockKeys(MachineQuickUnlock.TouchIdName)))
+        {
+            using (var master = TempVault.Secret(TempVault.Password))
+            {
+                Assert.Equal(UnlockOutcome.Opened, touchIdSession.TryUnlock(fixture.Path_, master.Value));
+            }
+
+            Assert.Equal(QuickUnlockOutcome.Done, touchIdSession.KeepForQuickUnlock());
+            touchIdSession.Lock(VaultLockReason.Manual);
+
+            using var resumable = new UnlockViewModel(touchIdSession, fixture.Home, picker, () => { }, lockedBy: VaultLockReason.Manual);
+            Assert.True(resumable.OffersQuickUnlock);
+            said.AddRange(Seen(new UnlockView { DataContext = resumable }, "the lock screen offering Touch ID"));
         }
 
         using (var master = TempVault.Secret(TempVault.Password))

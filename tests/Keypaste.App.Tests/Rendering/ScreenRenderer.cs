@@ -1930,7 +1930,7 @@ public sealed class ScreenRenderer
             [new Core.Recent.RecentVault(withRecents.Path_, DateTimeOffset.UtcNow), .. others.Select(other => new Core.Recent.RecentVault(other, DateTimeOffset.UtcNow.AddDays(-1)))]);
         using var recents = new UnlockViewModel(session, withRecents.Home, new FakeVaultFilePicker(), () => { });
 
-        using var helloSession = new AppVaultSession(new ManualClock(AppClock.Start), home: withRecents.Home, hardwareKeys: new SoftwareYubiKey(new byte[20]), quickUnlock: new FakeQuickUnlockSigner());
+        using var helloSession = new AppVaultSession(new ManualClock(AppClock.Start), home: withRecents.Home, hardwareKeys: new SoftwareYubiKey(new byte[20]), quickUnlock: new FakeQuickUnlockKeys());
 
         using (var master = TempVault.Secret(TempVault.Password))
         {

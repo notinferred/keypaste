@@ -1,5 +1,7 @@
+using System.Globalization;
 using Keypaste.App.Globalization;
 using Keypaste.App.Notifications;
+using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Ownership;
@@ -107,6 +109,17 @@ internal static class SelfTest
                 {
                     var accepted = MacNotifications.AddWithoutPermissionAsync().WaitAsync(_notificationAnswer).GetAwaiter().GetResult();
                     stdout.WriteLine($"keypaste-app: notification add {(accepted ? "accepted" : "refused")}");
+                }
+
+                // Touch ID needs the data protection keychain, which admits only a bundle whose provisioning profile authorizes it (D-0681).
+                var keychain = new TouchId(Path.Combine(scratch.FullName, "home")).Probe();
+                var profiled = File.Exists(Path.Combine(AppContext.BaseDirectory, "..", "embedded.provisionprofile"));
+                stdout.WriteLine($"keypaste-app: keychain {(keychain == TouchId.Succeeded ? "admits" : "refuses")} this build ({keychain.ToString(CultureInfo.InvariantCulture)}), provisioning profile {(profiled ? "embedded" : "absent")}");
+
+                if (profiled && keychain != TouchId.Succeeded)
+                {
+                    stderr.WriteLine("keypaste-app: selftest failed: the bundle embeds a provisioning profile, but the keychain refuses it, so Touch ID cannot work");
+                    return 1;
                 }
             }
 

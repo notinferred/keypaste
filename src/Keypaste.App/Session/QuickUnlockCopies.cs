@@ -14,13 +14,13 @@ internal enum QuickUnlockOutcome
     /// <summary>The person cancelled; a kept copy stays.</summary>
     Cancelled = 1,
 
-    /// <summary>The signer cannot be asked now; a kept copy stays.</summary>
+    /// <summary>The keys cannot be asked now; a kept copy stays.</summary>
     Unavailable = 2,
 
-    /// <summary>The signer was asked and gave no signature; a kept copy stays.</summary>
+    /// <summary>The keys were asked and released none; a kept copy stays.</summary>
     Failed = 3,
 
-    /// <summary>The signature no longer opens the copy, so it was dropped.</summary>
+    /// <summary>The copy's key no longer opens it, or no longer exists, so it was dropped.</summary>
     Unreadable = 4,
 
     /// <summary>No copy is kept for the vault, or a lock forgot it while the person was asked.</summary>
@@ -28,13 +28,15 @@ internal enum QuickUnlockOutcome
 }
 
 /// <summary>
-/// The key parts of vaults unlocked with their password, each sealed with AES-256-GCM under the SHA-256 of a signature
-/// only the person's Windows Hello gives, and kept in this process's memory alone, by the vault's identity (D-0550).
+/// The key parts of vaults unlocked with their password, each sealed with AES-256-GCM under the SHA-256 of a key only
+/// the person's Windows Hello or Touch ID releases, and kept in this process's memory alone, by the vault's identity
+/// (D-0550, D-0681).
 /// </summary>
 /// <remarks>
 /// <para>
-/// As KeePassXC 2.8's quick unlock keeps them: each copy has a fresh random challenge, signed again to open it, and a
-/// random nonce. The vault's identity is the associated data, so a copy opens only for the vault it was made for.
+/// As KeePassXC 2.8's quick unlock keeps them: each copy has a fresh random challenge, whose key is asked for again
+/// to open it, and a random nonce. The vault's identity is the associated data, so a copy opens only for the vault it
+/// was made for. A dropped copy's key is forgotten too.
 /// </para>
 /// <para>
 /// <b>Forgetting a vault counts.</b> A copy is stored only if its vault was not forgotten since its parts were read,
@@ -47,20 +49,20 @@ internal sealed class QuickUnlockCopies : IDisposable
     private const int _nonceLength = 12;
     private const int _tagLength = 16;
 
-    private readonly IQuickUnlockSigner _signer;
+    private readonly IQuickUnlockKeys _keys;
     private readonly Lock _gate = new();
     private readonly Dictionary<string, Sealed> _copies = new(StringComparer.Ordinal);
     private readonly Dictionary<string, long> _forgotten = new(StringComparer.Ordinal);
     private bool _disposed;
 
-    internal QuickUnlockCopies(IQuickUnlockSigner signer)
+    internal QuickUnlockCopies(IQuickUnlockKeys keys)
     {
-        ArgumentNullException.ThrowIfNull(signer);
-        _signer = signer;
+        ArgumentNullException.ThrowIfNull(keys);
+        _keys = keys;
     }
 
-    /// <summary>What the person knows the signer as, such as "Windows Hello".</summary>
-    internal string Name => _signer.Name;
+    /// <summary>What the person knows the keys as, such as "Windows Hello".</summary>
+    internal string Name => _keys.Name;
 
     /// <summary>How many vaults have a copy kept.</summary>
     internal int Count
@@ -106,14 +108,14 @@ internal sealed class QuickUnlockCopies : IDisposable
         ArgumentNullException.ThrowIfNull(vault);
         ArgumentNullException.ThrowIfNull(parts);
 
-        if (!_signer.IsAvailable())
+        if (!_keys.IsAvailable())
         {
             return QuickUnlockOutcome.Unavailable;
         }
 
         var challenge = RandomNumberGenerator.GetBytes(_challengeLength);
 
-        if (Sign(challenge, out var key) is not QuickUnlockOutcome.Done and var refused)
+        if (Released(_keys.Make(challenge, out var released), released, out var key) is not QuickUnlockOutcome.Done and var refused)
         {
             return refused;
         }
@@ -134,23 +136,28 @@ internal sealed class QuickUnlockCopies : IDisposable
             CryptographicOperations.ZeroMemory(key);
         }
 
+        var made = new Sealed(challenge, nonce, cipher, tag);
+        Sealed? replaced = null;
+        var stored = false;
+
         lock (_gate)
         {
-            if (_disposed || _forgotten.GetValueOrDefault(vault.Key) != generation)
+            if (!_disposed && _forgotten.GetValueOrDefault(vault.Key) == generation)
             {
-                return QuickUnlockOutcome.None;
+                _copies.Remove(vault.Key, out replaced);
+                _copies[vault.Key] = made;
+                stored = true;
             }
-
-            _copies[vault.Key] = new Sealed(challenge, nonce, cipher, tag);
         }
 
-        return QuickUnlockOutcome.Done;
+        Clear(stored ? replaced : made);
+        return stored ? QuickUnlockOutcome.Done : QuickUnlockOutcome.None;
     }
 
     /// <summary>Asks the person, then opens the copy kept for <paramref name="vault"/>.</summary>
     /// <param name="vault">The vault.</param>
     /// <param name="parts">The parts, which the caller disposes, when it is opened; otherwise null.</param>
-    /// <returns>What came of it; a copy the signature no longer opens is dropped, and any other refusal keeps it.</returns>
+    /// <returns>What came of it; a copy its key no longer opens, or whose key is gone, is dropped, and any other refusal keeps it.</returns>
     internal QuickUnlockOutcome Open(VaultIdentity vault, out VaultKeyParts? parts)
     {
         ArgumentNullException.ThrowIfNull(vault);
@@ -167,13 +174,18 @@ internal sealed class QuickUnlockCopies : IDisposable
             return QuickUnlockOutcome.None;
         }
 
-        if (!_signer.IsAvailable())
+        if (!_keys.IsAvailable())
         {
             return QuickUnlockOutcome.Unavailable;
         }
 
-        if (Sign(copy.Challenge, out var key) is not QuickUnlockOutcome.Done and var refused)
+        if (Released(_keys.Answer(copy.Challenge, out var released), released, out var key) is not QuickUnlockOutcome.Done and var refused)
         {
+            if (refused == QuickUnlockOutcome.Unreadable)
+            {
+                Drop(vault, copy);
+            }
+
             return refused;
         }
 
@@ -203,12 +215,15 @@ internal sealed class QuickUnlockCopies : IDisposable
     {
         ArgumentNullException.ThrowIfNull(vault);
 
+        Sealed? copy;
+
         lock (_gate)
         {
             _forgotten[vault.Key] = _forgotten.GetValueOrDefault(vault.Key) + 1;
-            _copies.Remove(vault.Key, out var copy);
-            copy?.Clear();
+            _copies.Remove(vault.Key, out copy);
         }
+
+        Clear(copy);
     }
 
     /// <summary>What is kept for <paramref name="vault"/>, as stored, for a test to look at; null when nothing is.</summary>
@@ -223,16 +238,18 @@ internal sealed class QuickUnlockCopies : IDisposable
     /// <summary>Drops every copy, and refuses any still being made: the app is quitting.</summary>
     public void Dispose()
     {
+        List<Sealed> copies;
+
         lock (_gate)
         {
             _disposed = true;
-
-            foreach (var copy in _copies.Values)
-            {
-                copy.Clear();
-            }
-
+            copies = [.. _copies.Values];
             _copies.Clear();
+        }
+
+        foreach (var copy in copies)
+        {
+            Clear(copy);
         }
     }
 
@@ -240,40 +257,53 @@ internal sealed class QuickUnlockCopies : IDisposable
     {
         lock (_gate)
         {
-            if (_copies.TryGetValue(vault.Key, out var kept) && ReferenceEquals(kept, copy))
+            if (!_copies.TryGetValue(vault.Key, out var kept) || !ReferenceEquals(kept, copy))
             {
-                _copies.Remove(vault.Key);
-                copy.Clear();
+                return;
             }
+
+            _copies.Remove(vault.Key);
+        }
+
+        Clear(copy);
+    }
+
+    // Outside the gate, since forgetting a key may reach the system's keychain.
+    private void Clear(Sealed? copy)
+    {
+        if (copy is not null)
+        {
+            copy.Clear();
+            _keys.Forget(copy.Challenge);
         }
     }
 
-    /// <summary>Asks the signer and turns its signature into a 32-byte key, zeroing the signature.</summary>
-    private QuickUnlockOutcome Sign(byte[] challenge, out byte[] key)
+    /// <summary>Turns what the keys released into a 32-byte key, zeroing what they released.</summary>
+    private static QuickUnlockOutcome Released(KeyOutcome outcome, byte[]? released, out byte[] key)
     {
         key = [];
-        var outcome = _signer.Sign(challenge, out var signature);
 
-        if (signature is null || outcome != SignOutcome.Signed)
+        if (released is null || outcome != KeyOutcome.Released)
         {
-            CryptographicOperations.ZeroMemory(signature);
+            CryptographicOperations.ZeroMemory(released);
 
             return outcome switch
             {
-                SignOutcome.Cancelled => QuickUnlockOutcome.Cancelled,
-                SignOutcome.Unavailable => QuickUnlockOutcome.Unavailable,
+                KeyOutcome.Cancelled => QuickUnlockOutcome.Cancelled,
+                KeyOutcome.Unavailable => QuickUnlockOutcome.Unavailable,
+                KeyOutcome.Gone => QuickUnlockOutcome.Unreadable,
                 _ => QuickUnlockOutcome.Failed,
             };
         }
 
         try
         {
-            key = SHA256.HashData(signature);
+            key = SHA256.HashData(released);
             return QuickUnlockOutcome.Done;
         }
         finally
         {
-            CryptographicOperations.ZeroMemory(signature);
+            CryptographicOperations.ZeroMemory(released);
         }
     }
 

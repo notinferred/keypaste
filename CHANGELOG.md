@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+On a Mac, the app now unlocks a vault again with Touch ID after you lock it, it locks when idle or minimized, or you close it into the menu bar, as it does with Windows Hello on Windows. After each unlock with the master password, Touch ID asks to keep it, and the unlock screen then offers Unlock with Touch ID above the master password, which stays. Only fingerprints enrolled at that moment reopen it: adding or removing one, `keypaste lock`, opening another vault, a changed password or key file and quitting need the master password. The vault's key parts stay in the app's memory; the key that seals them is kept in the Mac's keychain, on that Mac only, and deleted when it is no longer needed. Only keypaste's signed app can use Touch ID. Pressing the notification that an agent asked for a locked vault now asks Touch ID or Windows Hello straight away where it can reopen that vault, and keypaste's signed Mac app now carries the entitlement macOS needs to show the notification that a request is waiting for your answer during Focus, as a time-sensitive notification; no one has seen it do so yet (4.10b).
+
 The README is now a short introduction, installation moved to [docs/install.md](docs/install.md), and every guide and reference is rewritten to be shorter and organised by task.
 
 The browser extension's list of logins on a page is shown and placed only once its fonts and colours have loaded, so it no longer opens a little too large and then shifts. (F.146)

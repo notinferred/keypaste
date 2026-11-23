@@ -27,7 +27,7 @@ Out of scope: same-user attackers reading unlocked memory, audit records and key
 | Asset | Threats |
 |---|---|
 | Secret values: passwords, custom fields, project variables, one-time codes, attachments | T-4, T-8, T-12 to T-14, T-18, T-19, T-25, T-30, T-35, T-38, T-56 |
-| The master password and the vault's other factors: key file, YubiKey, Windows Hello's kept copy | T-7, T-20, T-22, T-27, T-28, T-37, T-44 |
+| The master password and the vault's other factors: key file, YubiKey, the copy quick unlock keeps | T-7, T-20, T-22, T-27, T-28, T-37, T-44 |
 | Item titles, sites and how items connect | T-1, T-4, T-24, T-55 |
 | The person's decision at a prompt | T-2, T-11, T-41, T-56 |
 | The audit log as evidence | T-5, T-6, T-16, T-53 |
@@ -373,7 +373,7 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Mitigation.** The desktop locks after 30 minutes idle by default, settable up to 8 hours but never off, on `Ctrl/Cmd+L`, and optionally on minimize. A lock locks every open vault, clears the copy and denies waiting requests, and agent requests never count as activity.
 
-**Limit.** On Windows, Windows Hello, PIN included, can undo these locks (T-44). Locking cannot erase copies (T-18), and `keypaste approve` has no idle lock.
+**Limit.** Windows Hello, PIN included, and Touch ID can undo these locks (T-44). Locking cannot erase copies (T-18), and `keypaste approve` has no idle lock.
 
 **Status.** Unreleased.
 
@@ -482,15 +482,15 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Status.** Unreleased.
 
-### T-44 — Windows Hello stands in for the master password after a lock
+### T-44 — Quick unlock stands in for the master password after a lock
 
-**Threat.** Anyone who can pass Windows Hello as this user reopens the vault after a lock without the master password, or a same-user program obtains a signature and reads the app's memory.
+**Threat.** Anyone who can pass Windows Hello or Touch ID as this user reopens the vault after a lock without the master password, or a same-user program obtains the copy's key and reads the app's memory.
 
-**Mitigation.** After a password unlock the app keeps the composite key's parts sealed under a Windows Hello signature, in memory only. Windows Hello asks on every keep and resume, and only the person's lock, the idle lock, minimize-lock and the tray allow a resume.
+**Mitigation.** After a password unlock the app keeps the composite key's parts sealed in memory only, under a key only quick unlock gives back: on Windows a Windows Hello signature, on macOS 32 random bytes in a keychain item that only a fingerprint enrolled when it was made releases, kept on that Mac alone, never synced and deleted when the copy is dropped. Windows Hello or Touch ID asks on every keep and resume, and only the person's lock, the idle lock, minimize-lock and the tray allow a resume. Adding or removing a fingerprint makes Touch ID's copy unreadable, and only keypaste's Developer ID build reaches the keychain item.
 
-**Limit.** Anyone who passes Windows Hello, PIN included, can reopen the vault after those locks. A same-user program with a signature and a read of the app's memory gets parts that open every copy of the vault, and a kept copy has no maximum age. Nothing has been tested against a real Windows Hello.
+**Limit.** Anyone who passes Windows Hello, PIN included, or whose fingerprint was enrolled, can reopen the vault after those locks. A same-user program with the key and a read of the app's memory gets parts that open every copy of the vault, and a kept copy has no maximum age. Nothing has been tested against a real Windows Hello; Touch ID was seen on one Mac, with the notarized app, on 2026-11-23.
 
-**Status.** Unreleased, Windows only.
+**Status.** Unreleased, Windows and macOS.
 
 ## Runs, tokens and share links
 

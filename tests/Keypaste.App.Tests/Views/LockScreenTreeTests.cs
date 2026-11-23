@@ -1,3 +1,4 @@
+using Avalonia.Automation;
 using Avalonia.Automation.Peers;
 using Avalonia.Controls;
 using Avalonia.VisualTree;
@@ -16,7 +17,7 @@ namespace Keypaste.App.Tests.Views;
 
 /// <summary>
 /// What a screen reader finds on the welcome and the lock screen (V-N.2): KeePassXC's databases by
-/// name, no word about agents, the YubiKey beside the key file, and Windows Hello alone where it can unlock.
+/// name, no word about agents, the YubiKey beside the key file, and Windows Hello or Touch ID alone where it can unlock.
 /// </summary>
 public sealed class LockScreenTreeTests
 {
@@ -85,14 +86,16 @@ public sealed class LockScreenTreeTests
         Assert.Contains("Unlock without a YubiKey", names);
     });
 
-    /// <summary>A vault Windows Hello can open again offers it alone, as the one amber action, with the master password a link away.</summary>
-    [Fact]
-    public Task A_vault_Windows_Hello_can_resume_offers_it_alone_as_the_one_amber_action() => HeadlessSession.On(() =>
+    /// <summary>A vault Windows Hello or Touch ID can open again offers it alone, by its own name, as the one amber action, with the master password a link away.</summary>
+    [Theory]
+    [InlineData("Windows Hello", "Unlock with Windows Hello")]
+    [InlineData("Touch ID", "Unlock with Touch ID")]
+    public Task A_vault_its_quick_unlock_can_resume_offers_it_alone_as_the_one_amber_action(string keys, string label) => HeadlessSession.On(() =>
     {
         using var fixture = new TempVault();
         fixture.RememberSelf();
 
-        using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home, quickUnlock: new FakeQuickUnlockSigner());
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home, quickUnlock: new FakeQuickUnlockKeys(keys));
         using (var master = TempVault.Secret(TempVault.Password))
         {
             Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(fixture.Path_, master.Value));
@@ -105,7 +108,7 @@ public sealed class LockScreenTreeTests
         var window = Show(model);
 
         var names = Names(window);
-        Assert.Contains("Unlock with Windows Hello", names);
+        Assert.Contains(label, names);
         Assert.Contains("Use master password", names);
         Assert.DoesNotContain("Unlock", names);
         Assert.DoesNotContain("Master password", names);
@@ -113,7 +116,8 @@ public sealed class LockScreenTreeTests
 
         var quick = window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "QuickUnlock");
         quick.Focus();
-        AccentElements.AssertOne(window, quick, "the lock screen offering Windows Hello");
+        Assert.Equal(label, AutomationProperties.GetName(quick));
+        AccentElements.AssertOne(window, quick, $"the lock screen offering {keys}");
     });
 
     private static Window Show(UnlockViewModel model)

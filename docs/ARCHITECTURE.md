@@ -59,7 +59,7 @@ Both solutions write into `artifacts/`.
 - `App/Session/SessionHost.cs` serves each vault to agents. `WindowApprovalChannel.cs` asks the person, one prompt at a time across all vaults, in a window under `Views/`.
 - While locked, `App/Session/LockedNotice.cs` tells the person when a bridge finds the vault locked.
 - All vaults lock together on idle, `Ctrl/Cmd+L`, quitting and closing into the tray (`App/AppTray.cs`). One locks alone for `keypaste lock`, an access change or a refused reload.
-- Windows Hello quick unlock: `Session/QuickUnlockCopies.cs`, `Session/WindowsHello.cs`.
+- Quick unlock: `Session/QuickUnlockCopies.cs`, with `Session/WindowsHello.cs` and `Session/TouchId.cs` as `MachineQuickUnlock.cs` picks them.
 - Agents › Connect registers an AI tool through `Core/Clients/`. `App/CrashReporting.cs` sends crash reports only under the terms the person accepted (`App/Terms/`).
 
 The [desktop guide](desktop.md) describes what the person sees.

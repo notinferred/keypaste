@@ -65,7 +65,7 @@ Every row is 1.0.0. [The desktop guide](desktop.md) describes the app. Screens a
 
 | Capability | Note |
 |---|---|
-| Open and create with a password, key file, both or a YubiKey; Windows Hello after a lock | Not run against a physical YubiKey ([T-37], [T-44]) |
+| Open and create with a password, key file, both or a YubiKey; Windows Hello or Touch ID after a lock | Not run against a physical YubiKey ([T-37], [T-44]) |
 | Change access in Settings: password, key file and YubiKey | [T-28] |
 | Items: templates, custom fields, tags, URLs, one-time codes, attachments, duplicate, rename, undo | No auto-type editor |
 | Find over titles, groups, usernames, URLs and tags | Never reads a password, note or protected field |

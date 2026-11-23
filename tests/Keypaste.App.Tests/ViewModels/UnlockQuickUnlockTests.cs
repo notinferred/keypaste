@@ -14,7 +14,7 @@ namespace Keypaste.App.Tests.ViewModels;
 public sealed class UnlockQuickUnlockTests : IDisposable
 {
     private readonly TempVault _fixture = new();
-    private readonly FakeQuickUnlockSigner _hello = new();
+    private readonly FakeQuickUnlockKeys _hello = new();
     private readonly AppVaultSession _session;
     private readonly FakeVaultFilePicker _picker = new();
     private int _landed;
@@ -56,6 +56,27 @@ public sealed class UnlockQuickUnlockTests : IDisposable
     }
 
     [Fact]
+    public async Task On_a_Mac_the_screen_names_Touch_ID_while_it_keeps_and_where_it_resumes()
+    {
+        var touchId = new FakeQuickUnlockKeys(MachineQuickUnlock.TouchIdName);
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: _fixture.Home, quickUnlock: touchId);
+        using (var model = new UnlockViewModel(session, _fixture.Home, _picker, () => _landed++))
+        {
+            Type(model, TempVault.Password);
+            await model.UnlockAsync();
+
+            Assert.Equal("Confirm with Touch ID so it can unlock this vault after a lock.", model.KeepingNote);
+        }
+
+        session.Lock(VaultLockReason.Manual);
+        using var locked = new UnlockViewModel(session, _fixture.Home, _picker, () => _landed++, lockedBy: VaultLockReason.Manual);
+
+        Assert.True(locked.OffersQuickUnlock);
+        Assert.Equal("Touch ID", locked.QuickUnlockName);
+        Assert.Equal("Unlock with Touch ID", locked.QuickUnlockLabel);
+    }
+
+    [Fact]
     public async Task After_an_idle_lock_the_screen_offers_Windows_Hello_alone_with_the_password_a_step_away_and_it_opens_the_vault()
     {
         await UnlockAndLockAsync(VaultLockReason.Idle);
@@ -63,6 +84,7 @@ public sealed class UnlockQuickUnlockTests : IDisposable
 
         Assert.True(model.OffersQuickUnlock);
         Assert.Equal("Windows Hello", model.QuickUnlockName);
+        Assert.Equal("Unlock with Windows Hello", model.QuickUnlockLabel);
         Assert.True(model.QuickUnlockIsPrimary);
         Assert.True(model.ShowsQuickUnlockAlone);
         Assert.False(model.ShowsPasswordForm);
@@ -115,7 +137,7 @@ public sealed class UnlockQuickUnlockTests : IDisposable
     {
         await UnlockAndLockAsync(VaultLockReason.Manual);
         using var model = Screen(VaultLockReason.Manual);
-        _hello.Answer = SignOutcome.Cancelled;
+        _hello.Response = KeyOutcome.Cancelled;
 
         await model.ResumeAsync();
 

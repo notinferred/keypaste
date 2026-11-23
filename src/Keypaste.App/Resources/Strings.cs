@@ -705,6 +705,7 @@ public static class Strings
     public static string Unlock => Manager.GetString("Unlock", CultureInfo.CurrentUICulture)!;
     public static string UnlockWithAKeyFileToo => Manager.GetString("UnlockWithAKeyFileToo", CultureInfo.CurrentUICulture)!;
     public static string UnlockWithAYubiKeyToo => Manager.GetString("UnlockWithAYubiKeyToo", CultureInfo.CurrentUICulture)!;
+    public static string UnlockWithTouchId => Manager.GetString("UnlockWithTouchId", CultureInfo.CurrentUICulture)!;
     public static string UnlockWithWindowsHello => Manager.GetString("UnlockWithWindowsHello", CultureInfo.CurrentUICulture)!;
     public static string UnlockWithoutAKeyFile => Manager.GetString("UnlockWithoutAKeyFile", CultureInfo.CurrentUICulture)!;
     public static string UnlockWithoutAYubiKey => Manager.GetString("UnlockWithoutAYubiKey", CultureInfo.CurrentUICulture)!;

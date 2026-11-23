@@ -303,7 +303,7 @@ public sealed class MaskedInputAutomationTests
     private static readonly string[] _unlockScreenLabels =
     [
         "Recent vaults", "KeePassXC's databases", "Backups", "Unlock", "Master password", "New master password", "Confirm master password", "Check this backup", "Unlock with a key file too", "Unlock without a key file", "Unlock with a YubiKey too",
-        "Unlock without a YubiKey", "Key file", "No key file", "Add a YubiKey", "No YubiKey", "Add vault…", "Unlock with Windows Hello", "Create vault",
+        "Unlock without a YubiKey", "Key file", "No key file", "Add a YubiKey", "No YubiKey", "Add vault…", "Unlock with Windows Hello", "Unlock with Touch ID", "Create vault",
     ];
 
     /// <summary>The restore field takes a pasted master password as the unlock field does, and shows only its length.</summary>

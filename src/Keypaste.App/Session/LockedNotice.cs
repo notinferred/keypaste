@@ -17,7 +17,7 @@ namespace Keypaste.App.Session;
 /// It listens for the vault the unlock screen shows and for the chosen vault, follows the unlock screen as its
 /// vault changes and the chosen vault as <c>app.toml</c> changes, and stops when a vault opens. One notice is
 /// shown each time the app is locked, whichever vault was asked for, and only its Open keypaste shows the unlock
-/// screen, with that vault on it. It is a system notification, which names no vault since the lock screen and other
+/// screen, with that vault on it, asking Windows Hello or Touch ID at once where they can reopen it. It is a system notification, which names no vault since the lock screen and other
 /// apps can read it; where the system takes none, as Windows takes none of these, keypaste shows its own window, which names the vault.
 /// </remarks>
 internal sealed class LockedNotice : IDisposable
@@ -284,6 +284,12 @@ internal sealed class LockedNotice : IDisposable
         }
 
         _open();
+
+        // The press is the person's own act, so a vault Windows Hello or Touch ID can reopen asks for it at once (D-0687).
+        if (!_session.IsUnlocked && _screen is { OffersQuickUnlock: true } offered && offered.ResumeCommand.CanExecute(null))
+        {
+            offered.ResumeCommand.Execute(null);
+        }
     }
 
     private void Stop()

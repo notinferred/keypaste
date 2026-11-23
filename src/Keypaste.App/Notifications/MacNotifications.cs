@@ -14,7 +14,8 @@ namespace Keypaste.App.Notifications;
 /// refused, alerts turned off in the system's settings and an add the system answers with an error all count as unable to post.
 /// </para>
 /// <para>
-/// The system shows a notice marked time-sensitive as an ordinary one: the entitlement that would let it pass Focus does not exist (Q.14).
+/// A notice marked time-sensitive passes Focus only in the Developer ID bundle, whose provisioning profile grants the
+/// time-sensitive entitlement; any other build shows it as an ordinary one.
 /// </para>
 /// </remarks>
 [SupportedOSPlatform("macos")]

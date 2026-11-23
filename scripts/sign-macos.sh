@@ -9,6 +9,10 @@
 # whose team signs every library too, so library validation stays on and each signature carries a secure timestamp,
 # which notarization requires.
 #
+# A Developer ID keypaste.app also embeds packaging/macos/embedded.provisionprofile and takes the keychain entitlements
+# it authorizes, which Touch ID's quick unlock needs, and any it grants for time-sensitive notices (Apple's TN3137).
+# Nothing else gets them: restricted entitlements a profile does not authorize stop a program from starting.
+#
 # Usage: sign-macos.sh <keypaste.app | directory> <identity>
 set -euo pipefail
 
@@ -48,7 +52,36 @@ for library in "$code"/*.dylib; do
 done
 sign --entitlements "$(entitlements '' keypaste)" "$code/keypaste"
 app_entitlements="$(entitlements "$ROOT/packaging/macos/keypaste-app.entitlements" keypaste-app)"
+
+# Prints one value of the decoded profile by PlistBuddy's path, whose colons let a key hold dots, or nothing when it has none.
+profile_value() { /usr/libexec/PlistBuddy -c "Print :$1" "$work/profile.plist" 2> /dev/null || true; }
+
+if [ "$identity" != - ] && [[ "$target" == *.app ]]; then
+  profile="$ROOT/packaging/macos/embedded.provisionprofile"
+  [ -f "$profile" ] || die "packaging/macos/embedded.provisionprofile is absent, and Touch ID needs it in a Developer ID bundle"
+  security cms -D -i "$profile" > "$work/profile.plist" 2> /dev/null || die "the provisioning profile does not decode"
+  team="$(profile_value TeamIdentifier:0)"
+  app_id="$(profile_value Entitlements:com.apple.application-identifier)"
+  [ -n "$team" ] && [ "$app_id" = "$team.$(plutil -extract CFBundleIdentifier raw -o - "$target/Contents/Info.plist")" ] \
+    || die "the provisioning profile is for ${app_id:-no app}, not this bundle"
+  expires="$(plutil -extract ExpirationDate raw -o - "$work/profile.plist" 2> /dev/null || true)"
+  [[ "$expires" > "$(date -u +%Y-%m-%dT%H:%M:%SZ)" ]] || die "the provisioning profile expired ${expires:-at an unknown date}"
+  cp "$profile" "$target/Contents/embedded.provisionprofile"
+  /usr/libexec/PlistBuddy \
+    -c "Add :com.apple.application-identifier string $app_id" \
+    -c "Add :com.apple.developer.team-identifier string $team" \
+    -c "Add :keychain-access-groups array" \
+    -c "Add :keychain-access-groups:0 string $app_id" \
+    "$app_entitlements" >&2
+  if [ "$(profile_value Entitlements:com.apple.developer.usernotifications.time-sensitive)" = true ]; then
+    /usr/libexec/PlistBuddy -c "Add :com.apple.developer.usernotifications.time-sensitive bool true" "$app_entitlements" >&2
+  fi
+fi
 case "$target" in
-  *.app) sign --entitlements "$app_entitlements" "$target" ;;
+  *.app)
+    sign --entitlements "$app_entitlements" "$target"
+    if [ -n "${team:-}" ]; then
+      [ "$(codesign -dv "$target" 2>&1 | sed -n 's/^TeamIdentifier=//p')" = "$team" ] || die "the bundle is signed by another team than its provisioning profile names"
+    fi ;;
   *) if [ -e "$code/keypaste-app" ]; then sign --entitlements "$app_entitlements" "$code/keypaste-app"; fi ;;
 esac

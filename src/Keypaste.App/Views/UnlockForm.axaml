@@ -57,18 +57,17 @@
         <TextBlock Name="NewFileLocation" Classes="mono muted size-12" TextAlignment="Center" TextWrapping="Wrap" Text="{Binding NewFileLocation}" />
       </StackPanel>
 
-      <!-- Where Windows Hello can open the vault, it stands alone until the person asks for the password. -->
+      <!-- Where Windows Hello or Touch ID can open the vault, it stands alone until the person asks for the password. Its label is set in code, from the screen's literal labels (F.25). -->
       <StackPanel Spacing="8" IsVisible="{Binding ShowsQuickUnlockAlone}">
         <Button Name="QuickUnlock"
                 Classes="lg"
                 Classes.primary="{Binding QuickUnlockIsPrimary}"
                 HorizontalAlignment="Stretch"
                 HorizontalContentAlignment="Center"
-                Command="{Binding ResumeCommand}"
-                AutomationProperties.Name="{x:Static res:Strings.UnlockWithWindowsHello}">
+                Command="{Binding ResumeCommand}">
           <DockPanel HorizontalSpacing="8">
             <ctl:KpIcon DockPanel.Dock="Left" Icon="fingerprint" Size="16" />
-            <TextBlock Text="{x:Static res:Strings.UnlockWithWindowsHello}" TextWrapping="Wrap" VerticalAlignment="Center" />
+            <TextBlock Name="QuickUnlockLabel" TextWrapping="Wrap" VerticalAlignment="Center" />
           </DockPanel>
         </Button>
         <Button Name="UsePassword" Classes="ghost sm" HorizontalAlignment="Center" Content="{x:Static res:Strings.UseMasterPassword}" Command="{Binding UsePasswordCommand}" />

@@ -1,3 +1,4 @@
+using Keypaste.App.Resources;
 using Keypaste.App.Session;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
@@ -145,7 +146,10 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     /// <summary>What the person knows the quick unlock as, such as "Windows Hello", or empty where the app offers none.</summary>
     internal string QuickUnlockName => _session.QuickUnlock?.Name ?? string.Empty;
 
-    /// <summary>What the screen says while Windows Hello asks, after a password unlock, to keep this unlock for a quick one.</summary>
+    /// <summary>The quick unlock button's label, one of the screen's literal labels (F.25).</summary>
+    internal string QuickUnlockLabel => QuickUnlockName == MachineQuickUnlock.TouchIdName ? Strings.UnlockWithTouchId : Strings.UnlockWithWindowsHello;
+
+    /// <summary>What the screen says while Windows Hello or Touch ID asks, after a password unlock, to keep this unlock for a quick one.</summary>
     internal string KeepingNote => $"Confirm with {QuickUnlockName} so it can unlock this vault after a lock.";
 
     /// <summary>Whether the selected vault has a quick unlock copy, so the screen offers to unlock it without its password.</summary>
@@ -178,10 +182,10 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     /// <summary>Use master password: shows the form the quick unlock stood in for.</summary>
     internal RelayCommand UsePasswordCommand { get; }
 
-    /// <summary>Opens the selected vault without its password, once the person answers Windows Hello.</summary>
+    /// <summary>Opens the selected vault without its password, once the person answers Windows Hello or Touch ID.</summary>
     internal AsyncRelayCommand ResumeCommand { get; }
 
-    /// <summary>Whether Windows Hello is asking, after a password unlock, to keep it for a quick unlock.</summary>
+    /// <summary>Whether Windows Hello or Touch ID is asking, after a password unlock, to keep it for a quick unlock.</summary>
     [ObservableProperty]
     internal partial bool IsKeepingQuickUnlock { get; private set; }
 
@@ -794,7 +798,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
         return true;
     }
 
-    /// <summary>Reads what the selection is: whether anything can be unlocked, whether it has backups, and whether Windows Hello can open it.</summary>
+    /// <summary>Reads what the selection is: whether anything can be unlocked, whether it has backups, and whether its quick unlock can open it.</summary>
     private void Look()
     {
         HasBackups = _selectedPath is { } path && VaultBackups.List(path).Count > 0;
@@ -853,8 +857,8 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// After a password unlock, has Windows Hello asked whether to keep this unlock for a quick one, as KeePassXC asks
-    /// after each, then hands the shell the vault, which is open whatever the answer.
+    /// After a password unlock, has Windows Hello or Touch ID asked whether to keep this unlock for a quick one, as
+    /// KeePassXC's Windows Hello asks after each (D-0552, D-0683), then hands the shell the vault, which is open whatever the answer.
     /// </summary>
     /// <remarks>
     /// A screen replaced meanwhile still hands it over while the unlock is the session's own, so the app locks a vault
@@ -884,7 +888,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>Opens the selected vault from its quick unlock copy, once the person answers Windows Hello.</summary>
+    /// <summary>Opens the selected vault from its quick unlock copy, once the person answers Windows Hello or Touch ID.</summary>
     /// <remarks><c>internal</c> for the reason <see cref="UnlockAsync"/> is.</remarks>
     internal async Task ResumeAsync()
     {

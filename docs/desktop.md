@@ -46,7 +46,7 @@ Drag a `.kdbx` onto the window, choose Open a vault…, or pick it from the rece
 
 - **Key file.** Choose it with Key file… under Unlock.
 - **YubiKey.** Choose YubiKey… (slot 2 by default), programmed for HMAC-SHA1 challenge-response, and touch the key when asked. Every save asks again. The CLI reaches such a vault only through the app while the app holds it. No physical YubiKey has been tested.
-- **Windows Hello.** After an idle lock or a lock you made, Unlock with Windows Hello reopens the vault. Quitting, `keypaste lock` or a changed password or key file needs the master password.
+- **Windows Hello and Touch ID.** After an idle lock or a lock you made, Unlock with Windows Hello, or Unlock with Touch ID on a Mac, reopens the vault. Quitting, `keypaste lock`, a changed password or key file, and on a Mac an added or removed fingerprint need the master password. Pressing the notification that an agent asked for a locked vault asks Windows Hello or Touch ID at once where they can reopen it.
 
 One vault has one approver at a time: while `keypaste approve` holds it in a terminal, the app cannot, and the other way round.
 

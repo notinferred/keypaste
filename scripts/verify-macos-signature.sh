@@ -4,7 +4,8 @@
 #   keypaste.app.zip  every Mach-O signed by one team under the hardened runtime with a timestamp, keypaste-app without
 #                     the library-validation exemption, the seal verified, a changed byte refused, spctl accepting the
 #                     bundle, its ticket stapled, and the bundle started through LaunchServices passing --selftest
-#                     with the libargon2.1.dylib beside it, as keypaste's doctor derives with it too.
+#                     with the libargon2.1.dylib beside it, as keypaste's doctor derives with it too, and with the
+#                     provisioning profile it embeds admitting it to the keychain Touch ID needs.
 #   .dmg              the image signed, its ticket stapled and spctl accepting it to open.
 #   directory         the CLI archive's keypaste and libargon2.1.dylib signed alike, and a quarantined keypaste
 #                     running and its doctor naming the libargon2.1.dylib beside it. Loose code holds no ticket.
@@ -59,6 +60,9 @@ check_bundle() {
   if codesign -d --entitlements - --xml "$app" 2> /dev/null | grep -q 'disable-library-validation'; then
     die "keypaste-app is exempt from library validation"
   fi
+  [ -f "$app/Contents/embedded.provisionprofile" ] || die "the bundle embeds no provisioning profile, so Touch ID cannot reach the keychain"
+  codesign -d --entitlements - --xml "$app" 2> /dev/null | grep -q 'keychain-access-groups' \
+    || die "keypaste-app is not signed with the keychain access group Touch ID needs"
   codesign --verify --deep --strict --verbose=2 "$app" >&2 || die "the bundle's signature does not verify"
   spctl -a -vvv -t exec "$app" >&2 || die "Gatekeeper does not accept the bundle"
   xcrun stapler validate "$app" >&2 || die "the bundle carries no stapled ticket"
@@ -79,6 +83,8 @@ check_bundle() {
     || die "the notarized bundle did not pass --selftest: $(cat "$work/launched" "$work/launched.err")"
   grep -q '^keypaste-app: Argon2 derived natively by .*/keypaste\.app/Contents/MacOS/libargon2\.1\.dylib$' "$work/launched" \
     || die "the notarized bundle did not derive with the libargon2.1.dylib in its Contents/MacOS: $(cat "$work/launched")"
+  grep -q '^keypaste-app: keychain admits this build ' "$work/launched" \
+    || die "the keychain does not admit the notarized bundle, so Touch ID cannot work: $(cat "$work/launched")"
   cat "$work/launched" >&2
 }
 

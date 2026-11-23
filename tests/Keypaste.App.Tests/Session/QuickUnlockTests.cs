@@ -11,16 +11,17 @@ using Xunit;
 namespace Keypaste.App.Tests.Session;
 
 /// <summary>
-/// 4.10a's quick unlock in the session (D-0550 to D-0553): a password unlock keeps the key's parts sealed in memory under
-/// Windows Hello, a lock the person made or idleness leaves them and any other lock drops them, and a resume takes the
-/// vault's claim, asks Windows Hello and opens the file as an unlock does.
+/// 4.10a's and 4.10b's quick unlock in the session (D-0550 to D-0553, D-0681 to D-0683): a password unlock keeps the
+/// key's parts sealed in memory under Windows Hello or Touch ID, a lock the person made or idleness leaves them and any
+/// other lock drops them and forgets their key, and a resume takes the vault's claim, asks for the key and opens the
+/// file as an unlock does.
 /// </summary>
 public sealed class QuickUnlockTests : IDisposable
 {
     private const string _next = "a-later-master-password";
 
     private readonly TempVault _fixture = new();
-    private readonly FakeQuickUnlockSigner _hello = new();
+    private readonly FakeQuickUnlockKeys _hello = new();
     private readonly AppVaultSession _session;
 
     public QuickUnlockTests() =>
@@ -138,7 +139,7 @@ public sealed class QuickUnlockTests : IDisposable
     [Fact]
     public void Cancelling_the_keep_keeps_nothing_and_the_vault_stays_open()
     {
-        _hello.Answer = SignOutcome.Cancelled;
+        _hello.Response = KeyOutcome.Cancelled;
         Unlock();
 
         Assert.Equal(QuickUnlockOutcome.Cancelled, _session.KeepForQuickUnlock());
@@ -153,7 +154,7 @@ public sealed class QuickUnlockTests : IDisposable
     {
         UnlockAndKeep();
         _session.Lock(VaultLockReason.Manual);
-        _hello.Answer = SignOutcome.Cancelled;
+        _hello.Response = KeyOutcome.Cancelled;
 
         Assert.Equal(UnlockOutcome.QuickUnlockRefused, _session.TryResume(_fixture.Path_));
 
@@ -163,7 +164,7 @@ public sealed class QuickUnlockTests : IDisposable
         Assert.True(VaultClaim.TryAcquire(_fixture.Home, _fixture.Path_, OwnerKind.DesktopApp, out var claim, out _, out _));
         claim.Dispose();
 
-        _hello.Answer = SignOutcome.Signed;
+        _hello.Response = KeyOutcome.Released;
         Assert.Equal(UnlockOutcome.Opened, _session.TryResume(_fixture.Path_));
     }
 
@@ -238,6 +239,21 @@ public sealed class QuickUnlockTests : IDisposable
     }
 
     [Fact]
+    public void A_copy_whose_key_is_gone_is_dropped_and_its_key_forgotten()
+    {
+        UnlockAndKeep();
+        _session.Lock(VaultLockReason.Manual);
+        _hello.Response = KeyOutcome.Gone;
+
+        Assert.Equal(UnlockOutcome.QuickUnlockRefused, _session.TryResume(_fixture.Path_));
+
+        Assert.Equal(QuickUnlockOutcome.Unreadable, _session.LastQuickUnlock);
+        Assert.False(_session.CanResume(_fixture.Path_));
+        Assert.False(_session.IsUnlocked);
+        Assert.Equal(0, _hello.Kept);
+    }
+
+    [Fact]
     public void A_lock_that_forces_the_full_unlock_while_Windows_Hello_asks_leaves_nothing_kept()
     {
         Unlock();
@@ -246,6 +262,38 @@ public sealed class QuickUnlockTests : IDisposable
         Assert.Equal(QuickUnlockOutcome.None, _session.KeepForQuickUnlock());
 
         Assert.False(_session.CanResume(_fixture.Path_));
+        Assert.Equal(0, _hello.Kept);
+        Assert.Equal(1, _hello.Forgotten);
+    }
+
+    [Theory]
+    [InlineData(nameof(VaultLockReason.Requested))]
+    [InlineData(nameof(VaultLockReason.AccessChanged))]
+    [InlineData(nameof(VaultLockReason.Shutdown))]
+    public void A_lock_that_drops_the_copy_forgets_its_key(string locked)
+    {
+        UnlockAndKeep();
+        Assert.Equal(1, _hello.Kept);
+
+        _session.Lock(Enum.Parse<VaultLockReason>(locked));
+
+        Assert.Equal(0, _hello.Kept);
+        Assert.Equal(1, _hello.Forgotten);
+    }
+
+    [Fact]
+    public void A_new_copy_forgets_the_key_of_the_one_it_replaces()
+    {
+        UnlockAndKeep();
+        _session.Lock(VaultLockReason.Manual);
+        Unlock();
+
+        Assert.Equal(QuickUnlockOutcome.Done, _session.KeepForQuickUnlock());
+
+        Assert.Equal(1, _hello.Kept);
+        Assert.Equal(1, _hello.Forgotten);
+        _session.Lock(VaultLockReason.Manual);
+        Assert.Equal(UnlockOutcome.Opened, _session.TryResume(_fixture.Path_));
     }
 
     [Fact]
@@ -320,6 +368,7 @@ public sealed class QuickUnlockTests : IDisposable
 
         Assert.Equal(0, copies.Count);
         Assert.False(copies.Has(VaultIdentity.Of(_fixture.Home, _fixture.Path_)));
+        Assert.Equal(0, _hello.Kept);
     }
 
     [Fact]

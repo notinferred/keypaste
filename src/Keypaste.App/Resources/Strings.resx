@@ -441,6 +441,7 @@
   <data name="Unlock" xml:space="preserve"><value>Unlock</value></data>
   <data name="UnlockWithAKeyFileToo" xml:space="preserve"><value>Unlock with a key file too</value></data>
   <data name="UnlockWithAYubiKeyToo" xml:space="preserve"><value>Unlock with a YubiKey too</value></data>
+  <data name="UnlockWithTouchId" xml:space="preserve"><value>Unlock with Touch ID</value></data>
   <data name="UnlockWithWindowsHello" xml:space="preserve"><value>Unlock with Windows Hello</value></data>
   <data name="UnlockWithoutAKeyFile" xml:space="preserve"><value>Unlock without a key file</value></data>
   <data name="UnlockWithoutAYubiKey" xml:space="preserve"><value>Unlock without a YubiKey</value></data>

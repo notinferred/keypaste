@@ -105,13 +105,13 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
     /// <param name="idleTimeout">How long the app may sit untouched, or null for the default.</param>
     /// <param name="home">keypaste's home, where the vault's claim is kept; null resolves it as the app does.</param>
     /// <param name="hardwareKeys">What reaches hardware keys, or null where none can be reached.</param>
-    /// <param name="quickUnlock">What a quick unlock asks, Windows Hello, or null where the app offers none.</param>
+    /// <param name="quickUnlock">What a quick unlock asks, Windows Hello or Touch ID, or null where the app offers none.</param>
     internal AppVaultSession(
         TimeProvider clock,
         TimeSpan? idleTimeout = null,
         string? home = null,
         IChallengeResponseDevice? hardwareKeys = null,
-        IQuickUnlockSigner? quickUnlock = null)
+        IQuickUnlockKeys? quickUnlock = null)
     {
         ArgumentNullException.ThrowIfNull(clock);
 
@@ -676,7 +676,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
     internal bool CanResume(string? path) =>
         QuickUnlock is { } copies && !string.IsNullOrEmpty(path) && copies.Has(VaultIdentity.Of(_home, path));
 
-    /// <summary>Opens a locked vault again from its quick unlock copy, once the person answers Windows Hello.</summary>
+    /// <summary>Opens a locked vault again from its quick unlock copy, once the person answers Windows Hello or Touch ID.</summary>
     /// <param name="path">The <c>.kdbx</c> file.</param>
     /// <returns>What happened; <see cref="LastQuickUnlock"/> says why for <see cref="UnlockOutcome.QuickUnlockRefused"/>.</returns>
     /// <remarks>
@@ -768,7 +768,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
     }
 
     /// <summary>
-    /// After a password unlock, asks the person through Windows Hello to keep this unlock's key parts sealed, so a lock
+    /// After a password unlock, asks the person through Windows Hello or Touch ID to keep this unlock's key parts sealed, so a lock
     /// that allows it can be resumed without the password.
     /// </summary>
     /// <returns>What came of it; <see cref="QuickUnlockOutcome.Unavailable"/> where the app offers no quick unlock.</returns>

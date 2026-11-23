@@ -168,7 +168,7 @@ What keypaste holds to under the [laws](#security-laws), and what it can't preve
 ### What unlocks a vault
 
 - A master password. Unreleased: also a key file, with or without a password, in every KeePass form; keypaste never creates a key file that is any file at all [T-27] [T-28].
-- Unreleased: a YubiKey slot in the desktop app [T-37], and Windows Hello after a lock on Windows [T-44].
+- Unreleased: a YubiKey slot in the desktop app [T-37], and Windows Hello on Windows or Touch ID on a Mac after a lock [T-44].
 - New vaults are KDBX4 with Argon2d at 2 iterations, 64 MiB and parallelism 2, pinned in `src/Keypaste.Core/KdbxFormat.cs` rather than taken from KeePassLib's defaults. keypaste writes no cryptography of its own and reaches the format only through `src/Keypaste.Core/Internal/`.
 - Unreleased: unlocking warns, and still opens the vault, when the file has a lower save count than the copy this computer's keypaste last opened or saved, as putting an older copy back leaves it. keypaste's own restore doesn't warn [T-26].
 
@@ -178,7 +178,7 @@ What keypaste holds to under the [laws](#security-laws), and what it can't preve
 - A copied vault can be guessed offline without limit [T-20].
 - After a password or key file change, older copies and backups still open with the old credentials; delete them.
 - A lost key file or YubiKey can't be recovered [T-27] [T-37].
-- Whoever passes Windows Hello as you, PIN included, can reopen the vault while the app runs [T-44].
+- Whoever passes Windows Hello as you, PIN included, or whose fingerprint is enrolled in Touch ID, can reopen the vault while the app runs [T-44].
 
 ### The desktop app (unreleased)
 

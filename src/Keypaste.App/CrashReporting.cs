@@ -31,6 +31,9 @@ internal sealed class CrashReporting : IDisposable
     /// <summary>Windows Hello failed in a way it does not report as an outcome.</summary>
     internal const string WindowsHelloSite = "WindowsHello.Sign";
 
+    /// <summary>Touch ID failed in a way it does not report as an outcome.</summary>
+    internal const string TouchIdSite = "TouchId.Keychain";
+
     /// <summary>The owner refused a request as one that could not be completed.</summary>
     internal const string OwnerSite = "SessionAuthority.Decided";
 

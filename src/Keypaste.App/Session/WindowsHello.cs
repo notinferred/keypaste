@@ -8,27 +8,11 @@ using Windows.Security.Cryptography;
 
 namespace Keypaste.App.Session;
 
-/// <summary>What a quick unlock asks on this machine.</summary>
-internal static class QuickUnlockSigners
-{
-    /// <summary>Windows Hello in the app's Windows build on Windows 10 2004 or later, and nothing elsewhere (D-0549).</summary>
-    /// <param name="unexpected">Keeps a report of a failure Windows Hello does not report as an outcome, at the site it names, or null (D-0596).</param>
-    internal static IQuickUnlockSigner? ForThisMachine(Action<Exception, string>? unexpected = null)
-    {
-#if WINDOWS
-        if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 19041))
-        {
-            return new WindowsHello(unexpected);
-        }
-#endif
-        return null;
-    }
-}
-
 #if WINDOWS
 /// <summary>
 /// Windows Hello through WinRT's <c>KeyCredentialManager</c>, as KeePassXC 2.8's quick unlock reaches it: one key of
 /// keypaste's own, made on first use, signs a challenge once the person has shown Windows Hello it is them (D-0549).
+/// The signature is the challenge's key, so making a key and answering for one are the same signing.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -40,7 +24,7 @@ internal static class QuickUnlockSigners
 /// for its window every half second, four times, and puts it in front, as KeePassXC's <c>queueSecurityPromptFocus</c> does.
 /// </para>
 /// </remarks>
-internal sealed class WindowsHello(Action<Exception, string>? unexpected) : IQuickUnlockSigner
+internal sealed class WindowsHello(Action<Exception, string>? unexpected) : IQuickUnlockKeys
 {
     private const string _keyName = "keypaste";
     private const string _promptWindowClass = "Credential Dialog Xaml Host";
@@ -72,7 +56,16 @@ internal sealed class WindowsHello(Action<Exception, string>? unexpected) : IQui
         }
     }
 
-    public SignOutcome Sign(byte[] challenge, out byte[]? signature)
+    public KeyOutcome Make(byte[] challenge, out byte[]? key) => Sign(challenge, out key);
+
+    public KeyOutcome Answer(byte[] challenge, out byte[]? key) => Sign(challenge, out key);
+
+    // Windows Hello keeps nothing per challenge; its one key stays for the next copy.
+    public void Forget(byte[] challenge)
+    {
+    }
+
+    private KeyOutcome Sign(byte[] challenge, out byte[]? signature)
     {
         ArgumentNullException.ThrowIfNull(challenge);
         signature = null;
@@ -94,19 +87,19 @@ internal sealed class WindowsHello(Action<Exception, string>? unexpected) : IQui
             }
 
             CryptographicBuffer.CopyToByteArray(signed.Result, out signature);
-            return SignOutcome.Signed;
+            return KeyOutcome.Released;
         }
         catch (Exception ex)
         {
             unexpected?.Invoke(ex, CrashReporting.WindowsHelloSite);
-            return SignOutcome.Failed;
+            return KeyOutcome.Failed;
         }
     }
 
     /// <summary>Opens keypaste's key, or makes it when there is none, which asks the person too.</summary>
-    private static KeyCredential? OpenOrCreate(out SignOutcome refused)
+    private static KeyCredential? OpenOrCreate(out KeyOutcome refused)
     {
-        refused = SignOutcome.Failed;
+        refused = KeyOutcome.Failed;
         var opened = KeyCredentialManager.OpenAsync(_keyName).AsTask().GetAwaiter().GetResult();
 
         if (opened.Status == KeyCredentialStatus.NotFound)
@@ -128,12 +121,12 @@ internal sealed class WindowsHello(Action<Exception, string>? unexpected) : IQui
         return opened.Credential;
     }
 
-    private static SignOutcome Outcome(KeyCredentialStatus status) => status switch
+    private static KeyOutcome Outcome(KeyCredentialStatus status) => status switch
     {
-        KeyCredentialStatus.Success => SignOutcome.Signed,
-        KeyCredentialStatus.UserCanceled or KeyCredentialStatus.UserPrefersPassword => SignOutcome.Cancelled,
-        KeyCredentialStatus.NotFound => SignOutcome.Unavailable,
-        _ => SignOutcome.Failed,
+        KeyCredentialStatus.Success => KeyOutcome.Released,
+        KeyCredentialStatus.UserCanceled or KeyCredentialStatus.UserPrefersPassword => KeyOutcome.Cancelled,
+        KeyCredentialStatus.NotFound => KeyOutcome.Unavailable,
+        _ => KeyOutcome.Failed,
     };
 
     private static void BringPromptForward() => _ = Task.Run(async () =>

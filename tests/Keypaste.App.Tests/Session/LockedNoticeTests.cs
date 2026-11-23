@@ -370,6 +370,42 @@ public sealed class LockedNoticeTests
         });
 
     [Fact]
+    public Task Pressing_the_notification_for_a_vault_quick_unlock_can_reopen_asks_for_it_at_once() =>
+        HeadlessSession.On(async () =>
+        {
+            using var system = new FakeNotifications { Answers = SystemAnswer.Accepts };
+            using var home = new TempHome();
+            using var vault = new TempVault();
+            using var claim = Claim(home);
+            using var lifetime = new ClassicDesktopStyleApplicationLifetime();
+            Attach(lifetime);
+            var keys = new FakeQuickUnlockKeys(MachineQuickUnlock.TouchIdName);
+            using var app = new App { Preferences = Tray(home), Claim = claim, Notifications = system, QuickUnlockKeys = () => keys };
+            app.Launch(lifetime, background: true);
+            lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
+            Assert.True(Screen(app).Offer(vault.Path_));
+
+            Unlock(app, vault.Path_);
+            Assert.Equal(QuickUnlockOutcome.Done, app.Authority!.Session.KeepForQuickUnlock());
+            WindowInput.Drain();
+            var unlocked = Screen(app);
+            app.Authority.Session.Lock(VaultLockReason.Manual);
+            await Until(() => !ReferenceEquals(Screen(app), unlocked));
+            Assert.True(Screen(app).Offer(vault.Path_));
+            Assert.True(Screen(app).OffersQuickUnlock);
+
+            Assert.True(await TellAsync(vault.Path_));
+            await Until(() => system.Posts.Count == 1);
+            Assert.Equal(1, keys.Asked);
+            system.Posts[0].Pressed();
+
+            await Until(() => app.Authority.Session.IsUnlocked);
+            Assert.Equal(2, keys.Asked);
+            Assert.True(app.Main!.IsVisible);
+            app.Main.Close();
+        });
+
+    [Fact]
     public Task Unlocking_removes_the_notification_and_its_late_press_after_another_lock_opens_nothing() =>
         WithNotifications(SystemAnswer.Accepts, async (app, _, system, vault, _) =>
         {

@@ -13,7 +13,7 @@ namespace Keypaste.App.Windows.Tests;
 /// </summary>
 /// <remarks>
 /// A machine with Windows Hello set up needs a person: making the key, the prompt's focus, cancelling, the PIN and a
-/// YubiKey vault resumed are checked by hand (4.10c).
+/// YubiKey vault resumed are checked by hand (BACKLOG's Windows Hello check, H-0025).
 /// </remarks>
 public sealed class WindowsHelloTests : IDisposable
 {
@@ -26,14 +26,10 @@ public sealed class WindowsHelloTests : IDisposable
     [Fact]
     public void The_Windows_build_reaches_Windows_Hello_only_on_Windows()
     {
-        var signer = QuickUnlockSigners.ForThisMachine();
+        var keys = MachineQuickUnlock.Keys(_directory);
 
-        Assert.Equal(OperatingSystem.IsWindowsVersionAtLeast(10, 0, 19041), signer is not null);
-
-        if (signer is not null)
-        {
-            Assert.Equal("Windows Hello", signer.Name);
-        }
+        // The Windows Hello type exists only in the Windows target, so the test knows it by its name.
+        Assert.Equal(OperatingSystem.IsWindowsVersionAtLeast(10, 0, 19041), keys?.Name == "Windows Hello");
     }
 
     [Fact]
@@ -43,7 +39,7 @@ public sealed class WindowsHelloTests : IDisposable
             OperatingSystem.IsWindows() && Environment.GetEnvironmentVariable("RUNNER_ENVIRONMENT") == "github-hosted",
             "Only a hosted Windows runner is known to have no Windows Hello set up.");
 
-        var signer = QuickUnlockSigners.ForThisMachine();
+        var signer = MachineQuickUnlock.Keys(_directory);
         Assert.NotNull(signer);
         Assert.False(signer.IsAvailable());
 
