@@ -79,7 +79,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# The Edge Add-ons build is the Chromium build under the Edge test key, so Edge names the ID keypaste knows for that store.
+# The Edge Add-ons build is the Chromium build under Microsoft Edge Add-ons' key, so Edge names the ID keypaste knows for that store.
 step "Make the Edge build"
 cp -R artifacts/extension/chromium "$work/edge-build"
 node -e '

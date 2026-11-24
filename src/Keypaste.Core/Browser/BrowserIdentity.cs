@@ -17,13 +17,11 @@ public sealed record BrowserIdentity(string Caller, string Store)
 
     private const string _chromeOrigin = "chrome-extension://";
 
-    // Edge carries a test ID, from extension/keys/edge.pub, until Microsoft Edge Add-ons assigns keypaste's extension its own (H-0029).
-
     /// <summary>keypaste's extension from the Chrome Web Store.</summary>
     public static BrowserIdentity ChromeWebStore { get; } = new("chrome-extension://kabnajpeogcbndlfgibmhiichfkgpdla/", "the Chrome Web Store");
 
     /// <summary>keypaste's extension from Microsoft Edge Add-ons.</summary>
-    public static BrowserIdentity EdgeAddOns { get; } = new("chrome-extension://iobkkhmaklkkeiadigbohfaplldmaogd/", "Microsoft Edge Add-ons");
+    public static BrowserIdentity EdgeAddOns { get; } = new("chrome-extension://fnecgepocmpbfaplbgmoolfkaphlbfpc/", "Microsoft Edge Add-ons");
 
     /// <summary>keypaste's extension from Firefox Add-ons.</summary>
     public static BrowserIdentity FirefoxAddOns { get; } = new("browser@keypaste.com", "Firefox Add-ons");

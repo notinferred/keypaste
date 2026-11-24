@@ -183,7 +183,7 @@ public sealed class SessionBrowsersTests : IDisposable
         Assert.Equal(3, refusals.Count);
         Assert.All(refusals, line => Assert.Equal("not-paired", line.GetProperty("method").GetString()));
         Assert.All(refusals, line => Assert.Equal("check", line.GetProperty("args").GetProperty("field").GetString()));
-        Assert.Equal("iobkkhmaklkkeiadigbohfaplldmaogd", refusals[0].GetProperty("client").GetProperty("name").GetString());
+        Assert.Equal("fnecgepocmpbfaplbgmoolfkaphlbfpc", refusals[0].GetProperty("client").GetProperty("name").GetString());
         Assert.DoesNotContain(_key, _log.Text(), StringComparison.Ordinal);
         Assert.NotNull(Assert.Single(owner.Browsers.List()).LastUsed);
     }

@@ -24,7 +24,7 @@ public sealed class BrowserCallerTests : IDisposable
     [InlineData(false, _chrome)]
     [InlineData(true, _chrome)]
     [InlineData(true, _chrome, "--parent-window=0")]
-    [InlineData(true, "chrome-extension://iobkkhmaklkkeiadigbohfaplldmaogd/", "--parent-window=1180410")]
+    [InlineData(true, "chrome-extension://fnecgepocmpbfaplbgmoolfkaphlbfpc/", "--parent-window=1180410")]
     [InlineData(false, "chrome-extension://abcdefghijklmnopabcdefghijklmnop/")]
     public void A_chrome_family_caller_s_origin_is_a_browser_start(bool windows, params string[] args) =>
         Assert.Equal(args[0], BrowserCaller.Of(args, windows));
@@ -60,7 +60,7 @@ public sealed class BrowserCallerTests : IDisposable
     public void Keypaste_answers_the_three_KeePassXC_Browser_builds_and_no_other()
     {
         Assert.True(BrowserCaller.TryRead([_chrome], windows: false, out var chrome, out _));
-        Assert.True(BrowserCaller.TryRead(["chrome-extension://iobkkhmaklkkeiadigbohfaplldmaogd/", "--parent-window=7"], windows: true, out var edge, out _));
+        Assert.True(BrowserCaller.TryRead(["chrome-extension://fnecgepocmpbfaplbgmoolfkaphlbfpc/", "--parent-window=7"], windows: true, out var edge, out _));
         Assert.True(BrowserCaller.TryRead([_manifest, "browser@keypaste.com"], windows: false, out var firefox, out _));
 
         Assert.Equal(BrowserIdentity.ChromeWebStore, chrome);
