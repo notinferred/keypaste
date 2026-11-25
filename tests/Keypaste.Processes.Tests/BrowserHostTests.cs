@@ -25,7 +25,7 @@ public sealed class BrowserHostTests
     private const string _edge = "fnecgepocmpbfaplbgmoolfkaphlbfpc";
     private const string _chromeBuild = "keypaste's extension from the Chrome Web Store (kabnajpeogcbndlfgibmhiichfkgpdla)";
     private const int _notFound = 20;
-    private static readonly string[] _browsers = ["chrome", "chromium", "edge", "brave", "firefox"];
+    private static readonly string[] _browsers = ["chrome", "chromium", "edge", "brave", "firefox", "librewolf"];
 
     [Fact]
     public void A_browser_pairs_once_the_person_confirms_its_code_its_pairing_proves_only_its_own_build_and_key_and_Remove_ends_it()
@@ -166,7 +166,10 @@ public sealed class BrowserHostTests
             Assert.Equal("on=false other=false status=Not installed program=none", status[browser]);
         }
 
-        Assert.Equal(!OperatingSystem.IsLinux(), app.Driver.Output.Contains("browser-shared Chrome and Brave read one setting, so they turn on and off together."));
+        Assert.Contains(
+            "browser-shared " + (OperatingSystem.IsLinux() ? string.Empty : "Chrome and Brave read one setting, so they turn on and off together. ")
+                + "Firefox and LibreWolf read one setting, so they turn on and off together.",
+            app.Driver.Output);
 
         // The extension is found in a profile of the browser's own folder; a profile without it is a browser it isn't installed in.
         Directory.CreateDirectory(Path.Combine(roots.ProfileFolder("chrome"), "Default", "Extensions", _chrome));
@@ -184,6 +187,9 @@ public sealed class BrowserHostTests
                 : browser == "brave" ? " Chrome reads the same setting, so it is on too."
                 : browser == "chrome" ? " Brave reads the same setting, so it is on too."
                 : string.Empty;
+            sharing = browser == "firefox" ? " LibreWolf reads the same setting, so it is on too."
+                : browser == "librewolf" ? " Firefox reads the same setting, so it is on too."
+                : sharing;
             Assert.Equal($"browser-on {browser}: {Name(browser)} now starts keypaste at {keypaste}.{sharing}", app.Act($"browser-on {browser}"));
             var on = Status(app, ref statuses)[browser];
             Assert.StartsWith("on=true other=false ", on, StringComparison.Ordinal);
@@ -239,13 +245,13 @@ public sealed class BrowserHostTests
         }
     }
 
-    private static string Name(string browser) => char.ToUpperInvariant(browser[0]) + browser[1..];
+    private static string Name(string browser) => browser == "librewolf" ? "LibreWolf" : char.ToUpperInvariant(browser[0]) + browser[1..];
 
-    // The driver prints the five browsers in order, Firefox last, after any line on a shared setting.
+    // The driver prints the six browsers in order, LibreWolf last, after any line on a shared setting.
     private static Dictionary<string, string> Status(HeldApp app, ref int statuses)
     {
         app.Send("browser-status");
-        app.WaitFor("^browser firefox ", ++statuses);
+        app.WaitFor("^browser librewolf ", ++statuses);
         return app.Driver.Output
             .Where(line => line.StartsWith("browser ", StringComparison.Ordinal))
             .TakeLast(_browsers.Length)

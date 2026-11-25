@@ -24,7 +24,7 @@ public enum HostState
 /// <param name="State">Who answers it.</param>
 /// <param name="Program">The program its manifest names, or the file another program wrote when it names none; null when not set up.</param>
 /// <param name="Extension">Whether keypaste's extension is in its profiles.</param>
-/// <param name="SharesWith">The other browsers that read the same manifest, which turn on and off with it: Brave and Chrome on Windows.</param>
+/// <param name="SharesWith">The other browsers that read the same manifest, which turn on and off with it: LibreWolf and Firefox, and Brave and Chrome on Windows and macOS.</param>
 public sealed record HostStatus(HostBrowser Browser, HostState State, string? Program, ExtensionState Extension, IReadOnlyList<HostBrowser> SharesWith);
 
 /// <summary>What turning a browser's host on or off did.</summary>
@@ -99,7 +99,7 @@ public sealed class BrowserHosts
     public string Program => _program;
 
     /// <summary>Reads each browser's host and extension.</summary>
-    /// <returns>The five, in <see cref="HostPlaces.Browsers"/>' order.</returns>
+    /// <returns>The six, in <see cref="HostPlaces.Browsers"/>' order.</returns>
     public IReadOnlyList<HostStatus> Read() => [.. HostPlaces.Browsers.Select(Read)];
 
     /// <summary>Reads one browser's host and extension.</summary>

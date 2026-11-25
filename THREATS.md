@@ -624,7 +624,7 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Mitigation.** Settings › Browser fill and `keypaste browser` name the program each browser starts. Settings asks before replacing another program's manifest.
 
-**Limit.** keypaste does not watch the manifests, so a replacement is seen only when the status is read (T-50).
+**Limit.** keypaste does not watch the manifests, so a replacement is seen only when the status is read (T-50). LibreWolf reads its own folder before Firefox's, which keypaste neither writes nor reads, so a manifest there answers LibreWolf while Settings shows keypaste on.
 
 **Status.** Unreleased.
 

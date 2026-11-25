@@ -110,7 +110,7 @@ public sealed partial class BrowserVerbTests : IDisposable
     {
         _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("browser", "on", "chrome", "safari"));
 
-        Assert.Contains("keypaste browser on: unknown browser 'safari'; name chrome, chromium, edge, brave, firefox", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("keypaste browser on: unknown browser 'safari'; name chrome, chromium, edge, brave, firefox, librewolf", _harness.Err, StringComparison.Ordinal);
         Assert.False(File.Exists(_places.ManifestFile(HostBrowser.Chrome)));
     }
 
@@ -134,11 +134,12 @@ public sealed partial class BrowserVerbTests : IDisposable
         using var json = JsonDocument.Parse(_harness.Out);
         var rows = json.RootElement.EnumerateArray().ToList();
 
-        Assert.Equal(["chrome", "chromium", "edge", "brave", "firefox"], rows.Select(row => row.GetProperty("browser").GetString()));
+        Assert.Equal(["chrome", "chromium", "edge", "brave", "firefox", "librewolf"], rows.Select(row => row.GetProperty("browser").GetString()));
         Assert.All(rows, row => Assert.Equal(["browser", "state", "program", "extension", "shares_with"], row.EnumerateObject().Select(property => property.Name)));
         Assert.Equal(("not-set-up", JsonValueKind.Null, "browser-not-found"), (rows[0].GetProperty("state").GetString(), rows[0].GetProperty("program").ValueKind, rows[0].GetProperty("extension").GetString()));
         Assert.Equal(("keypaste", _program), (rows[2].GetProperty("state").GetString(), rows[2].GetProperty("program").GetString()));
         Assert.Equal(OperatingSystem.IsLinux() ? [] : ["brave"], rows[0].GetProperty("shares_with").EnumerateArray().Select(name => name.GetString()));
+        Assert.Equal(["librewolf"], rows[4].GetProperty("shares_with").EnumerateArray().Select(name => name.GetString()));
     }
 
     [Fact]

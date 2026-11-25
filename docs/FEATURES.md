@@ -92,7 +92,7 @@ Every row is 1.0.0. [The desktop guide](desktop.md) describes the app. Screens a
 
 | Capability | Note |
 |---|---|
-| Browser fill: pair keypaste's extension once per browser, then fill a site's logins from every open vault | Tested in Chrome, Edge, Brave and Firefox under test IDs; not in any store (8.1g) ([T-48], [T-61]) |
+| Browser fill: pair keypaste's extension once per browser, then fill a site's logins from every open vault | Tested in Chrome, Edge, Brave, Firefox and LibreWolf under test IDs; not in any store (8.1g) ([T-48], [T-61]) |
 
 ## KeePassXC compatibility
 

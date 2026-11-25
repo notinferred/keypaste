@@ -53,7 +53,7 @@ internal static class HostLookup
             return (null, $"{manifest} is not JSON: {ex.Message}", Refused);
         }
 
-        var firefox = browser == HostBrowser.Firefox;
+        var firefox = HostPlaces.RunsFirefoxAddOn(browser);
         var caller = firefox ? BrowserIdentity.FirefoxAddOns.Caller
             : browser == HostBrowser.Edge ? BrowserIdentity.EdgeAddOns.Caller
             : BrowserIdentity.ChromeWebStore.Caller;

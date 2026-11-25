@@ -132,7 +132,7 @@ jobs:
           npm ci --no-audit --no-fund
           node build.js
 
-      - name: Fill logins in the runner's Chrome, Edge and Firefox, and Brave
+      - name: Fill logins in the runner's Chrome, Edge and Firefox, and Brave and LibreWolf
         shell: bash
         run: bash scripts/verify-browser-fill.sh --branded
 

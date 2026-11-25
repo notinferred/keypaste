@@ -157,7 +157,7 @@ What keypaste holds to under the [laws](#security-laws), and what it can't preve
 - An item matches a page only on its own host or a subdomain, with the same scheme and port, within one registrable domain, and the first fill on each subdomain is asked. An `http` page, a single-label host and a form posting to another site get a warning and are asked at every pick [T-58].
 - The extension refuses a login form in a frame from another origin before keypaste is asked [T-58].
 - A release carries one item's username, password, title and UUID, and nothing else [T-60].
-- Checked in real Chrome, Edge, Brave and Firefox on Windows, macOS and Linux with keypaste's test build (8.3a3).
+- Checked in real Chrome, Edge, Brave, Firefox and LibreWolf on Windows, macOS and Linux with keypaste's test build (8.3a3).
 
 **Limits**
 

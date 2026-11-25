@@ -22,10 +22,10 @@ internal static class BrowserCommand
     internal static CliVerb Command { get; } = new(
         "browser",
         "turn keypaste on or off as each browser's extension host\n\n"
-            + "lists Chrome, Chromium, Edge, Brave and Firefox: which program each starts for keypaste's extension, and "
+            + "lists Chrome, Chromium, Edge, Brave, Firefox and LibreWolf: which program each starts for keypaste's extension, and "
             + "whether the extension is installed in it. on writes a manifest naming this keypaste where the browser "
-            + "reads it, replacing another program's; off removes keypaste's own and leaves another program's. on Windows "
-            + "Brave reads Chrome's, so the two turn on and off together.",
+            + "reads it, replacing another program's; off removes keypaste's own and leaves another program's. LibreWolf "
+            + "reads Firefox's, and on Windows and macOS Brave reads Chrome's, so each pair turns on and off together.",
         List)
     {
         new CliVerb("on", "start this keypaste for keypaste's extension in these browsers", (line, context) => Change(line, context, "on")) { _browsers },

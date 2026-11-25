@@ -24,7 +24,7 @@ namespace Keypaste.FakeBrowser;
 /// <c>keepassxc-proxy</c> included, which drops what it cannot hand KeePassXC, hence <c>--within</c>.
 /// </para>
 /// <para>
-/// <c>find chrome|chromium|edge|brave|firefox</c> with the user's folders and registry root instead finds the host as that
+/// <c>find chrome|chromium|edge|brave|firefox|librewolf</c> with the user's folders and registry root instead finds the host as that
 /// browser finds <c>com.keypaste.browser</c> for keypaste's extension, and starts the program its manifest names as that
 /// browser does: on Windows through the key's manifest, Chrome's family through <c>cmd</c>. It prints <c>found &lt;manifest&gt;</c>
 /// on standard error, and exits 20 when no manifest is where the browser looks and 21 when the browser would refuse it.
@@ -34,7 +34,7 @@ internal static class Program
 {
     private const string _usage =
         "usage: Keypaste.FakeBrowser <host> chrome|edge|firefox [--id-key <base64>] [--within <seconds>] [action | test-associate=<id> | get-logins=<url> | pick=<url>]...\n" +
-        "       Keypaste.FakeBrowser find chrome|chromium|edge|brave|firefox --home <dir> --config-home <dir> --app-data <dir>\n" +
+        "       Keypaste.FakeBrowser find chrome|chromium|edge|brave|firefox|librewolf --home <dir> --config-home <dir> --app-data <dir>\n" +
         "                            --local-app-data <dir> --registry-root <key> [--id-key <base64>] [--within <seconds>] [action]...";
 
     private static async Task<int> Main(string[] args)
@@ -203,14 +203,14 @@ internal static class Program
 public static class BrowserLaunch
 {
     /// <summary>The arguments <paramref name="browser"/> passes, or null for a browser this fake does not stand in for.</summary>
-    /// <param name="browser"><c>chrome</c>, <c>edge</c> or <c>firefox</c>.</param>
+    /// <param name="browser"><c>chrome</c>, <c>edge</c>, <c>firefox</c> or <c>librewolf</c>.</param>
     /// <param name="windows">Whether to pass them as on Windows, where Chrome adds the window it was called from.</param>
     /// <returns>The arguments, without the program.</returns>
     public static string[]? Arguments(string browser, bool windows) => browser switch
     {
         "chrome" => Chromium(BrowserIdentity.ChromeWebStore, windows),
         "edge" => Chromium(BrowserIdentity.EdgeAddOns, windows),
-        "firefox" => [Path.Combine(AppContext.BaseDirectory, "com.keypaste.browser.json"), BrowserIdentity.FirefoxAddOns.Caller],
+        "firefox" or "librewolf" => [Path.Combine(AppContext.BaseDirectory, "com.keypaste.browser.json"), BrowserIdentity.FirefoxAddOns.Caller],
         _ => null,
     };
 

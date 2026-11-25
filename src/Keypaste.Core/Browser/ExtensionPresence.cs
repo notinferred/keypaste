@@ -16,7 +16,7 @@ public enum ExtensionState
 /// <summary>Finds keypaste's extension in a browser's profiles by reading their folders, never changing them.</summary>
 /// <remarks>
 /// A Chromium-family browser keeps a store-installed extension in <c>&lt;profile&gt;/Extensions/&lt;id&gt;</c>, and Firefox in
-/// <c>&lt;profile&gt;/extensions/&lt;id&gt;.xpi</c>; an extension loaded unpacked appears in neither.
+/// <c>&lt;profile&gt;/extensions/&lt;id&gt;.xpi</c>, as does LibreWolf; an extension loaded unpacked appears in neither.
 /// </remarks>
 public static class ExtensionPresence
 {
@@ -39,7 +39,7 @@ public static class ExtensionPresence
     }
 
     private static bool Holds(HostBrowser browser, string profile) =>
-        browser == HostBrowser.Firefox
+        HostPlaces.RunsFirefoxAddOn(browser)
             ? File.Exists(Path.Combine(profile, "extensions", BrowserIdentity.FirefoxAddOns.Id + ".xpi"))
             : Directory.Exists(Path.Combine(profile, "Extensions", BrowserIdentity.ChromeWebStore.Id))
                 || Directory.Exists(Path.Combine(profile, "Extensions", BrowserIdentity.EdgeAddOns.Id));

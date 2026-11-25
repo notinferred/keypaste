@@ -4,9 +4,9 @@
 # page's fields and the owner's log must show what keypaste's matching rules allow (extension/tests/fill-in-browsers.js).
 #
 # Usage: verify-browser-fill.sh, on Linux, after `node extension/build.js` and `npx playwright install chromium` in extension/:
-#          Playwright's Chromium, pinned by extension/package-lock.json, and Edge, Firefox ESR and geckodriver pinned below.
+#          Playwright's Chromium, pinned by extension/package-lock.json, and Edge, Firefox ESR, LibreWolf and geckodriver pinned below.
 #        verify-browser-fill.sh --branded, on a GitHub-hosted Windows, macOS or Linux runner, after `node extension/build.js`:
-#          the runner's own Chrome, Edge and Firefox, with its geckodriver, and Brave pinned below, keypaste turned on in each
+#          the runner's own Chrome, Edge and Firefox, with its geckodriver, and Brave and LibreWolf pinned below, keypaste turned on in each
 #          browser's real places for this user. Preinstalled browsers change with the runner's image, so this runs through
 #          dev.yml for a record's evidence and is no gate of any run.
 set -euo pipefail
@@ -34,6 +34,12 @@ readonly BRAVE_RELEASE="https://github.com/brave/brave-browser/releases/download
 readonly BRAVE_LINUX_SHA256='734bd9e1d24bc0a94c03b0a43845107dd8a29f572c652023cf7177f5fc3a5f38'
 readonly BRAVE_WINDOWS_SHA256='42ba3a5445f717b429fb3fe457e7e531cd1c208f06a2dc9315b1fa31c09bc8b9'
 readonly BRAVE_MACOS_SHA256='be8bb3332e45359c96219ae67102eb1d9a88ff1ef8906e6709efc5790705449b'
+readonly LIBREWOLF_VERSION='160.0.1-1'
+readonly LIBREWOLF_RELEASE="https://dl.librewolf.net/librewolf/$LIBREWOLF_VERSION"
+# The digests the release publishes beside each asset, in its .sha256sum files.
+readonly LIBREWOLF_LINUX_SHA256='07ab4fc73f401764890eb5c87dd7b5815c7783b1c7378ea789ca1330d362209b'
+readonly LIBREWOLF_WINDOWS_SHA256='8f2b72953b3fca144a82541f3a25fe62b7016a2773712e0586f3b331ef02033b'
+readonly LIBREWOLF_MACOS_SHA256='63fecdaff40925486c1c5023c651b61a0858e49847ea338a64d6e47d517f774c'
 readonly MASTER='browser-fill-master-pw'
 
 branded=false
@@ -57,7 +63,7 @@ chrome_id="$(id_of chrome)"
 edge_id="$(id_of edge)"
 [ -n "$chrome_id" ] && [ -n "$edge_id" ] || die "extension/keys/ids.js gave no Chrome or Edge ID"
 
-watchdog 1500 node Keypaste.AppDriver keypaste chrome msedge brave firefox geckodriver
+watchdog 1500 node Keypaste.AppDriver keypaste chrome msedge brave firefox librewolf geckodriver
 
 step "Build libsodium, keypaste and the app driver"
 bash scripts/build-libsodium.sh >/dev/null
@@ -75,6 +81,9 @@ cleanup() {
   # shellcheck disable=SC2046 # one process id per word
   end_tree $(pgrep -P "$$" 2>/dev/null) 2>/dev/null || true
   if [ -n "${brave_volume:-}" ]; then hdiutil detach "$brave_volume" -quiet || true; fi
+  if [ -n "${librewolf_volume:-}" ]; then hdiutil detach "$librewolf_volume" -quiet || true; fi
+  # A visible LibreWolf on Windows can outlive its session and hold its own folder open.
+  if [ "$os" != Linux ] && [ "$os" != Darwin ]; then taskkill //F //T //IM librewolf.exe >/dev/null 2>&1 || true; fi
   rm -rf "$work"
 }
 trap cleanup EXIT
@@ -112,6 +121,30 @@ case "$os" in
 esac
 [ -x "$brave" ] || [ -f "$brave" ] || die "Brave $BRAVE_VERSION has no browser at $brave"
 
+# geckodriver accepts LibreWolf only as its real program, whose application.ini says it is Firefox, never a wrapper script.
+librewolf=''
+case "$os" in
+  Linux)
+    scripts/fetch-pinned-asset.sh "$LIBREWOLF_RELEASE/librewolf-$LIBREWOLF_VERSION-linux-x86_64-package.tar.xz" "$LIBREWOLF_LINUX_SHA256" "$work/librewolf.tar.xz"
+    mkdir "$work/librewolf" && tar -xJf "$work/librewolf.tar.xz" -C "$work/librewolf"
+    librewolf="$(find "$work/librewolf" -type f -name librewolf -perm -u+x | head -1)"
+    ;;
+  Darwin)
+    scripts/fetch-pinned-asset.sh "$LIBREWOLF_RELEASE/librewolf-$LIBREWOLF_VERSION-macos-arm64-package.dmg" "$LIBREWOLF_MACOS_SHA256" "$work/librewolf.dmg"
+    librewolf_volume="$work/librewolf-volume"
+    hdiutil attach "$work/librewolf.dmg" -nobrowse -readonly -mountpoint "$librewolf_volume" -quiet
+    cp -R "$librewolf_volume/LibreWolf.app" "$work/"
+    hdiutil detach "$librewolf_volume" -quiet && librewolf_volume=''
+    librewolf="$work/LibreWolf.app/Contents/MacOS/librewolf"
+    ;;
+  *)
+    scripts/fetch-pinned-asset.sh "$LIBREWOLF_RELEASE/librewolf-$LIBREWOLF_VERSION-windows-x86_64-package.zip" "$LIBREWOLF_WINDOWS_SHA256" "$work/librewolf.zip"
+    mkdir "$work/librewolf" && unzip -q "$work/librewolf.zip" -d "$work/librewolf"
+    librewolf="$(find "$work/librewolf" -iname librewolf.exe | head -1)"
+    ;;
+esac
+[ -n "$librewolf" ] && [ -f "$librewolf" ] || die "LibreWolf $LIBREWOLF_VERSION has no browser at '$librewolf'"
+
 if $branded; then
   case "$os" in
     Linux)
@@ -134,7 +167,7 @@ if $branded; then
   for program in "$chrome" "$edge" "$firefox" "$geckodriver"; do
     [ -f "$program" ] || command -v "$program" >/dev/null || die "this runner has no $program"
   done
-  browsers=("chrome:$chrome" "edge:$edge" "brave:$brave" "firefox:$firefox")
+  browsers=("chrome:$chrome" "edge:$edge" "brave:$brave" "firefox:$firefox" "librewolf:$librewolf")
 else
   scripts/fetch-pinned-asset.sh "$FIREFOX_URL" "$FIREFOX_SHA256" "$work/firefox.tar.xz"
   scripts/fetch-pinned-asset.sh "$GECKODRIVER_URL" "$GECKODRIVER_SHA256" "$work/geckodriver.tar.gz"
@@ -144,7 +177,7 @@ else
   dpkg-deb -x "$work/edge.deb" "$work/edge"
   geckodriver="$work/geckodriver"
   chromium="$(cd extension && node -e 'console.log(require("@playwright/test").chromium.executablePath())')"
-  browsers=("chromium:$chromium" "edge:$work/edge/opt/microsoft/msedge/msedge" "brave:$brave" "firefox:$work/firefox/firefox")
+  browsers=("chromium:$chromium" "edge:$work/edge/opt/microsoft/msedge/msedge" "brave:$brave" "firefox:$work/firefox/firefox" "librewolf:$librewolf")
 fi
 
 step "Make the pages' certificate"

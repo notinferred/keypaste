@@ -63,14 +63,14 @@ internal sealed partial class BrowserHostRow(HostStatus status) : ObservableObje
     private string Store => status.Browser switch
     {
         HostBrowser.Edge => BrowserIdentity.EdgeAddOns.Store,
-        HostBrowser.Firefox => BrowserIdentity.FirefoxAddOns.Store,
+        HostBrowser.Firefox or HostBrowser.LibreWolf => BrowserIdentity.FirefoxAddOns.Store,
         _ => BrowserIdentity.ChromeWebStore.Store,
     };
 }
 
 /// <summary>
 /// Settings › Browser fill's browsers: Turn on writes the manifest each browser reads to start keypaste for keypaste's
-/// extension, and Turn off removes keypaste's own; every change reads all five again.
+/// extension, and Turn off removes keypaste's own; every change reads all six again.
 /// </summary>
 /// <remarks>Turning on over another program's manifest asks first, since that program's cannot be put back.</remarks>
 internal sealed partial class BrowserHostsViewModel : ObservableObject
@@ -112,10 +112,13 @@ internal sealed partial class BrowserHostsViewModel : ObservableObject
 
     internal string UnavailableText { get; }
 
-    /// <summary>That Brave reads another browser's manifest, Chrome's on Windows and macOS, said once.</summary>
-    internal string SharedText => Rows.FirstOrDefault(row => row.SharesWith.Count > 0) is { } shared
-        ? $"{Names(shared.SharesWith.Prepend(shared.Browser).Order())} read one setting, so they turn on and off together."
-        : string.Empty;
+    /// <summary>Each group of browsers that read one manifest, said once: LibreWolf with Firefox, and Brave with Chrome on Windows and macOS.</summary>
+    internal string SharedText => string.Join(
+        " ",
+        Rows.Where(row => row.SharesWith.Count > 0)
+            .Select(row => Names(row.SharesWith.Append(row.Browser).Order()))
+            .Distinct(StringComparer.Ordinal)
+            .Select(names => $"{names} read one setting, so they turn on and off together."));
 
     internal bool HasSharedText => SharedText.Length > 0;
 

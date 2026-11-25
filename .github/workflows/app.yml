@@ -279,7 +279,7 @@ jobs:
         shell: bash
         run: bash scripts/verify-extension-load.sh
 
-      - name: Fill logins in Chromium, Edge, Brave and Firefox
+      - name: Fill logins in Chromium, Edge, Brave, Firefox and LibreWolf
         shell: bash
         run: bash scripts/verify-browser-fill.sh
 

@@ -78,7 +78,7 @@ The window is laid out like Outlook for Mac: a rail of Items, Agents, Security a
 
 Settings shows each switch's whole label, and the extension says when it can't reach keypaste and names Settings › Browser.
 
-keypaste's extension fills in real Chrome, Edge, Brave and Firefox on Windows, macOS and Linux. A click or Connect made while the extension is starting is no longer lost; a page of another site you move to in the same tab no longer gets the last site's logins; and on macOS, turning on Brave writes the file Brave reads, which is Chrome's, so Chrome turns on and off with it, as on Windows (8.3a3).
+keypaste's extension fills in real Chrome, Edge, Brave, Firefox and LibreWolf on Windows, macOS and Linux. LibreWolf takes the Firefox add-on and reads Firefox's setting, so Settings › Browser fill and `keypaste browser` turn the two on and off together. A click or Connect made while the extension is starting is no longer lost; a page of another site you move to in the same tab no longer gets the last site's logins; and on macOS, turning on Brave writes the file Brave reads, which is Chrome's, so Chrome turns on and off with it, as on Windows (8.3a3).
 
 keypaste fills a login in the browser through its own extension, naming the site when it asks you; a page that just loads asks you nothing, `keypaste approve` asks the same question in its terminal, and every login filled is recorded in Activity (8.3a2).
 
@@ -102,7 +102,7 @@ The app and `keypaste approve` sign the audit log every 64 lines they write and 
 
 On Linux and macOS keypaste turns off core dumps of its own memory as it starts, and the commands `keypaste run` and an agent's `run` start inherit that; `ulimit -S -c` turns them back on for a command; the desktop packages leave out .NET's `createdump`, the app opens no .NET diagnostics port, and secret buffers stay out of swap where the system allows.
 
-keypaste has its own browser extension, a simplified fork of KeePassXC-Browser for Chrome, Chromium, Edge, Brave and Firefox that pairs with keypaste and fills logins, in keypaste's design; it is not in the stores yet (8.1f).
+keypaste has its own browser extension, a simplified fork of KeePassXC-Browser for Chrome, Chromium, Edge, Brave, Firefox and LibreWolf that pairs with keypaste and fills logins, in keypaste's design; it is not in the stores yet (8.1f).
 
 Settings › Browser fill and `keypaste browser` turn keypaste on and off as Chrome's, Chromium's, Edge's, Brave's and Firefox's host for keypaste's own browser extension, and show which program each browser starts and whether the extension is installed in it. keypaste no longer answers KeePassXC-Browser (8.1e).
 

@@ -19,6 +19,9 @@ public enum HostBrowser
 
     /// <summary>Firefox.</summary>
     Firefox,
+
+    /// <summary>LibreWolf, a Firefox fork that takes Firefox's add-ons and reads Firefox's manifest.</summary>
+    LibreWolf,
 }
 
 /// <summary>Where each browser reads the user's manifest for <see cref="HostName"/> and keeps its profiles, under one user's folders.</summary>
@@ -43,8 +46,13 @@ public sealed record HostPlaces(
     /// <summary>The key under <c>HKCU</c> each browser reads.</summary>
     public const string DefaultRegistryRoot = "Software";
 
-    /// <summary>The five, in the order Settings lists them.</summary>
-    public static IReadOnlyList<HostBrowser> Browsers { get; } = [HostBrowser.Chrome, HostBrowser.Chromium, HostBrowser.Edge, HostBrowser.Brave, HostBrowser.Firefox];
+    /// <summary>The six, in the order Settings lists them.</summary>
+    public static IReadOnlyList<HostBrowser> Browsers { get; } = [HostBrowser.Chrome, HostBrowser.Chromium, HostBrowser.Edge, HostBrowser.Brave, HostBrowser.Firefox, HostBrowser.LibreWolf];
+
+    /// <summary>Whether <paramref name="browser"/> runs Firefox's add-on, which its manifest allows by ID rather than by origin.</summary>
+    /// <param name="browser">The browser.</param>
+    /// <returns>True for Firefox and LibreWolf.</returns>
+    public static bool RunsFirefoxAddOn(HostBrowser browser) => browser is HostBrowser.Firefox or HostBrowser.LibreWolf;
 
     /// <summary>The places of the user this process runs as.</summary>
     /// <returns>The places, with the profile's own folders where a variable is unset.</returns>
@@ -83,12 +91,17 @@ public sealed record HostPlaces(
 
     /// <summary>
     /// The browser whose manifest <paramref name="browser"/> reads, else itself: Brave reads Chrome's, the key on Windows, having none
-    /// of its own, and the folder on macOS, as Brave 1.99 was seen to in 8.3a3.
+    /// of its own, and the folder on macOS, as Brave 1.99 was seen to in 8.3a3. LibreWolf reads Firefox's everywhere: Mozilla's
+    /// registry key on Windows, its only one, and Mozilla's folders after its own on macOS and Linux (LibreWolf's mozilla-dirs.patch).
     /// </summary>
     /// <param name="browser">The browser.</param>
     /// <returns>The browser that owns the manifest.</returns>
-    public HostBrowser Slot(HostBrowser browser) =>
-        Platform != McpClientPlatform.Linux && browser == HostBrowser.Brave ? HostBrowser.Chrome : browser;
+    public HostBrowser Slot(HostBrowser browser) => browser switch
+    {
+        HostBrowser.LibreWolf => HostBrowser.Firefox,
+        HostBrowser.Brave when Platform != McpClientPlatform.Linux => HostBrowser.Chrome,
+        _ => browser,
+    };
 
     /// <summary>The browsers that read one manifest with <paramref name="browser"/>.</summary>
     /// <param name="browser">The browser.</param>
@@ -127,7 +140,7 @@ public sealed record HostPlaces(
         _ => $@"{RegistryRoot}\Google\Chrome\NativeMessagingHosts\{HostName}",
     };
 
-    /// <summary>The folder the browser keeps its profiles in: a Chromium-family user data directory, or Firefox's profiles folders.</summary>
+    /// <summary>The folder the browser keeps its profiles in: a Chromium-family user data directory, or Firefox's or LibreWolf's profiles folders.</summary>
     /// <param name="browser">The browser.</param>
     /// <returns>The folders that may hold profiles; none when the platform's folder is unknown.</returns>
     public IReadOnlyList<string> ProfileFolders(HostBrowser browser)
@@ -135,10 +148,13 @@ public sealed record HostPlaces(
         IEnumerable<string?> folders = (Platform, browser) switch
         {
             (McpClientPlatform.Windows, HostBrowser.Firefox) => [Under(AppData, "Mozilla", "Firefox", "Profiles")],
+            (McpClientPlatform.Windows, HostBrowser.LibreWolf) => [Under(AppData, "librewolf", "Profiles")],
             (McpClientPlatform.Windows, _) => [Under(LocalAppData, WindowsFolder(browser), "User Data")],
             (McpClientPlatform.MacOS, HostBrowser.Firefox) => [Under(Home, "Library", "Application Support", "Firefox", "Profiles")],
+            (McpClientPlatform.MacOS, HostBrowser.LibreWolf) => [Under(Home, "Library", "Application Support", "librewolf", "Profiles")],
             (McpClientPlatform.MacOS, _) => [Under(Home, "Library", "Application Support", MacFolder(browser))],
             (_, HostBrowser.Firefox) => [Under(Home, ".mozilla", "firefox"), Under(ConfigHome, "mozilla", "firefox")],
+            (_, HostBrowser.LibreWolf) => [Under(Home, ".librewolf"), Under(ConfigHome, "librewolf", "librewolf")],
             _ => [Under(ConfigHome, LinuxFolder(browser))],
         };
 

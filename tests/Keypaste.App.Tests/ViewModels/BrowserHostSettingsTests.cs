@@ -31,16 +31,19 @@ public sealed partial class BrowserHostSettingsTests : IDisposable
     private static partial Regex Retired();
 
     [Fact]
-    public void Five_browsers_none_installed_go_quiet_and_leave_the_disclosure_closed()
+    public void Six_browsers_none_installed_go_quiet_and_leave_the_disclosure_closed()
     {
         var screen = Screen();
 
         Assert.True(screen.IsAvailable);
-        Assert.Equal(["Chrome", "Chromium", "Edge", "Brave", "Firefox"], screen.Rows.Select(row => row.Name));
+        Assert.Equal(["Chrome", "Chromium", "Edge", "Brave", "Firefox", "LibreWolf"], screen.Rows.Select(row => row.Name));
         Assert.All(screen.Rows, row => Assert.Equal(("Not installed", false, false), (row.Status, row.HasHint, row.OffersSwitch)));
         Assert.All(screen.Rows, row => Assert.Equal($"Turn on for {row.Name}", row.ActionName));
         Assert.False(screen.IsOpen);
-        Assert.Equal(OperatingSystem.IsLinux() ? string.Empty : "Chrome and Brave read one setting, so they turn on and off together.", screen.SharedText);
+        Assert.Equal(
+            (OperatingSystem.IsLinux() ? string.Empty : "Chrome and Brave read one setting, so they turn on and off together. ")
+                + "Firefox and LibreWolf read one setting, so they turn on and off together.",
+            screen.SharedText);
         Assert.False(screen.HasMessage);
     }
 
@@ -56,13 +59,14 @@ public sealed partial class BrowserHostSettingsTests : IDisposable
         Assert.Contains(_browsers.Program.Replace(@"\", @"\\", StringComparison.Ordinal), File.ReadAllText(manifest), StringComparison.Ordinal);
         Assert.Equal((true, _browsers.Program), (Row(screen, HostBrowser.Firefox).SwitchedOn, Row(screen, HostBrowser.Firefox).Program));
         Assert.Equal("Turn off for Firefox", Row(screen, HostBrowser.Firefox).ActionName);
-        Assert.Equal($"Firefox now starts keypaste at {_browsers.Program}.", screen.Message);
+        Assert.Equal($"Firefox now starts keypaste at {_browsers.Program}. LibreWolf reads the same setting, so it is on too.", screen.Message);
+        Assert.True(Row(screen, HostBrowser.LibreWolf).IsOn);
 
         screen.ChangeCommand.Press(Row(screen, HostBrowser.Firefox));
 
         Assert.False(File.Exists(manifest));
         Assert.False(Row(screen, HostBrowser.Firefox).SwitchedOn);
-        Assert.Equal("Firefox no longer starts keypaste.", screen.Message);
+        Assert.Equal("Firefox no longer starts keypaste. LibreWolf reads the same setting, so it is off too.", screen.Message);
     }
 
     [Fact]
@@ -135,6 +139,25 @@ public sealed partial class BrowserHostSettingsTests : IDisposable
         Assert.Equal(("Extension installed", true), (Row(screen, HostBrowser.Brave).Status, Row(screen, HostBrowser.Brave).OffersSwitch));
         Assert.Equal(("Not installed", false), (Row(screen, HostBrowser.Chromium).Status, Row(screen, HostBrowser.Chromium).OffersSwitch));
         Assert.True(screen.IsOpen);
+    }
+
+    [Fact]
+    public void LibreWolf_with_Firefoxs_add_on_and_no_Firefox_offers_its_own_switch_and_turns_on()
+    {
+        var profile = Path.Combine(_browsers.Places.ProfileFolders(HostBrowser.LibreWolf)[0], "zixesjok.default-release");
+        TempBrowserHosts.Made(Path.Combine(profile, "prefs.js"));
+        TempBrowserHosts.Made(Path.Combine(profile, "extensions", BrowserIdentity.FirefoxAddOns.Id + ".xpi"));
+        var screen = Screen();
+
+        Assert.Equal(("Extension installed", true), (Row(screen, HostBrowser.LibreWolf).Status, Row(screen, HostBrowser.LibreWolf).OffersSwitch));
+        Assert.Equal(("Not installed", false), (Row(screen, HostBrowser.Firefox).Status, Row(screen, HostBrowser.Firefox).OffersSwitch));
+        Assert.True(screen.IsOpen);
+
+        screen.ChangeCommand.Press(Row(screen, HostBrowser.LibreWolf));
+
+        Assert.Equal($"LibreWolf now starts keypaste at {_browsers.Program}. Firefox reads the same setting, so it is on too.", screen.Message);
+        Assert.True(Row(screen, HostBrowser.LibreWolf).IsOn);
+        Assert.False(Row(screen, HostBrowser.LibreWolf).NeedsAttention);
     }
 
     [Fact]

@@ -46,7 +46,7 @@ public sealed class BrowserHostsTests : IDisposable
     }
 
     [Fact]
-    public void Each_browser_reads_its_manifest_where_KeePassXC_writes_its_own_but_Brave_on_macOS_reads_Chromes()
+    public void Each_browser_reads_its_manifest_where_KeePassXC_writes_its_own_but_Brave_on_macOS_reads_Chromes_and_LibreWolf_Firefoxs()
     {
         string[] expected = McpClientMachine.CurrentPlatform switch
         {
@@ -57,6 +57,7 @@ public sealed class BrowserHostsTests : IDisposable
                 @"local\keypaste\NativeMessagingHosts\com.keypaste.browser_edge.json",
                 @"local\keypaste\NativeMessagingHosts\com.keypaste.browser_chrome.json",
                 @"local\keypaste\NativeMessagingHosts\com.keypaste.browser_firefox.json",
+                @"local\keypaste\NativeMessagingHosts\com.keypaste.browser_firefox.json",
             ],
             McpClientPlatform.MacOS =>
             [
@@ -65,6 +66,7 @@ public sealed class BrowserHostsTests : IDisposable
                 "home/Library/Application Support/Microsoft Edge/NativeMessagingHosts/com.keypaste.browser.json",
                 "home/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.keypaste.browser.json",
                 "home/Library/Application Support/Mozilla/NativeMessagingHosts/com.keypaste.browser.json",
+                "home/Library/Application Support/Mozilla/NativeMessagingHosts/com.keypaste.browser.json",
             ],
             _ =>
             [
@@ -72,6 +74,7 @@ public sealed class BrowserHostsTests : IDisposable
                 "config/chromium/NativeMessagingHosts/com.keypaste.browser.json",
                 "config/microsoft-edge/NativeMessagingHosts/com.keypaste.browser.json",
                 "config/BraveSoftware/Brave-Browser/NativeMessagingHosts/com.keypaste.browser.json",
+                "home/.mozilla/native-messaging-hosts/com.keypaste.browser.json",
                 "home/.mozilla/native-messaging-hosts/com.keypaste.browser.json",
             ],
         };
@@ -86,6 +89,7 @@ public sealed class BrowserHostsTests : IDisposable
                     $@"{_registryRoot}\Chromium\NativeMessagingHosts\com.keypaste.browser",
                     $@"{_registryRoot}\Microsoft\Edge\NativeMessagingHosts\com.keypaste.browser",
                     $@"{_registryRoot}\Google\Chrome\NativeMessagingHosts\com.keypaste.browser",
+                    $@"{_registryRoot}\Mozilla\NativeMessagingHosts\com.keypaste.browser",
                     $@"{_registryRoot}\Mozilla\NativeMessagingHosts\com.keypaste.browser",
                 ],
                 HostPlaces.Browsers.Select(_places.RegistryKey));
@@ -117,10 +121,11 @@ public sealed class BrowserHostsTests : IDisposable
             var manifest = JsonDocument.Parse(File.ReadAllBytes(_places.ManifestFile(browser)!)).RootElement;
             Assert.Equal(("com.keypaste.browser", _program, "stdio"), (manifest.GetProperty("name").GetString(), manifest.GetProperty("path").GetString(), manifest.GetProperty("type").GetString()));
 
-            string[] allowed = browser == HostBrowser.Firefox
+            var firefoxAddOn = HostPlaces.RunsFirefoxAddOn(browser);
+            string[] allowed = firefoxAddOn
                 ? [.. manifest.GetProperty("allowed_extensions").EnumerateArray().Select(id => id.GetString()!)]
                 : [.. manifest.GetProperty("allowed_origins").EnumerateArray().Select(id => id.GetString()!)];
-            Assert.Equal(browser == HostBrowser.Firefox ? [BrowserIdentity.FirefoxAddOns.Caller] : [BrowserIdentity.ChromeWebStore.Caller, BrowserIdentity.EdgeAddOns.Caller], allowed);
+            Assert.Equal(firefoxAddOn ? [BrowserIdentity.FirefoxAddOns.Caller] : [BrowserIdentity.ChromeWebStore.Caller, BrowserIdentity.EdgeAddOns.Caller], allowed);
 
             if (OperatingSystem.IsWindows())
             {
@@ -249,6 +254,50 @@ public sealed class BrowserHostsTests : IDisposable
         File.WriteAllText(Path.Combine(firefox, "extensions", BrowserIdentity.FirefoxAddOns.Id + ".xpi"), string.Empty);
         Assert.Equal(ExtensionState.Installed, hosts.Read(HostBrowser.Firefox).Extension);
     }
+
+    [Fact]
+    public void LibreWolf_reads_Firefoxs_manifest_so_the_two_turn_on_and_off_together_and_allow_Firefoxs_add_on()
+    {
+        var hosts = Hosts();
+        Assert.Equal([HostBrowser.LibreWolf], hosts.Read(HostBrowser.Firefox).SharesWith);
+        Assert.Equal([HostBrowser.Firefox], hosts.Read(HostBrowser.LibreWolf).SharesWith);
+
+        Assert.Equal(HostOutcome.On, hosts.TurnOn(HostBrowser.LibreWolf).Outcome);
+
+        Assert.Equal(HostState.Keypaste, hosts.Read(HostBrowser.Firefox).State);
+        using var manifest = JsonDocument.Parse(File.ReadAllBytes(ManifestRead(HostBrowser.LibreWolf)));
+        Assert.Equal(BrowserIdentity.FirefoxAddOns.Caller, manifest.RootElement.GetProperty("allowed_extensions").EnumerateArray().Single().GetString());
+        Assert.Equal(HostOutcome.Off, hosts.TurnOff(HostBrowser.Firefox).Outcome);
+        Assert.Equal(HostState.NotSetUp, hosts.Read(HostBrowser.LibreWolf).State);
+    }
+
+    [Fact]
+    public void LibreWolfs_add_on_is_found_in_LibreWolfs_own_profiles_where_LibreWolf_keeps_them()
+    {
+        string[] expected = McpClientMachine.CurrentPlatform switch
+        {
+            McpClientPlatform.Windows => [@"roaming\librewolf\Profiles"],
+            McpClientPlatform.MacOS => ["home/Library/Application Support/librewolf/Profiles"],
+            _ => ["home/.librewolf", "config/librewolf/librewolf"],
+        };
+        Assert.Equal(expected.Select(path => Path.Combine(_root, path)), _places.ProfileFolders(HostBrowser.LibreWolf));
+
+        var hosts = Hosts();
+        var profile = Path.Combine(_places.ProfileFolders(HostBrowser.LibreWolf)[^1], "zixesjok.default-release");
+        Directory.CreateDirectory(Path.Combine(profile, "extensions"));
+        File.WriteAllText(Path.Combine(profile, "prefs.js"), string.Empty);
+        Assert.Equal(ExtensionState.NotFound, hosts.Read(HostBrowser.LibreWolf).Extension);
+        Assert.Equal(ExtensionState.BrowserNotFound, hosts.Read(HostBrowser.Firefox).Extension);
+
+        File.WriteAllText(Path.Combine(profile, "extensions", BrowserIdentity.FirefoxAddOns.Id + ".xpi"), string.Empty);
+        Assert.Equal(ExtensionState.Installed, hosts.Read(HostBrowser.LibreWolf).Extension);
+    }
+
+    // The manifest file a browser reads: named by the key on Windows, else where keypaste writes it.
+    private string ManifestRead(HostBrowser browser) =>
+        OperatingSystem.IsWindows()
+            ? (string)Registry.CurrentUser.OpenSubKey(_places.RegistryKey(browser))!.GetValue(null)!
+            : _places.ManifestFile(browser)!;
 
     private static (HostState, string?) Status(BrowserHosts hosts, HostBrowser browser) => hosts.Read(browser) is var status ? (status.State, status.Program) : default;
 
