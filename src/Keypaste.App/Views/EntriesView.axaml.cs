@@ -177,6 +177,16 @@ internal sealed partial class EntriesView : UserControl
     }
 
     /// <summary>A field's ⋯ asks for that row's menu as the menu key does.</summary>
+    // Notes often hold secrets, so a copied selection goes through the clipboard that clears itself, as Copy password does.
+    private void OnNotesCopying(object? sender, RoutedEventArgs e)
+    {
+        if (sender is SelectableTextBlock { SelectedText: { Length: > 0 } selection, DataContext: EntryDetailViewModel detail })
+        {
+            e.Handled = true;
+            _ = detail.CopyNotesSelectionAsync(selection);
+        }
+    }
+
     private void OnClick(object? sender, RoutedEventArgs e)
     {
         if (e.Source is Button { Name: "FieldMenu" } fieldMenu)

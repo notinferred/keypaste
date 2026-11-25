@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## Unreleased
 
+New's menu in the sidebar shows its choices again; it had opened empty. An item's notes can be selected, and copying a selection clears it from the clipboard after the countdown, as Copy password does. The Agents screen's list starts level with Items' instead of lower.
+
 The app's title band is thinner, New spans the sidebar, the item list shows its count beside its title with the search under it, and a new sidebar place, Other, lists identities, SSH keys and Wi-Fi networks.
 
 With several vaults open, an agent asking for a locked one, one of several or one you locked alone while another stays open, now brings up keypaste's notice, and the agent hears that the app is open and the vault is locked instead of being told to run `keypaste approve`. Sharing an item from a second open vault shares that vault's item, where before it said the item was missing, or shared the other vault's value when both held a copy, and the Share dialog closes when its vault locks, taking the item and the passphrase you typed with it. Settings › Share links and Settings › Scoped tokens show and create links and tokens in the vault Settings shows, not always in the first vault you opened. The run command a project offers to copy names its vault with `--vault`, so the run asks the vault the project belongs to; when the vault's file path holds characters a terminal could run or change, the project shows no command to copy and says why.

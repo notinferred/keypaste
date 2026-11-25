@@ -1371,6 +1371,10 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         }
     }
 
+    /// <summary>Copies the part of the notes the person selected, cleared after the countdown as a copied password is.</summary>
+    /// <param name="selection">The selected text.</param>
+    internal Task CopyNotesSelectionAsync(string selection) => _clipboard.CopyAsync(selection, "Notes");
+
     private async Task CopyUsernameAsync() =>
         await CopyFilledAsync(Username, "The username", "Username").ConfigureAwait(true);
 

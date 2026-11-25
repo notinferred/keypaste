@@ -770,7 +770,7 @@
                     </Border.IsVisible>
                     <ctl:GroupedRows>
                     <ctl:FieldRow Classes="top-label" Label="{x:Static res:Strings.Notes}">
-                      <TextBlock Text="{Binding DisplayNotes}" TextWrapping="Wrap" LineHeight="19.5" Classes="secondary size-13" />
+                      <SelectableTextBlock Name="NotesText" Text="{Binding DisplayNotes}" TextWrapping="Wrap" LineHeight="19.5" Classes="secondary size-13" CopyingToClipboard="OnNotesCopying" />
                     </ctl:FieldRow>
                   </ctl:GroupedRows>
                   </Border>

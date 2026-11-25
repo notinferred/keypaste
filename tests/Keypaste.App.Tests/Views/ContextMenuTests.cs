@@ -8,6 +8,7 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
 using Keypaste.App.Navigation;
+using Keypaste.App.Resources;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.Tests.ViewModels;
@@ -267,6 +268,25 @@ public sealed class ContextMenuTests
         Assert.False(Item(open, "Open project").IsEffectivelyEnabled);
     });
 
+    /// <summary>With nothing to warn about, the agents list starts where the items list does, with no empty notice band above it.</summary>
+    [Fact]
+    public Task The_agents_list_starts_where_the_items_list_does() => HeadlessSession.On(async () =>
+    {
+        await using var agents = await AgentsInShell.StartAsync();
+        Assert.False(agents.Model.IsUnavailable || agents.Model.HasAuditRefusal || agents.Model.HasClientsProblem || agents.Model.HasWaiting);
+        var agentsTop = TopOf(agents.Window, agents.Window.GetVisualDescendants().OfType<TextBlock>()
+            .Single(title => title.Classes.Contains("list-title") && title.Text == Strings.Agents && title.IsEffectivelyVisible));
+
+        agents.Shell.Current = Destinations.Of(DestinationKind.Entries);
+        WindowInput.Drain();
+        agents.Window.UpdateLayout();
+        var itemsTop = TopOf(agents.Window, agents.Window.GetVisualDescendants().OfType<TextBlock>().Single(title => title.Name == "ListTitle"));
+
+        Assert.Equal(itemsTop, agentsTop, 0.5);
+    });
+
+    private static double TopOf(Window window, Control control) => control.TranslatePoint(default, window)!.Value.Y;
+
     /// <summary>An agent's menu opens its settings, and the menu bar's agent commands act on the agent the keyboard is in.</summary>
     [Fact]
     public Task An_agents_menu_opens_its_settings_and_the_menu_bar_reaches_the_focused_agent() => HeadlessSession.On(async () =>
@@ -408,6 +428,8 @@ public sealed class ContextMenuTests
         }
 
         internal Window Window { get; }
+
+        internal ShellViewModel Shell => _shell;
 
         internal AppCommands Commands { get; }
 

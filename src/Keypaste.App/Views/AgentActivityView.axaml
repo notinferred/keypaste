@@ -12,7 +12,16 @@
   <Grid RowDefinitions="Auto,*">
 
     <!-- What concerns every agent, above the list and the detail, and no wider than both: refusals, and a request waiting for the person. -->
+    <!-- Shown only with a notice, so its margin leaves no gap above the list when there is none. -->
     <Grid Grid.Row="0" Margin="24,16,24,0">
+      <Grid.IsVisible>
+        <MultiBinding Converter="{x:Static BoolConverters.Or}">
+          <Binding Path="IsUnavailable" />
+          <Binding Path="HasAuditRefusal" />
+          <Binding Path="HasClientsProblem" />
+          <Binding Path="HasWaiting" />
+        </MultiBinding>
+      </Grid.IsVisible>
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" MaxWidth="1018" />
       </Grid.ColumnDefinitions>

@@ -7,7 +7,7 @@ using Keypaste.App.ViewModels;
 
 namespace Keypaste.App.Views;
 
-/// <summary>New's menu, made as it opens: the vault it adds to, the common templates and the way to every template.</summary>
+/// <summary>New's menu: the vault it adds to, the common templates and the way to every template, pointed at the shell as it opens.</summary>
 internal static class NewItemMenu
 {
     public static readonly AttachedProperty<bool> OffersTemplatesProperty =
@@ -18,7 +18,8 @@ internal static class NewItemMenu
         {
             if (change.NewValue is true)
             {
-                menu.Opening += (_, _) => Fill(menu);
+                Build(menu);
+                menu.Opening += (_, _) => Point(menu);
             }
         });
 
@@ -26,16 +27,11 @@ internal static class NewItemMenu
 
     public static void SetOffersTemplates(MenuFlyout menu, bool value) => menu.SetValue(OffersTemplatesProperty, value);
 
-    private static void Fill(MenuFlyout menu)
+    // Made before the menu first opens, as the app's other menus are: rows added while a flyout opens are never drawn.
+    private static void Build(MenuFlyout menu)
     {
         menu.Items.Clear();
-
-        if (menu.Target?.DataContext is not ShellViewModel shell)
-        {
-            return;
-        }
-
-        menu.Items.Add(new MenuItem { Header = shell.NewItemHeading, IsEnabled = false });
+        menu.Items.Add(new MenuItem { Name = "NewItemHeading", IsEnabled = false });
 
         foreach (var kind in TemplateChoice.Common)
         {
@@ -43,7 +39,6 @@ internal static class NewItemMenu
             {
                 Header = kind.MenuLabel,
                 Icon = new KpIcon { Icon = kind.Icon, Size = 14 },
-                Command = shell.NewItemOfKindCommand,
                 CommandParameter = kind.Template,
             };
             AutomationProperties.SetName(item, kind.Label);
@@ -56,7 +51,31 @@ internal static class NewItemMenu
             Name = "MoreTemplates",
             Header = Strings.MoreTemplatesLabel,
             Icon = new KpIcon { Icon = "ellipsis", Size = 14 },
-            Command = shell.NewItemCommand,
         });
+    }
+
+    /// <summary>Points the rows at the shell the menu opens over: its vault's heading and its commands.</summary>
+    private static void Point(MenuFlyout menu)
+    {
+        if (menu.Target?.DataContext is not ShellViewModel shell)
+        {
+            return;
+        }
+
+        foreach (var item in menu.Items.OfType<MenuItem>())
+        {
+            switch (item.Name)
+            {
+                case "NewItemHeading":
+                    item.Header = shell.NewItemHeading;
+                    break;
+                case "MoreTemplates":
+                    item.Command = shell.NewItemCommand;
+                    break;
+                default:
+                    item.Command = shell.NewItemOfKindCommand;
+                    break;
+            }
+        }
     }
 }

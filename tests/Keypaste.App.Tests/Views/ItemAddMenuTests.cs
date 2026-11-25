@@ -22,6 +22,7 @@ public sealed class ItemAddMenuTests
         Assert.Equal($"New in {items.VaultTitle}", rows[0].Header);
         Assert.False(rows[0].IsEnabled);
         Assert.Equal(TemplateChoice.Common.Select(kind => kind.MenuLabel).Append(Strings.MoreTemplatesLabel), rows.Skip(1).Select(row => row.Header));
+        Assert.Equal(rows.Select(row => row.Header), Menus.Rows(menu).Select(row => row.Header));
 
         Menus.Choose(menu, Menus.Item(menu, "MoreTemplates"));
 
