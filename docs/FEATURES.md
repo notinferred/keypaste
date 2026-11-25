@@ -84,7 +84,7 @@ Every row is 1.0.0. [The desktop guide](desktop.md) describes the app. Screens a
 | Import from KeePass and other managers, with an editable plan | Not observed in an installed app |
 | System notifications while in the background | No person has seen one ([T-51]) |
 | Drag and drop, and Open With for `.kdbx` | Never run for real |
-| Crash reports, off unless chosen | The terms are a draft |
+| Crash reports, off unless chosen | The service that receives them is not switched on yet |
 
 ## Browser extension
 

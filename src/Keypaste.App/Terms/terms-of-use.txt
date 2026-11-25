@@ -1,12 +1,8 @@
 // The terms of use the first-launch screen agrees to and links, the one copy of them. A line starting // is not shown, a line
 // starting ## is a heading, and every other line is a paragraph. The version is the date on the second shown line, and a
 // new date shows that screen once more and stops crash reports until it is agreed to, unless they are switched off.
-// DRAFT: not legal advice and not reviewed. Counsel approves it before 1.0.0, deciding:
-// whether disclaimers and the liability cap need capital letters to be conspicuous under Florida law; whether to add
-// arbitration and a class-action waiver; whether agreeing before the app opens sits with AGPL-3.0 §10; and whether an LLC
-// should replace the individual as the party.
 keypaste terms of use
-Draft version 2026-11-19
+Version 2026-11-19
 ## Who we are and what these terms cover
 keypaste is a password manager for KeePass files. Dan I Ochoa Barrios, an individual doing business as keypaste ("keypaste", "we", "us"), publishes it. These terms are an agreement between you and us. They cover your use of the keypaste app, its command line, MCP bridge and browser extension, the services we run at api.keypaste.com and share.keypaste.com (share links and crash reports), and the website keypaste.com. By continuing past the app's first screen or by using our services, you agree to these terms. If you don't agree, don't use them.
 ## The software and its licence
