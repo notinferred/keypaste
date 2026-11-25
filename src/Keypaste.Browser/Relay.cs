@@ -368,7 +368,7 @@ internal sealed class Relay : IAsyncDisposable
         }
     }
 
-    /// <summary>Asks for the one login the person picked, which keypaste fills at once on a site it filled it on before and otherwise asks about.</summary>
+    /// <summary>Asks for the one login the person picked, which keypaste fills at once.</summary>
     private async Task<byte[]> GetLoginAsync(Dictionary<string, string> inner, byte[] replyNonce, bool knock, CancellationToken stop)
     {
         if (inner.GetValueOrDefault("uuid") is not { } uuid || !IsPairing(uuid))

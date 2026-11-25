@@ -350,36 +350,6 @@ internal sealed class SessionHost : IDisposable
         return browsers?.Remove(id) ?? new PairingRemoval(false, _notAnswering);
     }
 
-    /// <summary>The logins the pairings the unlocked vault holds filled on a site before; none while nothing here answers browsers.</summary>
-    internal IReadOnlyList<AllowanceRow> Allowances()
-    {
-        SessionBrowsers? browsers;
-
-        lock (_gate)
-        {
-            browsers = _hosted?.Browsers;
-        }
-
-        return browsers?.Allowances() ?? [];
-    }
-
-    /// <summary>Forgets, for the person, that a login was filled on a site before, so its next fill there is asked.</summary>
-    /// <param name="allowance">The allowance.</param>
-    /// <param name="problem">Why it was not removed, or empty.</param>
-    /// <returns>Whether it was removed.</returns>
-    internal bool Unallow(Core.Agents.BrowserAllowance allowance, out string problem)
-    {
-        SessionBrowsers? browsers;
-
-        lock (_gate)
-        {
-            browsers = _hosted?.Browsers;
-        }
-
-        problem = _notAnswering;
-        return browsers?.Unallow(allowance, out problem) ?? false;
-    }
-
     /// <summary>Issues the pass a Run confirmed in the app hands the <c>keypaste run --session</c> Terminal starts on macOS.</summary>
     /// <param name="claim">The request the confirmation named, and the set it showed.</param>
     /// <param name="lifetimeId">The session the confirmation was answered in.</param>

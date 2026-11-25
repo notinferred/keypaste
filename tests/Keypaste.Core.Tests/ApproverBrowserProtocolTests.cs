@@ -108,7 +108,7 @@ public sealed class ApproverBrowserProtocolTests
             Site = "github.com",
             Names = [new BrowserLoginName("0123456789abcdef0123456789abcdef", "GitHub", "ada") { Vault = "Personal" }],
             LockedVaults = ["Acme"],
-            Warning = "This page's connection is not secure. keypaste asks before each fill.",
+            Warning = "This page's connection is not secure.",
         };
 
         Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(list), out BrowserListReply? decoded));

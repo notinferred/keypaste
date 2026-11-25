@@ -67,8 +67,7 @@ public enum BrowserAct
     /// <summary>A login filled in a page, or a matched item refused one.</summary>
     Fill = 3,
 
-    /// <summary>The person's removal of a login's "filled on this site before", so its next fill there is asked.</summary>
-    Unallow = 4,
+    // 4 was the person's removal of a login's "filled on this site before"; its lines still read as "unallow".
 
     /// <summary>A page's list of its logins by name, which releases nothing that fills.</summary>
     List = 5,
@@ -615,7 +614,6 @@ public static class RequestRecords
                     BrowserAct.Check => "check",
                     BrowserAct.Remove => "remove",
                     BrowserAct.Fill => "fill",
-                    BrowserAct.Unallow => "unallow",
                     BrowserAct.List => "list",
                     _ => "pair",
                 },

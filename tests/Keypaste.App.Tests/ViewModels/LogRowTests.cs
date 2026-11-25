@@ -58,6 +58,17 @@ public sealed class LogRowTests
         Assert.Equal(LogTone.Ok, row.Tone);
     }
 
+    /// <summary>A login filled at the person's pick in a page says so; an old line asking again before a fill still reads.</summary>
+    [Fact]
+    public void A_browser_fill_picked_in_the_page_says_so_and_an_old_unallow_line_still_reads()
+    {
+        var picked = Row(Entry("browser", "granted", "picked") with { Field = "fill", Entry = "web/GitHub" });
+        var unallow = Row(Entry("browser", "granted", "removed") with { Field = "unallow" });
+
+        Assert.Equal(("Filled a login", "You picked it in the page", LogTone.Ok), (picked.Action, picked.Result, picked.Tone));
+        Assert.Equal("Asks again before filling", unallow.Action);
+    }
+
     [Fact]
     public void A_refusal_is_denied_in_danger()
     {

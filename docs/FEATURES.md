@@ -92,7 +92,7 @@ Every row is 1.0.0. [The desktop guide](desktop.md) describes the app. Screens a
 
 | Capability | Note |
 |---|---|
-| Browser fill: pair keypaste's extension once per browser, then fill a site's logins from every open vault | Tested in Chrome, Edge, Brave, Firefox and LibreWolf under test IDs; not in any store (8.1g) ([T-48], [T-61]) |
+| Browser fill: pair keypaste's extension once per browser, then fill a site's logins from every open vault | Tested in Chrome, Edge, Brave, Firefox and LibreWolf under test IDs; not in any store (8.1g) ([T-48]) |
 
 ## KeePassXC compatibility
 
@@ -143,4 +143,3 @@ These tests run against source; `v0.3.0` passed its own release's gate. This is 
 [T-48]: ../THREATS.md#t-48--the-browser-relay-holds-released-passwords-in-plaintext-and-anything-can-start-it-or-ask-to-pair
 [T-51]: ../THREATS.md#t-51--a-notification-is-read-by-more-than-the-person
 [T-54]: ../THREATS.md#t-54--an-agent-asks-the-person-to-save-a-value
-[T-61]: ../THREATS.md#t-61--a-login-filled-on-a-site-before-fills-there-at-once

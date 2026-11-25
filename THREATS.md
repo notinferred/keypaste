@@ -19,7 +19,7 @@ Out of scope: same-user attackers reading unlocked memory, audit records and key
 - **Agent settings**: this computer's rules for each vault, in `~/.keypaste/agents/<vault>.toml`. For each category of value (password, custom field, project variable, card value, identity value, one-time code, notes, attachment) they say Ask, Allow or Block, for every agent and per agent, and whether each agent may run commands. `v0.3.0` uses a user-written `policy.toml` instead.
 - **Unasked release**: a value released under an Allow, with no prompt.
 - **Same-user process**: any program running as the person's own account.
-- **Threat IDs** are permanent and grouped below by surface. T-45, T-46 and T-47 are retired.
+- **Threat IDs** are permanent and grouped below by surface. T-45, T-46, T-47 and T-61 are retired.
 - **Status**: `v0.3.0` means the published CLI and bridge have the mitigation. *Unreleased* means only the source build headed for 1.0.0 has it, which includes all of the desktop app. [RELEASE](docs/RELEASE.md) defines the states.
 
 ## Assets
@@ -31,9 +31,9 @@ Out of scope: same-user attackers reading unlocked memory, audit records and key
 | Item titles, sites and how items connect | T-1, T-4, T-24, T-55 |
 | The person's decision at a prompt | T-2, T-11, T-41, T-56 |
 | The audit log as evidence | T-5, T-6, T-16, T-53 |
-| Agent settings and remembered browser fills | T-3, T-15, T-36, T-41, T-61 |
+| Agent settings | T-3, T-15, T-36, T-41 |
 | The vault's contents and its newest state | T-26, T-29, T-43, T-54, T-57 |
-| Logins released to a browser, and browser pairings | T-48 to T-50, T-58 to T-61 |
+| Logins released to a browser, and browser pairings | T-48 to T-50, T-58 to T-60 |
 | Scoped tokens, share links and launch passes | T-32 to T-34, T-42 |
 | That a download is its tagged source | T-9, T-21 |
 
@@ -213,7 +213,7 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 ### T-15 — Agent rules are a file any program of the person's can write
 
-**Threat.** A same-user program writes a vault's file in `~/.keypaste/agents/`, or a synced or edited vault carries agent records, to change the agent settings or the remembered browser fills (T-61).
+**Threat.** A same-user program writes a vault's file in `~/.keypaste/agents/`, or a synced or edited vault carries agent records, to change the agent settings.
 
 **Mitigation.** The approver follows the file only while its seal holds: an HMAC under a key the vault keeps, which an older or copied file fails. Anything unsealed reads as the defaults (every category Ask, run off) and the app says so; an unreadable file refuses every request. Agent records inside a vault are ignored.
 
@@ -287,7 +287,7 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Threat.** A line or agent-facing text presents an unasked release as a person's approval.
 
-**Mitigation.** Each authority has its own method in the log: `prompt` for a person's answer, `allowed` for an Allow, `blocked` for a Block and `rules-changed` for a settings change. Agent-facing text uses the same words.
+**Mitigation.** Each authority has its own method in the log: `prompt` for a person's answer, `picked` for a login filled at the person's pick in the page, `allowed` for an Allow, `blocked` for a Block and `rules-changed` for a settings change. Agent-facing text uses the same words.
 
 **Limit.** Editing the vocabulary later breaks the chain unless the attacker repairs it too (T-5).
 
@@ -632,7 +632,7 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Threat.** Whoever reads the pairing key from the browser profile and can reach the approver's pipe uses the pairing, or a same-user program edits `~/.keypaste/browsers.json` to add or revive one.
 
-**Mitigation.** `browsers.json` holds each key's hash, never the key, and a pairing counts only while an unlocked vault vouches for it with an HMAC. Settings lists pairings with their last use, and Remove ends one. A pairing alone lists names; a login fills unasked only where that pairing filled it on that exact origin before (T-59, T-61).
+**Mitigation.** `browsers.json` holds each key's hash, never the key, and a pairing counts only while an unlocked vault vouches for it with an HMAC. Settings lists pairings with their last use, and Remove ends one. A pairing alone lists names; a login fills only on a pick the extension reports (T-59).
 
 **Limit.** A same-user process can read the profile's key and use it, since KeePassXC's protocol has only that key as proof. The seal authenticates the process holding a vault, not the person.
 
@@ -642,9 +642,9 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Threat.** A page made to look like the item's site gets its login filled: a lookalike domain, another tenant of a shared host, a hostile subdomain, plain `http`, or a form posting elsewhere.
 
-**Mitigation.** The extension takes the address from the browser's tab and refuses login forms in cross-origin frames. An item matches only its own host or subdomains within one registrable domain, on the same scheme and port. The first fill on each origin is asked, and `http` pages, single-label hosts and forms posting to another site are always asked, with a warning.
+**Mitigation.** The extension takes the address from the browser's tab and refuses login forms in cross-origin frames. An item matches only its own host or subdomains within one registrable domain, on the same scheme and port. On `http` pages, single-label hosts and forms posting to another site, keypaste's list warns before the pick.
 
-**Limit.** A person can fill a lookalike they misread. Whoever controls a subdomain of the item's site gets its login if the person allows the first fill there, and anyone on the network can answer for an `http` page.
+**Limit.** A person can fill a lookalike they misread. Whoever controls a subdomain of the item's site gets its login when the person picks it there, and anyone on the network can answer for an `http` page.
 
 **Status.** Unreleased.
 
@@ -652,9 +652,9 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Threat.** A page tricks the person into a click on keypaste's list, by clickjacking as Marek Tóth showed at DEF CON 33 in 2025, or a process holding a pairing's key names any page and claims the person picked.
 
-**Mitigation.** Only a trusted click on keypaste's key icon lists logins, in a list the page can neither read nor restyle. A pick counts only on a list that has been visible, topmost and unobscured for half a second. A pick fills at once only where it filled before (T-61), and otherwise once the person allows it.
+**Mitigation.** Only a trusted click on keypaste's key icon lists logins, in a list the page can neither read nor restyle. A pick counts only on a list that has been visible, topmost and unobscured for half a second. The pick is the person's answer, and the fill is logged with the page's origin as `picked`.
 
-**Limit.** keypaste sees only the extension's word, not the page or the click. A process holding a pairing's key lists any site's login names and receives unasked every login that pairing filled before.
+**Limit.** keypaste sees only the extension's word, not the page or the click. A process holding a pairing's key lists any site's login names and receives any of them by claiming a pick.
 
 **Status.** Unreleased.
 
@@ -667,16 +667,6 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 **Limit.** Once released, the extension and the page hold the password, and an update could send it anywhere. keypaste cannot verify the code the browser runs.
 
 **Status.** Unreleased; the extension is not yet in a store.
-
-### T-61 — A login filled on a site before fills there at once
-
-**Threat.** A same-user process holding a pairing's key, or one writing a vault's sealed settings, aims at the logins that fill without asking.
-
-**Mitigation.** After the person allows a first fill, that login, pairing and exact origin are kept in the vault's sealed settings on this computer (T-15). It applies only to that pairing and while the item still matches the page, and Settings › Browser fill lists and forgets them.
-
-**Limit.** Whoever holds the pairing's key gets those logins on those origins unasked (T-50, T-59). A domain that changes hands keeps what was filled on it.
-
-**Status.** Unreleased.
 
 ## Known limits
 

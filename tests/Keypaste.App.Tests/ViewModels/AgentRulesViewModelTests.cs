@@ -159,7 +159,7 @@ public sealed class AgentRulesViewModelTests : IDisposable
         using var model = new AgentRulesViewModel(_authority);
 
         Assert.True(model.IsIgnored);
-        Assert.StartsWith("Agent rules and browser fill allowances were changed outside keypaste", model.Ignored, StringComparison.Ordinal);
+        Assert.StartsWith("Agent rules were changed outside keypaste", model.Ignored, StringComparison.Ordinal);
         Assert.True(Choice(model, FieldCategory.Password, CategoryRule.Ask).IsChosen);
     }
 

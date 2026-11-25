@@ -351,18 +351,6 @@ internal sealed class FakeChannel : IApprovalChannel
         return ValueTask.FromResult(AnswerPairing(prompt));
     }
 
-    /// <summary>How a fill prompt is answered; a no unless a test says otherwise.</summary>
-    internal Func<FillPrompt, CancellationToken, ValueTask<ApprovalAnswer>> AnswerFill { get; set; } = (_, _) => ValueTask.FromResult(ApprovalAnswer.Denied);
-
-    /// <summary>Every fill prompt shown, in order.</summary>
-    internal List<FillPrompt> FillPrompts { get; } = [];
-
-    public ValueTask<ApprovalAnswer> AskAsync(FillPrompt prompt, CancellationToken cancellationToken)
-    {
-        FillPrompts.Add(prompt);
-        return AnswerFill(prompt, cancellationToken);
-    }
-
     private async ValueTask<ApprovalAnswer> AnswerAsync(CancellationToken cancellationToken)
     {
         Asked++;

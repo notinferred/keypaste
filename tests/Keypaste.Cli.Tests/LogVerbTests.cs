@@ -234,6 +234,25 @@ public sealed class LogVerbTests : IDisposable
         Assert.Contains("31mred", _cli.Out, StringComparison.Ordinal);
     }
 
+    /// <summary>A browser fill the person picked in the page lists as <c>picked</c>, beside a line an earlier keypaste wrote, and both verify.</summary>
+    [Fact]
+    public void A_picked_fill_and_an_earlier_unallow_line_list_and_verify()
+    {
+        var browser = Keypaste.Core.Browser.BrowserIdentity.ChromeWebStore;
+        var removal = RequestRecords.Browser(browser, "laptop", BrowserAct.Remove, AuditDecision.Granted, AuditMethod.Removed, "the person asked to be asked again before filling an item on https://github.com:443", "session-one", null);
+        Write(
+            new DateTimeOffset(2026, 7, 26, 14, 0, 0, TimeSpan.Zero),
+            removal with { Args = removal.Args with { Field = "unallow" } },
+            RequestRecords.BrowserFill(browser, "laptop", new EntryName("web", "GitHub"), "https://github.com:443", AuditDecision.Granted, AuditMethod.Picked, "the person picked it in the page's list", "session-one", null));
+
+        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("log"));
+        Assert.Contains("picked", _cli.Out, StringComparison.Ordinal);
+        Assert.Contains("removed", _cli.Out, StringComparison.Ordinal);
+
+        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("log", "verify"));
+        Assert.Contains("2 records verified", _cli.Out, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void VerifyOnAnUntouchedLog_Succeeds()
     {

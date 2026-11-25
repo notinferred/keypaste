@@ -1,4 +1,5 @@
 using Keypaste.Core.Approval;
+using Keypaste.Core.Browser;
 
 namespace Keypaste.App.ViewModels;
 
@@ -14,7 +15,7 @@ internal sealed class PairingViewModel : PromptViewModel
     private string _name;
 
     internal PairingViewModel(PairingPrompt prompt)
-        : base(FillViewModel.Extension(prompt?.Identity))
+        : base(Extension(prompt?.Identity))
     {
         ArgumentNullException.ThrowIfNull(prompt);
 
@@ -54,7 +55,12 @@ internal sealed class PairingViewModel : PromptViewModel
     }
 
     /// <inheritdoc/>
-    internal override string VerificationExplained => FillViewModel.Explained(_prompt.Identity);
+    internal override string VerificationExplained =>
+        $"keypaste can't check that {_prompt.Identity.Browser} is asking: any program on this computer can name keypaste's extension.";
+
+    /// <summary>Who the requester line says is asking: the browser and keypaste's extension, which keypaste cannot check.</summary>
+    private static RequesterIdentity? Extension(BrowserIdentity? identity) =>
+        identity is null ? null : new(identity.Browser, "keypaste extension", false);
 
     /// <inheritdoc/>
     internal override bool AnswersReturn => false;

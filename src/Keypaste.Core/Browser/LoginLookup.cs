@@ -35,12 +35,6 @@ public sealed class LoginLookup
     /// <summary>Where the page's form posts when that is another registrable domain, which the person is told; otherwise null.</summary>
     public WebOrigin? OtherSiteForm { get; }
 
-    /// <summary>
-    /// Whether a fill here is asked about every time and never remembered: the page is <c>http</c>, its host is a single label
-    /// anyone on the network can answer to, or its form posts to another registrable domain.
-    /// </summary>
-    public bool AsksEveryTime => Page.Scheme == Uri.UriSchemeHttp || Page.IsSingleLabel || OtherSiteForm is not null;
-
     /// <summary>Reads the extension's request.</summary>
     /// <param name="url">The page's URL, which a browser writes with its host in A-labels.</param>
     /// <param name="submitUrl">Where the page's form posts, or null or empty when it names nowhere else.</param>

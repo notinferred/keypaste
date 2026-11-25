@@ -95,7 +95,7 @@ public sealed record BrowserListReply(BrowserOutcome Outcome, string Reason)
     /// <summary>The names of the vaults open here and locked, whose logins are not listed.</summary>
     public IReadOnlyList<string> LockedVaults { get; init; } = [];
 
-    /// <summary>Why a fill here is asked in keypaste every time, in words the list shows, or empty.</summary>
+    /// <summary>What the list warns of before a pick, such as the page's connection not being secure, in words it shows, or empty.</summary>
     public string Warning { get; init; } = string.Empty;
 }
 

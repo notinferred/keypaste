@@ -50,8 +50,8 @@ public sealed class LoginLookupTests
         Assert.Equal(matches, Lookup(page).Matches(item));
 
     [Fact]
-    public void A_single_label_host_is_asked_about_every_time_whatever_its_scheme() =>
-        Assert.True(Lookup("https://nas/").AsksEveryTime);
+    public void A_single_label_host_is_one_whatever_its_scheme() =>
+        Assert.True(Lookup("https://nas/").Page.IsSingleLabel);
 
     [Theory]
     [InlineData("https://192.168.1.10:8443/login", "https://192.168.1.10:8443")]
@@ -80,15 +80,13 @@ public sealed class LoginLookupTests
         Assert.False(Lookup(page).Matches(item));
 
     [Fact]
-    public void An_http_item_matches_its_http_page_and_is_asked_about_every_time()
+    public void An_http_item_matches_its_http_page_only()
     {
         var plain = Lookup("http://nas.home.arpa/login");
         var secure = Lookup("https://nas.home.arpa/login");
 
         Assert.True(plain.Matches("http://nas.home.arpa"));
-        Assert.True(plain.AsksEveryTime);
         Assert.False(secure.Matches("http://nas.home.arpa"));
-        Assert.False(secure.AsksEveryTime);
     }
 
     [Theory]
@@ -103,13 +101,12 @@ public sealed class LoginLookupTests
         Assert.Equal(matches, Lookup(page).Matches(item));
 
     [Fact]
-    public void A_form_posting_to_another_registrable_domain_is_asked_about_every_time_with_its_origin_named()
+    public void A_form_posting_to_another_registrable_domain_names_its_origin()
     {
         var lookup = Lookup("https://shop.example.com/checkout", "https://pay.other.net/charge?order=1");
 
         Assert.True(lookup.Matches("https://shop.example.com"));
         Assert.Equal("https://pay.other.net:443", lookup.OtherSiteForm?.ToString());
-        Assert.True(lookup.AsksEveryTime);
     }
 
     [Theory]
@@ -122,7 +119,6 @@ public sealed class LoginLookupTests
         var lookup = Lookup("https://shop.example.com/login", submitUrl);
 
         Assert.Null(lookup.OtherSiteForm);
-        Assert.False(lookup.AsksEveryTime);
     }
 
     [Theory]

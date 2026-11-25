@@ -18,8 +18,7 @@ namespace Keypaste.Core.Agents;
 /// <para>
 /// Each sealed write counts up this home's count in the vault first, in a record of the home's own, and writes the file
 /// after, so a file sealed before the home's latest write, put back, is ignored too, a write whose file never lands leaves
-/// the defaults, and another home sharing the vault changes nothing here. Each write keeps the sites of browser allowances encrypted
-/// under the same key (<see cref="FillSites"/>), and a read opens them.
+/// the defaults, and another home sharing the vault changes nothing here.
 /// </para>
 /// <para>
 /// Each vault keeps its own file, so two vaults open at once never seal over each other's rules. The one
@@ -34,7 +33,7 @@ namespace Keypaste.Core.Agents;
 public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Func<Func<Vault, bool>, AgentSave> save, AgentRulesFile? shared = null) : IAgentRules
 {
     /// <summary>What the app says while the file's rules are ignored.</summary>
-    public const string IgnoredText = "agent rules and browser fill allowances were changed outside keypaste and are ignored until you set them again";
+    public const string IgnoredText = "agent rules were changed outside keypaste and are ignored until you set them again";
 
     /// <summary>The title of the vault's record that holds the key.</summary>
     internal const string KeyTitle = "agent-rules";
@@ -68,7 +67,7 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
         var key = KeyOf(open);
         var holds = !read.Present || Sealed(read, open, key);
         _ignored = holds ? null : IgnoredText;
-        rules = !holds ? AgentRules.Defaults : key is null ? read.Rules : FillSites.Shown(read.Rules, key);
+        rules = holds ? read.Rules : AgentRules.Defaults;
         return true;
     }
 
@@ -92,7 +91,7 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
 
     private bool Sealed(RulesFileRead read, Vault? open, byte[]? key) =>
         read.Seal is { } seal && key is not null && _file.HomeId() is { } home && Count(open, home) is { } count
-        && Matches(Seal(key, home, count, read.Rules), seal);
+        && Matches(Seal(key, home, count, read.Covered), seal);
 
     /// <inheritdoc/>
     /// <remarks>Applied to the rules that hold now, the defaults while the file's are ignored, so a change made outside keypaste is replaced, never carried on.</remarks>
@@ -128,9 +127,7 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
             return false;
         }
 
-        var kept = FillSites.Hidden(next, key);
-
-        if (!_file.TryWrite(kept, Seal(key, home, count + 1, kept), out problem))
+        if (!_file.TryWrite(next, Seal(key, home, count + 1, next), out problem))
         {
             return false;
         }
@@ -139,16 +136,35 @@ public sealed class SealedAgentRules(AgentRulesFile file, Func<Vault?> vault, Fu
         return true;
     }
 
+    /// <inheritdoc/>
+    /// <remarks>A file whose seal does not hold is left as it is, so it still says the defaults hold.</remarks>
+    public bool TryDropRetiredFills(Func<bool> mayWrite, out string problem)
+    {
+        ArgumentNullException.ThrowIfNull(mayWrite);
+
+        problem = string.Empty;
+        var open = _vault();
+
+        if (!_file.TryReadFile(out var read, out _) || !read.HoldsRetiredFills || !Sealed(read, open, KeyOf(open)) || !mayWrite())
+        {
+            return false;
+        }
+
+        return TryChange(rules => rules, out problem);
+    }
+
     /// <summary>The seal of rules for a home under a key.</summary>
     /// <param name="key">The vault's key.</param>
     /// <param name="home">This home's identity.</param>
     /// <param name="count">The vault's count of sealed writes, this one's included.</param>
     /// <param name="rules">The rules.</param>
     /// <returns>The HMAC-SHA256, as lower-case hex.</returns>
-    internal static string Seal(byte[] key, string home, ulong count, AgentRules rules) =>
+    internal static string Seal(byte[] key, string home, ulong count, AgentRules rules) => Seal(key, home, count, AgentRulesFile.Canonical(rules));
+
+    private static string Seal(byte[] key, string home, ulong count, string covered) =>
         Convert.ToHexStringLower(HMACSHA256.HashData(
             key,
-            Encoding.UTF8.GetBytes(string.Create(CultureInfo.InvariantCulture, $"keypaste agents.toml 2\n{home}\n{count}\n{AgentRulesFile.Canonical(rules)}"))));
+            Encoding.UTF8.GetBytes(string.Create(CultureInfo.InvariantCulture, $"keypaste agents.toml 2\n{home}\n{count}\n{covered}"))));
 
     private static bool Matches(string expected, string seal) =>
         CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(expected), Encoding.ASCII.GetBytes(seal));

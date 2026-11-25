@@ -181,15 +181,6 @@ internal sealed class AppAuthority : IDisposable
     /// <returns>Whether it was removed, and why not.</returns>
     internal Core.Ownership.PairingRemoval RemovePairing(string id) => _host.RemovePairing(id);
 
-    /// <summary>The logins the pairings the unlocked vault holds filled on a site before.</summary>
-    internal IReadOnlyList<Core.Ownership.AllowanceRow> Allowances() => _host.Allowances();
-
-    /// <summary>Forgets, for the person, that a login was filled on a site before, so its next fill there is asked.</summary>
-    /// <param name="allowance">The allowance.</param>
-    /// <param name="problem">Why it was not removed, or empty.</param>
-    /// <returns>Whether it was removed.</returns>
-    internal bool Unallow(Core.Agents.BrowserAllowance allowance, out string problem) => _host.Unallow(allowance, out problem);
-
     /// <summary>The MCP clients attached to the live session, as they describe themselves (display only).</summary>
     internal IReadOnlyList<Core.Clients.ConnectedClient> Clients => _host.Clients;
 

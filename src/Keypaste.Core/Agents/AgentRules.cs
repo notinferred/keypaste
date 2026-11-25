@@ -25,13 +25,6 @@ public sealed record RememberedAnswer(string Agent, string Item, string Field, C
 /// <param name="Item">The picked item's UUID as hex.</param>
 public sealed record RememberedPick(string Agent, string Name, string Field, string Item);
 
-/// <summary>A login the person filled on one origin through one browser's pairing, kept so a pick of it in that page's list fills at once.</summary>
-/// <param name="Pairing">The pairing's name.</param>
-/// <param name="Paired">When that pairing was made, so a later pairing of the same name inherits nothing.</param>
-/// <param name="Origin">The page's origin, as <c>scheme://host:port</c>; in rules read from the file and not yet opened by the owner, encrypted under the vault's key.</param>
-/// <param name="Item">The item's UUID as hex.</param>
-public sealed record BrowserAllowance(string Pairing, DateTimeOffset Paired, string Origin, string Item);
-
 /// <summary>Which answer decided a request, from the most specific.</summary>
 public enum RuleLevel
 {
@@ -67,9 +60,6 @@ public sealed record AgentRules
 
     /// <summary>The most remembered answers and picks the file keeps, together.</summary>
     public const int MaximumRemembered = 128;
-
-    /// <summary>The most browser allowances the file keeps; past it the oldest is forgotten, and its next fill is asked again.</summary>
-    public const int MaximumBrowserAllowances = 128;
 
     private Dictionary<FieldCategory, CategoryRule> Rules { get; init; } = [];
     private readonly IReadOnlyList<KnownAgent> _agents = [];
@@ -115,57 +105,6 @@ public sealed record AgentRules
 
     /// <summary>Whether another answer or pick can be remembered.</summary>
     public bool HasRoom => Answers.Count + Picks.Count < MaximumRemembered;
-
-    /// <summary>The browser allowances kept, in the order they were given.</summary>
-    public IReadOnlyList<BrowserAllowance> BrowserAllowances { get; private init; } = [];
-
-    /// <summary>Whether the person filled an item on an origin through a pairing before, so a pick of it there fills without asking.</summary>
-    /// <param name="pairing">The pairing's name.</param>
-    /// <param name="paired">When it was made.</param>
-    /// <param name="origin">The page's origin, as <c>scheme://host:port</c>.</param>
-    /// <param name="item">The item's UUID as hex.</param>
-    /// <returns>Whether an allowance names all four.</returns>
-    public bool AllowsFill(string pairing, DateTimeOffset paired, string origin, string item) =>
-        BrowserAllowances.Any(allowance => Same(allowance.Pairing, pairing) && allowance.Paired == paired && Same(allowance.Origin, origin) && SameItem(allowance.Item, item));
-
-    /// <summary>These rules keeping a fill the person allowed, in place of the same one kept before, forgetting the oldest when full.</summary>
-    /// <param name="allowance">The allowance.</param>
-    /// <returns>The new rules.</returns>
-    /// <exception cref="ArgumentException">The allowance names no pairing, origin or item.</exception>
-    public AgentRules AllowingFill(BrowserAllowance allowance)
-    {
-        ArgumentNullException.ThrowIfNull(allowance);
-
-        if (allowance.Pairing.Length == 0 || allowance.Origin.Length == 0 || !IsItem(allowance.Item))
-        {
-            throw new ArgumentException("a browser allowance names a pairing, an origin and an item", nameof(allowance));
-        }
-
-        List<BrowserAllowance> kept = [.. BrowserAllowances.Where(held => !SameAllowance(held, allowance))];
-
-        if (kept.Count >= MaximumBrowserAllowances)
-        {
-            kept.RemoveRange(0, kept.Count - MaximumBrowserAllowances + 1);
-        }
-
-        return this with { BrowserAllowances = [.. kept, allowance with { Item = allowance.Item.ToLowerInvariant() }] };
-    }
-
-    /// <summary>These rules without a browser allowance, so the next fill it covered is asked again.</summary>
-    /// <param name="allowance">The allowance.</param>
-    /// <returns>The new rules.</returns>
-    public AgentRules ForgettingFill(BrowserAllowance allowance)
-    {
-        ArgumentNullException.ThrowIfNull(allowance);
-        return this with { BrowserAllowances = [.. BrowserAllowances.Where(held => !SameAllowance(held, allowance))] };
-    }
-
-    /// <summary>These rules without any allowance of a pairing, as when it is removed.</summary>
-    /// <param name="pairing">The pairing's name.</param>
-    /// <param name="paired">When it was made.</param>
-    /// <returns>The new rules.</returns>
-    public AgentRules WithoutPairing(string pairing, DateTimeOffset paired) =>
-        this with { BrowserAllowances = [.. BrowserAllowances.Where(held => !(Same(held.Pairing, pairing) && held.Paired == paired))] };
 
     /// <summary>The rule Settings gives every agent for a category.</summary>
     /// <param name="category">The category.</param>
@@ -470,25 +409,18 @@ public sealed record AgentRules
         && _agents.SequenceEqual(other._agents)
         && AgentCategories.ToHashSet().SetEquals(other.AgentCategories)
         && Answers.SequenceEqual(other.Answers)
-        && Picks.SequenceEqual(other.Picks)
-        && BrowserAllowances.SequenceEqual(other.BrowserAllowances);
+        && Picks.SequenceEqual(other.Picks);
 
     /// <inheritdoc/>
     public override int GetHashCode() => HashCode.Combine(ShowsUsername, ShowsLinkedHosts, _agents.Count, Answers.Count, Picks.Count);
 
     /// <summary>These rules as a file holds them, its sections read in turn, nothing confirmed by a person.</summary>
-    internal AgentRules Read(IReadOnlyList<AgentCategoryRule> agentCategories, IReadOnlyList<RememberedAnswer> answers, IReadOnlyList<RememberedPick> picks, IReadOnlyList<BrowserAllowance> allowances) =>
-        this with { AgentCategories = [.. agentCategories], Answers = [.. answers], Picks = [.. picks], BrowserAllowances = [.. allowances] };
-
-    /// <summary>These rules with other browser allowances, as the file keeps or the owner reads them.</summary>
-    internal AgentRules WithBrowserAllowances(IEnumerable<BrowserAllowance> allowances) => this with { BrowserAllowances = [.. allowances] };
+    internal AgentRules Read(IReadOnlyList<AgentCategoryRule> agentCategories, IReadOnlyList<RememberedAnswer> answers, IReadOnlyList<RememberedPick> picks) =>
+        this with { AgentCategories = [.. agentCategories], Answers = [.. answers], Picks = [.. picks] };
 
     private static bool Same(string left, string? right) => string.Equals(left, right, StringComparison.Ordinal);
 
     private static bool SameItem(string left, string right) => string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
-
-    private static bool SameAllowance(BrowserAllowance left, BrowserAllowance right) =>
-        Same(left.Pairing, right.Pairing) && left.Paired == right.Paired && Same(left.Origin, right.Origin) && SameItem(left.Item, right.Item);
 
     /// <summary>Whether a value is an item's UUID as hex.</summary>
     internal static bool IsItem(string item) => item.Length == 32 && item.All(char.IsAsciiHexDigit);

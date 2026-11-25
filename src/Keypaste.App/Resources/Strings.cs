@@ -260,7 +260,6 @@ public static class Strings
     public static string FieldValue => Manager.GetString("FieldValue", CultureInfo.CurrentUICulture)!;
     public static string FileMenu => Manager.GetString("FileMenu", CultureInfo.CurrentUICulture)!;
     public static string FillsInYourBrowser => Manager.GetString("FillsInYourBrowser", CultureInfo.CurrentUICulture)!;
-    public static string FillsWithoutAsking => Manager.GetString("FillsWithoutAsking", CultureInfo.CurrentUICulture)!;
     public static string FindAnItem => Manager.GetString("FindAnItem", CultureInfo.CurrentUICulture)!;
     public static string FindMenu => Manager.GetString("FindMenu", CultureInfo.CurrentUICulture)!;
     public static string ForYourListOnlyNeverSent => Manager.GetString("ForYourListOnlyNeverSent", CultureInfo.CurrentUICulture)!;
@@ -436,7 +435,6 @@ public static class Strings
     public static string NoActivityYet => Manager.GetString("NoActivityYet", CultureInfo.CurrentUICulture)!;
     public static string NoCopiesYet => Manager.GetString("NoCopiesYet", CultureInfo.CurrentUICulture)!;
     public static string NoFavoritesYet => Manager.GetString("NoFavoritesYet", CultureInfo.CurrentUICulture)!;
-    public static string NoItemIsAlwaysFilled => Manager.GetString("NoItemIsAlwaysFilled", CultureInfo.CurrentUICulture)!;
     public static string NoKeyFile => Manager.GetString("NoKeyFile", CultureInfo.CurrentUICulture)!;
     public static string NoKeysFoundInNotesNoWeakX50d3ee => Manager.GetString("NoKeysFoundInNotesNoWeakX50d3ee", CultureInfo.CurrentUICulture)!;
     public static string NoKeysYetAddTheFirstOneX0cbcf7 => Manager.GetString("NoKeysYetAddTheFirstOneX0cbcf7", CultureInfo.CurrentUICulture)!;
@@ -638,10 +636,6 @@ public static class Strings
     public static string Stages => Manager.GetString("Stages", CultureInfo.CurrentUICulture)!;
     public static string Start => Manager.GetString("Start", CultureInfo.CurrentUICulture)!;
     public static string StartsLockedWithNoWindow => Manager.GetString("StartsLockedWithNoWindow", CultureInfo.CurrentUICulture)!;
-    public static string Stop => Manager.GetString("Stop", CultureInfo.CurrentUICulture)!;
-    public static string StopAlwaysFillingValue => Manager.GetString("StopAlwaysFillingValue", CultureInfo.CurrentUICulture)!;
-    public static string StopEllipsis => Manager.GetString("StopEllipsis", CultureInfo.CurrentUICulture)!;
-    public static string StopFillingValueWithoutAsking => Manager.GetString("StopFillingValueWithoutAsking", CultureInfo.CurrentUICulture)!;
     public static string StopUsingAKeyFile => Manager.GetString("StopUsingAKeyFile", CultureInfo.CurrentUICulture)!;
     public static string StopUsingTheYubiKey => Manager.GetString("StopUsingTheYubiKey", CultureInfo.CurrentUICulture)!;
     public static string StopWaitingForTheYubiKey => Manager.GetString("StopWaitingForTheYubiKey", CultureInfo.CurrentUICulture)!;

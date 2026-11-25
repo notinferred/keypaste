@@ -157,15 +157,6 @@ internal sealed class WindowApprovalChannel(
         return answer == ApprovalAnswer.ApprovedOnce ? new PairingAnswer(answer, request.Name) : new PairingAnswer(answer, null);
     }
 
-    /// <summary>Asks the person who picked a login in a page whether to fill it on a site it was not filled on before, in a prompt window of its own.</summary>
-    public async ValueTask<ApprovalAnswer> AskAsync(FillPrompt prompt, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(prompt);
-
-        var request = new FillViewModel(prompt);
-        return await ShowAsync(request, () => new FillWindow(request), cancellationToken).ConfigureAwait(false);
-    }
-
     /// <summary>Whether a prompt waits for the person's answer or is on its way to the screen, which no file dropped on the main window or system dialog goes ahead of.</summary>
     internal bool IsAsking => Volatile.Read(ref _screen.Queued) > 0 || _screen.Showing is { Request.IsAnswered: false };
 

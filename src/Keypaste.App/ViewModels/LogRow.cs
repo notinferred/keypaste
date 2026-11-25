@@ -208,6 +208,7 @@ internal sealed record LogRow
                 "check" => "Checked its pairing",
                 "remove" => "Removed a pairing",
                 "fill" => entry.Granted ? "Filled a login" : "Asked to fill a login",
+                // Written by a keypaste that remembered the logins filled on each site.
                 "unallow" => "Asks again before filling",
                 "list" => "Listed logins by name",
                 _ => entry.Granted ? "Paired a browser" : "Asked to pair",
@@ -296,6 +297,7 @@ internal sealed record LogRow
             // policy: released by a policy.toml rule, in a line written before agents had modes.
             "automatic" or "automatic-commands" or "policy" or "exposure" or "allowed" => (Strings.AllowedByRule, LogTone.Ok),
             "narrowing" => ("Narrowed", LogTone.Muted),
+            "picked" => ("You picked it in the page", LogTone.Ok),
             "merged" => ("Merged", LogTone.Muted),
             "token" => (Strings.TokenResult, LogTone.Info),
             "share-created" => (Strings.Shared, LogTone.Muted),

@@ -926,11 +926,6 @@ public sealed class ScreenRenderer
         pairing.IsConfirmingRemove = true;
         Save(window, output, "04-settings-browser-fill-remove");
         pairing.IsConfirmingRemove = false;
-        SetDrawnState(browserFill, nameof(browserFill.Allowances), new[]
-        {
-            new AllowanceItem(new Core.Agents.BrowserAllowance("work laptop", AppClock.Start, "https://github.com", "a1"), "work/GitHub"),
-            new AllowanceItem(new Core.Agents.BrowserAllowance("work laptop", AppClock.Start, "https://accounts.login.payroll-provider-for-enterprises.example.co.uk", "a5"), "work/finance/payroll/Payroll provider administrator account"),
-        });
         WindowInput.Drain();
         scroller.Offset = default;
         WindowInput.Drain();
@@ -1774,7 +1769,7 @@ public sealed class ScreenRenderer
         }
     }
 
-    /// <summary>A browser asking to pair with its code, under a free name and a taken one; and fill prompts for one login, several, an http page, a form posting elsewhere and long names.</summary>
+    /// <summary>A browser asking to pair with its code, under a free name and a taken one.</summary>
     private static void DrawBrowserPrompts(string output)
     {
         var pairing = new PairingPrompt
@@ -1786,32 +1781,6 @@ public sealed class ScreenRenderer
         };
         DrawWindow(new PairingWindow(new PairingViewModel(pairing)), output, "91m-pairing");
         DrawWindow(new PairingWindow(new PairingViewModel(pairing with { TakenNames = ["Chrome on work laptop"] })), output, "91m2-pairing-name-taken");
-
-        var fill = new FillPrompt
-        {
-            Identity = Core.Browser.BrowserIdentity.ChromeWebStore,
-            Pairing = "Chrome on work laptop",
-            Origin = "https://github.com:443",
-            Site = "github.com",
-            Title = "GitHub",
-            Username = "dana@acme.example",
-        };
-        DrawWindow(new FillWindow(new FillViewModel(fill)), output, "91n-fill");
-        DrawWindow(new FillWindow(new FillViewModel(fill with { Vault = "Acme" })), output, "91n2-fill-vault");
-        DrawWindow(new FillWindow(new FillViewModel(fill with { Origin = "http://intranet.acme.example:8080", Site = "intranet.acme.example", Warning = "This page's connection is not secure. keypaste asks before each fill." })), output, "91n3-fill-http");
-        DrawWindow(new FillWindow(new FillViewModel(fill with { FormOrigin = "https://collect.example.net:443", Warning = "This form sends what you fill to collect.example.net, another site. keypaste asks before each fill." })), output, "91n4-fill-form-elsewhere");
-        DrawWindow(
-            new FillWindow(new FillViewModel(fill with
-            {
-                Pairing = "Microsoft Edge on the shared design studio workstation",
-                Identity = Core.Browser.BrowserIdentity.EdgeAddOns,
-                Origin = "https://accounts.login.payroll-provider-for-enterprises.example.co.uk:443",
-                Site = "accounts.login.payroll-provider-for-enterprises.example.co.uk",
-                Title = "Payroll provider administrator account for the finance department",
-                Username = "finance-administrator@acme-holdings-international.example",
-            })),
-            output,
-            "91n5-fill-long");
     }
 
     private static void DrawWindow(PromptWindow window, string output, string name)

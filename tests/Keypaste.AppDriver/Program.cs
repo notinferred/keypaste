@@ -104,7 +104,6 @@ internal static class Program
         "             setting <label> mode|values|run <word>, setting <label> see <selector,...>,\n" +
         "             setting <label> row <scope>, setting <label> row-mode <scope> <word>, setting <label> use-vault;\n" +
         "             pairings, unpair <name>, which list Settings › Browser fill's pairings and press Remove;\n" +
-        "             allowances, which lists the logins filled on a site before;\n" +
         "             browser-status, browser-on <browser>, browser-off <browser>, which list Settings › Browser fill's browsers\n" +
         "             and press Turn on or Turn off, set up under the KEYPASTE_DRIVER_BROWSER_ folders;\n" +
         "             and on macOS with --terminal-bundle: terminal <run | open> <project> <directory> [command, the rest of the line])\n" +
@@ -1055,10 +1054,6 @@ internal sealed class Driver(string home)
                     await agents.ChangeAsync(label, change).ConfigureAwait(true);
                     break;
 
-                case ["allowances"]:
-                    Allowances(authority);
-                    break;
-
                 case [("once" or "always" or "allow" or "deny" or "close") and var answer]:
                     await (screen ?? throw new DriverException("hold answers a prompt only with the app's own"))
                         .AnswerAsync(answer).ConfigureAwait(true);
@@ -1095,22 +1090,6 @@ internal sealed class Driver(string home)
         foreach (var row in browserFill.Rows)
         {
             Console.Out.WriteLine($"pairing identity={row.Identity} name={row.Name}");
-        }
-    }
-
-    /// <summary>Prints the logins Settings › Browser fill lists as filled on a site before, or <c>allowances none</c>.</summary>
-    private static void Allowances(AppAuthority authority)
-    {
-        using var browserFill = new BrowserFillViewModel(authority);
-
-        if (browserFill.Allowances.Count == 0)
-        {
-            Console.Out.WriteLine("allowances none");
-        }
-
-        foreach (var row in browserFill.Allowances)
-        {
-            Console.Out.WriteLine($"allowance item={row.Item} on {row.Allowance.Origin} in {row.Allowance.Pairing}");
         }
     }
 

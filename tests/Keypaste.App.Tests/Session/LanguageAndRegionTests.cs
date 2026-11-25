@@ -174,7 +174,7 @@ public sealed partial class LanguageAndRegionTests
         {
             "keypaste", "API_KEY", "Work/github", "~/code/acme-api", "db.example.com:5432", "env:project:prod", "https://", "OPENAI_API_KEY", "STRIPE_SECRET_KEY", "billing-api", "npm start", "staging", "STRIPE_KEY", "FIELD_NAME", "ci-staging", "read:acme-api/staging/*",
         };
-        var prompts = new[] { "PromptHead", "ApprovalWindow", "ItemPickWindow", "EnvApprovalWindow", "RunApprovalWindow", "PairingWindow", "TerminalEditWindow", "LockedNoticeWindow", "TermsWindow", "SaveValueWindow", "SetApprovalWindow", "ItemChangeWindow", "FillWindow" };
+        var prompts = new[] { "PromptHead", "ApprovalWindow", "ItemPickWindow", "EnvApprovalWindow", "RunApprovalWindow", "PairingWindow", "TerminalEditWindow", "LockedNoticeWindow", "TermsWindow", "SaveValueWindow", "SetApprovalWindow", "ItemChangeWindow" };
         var app = Path.Combine(RepoRoot(), "src", "Keypaste.App");
 
         var literals = Directory.EnumerateFiles(app, "*.axaml", SearchOption.AllDirectories)

@@ -98,12 +98,4 @@ public interface IApprovalChannel
     /// <remarks>A channel that cannot show this has asked nobody, which is a no: nothing is paired.</remarks>
     ValueTask<PairingAnswer> AskAsync(PairingPrompt prompt, CancellationToken cancellationToken) =>
         ValueTask.FromResult(PairingAnswer.NoChannel);
-
-    /// <summary>Asks a human whether to fill the login they picked in a page's list, and waits for their answer.</summary>
-    /// <param name="prompt">What to show. Render it as inert text.</param>
-    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
-    /// <returns>What the human said, <see cref="ApprovalAnswer.ApprovedOnce"/> for Fill, or why they were not asked.</returns>
-    /// <remarks>A channel that cannot show this has asked nobody, which is a no: nothing is filled.</remarks>
-    ValueTask<ApprovalAnswer> AskAsync(FillPrompt prompt, CancellationToken cancellationToken) =>
-        ValueTask.FromResult(ApprovalAnswer.NoChannel);
 }

@@ -18,7 +18,7 @@ public enum AuditDecision
 /// <see cref="Prompt"/> with <see cref="AuditDecision.Denied"/> means a person said no, and only
 /// <see cref="Busy"/> and <see cref="TimedOut"/> mean nobody got to it.
 /// Only <see cref="Exposure"/>, <see cref="Prompt"/>, <see cref="Allowed"/>, <see cref="AlwaysAllowed"/>, <see cref="Automatic"/>,
-/// <see cref="Token"/>, <see cref="Narrowing"/>, <see cref="RulesChanged"/>, <see cref="Merged"/> and <see cref="Removed"/> ever accompany <see cref="AuditDecision.Granted"/>.
+/// <see cref="Token"/>, <see cref="Narrowing"/>, <see cref="RulesChanged"/>, <see cref="Merged"/>, <see cref="Removed"/> and <see cref="Picked"/> ever accompany <see cref="AuditDecision.Granted"/>.
 /// <see cref="Allowed"/>, <see cref="Automatic"/> and <see cref="AlwaysAllowed"/> are the releases no person saw, so they must
 /// never be logged as <see cref="Prompt"/>, which claims a person acted on this request.
 /// Adding a member means adding a case to <c>AuditLog.Wire</c>.
@@ -179,6 +179,10 @@ public enum AuditMethod
     /// <summary>The vault's owner sealed the log it compacted with the vault's checkpoint key.</summary>
     /// <remarks>Released nothing and was asked of nobody; <c>keypaste log</c> and Activity do not list it.</remarks>
     Compaction = 39,
+
+    /// <summary>A login filled in a paired browser because the person picked it in keypaste's list in the page.</summary>
+    /// <remarks>The pick is the extension's word, which keypaste cannot check (THREATS.md T-59), so it is never written as <see cref="Prompt"/>.</remarks>
+    Picked = 40,
 }
 
 /// <summary>How many lookups of one tool with one decision a summary line folds.</summary>

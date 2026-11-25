@@ -832,6 +832,7 @@ public sealed class AuditLog : IDisposable
         AuditMethod.Folded => "folded",
         AuditMethod.Expired => "expired",
         AuditMethod.Compaction => AuditCompaction.Method,
+        AuditMethod.Picked => "picked",
         _ => "unknown",
     };
 

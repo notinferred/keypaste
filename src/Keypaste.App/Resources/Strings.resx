@@ -596,8 +596,6 @@
   <data name="Result" xml:space="preserve"><value>Result</value></data>
   <data name="Browsers" xml:space="preserve"><value>Browsers</value></data>
   <data name="TurnOnForThisBrowser" xml:space="preserve"><value>Turn on for this browser</value></data>
-  <data name="NoItemIsAlwaysFilled" xml:space="preserve"><value>No login has been filled yet. The first time you pick a login on a site, keypaste asks you; after that, picking it there fills it at once.</value></data>
-  <data name="StopAlwaysFillingValue" xml:space="preserve"><value>Ask again before filling {0}</value></data>
   <data name="Variable" xml:space="preserve"><value>Variable</value></data>
   <data name="FromItem" xml:space="preserve"><value>From item</value></data>
   <data name="AddVariable" xml:space="preserve"><value>Add variable</value></data>
@@ -657,13 +655,9 @@
   <data name="KeepACopyOnAnotherDisk" xml:space="preserve"><value>Keep a copy on another disk</value></data>
   <data name="LearnMoreAboutBackups" xml:space="preserve"><value>Learn more about backups</value></data>
   <data name="BrowserFillIsNotAvailableHere" xml:space="preserve"><value>Browser fill isn&apos;t available, because nothing answers browsers for this vault.</value></data>
-  <data name="FillsWithoutAsking" xml:space="preserve"><value>Fills without asking</value></data>
   <data name="UnpairValue" xml:space="preserve"><value>Unpair {0}?</value></data>
   <data name="UnpairEllipsis" xml:space="preserve"><value>Unpair…</value></data>
   <data name="Unpair" xml:space="preserve"><value>Unpair</value></data>
-  <data name="StopFillingValueWithoutAsking" xml:space="preserve"><value>Stop filling {0} without asking?</value></data>
-  <data name="StopEllipsis" xml:space="preserve"><value>Stop…</value></data>
-  <data name="Stop" xml:space="preserve"><value>Stop</value></data>
   <data name="NotInstalled" xml:space="preserve"><value>Not installed</value></data>
   <data name="KeypasteMovedTurnOnAgain" xml:space="preserve"><value>keypaste moved, so turn it on again</value></data>
   <data name="AnotherProgramAnswersItsExtension" xml:space="preserve"><value>Another program answers its extension</value></data>

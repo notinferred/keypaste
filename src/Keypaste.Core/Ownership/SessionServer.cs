@@ -150,7 +150,7 @@ public sealed class SessionServer : IDisposable
                 : null;
 
             var browsers = options.BrowserPairings is { } pairings && options.WriteEdit is { } pair
-                ? new SessionBrowsers(options.Vault, lifetime, gate, options.UnlockedFor, pair, options.Rules, checkpoints.Watched, pairings, options.Clock, options.Narrate)
+                ? new SessionBrowsers(options.Vault, lifetime, gate, options.UnlockedFor, pair, checkpoints.Watched, pairings, options.Clock, options.Narrate)
                 : null;
 
             var authority = new SessionAuthority(
@@ -174,6 +174,8 @@ public sealed class SessionServer : IDisposable
                 browsers.Removed += (_, pairing) => authority.Unbind(pairing);
             }
 
+            DropRetiredFills(options, checkpoints.Watched, lifetime.Id);
+
             var compactions = new AuditCompactions(options.AuditPath, () => options.UnlockedFor(lifetime), options.Vault, lifetime.Id, options.KeepLogDays, options.Clock, options.OtherCheckpointKeys);
             compactions.Start();
             return new SessionServer(authority, gate, checkpoints, compactions) { Browsers = browsers };
@@ -184,6 +186,30 @@ public sealed class SessionServer : IDisposable
             throw;
         }
     }
+
+    /// <summary>Rewrites, once, a sealed settings file that still names the sites a browser filled a login on, recording it on its own line.</summary>
+    /// <remarks>The log is opened only for a file that needs it, and nothing is rewritten unless it opens, so the rewrite is never left unrecorded.</remarks>
+    private static void DropRetiredFills(SessionServerOptions options, Func<AuditLog?> audit, string session)
+    {
+        var recorder = new RequestRecorder(audit);
+
+        if (!options.Rules.TryDropRetiredFills(() => recorder.Opens, out _))
+        {
+            return;
+        }
+
+        recorder.Recorded(RequestRecords.AccessChange(
+            AuditClient.Of("keypaste", CoreInfo.Version, null),
+            string.Empty,
+            AuditDecision.Granted,
+            AuditMethod.RulesChanged,
+            DroppedFillsReason,
+            session,
+            options.Vault.Key));
+    }
+
+    /// <summary>What the line for rewriting a settings file without the sites a browser filled a login on says.</summary>
+    internal const string DroppedFillsReason = "keypaste removed the sites where a browser filled a login, which it no longer keeps; nothing any agent gets changed";
 
     /// <summary>Builds what answers agents for one unlock and binds its endpoint.</summary>
     /// <param name="pipeName">The vault's endpoint, as <see cref="ApproverEndpoint"/> names it.</param>

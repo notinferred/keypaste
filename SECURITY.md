@@ -95,7 +95,7 @@ An attestation shows which repository, workflow, tag and commit produced the byt
 These laws stand above every other rule of keypaste's and change only by the founder's dated re-ratification.
 
 1. The vault master key never leaves the local process, including through telemetry or an encrypted server backup. There are no exceptions.
-2. Agents never get the vault. Each release contains one credential with one scope, or a linked set the person approves whole in one prompt, following explicit human approval or a pre-approved policy the human wrote, of which a category's Allow the human confirmed on this computer is one. A set is never released by a rule alone. Default is deny. A browser gets one login at a time, and only at the person's pick in keypaste's own in-page list, drawn apart from the page, which lists names and no password: the pick counts as their answer for a login already filled through that browser's pairing on that exact site, and a first fill of a login on a site, and every fill on a site keypaste asks about each time, is asked in keypaste.
+2. Agents never get the vault. Each release contains one credential with one scope, or a linked set the person approves whole in one prompt, following explicit human approval or a pre-approved policy the human wrote, of which a category's Allow the human confirmed on this computer is one. A set is never released by a rule alone. Default is deny. A browser gets one login at a time, and only at the person's pick in keypaste's own in-page list, drawn apart from the page, which lists names and no password, and that pick is their answer.
 3. Every agent request for a value, a command, a save or a change to an item, and every login released to a browser with the page's origin, is recorded as its own line in a local, human-readable log before keypaste answers, recording who or what asked for which item, when, and whether it was granted or denied; nothing rewrites a line. An agent's lookups of names, a listing or a search, keep their own lines for 30 days and are then folded into one sealed summary line per agent per day. The person sets how long the log is kept, one year by default; older lines are removed only as whole days, behind a sealed line recording what was removed.
 4. Keypaste never writes secrets to disk unencrypted, except a key file the person asks keypaste to create, an attachment the person asks it to save and a file the person explicitly asks to export, such as `env export --dotenv`, each written once where they choose. Injection uses process environment memory only.
 5. Analytics and telemetry never include secret content or entry names. Only opt-in anonymous usage counts are permitted, and the desktop app's crash reports once the person says yes to them on its first launch, a yes of its own apart from accepting the terms of use, until they turn them off in Settings; a report holds no exception message, secret content, entry or vault name, file path or value.
@@ -152,16 +152,16 @@ What keypaste holds to under the [laws](#security-laws), and what it can't preve
 - A browser pairs only once you confirm, in keypaste, the code its extension shows. One pairing request is asked at a time, and a refusal holds the next back for a minute up to an hour [T-48].
 - One pairing per browser serves every vault unlocked on this computer. keypaste keeps only a hash of the extension's key, and the pairing counts only while an unlocked vault's seal holds it [T-50].
 - Nothing is asked of keypaste as a page loads. Clicking keypaste's key icon in a login field lists the page's logins from every open vault by title, with no password [T-59].
-- A login fills only when you pick it in that list: at once if that browser filled it on that exact site before, otherwise once you allow it in keypaste, which names the site. Every fill is logged with the page's origin before it leaves keypaste [T-59] [T-61].
+- A login fills only when you pick it in that list, at once, and every fill is logged with the page's origin before it leaves keypaste [T-59].
 - A pick counts only from a trusted click or key on a list the page hasn't faded, filtered or covered. The extension takes the site from the browser's tab, never from the page [T-59].
-- An item matches a page only on its own host or a subdomain, with the same scheme and port, within one registrable domain, and the first fill on each subdomain is asked. An `http` page, a single-label host and a form posting to another site get a warning and are asked at every pick [T-58].
+- An item matches a page only on its own host or a subdomain, with the same scheme and port, within one registrable domain. On an `http` page, a single-label host or a form posting to another site, the list says so before you pick [T-58].
 - The extension refuses a login form in a frame from another origin before keypaste is asked [T-58].
 - A release carries one item's username, password, title and UUID, and nothing else [T-60].
 - Checked in real Chrome, Edge, Brave, Firefox and LibreWolf on Windows, macOS and Linux with keypaste's test build (8.3a3).
 
 **Limits**
 
-- Whoever holds a pairing's key can list the login titles of any site it names, and gets the logins that browser filled on a site before, unasked, by naming that site. Anything that can start keypaste as the browser can put a pairing confirmation in front of you at any time, with a code that differs from your browser's [T-48] [T-50] [T-59] [T-61].
+- Whoever holds a pairing's key can list the login titles of any site it names, and get any login listed there by claiming a pick on that site. Anything that can start keypaste as the browser can put a pairing confirmation in front of you at any time, with a code that differs from your browser's [T-48] [T-50] [T-59].
 - A filled password belongs to the page and the extension, whose scripts or updates can send it anywhere [T-60].
 - A page that fools you into picking from a list it didn't tamper with, or a compromised page of the site itself, gets the login picked on it. Whoever controls a subdomain of an item's site has its login listed there [T-58] [T-59].
 
@@ -282,4 +282,3 @@ What keypaste holds to under the [laws](#security-laws), and what it can't preve
 [T-58]: THREATS.md#t-58--a-page-that-is-not-the-items-site
 [T-59]: THREATS.md#t-59--keypaste-believes-the-extension-about-which-page-asks-and-whether-the-person-picked
 [T-60]: THREATS.md#t-60--the-extension-someone-elses-code-receives-passwords
-[T-61]: THREATS.md#t-61--a-login-filled-on-a-site-before-fills-there-at-once

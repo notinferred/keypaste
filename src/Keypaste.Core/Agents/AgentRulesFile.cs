@@ -34,6 +34,16 @@ public interface IAgentRules
         return false;
     }
 
+    /// <summary>Writes, sealed and without them, a file whose seal holds and that still names the sites a browser filled a login on.</summary>
+    /// <param name="mayWrite">Asked only once there is something to write, and nothing is written unless it says yes.</param>
+    /// <param name="problem">Why it was not written when it needed to be, otherwise empty.</param>
+    /// <returns>Whether it was written.</returns>
+    bool TryDropRetiredFills(Func<bool> mayWrite, out string problem)
+    {
+        problem = string.Empty;
+        return false;
+    }
+
     private sealed class Fixed(AgentRules rules) : IAgentRules
     {
         public bool TryRead([NotNullWhen(true)] out AgentRules? read, out string problem)
@@ -49,7 +59,14 @@ public interface IAgentRules
 /// <param name="Rules">The rules the file says, <see cref="AgentRules.Defaults"/> when there is no file.</param>
 /// <param name="Seal">The seal the file carries, or null.</param>
 /// <param name="Present">Whether there is a file at all.</param>
-public sealed record RulesFileRead(AgentRules Rules, string? Seal, bool Present);
+public sealed record RulesFileRead(AgentRules Rules, string? Seal, bool Present)
+{
+    /// <summary>The text the seal covers: the rules' sections, then any <c>[[fill]]</c> sections an earlier keypaste wrote.</summary>
+    public string Covered { get; init; } = AgentRulesFile.Canonical(Rules);
+
+    /// <summary>Whether the file still holds <c>[[fill]]</c> sections an earlier keypaste wrote, which nothing reads.</summary>
+    public bool HoldsRetiredFills => !string.Equals(Covered, AgentRulesFile.Canonical(Rules), StringComparison.Ordinal);
+}
 
 /// <summary>
 /// One vault's agent rules under the keypaste home, <c>agents/&lt;vault&gt;.toml</c>: whether usernames, and hosts and references, are shown,
@@ -83,14 +100,16 @@ public sealed class AgentRulesFile(string path, string homeIdPath)
     private const string _pairedKey = "paired";
     private const string _originKey = "origin";
     private const string _siteKey = "site";
-    private const string _pairedFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'";
 
-    // Room for every agent, every remembered answer, each naming a field or an attachment and a name up to a request's length, and every browser allowance.
+    // The most [[fill]] sections an earlier keypaste wrote, each remembering a login filled on a site.
+    private const int _retiredFills = 128;
+
+    // Room for every agent, every remembered answer, each naming a field or an attachment and a name up to a request's length, and an earlier keypaste's [[fill]] sections.
     private static readonly TomlLimits _limits = TomlLimits.Policy with
     {
-        Tables = AgentRules.MaximumAgents + AgentRules.MaximumRemembered + AgentRules.MaximumBrowserAllowances + 2,
+        Tables = AgentRules.MaximumAgents + AgentRules.MaximumRemembered + _retiredFills + 2,
         Pairs = FieldCategories.Ruled.Count + 2,
-        Lines = 2048 + (AgentRules.MaximumBrowserAllowances * 6),
+        Lines = 2048 + (_retiredFills * 6),
         Bytes = 256 * 1024,
         LineLength = 1024,
         StringLength = Approval.CredentialRequestRules.MaximumEntryLength + 128,
@@ -152,14 +171,14 @@ public sealed class AgentRulesFile(string path, string homeIdPath)
 
         if (!Toml.TryDecode(bytes, _limits, out var text, out var error)
             || !Toml.TryParse(text, _limits, out var document, out error)
-            || !TryParse(document, out var rules, out var seal, out error))
+            || !TryParse(document, out var rules, out var seal, out var covered, out error))
         {
             read = null;
             problem = $"{Path}: {error}";
             return false;
         }
 
-        read = new RulesFileRead(rules, seal, Present: true);
+        read = new RulesFileRead(rules, seal, Present: true) { Covered = covered };
         problem = string.Empty;
         return true;
     }
@@ -246,12 +265,6 @@ public sealed class AgentRulesFile(string path, string homeIdPath)
             return false;
         }
 
-        if (rules.BrowserAllowances.Any(allowance => !CanWrite(allowance.Pairing) || !CanWrite(allowance.Origin)))
-        {
-            problem = "a browser allowance names a pairing or an origin that cannot be written";
-            return false;
-        }
-
         var writer = new TomlWriter(_limits)
             .Comment(" What every AI agent gets on this computer. keypaste writes this file and seals it with a key the vault holds;")
             .Comment(" a change made anywhere else is ignored, and every value is asked about, until it is set again in keypaste.");
@@ -314,31 +327,35 @@ public sealed class AgentRulesFile(string path, string homeIdPath)
             writer.BlankLine().Table(_pickTable).Text(_agentKey, pick.Agent).Text(_nameKey, pick.Name).Text(_fieldKey, pick.Field).Text(_itemKey, pick.Item);
         }
 
-        // Last, and only when there are any, so a file sealed before allowances existed still renders, and seals, as it did.
-        foreach (var allowance in rules.BrowserAllowances)
+        return writer;
+    }
+
+    /// <summary>What the seal covers in a file an earlier keypaste wrote: the rules, then its <c>[[fill]]</c> sections as it rendered them.</summary>
+    private static string Covered(AgentRules rules, IReadOnlyList<(string SiteKey, string[] Texts)> fills)
+    {
+        var writer = Render(new TomlWriter(_limits), rules);
+
+        foreach (var (siteKey, texts) in fills)
         {
-            writer.BlankLine().Table(_fillTable)
-                .Text(_pairingKey, allowance.Pairing)
-                .Text(_pairedKey, allowance.Paired.UtcDateTime.ToString(_pairedFormat, CultureInfo.InvariantCulture))
-                .Text(FillSites.IsHidden(allowance.Origin) ? _siteKey : _originKey, allowance.Origin)
-                .Text(_itemKey, allowance.Item);
+            writer.BlankLine().Table(_fillTable).Text(_pairingKey, texts[0]).Text(_pairedKey, texts[1]).Text(siteKey, texts[2]).Text(_itemKey, texts[3]);
         }
 
-        return writer;
+        return writer.ToString();
     }
 
     private static bool CanWrite(string value) => new TomlWriter(_limits).CanWrite(_nameKey, value);
 
-    private static bool TryParse(TomlDocument document, [NotNullWhen(true)] out AgentRules? rules, out string? seal, out string error)
+    private static bool TryParse(TomlDocument document, [NotNullWhen(true)] out AgentRules? rules, out string? seal, out string covered, out string error)
     {
         rules = null;
         seal = null;
+        covered = string.Empty;
         var parsed = AgentRules.Defaults;
         List<KnownAgent> agents = [];
         List<AgentCategoryRule> agentCategories = [];
         List<RememberedAnswer> answers = [];
         List<RememberedPick> picks = [];
-        List<BrowserAllowance> allowances = [];
+        List<(string SiteKey, string[] Texts)> fills = [];
         var sawRules = false;
 
         foreach (var table in document.Tables)
@@ -394,12 +411,12 @@ public sealed class AgentRulesFile(string path, string homeIdPath)
                     picks.Add(pick);
                     break;
                 case _fillTable:
-                    if (!TryAllowance(table, out var allowance, out error))
+                    if (!TryRetiredFill(table, out var fill, out error))
                     {
                         return false;
                     }
 
-                    allowances.Add(allowance);
+                    fills.Add(fill);
                     break;
                 default:
                     error = $"{At(table.Line)}: [[{table.Name}]] is not a section keypaste reads here";
@@ -426,19 +443,8 @@ public sealed class AgentRulesFile(string path, string homeIdPath)
             return false;
         }
 
-        if (allowances.Count > AgentRules.MaximumBrowserAllowances)
-        {
-            error = $"keypaste reads at most {AgentRules.MaximumBrowserAllowances} [[{_fillTable}]] sections";
-            return false;
-        }
-
-        if (allowances.GroupBy(allowance => (allowance.Pairing, allowance.Paired, allowance.Origin, allowance.Item)).Any(same => same.Count() > 1))
-        {
-            error = $"two [[{_fillTable}]] sections keep the same allowance";
-            return false;
-        }
-
-        rules = (parsed with { Agents = agents }).Read(agentCategories, answers, picks, allowances);
+        rules = (parsed with { Agents = agents }).Read(agentCategories, answers, picks);
+        covered = Covered(rules, fills);
         error = string.Empty;
         return true;
     }
@@ -588,28 +594,23 @@ public sealed class AgentRulesFile(string path, string homeIdPath)
         return true;
     }
 
-    private static bool TryAllowance(TomlTable table, [NotNullWhen(true)] out BrowserAllowance? allowance, out string error)
+    /// <summary>
+    /// A <c>[[fill]]</c> section an earlier keypaste wrote to remember a login filled on a site, its site encrypted or in the clear:
+    /// nothing reads it any more, and it is kept only for the seal over it, until the owner's next write leaves it out.
+    /// </summary>
+    private static bool TryRetiredFill(TomlTable table, out (string SiteKey, string[] Texts) fill, out string error)
     {
-        allowance = null;
+        fill = default;
+        var siteKey = table.TryGet(_siteKey, out _) ? _siteKey : _originKey;
 
-        // A site an earlier keypaste kept in the clear is read, so its rules hold until the owner's next write hides it.
-        var hidden = table.TryGet(_siteKey, out _);
-
-        if (!TryTexts(table, [_pairingKey, _pairedKey, hidden ? _siteKey : _originKey, _itemKey], out var texts, out error))
+        if (!TryTexts(table, [_pairingKey, _pairedKey, siteKey, _itemKey], out var texts, out error))
         {
             return false;
         }
 
-        if (Browser.PairingNames.Problem(texts[0], []) is not null
-            || !DateTimeOffset.TryParseExact(texts[1], _pairedFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var paired)
-            || !(hidden ? FillSites.IsHidden(texts[2]) : Browser.WebOrigin.IsOrigin(texts[2]))
-            || !AgentRules.IsItem(texts[3]))
-        {
-            error = $"{At(table.Line)}: a [[{_fillTable}]] section names a pairing, when it was paired, its site as keypaste encrypted it or as scheme://host:port, and an item's UUID";
-            return false;
-        }
-
-        allowance = new BrowserAllowance(texts[0], paired, texts[2], texts[3].ToLowerInvariant());
+        // As the earlier keypaste read it, so the text the seal covers is the one it sealed.
+        texts[3] = texts[3].ToLowerInvariant();
+        fill = (siteKey, texts);
         return true;
     }
 

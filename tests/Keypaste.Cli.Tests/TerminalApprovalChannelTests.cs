@@ -400,42 +400,6 @@ public sealed class TerminalApprovalChannelTests
         Assert.StartsWith("[d] deny  [y] pair", rig.Prompt.PromptsSeen[0], StringComparison.Ordinal);
     }
 
-    private static FillPrompt FillPromptFor() => new()
-    {
-        Identity = Keypaste.Core.Browser.BrowserIdentity.ChromeWebStore,
-        Pairing = "laptop",
-        Origin = "https://github.com:443",
-        Site = "github.com",
-        FormOrigin = "https://collector.example:443",
-        Warning = "This form sends what you fill to collector.example, another site. keypaste asks before each fill.",
-        Title = "GitHub",
-        Username = "dana",
-        Vault = "Acme",
-    };
-
-    /// <summary>A first fill on a site asks y/N about the one login picked in the page, naming it and the site and never a password.</summary>
-    [Theory]
-    [InlineData("y", ApprovalAnswer.ApprovedOnce)]
-    [InlineData("d", ApprovalAnswer.Denied)]
-    [InlineData("1", ApprovalAnswer.Denied)]
-    [InlineData("", ApprovalAnswer.Denied)]
-    public async Task A_first_fill_on_a_site_asks_y_or_no_about_the_login_picked(string answer, ApprovalAnswer expected)
-    {
-        var rig = Build(answer);
-
-        var said = await rig.Channel.AskAsync(FillPromptFor(), Token);
-
-        Assert.Equal(expected, said);
-        var shown = rig.Stderr.ToString();
-        Assert.Contains("keypaste: Fill GitHub on github.com?", shown, StringComparison.Ordinal);
-        Assert.Contains("  login    GitHub (dana)", shown, StringComparison.Ordinal);
-        Assert.Contains("  vault    Acme", shown, StringComparison.Ordinal);
-        Assert.Contains("  page     https://github.com:443", shown, StringComparison.Ordinal);
-        Assert.Contains("  This form sends what you fill to collector.example, another site.", shown, StringComparison.Ordinal);
-        Assert.StartsWith("[d] deny  [y] fill", rig.Prompt.PromptsSeen[0], StringComparison.Ordinal);
-        Assert.DoesNotContain("always", shown, StringComparison.OrdinalIgnoreCase);
-    }
-
     [Fact]
     public async Task A_Denies_WhereNothingOffersIt_AndH_IsNoAnswerAtAll()
     {

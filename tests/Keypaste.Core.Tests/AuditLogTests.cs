@@ -133,6 +133,7 @@ public sealed class AuditLogTests : IDisposable
         Assert.Contains("prompt", written, StringComparer.Ordinal);
         Assert.Contains("always-allowed", written, StringComparer.Ordinal);
         Assert.Contains("automatic", written, StringComparer.Ordinal);
+        Assert.Contains("picked", written, StringComparer.Ordinal);
         Assert.DoesNotContain("policy", written, StringComparer.Ordinal);
         Assert.DoesNotContain("policy-limit", written, StringComparer.Ordinal);
     }

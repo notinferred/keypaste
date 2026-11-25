@@ -19,7 +19,7 @@ namespace Keypaste.App.Tests.Session;
 /// <summary>
 /// Pairing a browser with the app: a request brings the app's own window at once, with the code the extension shows and the build
 /// the browser named, Deny focused, Pair armed after a moment and only for a name a new pairing can take; a Deny holds the next
-/// request back unasked; Settings lists each pairing as it is made and Remove ends it.
+/// request back unasked; Settings lists each pairing as it is made and Remove ends it; and a pick in a page fills with no window.
 /// </summary>
 public sealed partial class BrowserPairingTests
 {
@@ -175,7 +175,7 @@ public sealed partial class BrowserPairingTests
         var said = card.GetVisualDescendants().OfType<TextBlock>().Where(block => block.IsEffectivelyVisible).Select(block => block.Text ?? string.Empty).ToList();
         Assert.Contains("Paired browsers", said);
         Assert.Contains("work laptop", said);
-        Assert.Contains("Fills without asking", said);
+        Assert.DoesNotContain("Fills without asking", said);
         Assert.DoesNotContain(Keypaste.App.Resources.Strings.PairInTheExtension, said);
         Assert.DoesNotContain(said, text => Retired().IsMatch(text));
 
@@ -187,7 +187,7 @@ public sealed partial class BrowserPairingTests
     });
 
     [Fact]
-    public Task A_first_pick_on_a_site_opens_a_confirmation_that_names_the_login_and_the_site_and_shows_no_password() => HeadlessSession.On(async () =>
+    public Task A_pick_on_the_first_visit_fills_at_once_and_opens_no_window() => HeadlessSession.On(async () =>
     {
         await using var app = await PromptedApp.StartAsync(seed: vault =>
         {
@@ -200,62 +200,11 @@ public sealed partial class BrowserPairingTests
 
         var listed = await link.ListAsync(List(app, "https://github.com/login"), Token);
         Assert.Equal(["GitHub", "GitHub work"], listed!.Names.Select(name => name.Title));
-        Assert.Single(app.Windows);
 
-        var filling = link.ReleaseAsync(Release(app, "https://github.com/login", listed.Names[1].Uuid), Token).AsTask();
-        var window = Assert.IsType<FillWindow>(await app.PromptAsync(2));
+        var reply = await link.ReleaseAsync(Release(app, "https://github.com/login", listed.Names[1].Uuid), Token);
 
-        Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
-        Assert.True(window.FindControl<Button>("Allow")!.IsEffectivelyEnabled);
-        Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(), button => button.IsDefault);
-        var title = window.FindControl<TextBlock>("TitleText")!;
-        Assert.Equal("Fill on github.com?", title.Inlines!.OfType<Avalonia.Controls.Documents.Run>().Aggregate(string.Empty, (text, run) => text + run.Text).Replace("\u200b", string.Empty, StringComparison.Ordinal));
-        Assert.Equal("Fill GitHub work on github.com?", Avalonia.Automation.AutomationProperties.GetName(title));
-        Assert.Equal("https://github.com:443", window.FindControl<TextBlock>("OriginText")!.Text);
-        Assert.DoesNotContain(window.GetVisualDescendants().OfType<TextBlock>(), text => (text.Text ?? string.Empty).Contains("s3cret", StringComparison.Ordinal));
-
-        Click(window, "Allow");
-
-        var reply = await filling.WaitAsync(_wait, Token);
         Assert.Equal("work-s3cret", Assert.Single(reply!.Logins).Password);
-        await PromptedApp.WithdrawnAsync(window);
-        Assert.Single(new BrowserFillViewModel(app.Authority).Allowances);
-    });
-
-    [Fact]
-    public Task A_site_filled_before_fills_at_once_is_listed_in_Settings_and_forgetting_it_asks_again() => HeadlessSession.On(async () =>
-    {
-        await using var app = await PromptedApp.StartAsync(seed: vault =>
-            vault.AddEntry(new VaultEntry { Title = "GitHub", Username = "dana", Password = "fill-s3cret", Url = "https://github.com" }));
-        await PairAsync(app, "laptop");
-        await using var link = await AttachAsync(app, BrowserIdentity.ChromeWebStore);
-        Assert.Equal(BrowserOutcome.Done, (await link.CheckAsync(Check(app, "laptop"), Token))?.Outcome);
-        var item = Assert.Single((await link.ListAsync(List(app, "https://github.com/login"), Token))!.Names).Uuid;
-
-        var filling = link.ReleaseAsync(Release(app, "https://github.com/login", item), Token).AsTask();
-        var window = Assert.IsType<FillWindow>(await app.PromptAsync(2));
-        await app.ArmAsync();
-        Click(window, "Allow");
-        Assert.Single((await filling.WaitAsync(_wait, Token))!.Logins);
-        await PromptedApp.WithdrawnAsync(window);
-
-        using var browserFill = new BrowserFillViewModel(app.Authority);
-        var row = Assert.Single(browserFill.Allowances);
-        Assert.Equal(("GitHub", "github.com in laptop · until you remove it"), (row.Item, row.Where));
-
-        var atOnce = await link.ReleaseAsync(Release(app, "https://github.com/", item), Token);
-        Assert.Single(atOnce!.Logins);
-        Assert.Equal(2, app.Windows.Count);
-
-        browserFill.AskUnallowCommand.Execute(row);
-        Assert.True(row.IsConfirmingStop);
-        Assert.Single(browserFill.Allowances);
-        browserFill.UnallowCommand.Execute(row);
-        Assert.Empty(browserFill.Allowances);
-        var askedAgain = link.ReleaseAsync(Release(app, "https://github.com/", item), Token).AsTask();
-        var again = Assert.IsType<FillWindow>(await app.PromptAsync(3));
-        Click(again, "Deny");
-        Assert.Empty((await askedAgain.WaitAsync(_wait, Token))!.Logins);
+        Assert.Single(app.Windows);
     });
 
     private static BrowserListRequest List(PromptedApp app, string url) =>

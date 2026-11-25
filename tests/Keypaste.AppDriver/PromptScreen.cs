@@ -161,9 +161,6 @@ internal sealed class PromptScreen : IDisposable
                 $"warning={Text(window, "WarningText")} changes={string.Join("; ", Changes(window))}",
             PairingWindow =>
                 $"pair-prompt identity={Text(window, "IdentityText")} code={Text(window, "CodeText")} name={window.FindControl<TextBox>("NameBox")?.Text}",
-            FillWindow when window.DataContext is FillViewModel fill =>
-                $"fill-prompt question={fill.Question} origin={fill.Origin} pairing={fill.Pairing} login={fill.Login}" +
-                (fill.HasNote ? $" note={fill.Note}" : string.Empty),
             _ =>
                 $"prompt client={Text(window, "ClientText")} label={Text(window, "LabelText")} " +
                 $"entry={Text(window, "EntryText")} field={Text(window, "FieldText")} for=once always=none",
@@ -173,7 +170,6 @@ internal sealed class PromptScreen : IDisposable
         {
             TerminalEditWindow => "edit-prompt withdrawn",
             PairingWindow => "pair-prompt withdrawn",
-            FillWindow => "fill-prompt withdrawn",
             _ => "prompt withdrawn",
         };
 

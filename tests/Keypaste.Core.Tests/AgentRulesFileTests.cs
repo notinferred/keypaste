@@ -67,50 +67,26 @@ public sealed class AgentRulesFileTests : IDisposable
         Assert.Null(read.PickFor("cursor", "services/Mail", "password"));
     }
 
+    /// <summary>
+    /// The <c>[[fill]]</c> sections an earlier keypaste wrote to remember the logins filled on each site, their sites encrypted or
+    /// in the clear and as many as it kept, are read past: the rules come back without them, and the seal covers them as it wrote them.
+    /// </summary>
     [Fact]
-    public void Browser_allowances_read_back_as_themselves()
-    {
-        var paired = new DateTimeOffset(2026, 11, 16, 10, 0, 0, TimeSpan.Zero);
-        var written = AgentRules.Defaults
-            .AllowingFill(new BrowserAllowance("work laptop", paired, "https://github.com:443", "0123456789ABCDEF0123456789ABCDEF"))
-            .AllowingFill(new BrowserAllowance("work laptop", paired, "http://nas:5000", "fedcba9876543210fedcba9876543210"));
-
-        Assert.True(File.TryWrite(written, seal: null, out var problem), problem);
-        Assert.True(File.TryRead(out var read, out problem), problem);
-
-        Assert.Equal(written, read);
-        Assert.True(read.AllowsFill("work laptop", paired, "https://github.com:443", "0123456789abcdef0123456789abcdef"));
-        Assert.False(read.AllowsFill("work laptop", paired.AddSeconds(1), "https://github.com:443", "0123456789abcdef0123456789abcdef"));
-        Assert.False(read.AllowsFill("work laptop", paired, "https://gist.github.com:443", "0123456789abcdef0123456789abcdef"));
-    }
-
-    [Fact]
-    public void A_fill_kept_past_the_most_forgets_the_oldest_so_its_next_fill_is_asked()
-    {
-        var rules = AgentRules.Defaults;
-
-        for (var site = 0; site <= AgentRules.MaximumBrowserAllowances; site++)
-        {
-            rules = rules.AllowingFill(new BrowserAllowance("laptop", DateTimeOffset.UnixEpoch, $"https://site{site}.example:443", "0123456789abcdef0123456789abcdef"));
-        }
-
-        Assert.Equal(AgentRules.MaximumBrowserAllowances, rules.BrowserAllowances.Count);
-        Assert.False(rules.AllowsFill("laptop", DateTimeOffset.UnixEpoch, "https://site0.example:443", "0123456789abcdef0123456789abcdef"));
-        Assert.True(rules.AllowsFill("laptop", DateTimeOffset.UnixEpoch, $"https://site{AgentRules.MaximumBrowserAllowances}.example:443", "0123456789abcdef0123456789abcdef"));
-        Assert.True(File.TryWrite(rules, seal: null, out var problem), problem);
-        Assert.True(File.TryRead(out var read, out problem), problem);
-        Assert.Equal(AgentRules.MaximumBrowserAllowances, read.BrowserAllowances.Count);
-    }
-
-    [Fact]
-    public void Rules_without_allowances_are_written_and_sealed_as_before_allowances_existed()
+    public void An_earlier_keypastes_fill_sections_are_read_past_and_still_covered_by_the_seal()
     {
         var rules = AgentRules.Defaults.WithRun("claude-code", run: true);
-        var allowing = rules.AllowingFill(new BrowserAllowance("laptop", DateTimeOffset.UnixEpoch, "https://github.com:443", "0123456789abcdef0123456789abcdef"));
+        Assert.True(File.TryWrite(rules, seal: null, out var problem), problem);
+        var hidden = Convert.ToBase64String(new byte[12 + 448 + 16]);
+        var fills = "\n[[fill]]\npairing = \"work laptop\"\npaired = \"2026-11-16T10:00:00Z\"\nsite = \"" + hidden + "\"\nitem = \"0123456789abcdef0123456789abcdef\"\n"
+            + string.Concat(Enumerable.Range(1, 127).Select(site =>
+                $"\n[[fill]]\npairing = \"laptop\"\npaired = \"2026-11-16T10:00:00Z\"\norigin = \"https://site{site}.example:443\"\nitem = \"fedcba9876543210fedcba9876543210\"\n"));
+        System.IO.File.AppendAllText(File.Path, fills);
 
-        Assert.DoesNotContain("fill", AgentRulesFile.Canonical(rules), StringComparison.Ordinal);
-        Assert.Equal(AgentRulesFile.Canonical(rules), AgentRulesFile.Canonical(allowing.WithoutPairing("laptop", DateTimeOffset.UnixEpoch)));
-        Assert.StartsWith(AgentRulesFile.Canonical(rules), AgentRulesFile.Canonical(allowing), StringComparison.Ordinal);
+        Assert.True(File.TryReadFile(out var read, out problem), problem);
+
+        Assert.Equal(rules, read.Rules);
+        Assert.Equal(AgentRulesFile.Canonical(rules) + fills, read.Covered);
+        Assert.DoesNotContain("fill", AgentRulesFile.Canonical(read.Rules), StringComparison.Ordinal);
     }
 
     [Theory]
@@ -125,12 +101,7 @@ public sealed class AgentRulesFileTests : IDisposable
     [InlineData("[[client]]\nlabel = \"claude-code\"\n", "line 1")]
     [InlineData("[[agent]]\nname = \"claude-code\"\nrun = 2\n", "line 3")]
     [InlineData("[[agent]]\nname = \"a\"\n[[agent]]\nname = \"a\"\n", "same agent")]
-    [InlineData("[[fill]]\npairing = \"laptop\"\npaired = \"2026-11-16T10:00:00Z\"\norigin = \"https://github.com\"\nitem = \"0123456789abcdef0123456789abcdef\"\n", "line 1")]
-    [InlineData("[[fill]]\npairing = \"laptop\"\npaired = \"2026-11-16T10:00:00Z\"\nsite = \"https://github.com:443\"\nitem = \"0123456789abcdef0123456789abcdef\"\n", "line 1")]
     [InlineData("[[fill]]\npairing = \"laptop\"\npaired = \"2026-11-16T10:00:00Z\"\nsite = \"AAAA\"\norigin = \"https://github.com:443\"\nitem = \"0123456789abcdef0123456789abcdef\"\n", "line 1")]
-    [InlineData("[[fill]]\npairing = \"laptop\"\npaired = \"yesterday\"\norigin = \"https://github.com:443\"\nitem = \"0123456789abcdef0123456789abcdef\"\n", "line 1")]
-    [InlineData("[[fill]]\npairing = \"laptop\"\npaired = \"2026-11-16T10:00:00Z\"\norigin = \"https://github.com:443\"\nitem = \"0123\"\n", "line 1")]
-    [InlineData("[[fill]]\npairing = \"laptop\"\npaired = \"2026-11-16T10:00:00Z\"\norigin = \"https://github.com:443\"\nitem = \"0123456789abcdef0123456789abcdef\"\n[[fill]]\npairing = \"laptop\"\npaired = \"2026-11-16T10:00:00Z\"\norigin = \"https://github.com:443\"\nitem = \"0123456789abcdef0123456789abcdef\"\n", "same allowance")]
     public void A_file_keypaste_cannot_read_refuses_and_is_left_as_it_is(string text, string said)
     {
         var path = Path.Combine(_directory, "agents.toml");

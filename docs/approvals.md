@@ -173,6 +173,7 @@ The next record starts a new file. Check the archive with `keypaste log verify -
 | `method` | Meaning |
 |---|---|
 | `prompt` | You answered |
+| `picked` | A login filled at your pick in keypaste's list in the page |
 | `allowed` / `blocked` | Released or refused without asking by a setting or kept answer |
 | `exposure` | A listing |
 | `out-of-scope` | Out of reach or absent, one answer for both |

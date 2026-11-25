@@ -17,8 +17,6 @@ public sealed class SealedAgentRulesTests : IDisposable
     private const string _password = "SENTINEL-SEALED-PASSWORD";
     private const string _site = "https://github.com:443";
 
-    private static readonly DateTimeOffset _paired = new(2026, 11, 1, 9, 30, 0, TimeSpan.Zero);
-
     private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-sealed-rules-").FullName;
     private readonly ManualClock _clock = new();
     private readonly FakeChannel _channel = new();
@@ -360,62 +358,114 @@ public sealed class SealedAgentRulesTests : IDisposable
         Assert.Equal(AuditMethod.Prompt, (await RequestAsync()).Method);
     }
 
-    /// <summary>A login filled on a site is kept with its site encrypted under the vault's key, so the file names no site, and the owner still fills it there at once.</summary>
+    /// <summary>
+    /// A file an earlier keypaste sealed while it remembered the logins filled on each site still holds, its rules followed and its
+    /// <c>[[fill]]</c> sections ignored, and the owner's next change writes the file without them.
+    /// </summary>
     [Fact]
-    public void A_browser_allowance_keeps_its_site_out_of_the_file_and_still_fills()
-    {
-        var item = _vault.EntryUuid(new EntryName("work", "github"))!;
-
-        Assert.True(_rules.TryChange(rules => rules.AllowingFill(new BrowserAllowance("work laptop", _paired, _site, item)), out var problem), problem);
-
-        Assert.DoesNotContain("github", File.ReadAllText(_file.Path), StringComparison.OrdinalIgnoreCase);
-        Assert.True(_file.TryRead(out var unopened, out _));
-        Assert.False(unopened.AllowsFill("work laptop", _paired, _site, item));
-        Assert.True(_rules.TryRead(out var held, out _));
-        Assert.True(held.AllowsFill("work laptop", _paired, _site, item));
-        Assert.False(held.AllowsFill("work laptop", _paired, "https://gist.github.com:443", item));
-        Assert.Null(_rules.Ignored);
-    }
-
-    /// <summary>A file an earlier keypaste sealed with its sites in the clear holds as it is, and the owner's next change keeps every rule and hides the sites.</summary>
-    [Fact]
-    public void A_file_sealed_with_sites_in_the_clear_holds_and_its_next_change_hides_them()
+    public async Task A_file_sealed_with_remembered_fills_still_holds_and_its_next_change_drops_them()
     {
         var item = _vault.EntryUuid(new EntryName("work", "github"))!;
         Assert.True(_rules.TryChange(rules => rules.WithRun(_agent, run: true), out var problem), problem);
-        var earlier = AgentRules.Defaults.WithRun(_agent, run: true)
-            .Remembering(new RememberedAnswer(_agent, item, "password", CategoryRule.Allow), confirmed: true)
-            .AllowingFill(new BrowserAllowance("work laptop", _paired, _site, item));
-        Assert.True(_file.TryWrite(earlier, SealedAgentRules.Seal(Key(), _file.HomeId()!, 1, earlier), out problem), problem);
-        Assert.Contains("https://github.com:443", File.ReadAllText(_file.Path), StringComparison.Ordinal);
+        var earlier = AgentRules.Defaults.WithRun(_agent, run: true).Remembering(new RememberedAnswer(_agent, item, "password", CategoryRule.Allow), confirmed: true);
+        WriteSealedWithFills(earlier, item, _site);
 
         Assert.True(_rules.TryRead(out var before, out _));
         Assert.Equal(earlier, before);
         Assert.Null(_rules.Ignored);
+        var reply = await RequestAsync();
+        Assert.Equal((AuditMethod.Allowed, _password), (reply.Method, reply.Value));
 
         Assert.True(_rules.TryChange(rules => rules.With(FieldCategory.Notes, CategoryRule.Block), out problem), problem);
 
-        Assert.DoesNotContain("github", File.ReadAllText(_file.Path), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("[[fill]]", File.ReadAllText(_file.Path), StringComparison.Ordinal);
         Assert.True(_rules.TryRead(out var after, out _));
         Assert.Equal(earlier.With(FieldCategory.Notes, CategoryRule.Block), after);
         Assert.Null(_rules.Ignored);
     }
 
-    /// <summary>A hidden site swapped in the file for another the owner sealed breaks the seal, so the defaults hold and nothing fills unasked.</summary>
+    /// <summary>A remembered fill changed in a file an earlier keypaste sealed breaks the seal, so the defaults hold.</summary>
     [Fact]
-    public void A_hidden_site_swapped_in_the_file_is_ignored()
+    public void A_remembered_fill_changed_in_a_sealed_file_is_ignored()
     {
         var item = _vault.EntryUuid(new EntryName("work", "github"))!;
-        Assert.True(_rules.TryChange(rules => rules.AllowingFill(new BrowserAllowance("work laptop", _paired, "https://gitlab.com:443", item)), out var problem), problem);
-        var other = File.ReadAllLines(_file.Path).Single(line => line.StartsWith("site = ", StringComparison.Ordinal));
-        Assert.True(_rules.TryChange(rules => rules.WithoutPairing("work laptop", _paired).AllowingFill(new BrowserAllowance("work laptop", _paired, _site, item)), out problem), problem);
-        var sealedText = File.ReadAllLines(_file.Path);
-        File.WriteAllLines(_file.Path, sealedText.Select(line => line.StartsWith("site = ", StringComparison.Ordinal) ? other : line));
+        Assert.True(_rules.TryChange(rules => rules.WithRun(_agent, run: true), out var problem), problem);
+        WriteSealedWithFills(AgentRules.Defaults.WithRun(_agent, run: true), item, _site);
+        File.WriteAllText(_file.Path, File.ReadAllText(_file.Path).Replace(_site, "https://gitlab.com:443", StringComparison.Ordinal));
 
         Assert.True(_rules.TryRead(out var held, out _));
 
-        Assert.Empty(held.BrowserAllowances);
+        Assert.False(held.Runs(_agent));
         Assert.Equal(SealedAgentRules.IgnoredText, _rules.Ignored);
+        var edited = File.ReadAllText(_file.Path);
+        Assert.False(_rules.TryDropRetiredFills(() => true, out _));
+        Assert.Equal(edited, File.ReadAllText(_file.Path));
+    }
+
+    /// <summary>
+    /// The first owner started over a file sealed with remembered fills writes it again, sealed, without them, keeping every
+    /// agent rule and Always allow, and records that on one line; the next owner finds nothing to do.
+    /// </summary>
+    [Fact]
+    public async Task An_owner_drops_remembered_fills_once_keeping_every_rule_and_saying_so()
+    {
+        var item = _vault.EntryUuid(new EntryName("work", "github"))!;
+        Assert.True(_rules.TryChange(rules => rules.WithRun(_agent, run: true), out var problem), problem);
+        var earlier = AgentRules.Defaults.WithRun(_agent, run: true).Remembering(new RememberedAnswer(_agent, item, "password", CategoryRule.Allow), confirmed: true);
+        WriteSealedWithFills(earlier, item, _site);
+
+        StartOwner();
+        var rewritten = File.ReadAllText(_file.Path);
+        StartOwner();
+
+        Assert.DoesNotContain("[[fill]]", rewritten, StringComparison.Ordinal);
+        Assert.Equal(rewritten, File.ReadAllText(_file.Path));
+        Assert.True(_rules.TryRead(out var held, out _));
+        Assert.Equal(earlier, held);
+        Assert.Null(_rules.Ignored);
+        var line = Assert.Single(_log.Lines(), line => line.GetProperty("method").GetString() == "rules-changed");
+        Assert.Equal(("access_change", "granted", SessionServer.DroppedFillsReason), (line.GetProperty("tool").GetString(), line.GetProperty("decision").GetString(), line.GetProperty("reason").GetString()));
+        var reply = await RequestAsync();
+        Assert.Equal((AuditMethod.Allowed, _password), (reply.Method, reply.Value));
+    }
+
+    /// <summary>A sealed file without remembered fills is left as it is when an owner starts, and no line says otherwise.</summary>
+    [Fact]
+    public void An_owner_leaves_a_file_without_remembered_fills_as_it_is()
+    {
+        Assert.True(_rules.TryChange(rules => rules.WithRun(_agent, run: true), out var problem), problem);
+        var before = File.ReadAllText(_file.Path);
+
+        StartOwner();
+
+        Assert.Equal(before, File.ReadAllText(_file.Path));
+        Assert.DoesNotContain(_log.Lines(), line => line.GetProperty("method").GetString() == "rules-changed");
+        Assert.Null(_rules.Ignored);
+    }
+
+    /// <summary>Starts and stops an owner of this vault over these rules, as an unlock does.</summary>
+    private void StartOwner()
+    {
+        using var server = SessionServer.Build(new SessionServerOptions
+        {
+            Vault = VaultIdentity.Of(_directory, VaultPath),
+            Lifetime = _lifetime,
+            CurrentLifetime = () => _lifetime,
+            UnlockedFor = asked => asked.IsLive ? _vault : null,
+            Channel = _channel,
+            Rules = _rules,
+            Audit = () => _log.Log,
+        });
+    }
+
+    /// <summary>Writes rules with one <c>[[fill]]</c> section after them, as an earlier keypaste wrote and sealed them, at this home's first count.</summary>
+    private void WriteSealedWithFills(AgentRules rules, string item, string origin)
+    {
+        var fill = $"\n[[fill]]\npairing = \"work laptop\"\npaired = \"2026-11-01T09:30:00Z\"\norigin = \"{origin}\"\nitem = \"{item.ToLowerInvariant()}\"\n";
+        var covered = $"keypaste agents.toml 2\n{_file.HomeId()}\n1\n{AgentRulesFile.Canonical(rules)}{fill}";
+        var seal = Convert.ToHexStringLower(System.Security.Cryptography.HMACSHA256.HashData(Key(), System.Text.Encoding.UTF8.GetBytes(covered)));
+        Assert.True(_file.TryWrite(rules, seal: null, out var problem), problem);
+        File.AppendAllText(_file.Path, $"{fill}\n[[seal]]\nmac = \"{seal}\"\n");
     }
 
     private byte[] Key() => Convert.FromBase64String(_vault.ReadRecords(ReservedGroups.Keys, SealedAgentRules.KeyField).Single(record => record.Title == SealedAgentRules.KeyTitle).Value!);
