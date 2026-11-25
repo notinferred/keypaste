@@ -3,15 +3,14 @@ using Avalonia;
 using Avalonia.Automation.Peers;
 using Avalonia.Controls;
 using Avalonia.Media;
-using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Keypaste.App.ViewModels;
 
 namespace Keypaste.App.Controls;
 
 /// <summary>
-/// A cell that shows dots, and shows a value from when somebody asks until they hide it, it times out,
-/// they leave it or its window stops being in front of them.
+/// A cell that shows dots, and shows a value from when somebody asks until they hide it, they leave it
+/// or its window stops being in front of them.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -49,13 +48,6 @@ namespace Keypaste.App.Controls;
 /// </remarks>
 internal sealed class RevealedValue : Control
 {
-    /// <summary>How long a value stays shown: time to read or type a long value, and short enough that one forgotten does not sit on the screen.</summary>
-    internal static readonly TimeSpan ShownFor = TimeSpan.FromSeconds(30);
-
-    /// <summary>The clock <see cref="ShownFor"/> runs on, inherited so a test can set it on a window.</summary>
-    internal static readonly AttachedProperty<TimeProvider> ClockProperty =
-        AvaloniaProperty.RegisterAttached<RevealedValue, Control, TimeProvider>("Clock", TimeProvider.System, inherits: true);
-
     /// <summary>How many characters the hidden value has. All this control knows at rest.</summary>
     internal static readonly StyledProperty<int> MaskedLengthProperty =
         AvaloniaProperty.Register<RevealedValue, int>(nameof(MaskedLength));
@@ -94,8 +86,6 @@ internal sealed class RevealedValue : Control
     private string? _shown;
     private IRevealSource? _reading;
     private Window? _window;
-    private ITimer? _timeout;
-    private long _reveals;
 
     public RevealedValue() => FlowDirection = FlowDirection.LeftToRight;
 
@@ -323,11 +313,10 @@ internal sealed class RevealedValue : Control
         source.Changed += OnReadingChanged;
     }
 
-    /// <summary>Everything that ends a reveal comes through here, so none of it can leave a watcher or a timer behind.</summary>
+    /// <summary>Everything that ends a reveal comes through here, so none of it can leave a watcher behind.</summary>
     private void StopShowing()
     {
         _shown = null;
-        _reveals++;
 
         if (_reading is { } read)
         {
@@ -342,8 +331,6 @@ internal sealed class RevealedValue : Control
             _window = null;
         }
 
-        _timeout?.Dispose();
-        _timeout = null;
         LayoutUpdated -= OnLayoutUpdated;
 
         if (ReferenceEquals(Shown, this))
@@ -355,19 +342,7 @@ internal sealed class RevealedValue : Control
 
     private void WatchForLeaving()
     {
-        var reveal = _reveals;
         LayoutUpdated += OnLayoutUpdated;
-        _timeout = GetValue(ClockProperty).CreateTimer(
-            _ => Dispatcher.UIThread.Post(() =>
-            {
-                if (reveal == _reveals)
-                {
-                    EndReveal();
-                }
-            }),
-            null,
-            ShownFor,
-            Timeout.InfiniteTimeSpan);
 
         if (TopLevel.GetTopLevel(this) is Window window)
         {

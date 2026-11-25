@@ -15,7 +15,7 @@ namespace Keypaste.App.Tests.Controls;
 
 /// <summary>
 /// The Reveal toggle: one activation of any kind shows its cell's value, the next hides it, it says which it
-/// will do with no value in what it says, and each way out of a reveal hides the value and leaves no timer.
+/// will do with no value in what it says, each way out of a reveal hides the value, and time alone is not one.
 /// </summary>
 public sealed class RevealButtonTests
 {
@@ -76,7 +76,7 @@ public sealed class RevealButtonTests
         using var screen = new Screen();
         var peer = ControlAutomationPeer.CreatePeerForElement(screen.Button);
         Assert.Equal("Reveal the key", peer.GetName());
-        Assert.Equal("Reveal for 30 seconds", ToolTip.GetTip(screen.Button));
+        Assert.Equal("Reveal", ToolTip.GetTip(screen.Button));
 
         screen.Button.Focus();
         screen.Tap(PhysicalKey.Space);
@@ -161,66 +161,32 @@ public sealed class RevealButtonTests
     });
 
     [Fact]
-    public Task It_hides_itself_when_its_time_is_up_and_not_before() => HeadlessSession.On(() =>
-    {
-        using var screen = new Screen();
-        screen.Cell.BeginReveal();
-
-        screen.Clock.Advance(RevealedValue.ShownFor - TimeSpan.FromSeconds(1));
-        WindowInput.Drain();
-        Assert.True(screen.Cell.IsRevealed);
-
-        screen.Clock.Advance(TimeSpan.FromSeconds(1));
-        WindowInput.Drain();
-        Assert.False(screen.Cell.IsRevealed);
-        Assert.Null(RevealedValue.Shown);
-    });
-
-    [Fact]
-    public Task A_time_up_from_an_earlier_reveal_does_not_hide_the_next() => HeadlessSession.On(() =>
-    {
-        using var screen = new Screen();
-        screen.Cell.BeginReveal();
-        screen.Clock.Advance(TimeSpan.FromSeconds(20));
-        screen.Cell.EndReveal();
-        screen.Cell.BeginReveal();
-
-        screen.Clock.Advance(TimeSpan.FromSeconds(20));
-        WindowInput.Drain();
-        Assert.True(screen.Cell.IsRevealed);
-
-        screen.Clock.Advance(TimeSpan.FromSeconds(10));
-        WindowInput.Drain();
-        Assert.False(screen.Cell.IsRevealed);
-    });
-
-    [Theory]
-    [InlineData("hidden by hand")]
-    [InlineData("left the tree")]
-    [InlineData("another row")]
-    public Task No_timer_is_left_running_after_a_reveal_ends(string how) => HeadlessSession.On(() =>
+    public Task It_stays_shown_past_thirty_seconds_and_starts_no_timer() => HeadlessSession.On(() =>
     {
         using var screen = new Screen();
         var before = screen.Clock.PendingTimers;
         screen.Cell.BeginReveal();
-        Assert.Equal(before + 1, screen.Clock.PendingTimers);
-
-        switch (how)
-        {
-            case "hidden by hand":
-                screen.Cell.EndReveal();
-                break;
-            case "left the tree":
-                screen.Window.Content = null;
-                break;
-            default:
-                screen.Cell.Source = new Source();
-                break;
-        }
-
-        WindowInput.Drain();
-        Assert.False(screen.Cell.IsRevealed);
         Assert.Equal(before, screen.Clock.PendingTimers);
+
+        screen.Clock.Advance(TimeSpan.FromHours(1));
+        WindowInput.Drain();
+
+        Assert.True(screen.Cell.IsRevealed);
+        Assert.Equal(_value, screen.Cell.Rendered);
+        Assert.Same(screen.Cell, RevealedValue.Shown);
+    });
+
+    [Fact]
+    public Task Leaving_the_tree_hides_it() => HeadlessSession.On(() =>
+    {
+        using var screen = new Screen();
+        screen.Cell.BeginReveal();
+
+        screen.Window.Content = null;
+        WindowInput.Drain();
+
+        Assert.False(screen.Cell.IsRevealed);
+        Assert.Null(RevealedValue.Shown);
     });
 
     [Fact]
@@ -312,7 +278,7 @@ public sealed class RevealButtonTests
                 Height = 200,
                 Content = new StackPanel { Children = { Cell, Button, Other } },
             };
-            Window.SetValue(RevealedValue.ClockProperty, Clock);
+            Window.SetValue(PressToCopy.ClockProperty, Clock);
             Window.Show();
             WindowInput.Drain();
         }

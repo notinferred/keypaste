@@ -15,7 +15,7 @@ public sealed class PressToCopyTests
 {
     private static PressToCopy Open(RenderedShell shell, ManualClock clock, string name)
     {
-        shell.Window.SetValue(RevealedValue.ClockProperty, clock);
+        shell.Window.SetValue(PressToCopy.ClockProperty, clock);
         var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
         entries.Selected = entries.Rows.Single(row => row.Title == "github");
         RenderedShell.Drain();

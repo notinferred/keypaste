@@ -182,7 +182,7 @@ What keypaste holds to under the [laws](#security-laws), and what it can't preve
 
 ### The desktop app (unreleased)
 
-- Secret fields show automation only their length [T-22]. A revealed value shows for at most 30 seconds [T-25].
+- Secret fields show automation only their length [T-22]. A revealed value shows until you hide it, leave its item or window, or the vault locks [T-25].
 - Copies clear after 20 seconds if unchanged, as `keypaste get` does in v0.3.0 [T-19].
 - Several vaults can be open at once, each with its own claim and pipe. The idle lock, `Ctrl/Cmd+L` and quitting lock them all [T-23] [T-29].
 - The idle lock comes after 30 minutes by default, and at most 8 hours [T-23].

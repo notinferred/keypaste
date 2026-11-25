@@ -123,7 +123,7 @@ internal sealed class RevealButton : Button
         _icon.Icon = showing ? "eye-off" : "eye";
         _word.Text = word;
         AutomationProperties.SetName(this, Subject is { Length: > 0 } subject ? $"{word} {subject}" : word);
-        ToolTip.SetTip(this, showing ? Strings.Hide : UseText.RevealFor(RevealedValue.ShownFor));
+        ToolTip.SetTip(this, word);
         (Parent as Control)?.Classes.Set("shows-value", showing);
     }
 

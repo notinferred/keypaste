@@ -71,7 +71,7 @@ Find searches titles, group paths, usernames, websites and tags. Passwords, note
 
 ### Copy and reveal
 
-Select an item, then press a field's row to copy it; `Ctrl/Cmd+C` copies the password. A password stays hidden until you press Reveal, and hides again after 30 seconds, when you leave the item or the window, and on lock.
+Select an item, then press a field's row to copy it; `Ctrl/Cmd+C` copies the password. A password stays hidden until you press Reveal, and hides again when you press Hide, leave the item or the window, and on lock.
 
 A copied secret clears after twenty seconds, and sooner on lock or quit. Each copy asks clipboard managers not to keep it. Nothing clears it if the app is killed, and keypaste cannot make a clipboard manager honour the request ([THREATS](../THREATS.md) T-19).
 

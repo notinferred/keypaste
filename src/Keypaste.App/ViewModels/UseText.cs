@@ -23,7 +23,6 @@ internal static class UseText
     /// <summary>"Changed" and the moment, as an item's row says it in its tooltip and to a screen reader.</summary>
     internal static string Changed(DateTimeOffset at) => string.Format(CultureInfo.CurrentCulture, Strings.ChangedValue, PersonTime.Moment(at.ToLocalTime()));
 
-    /// <summary>What the reveal button's tooltip says.</summary>
     /// <summary>Who wants what, as Agents' waiting row says it.</summary>
     internal static string Wants(string who, string what) => string.Format(CultureInfo.CurrentCulture, Strings.WantsValue, who, what);
 
@@ -91,8 +90,6 @@ internal static class UseText
     internal static string TagIsNotAStage(string item, string stage) => string.Format(CultureInfo.CurrentCulture, Strings.ValuesTagValueIsntAStageName, item, stage);
 
     internal static string ChangeTo(string stage) => string.Format(CultureInfo.CurrentCulture, Strings.ChangeToValue, stage);
-
-    internal static string RevealFor(TimeSpan shownFor) => string.Format(CultureInfo.CurrentCulture, Strings.RevealForSeconds, shownFor.TotalSeconds);
 
     /// <summary>A time as how long ago it was, in its largest whole unit.</summary>
     /// <param name="at">The time.</param>

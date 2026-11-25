@@ -31,9 +31,9 @@ public sealed class DrawnRevealWaysOutTests
 
     private static readonly IReadOnlyDictionary<string, string[]> _waysOut = new Dictionary<string, string[]>
     {
-        ["totp"] = ["hide", "time", "window focus", "minimize", "window hidden", "lock", "another item", "search", "another place", "edit form", "saved change", "another value", "menu"],
-        ["generated"] = ["hide", "time", "window focus", "minimize", "window hidden", "lock", "cancel", "escape"],
-        ["token"] = ["hide", "time", "window focus", "minimize", "window hidden", "lock", "done", "another place", "menu"],
+        ["totp"] = ["hide", "window focus", "minimize", "window hidden", "lock", "another item", "search", "another place", "edit form", "saved change", "another value", "menu"],
+        ["generated"] = ["hide", "window focus", "minimize", "window hidden", "lock", "cancel", "escape"],
+        ["token"] = ["hide", "window focus", "minimize", "window hidden", "lock", "done", "another place", "menu"],
     };
 
     public static TheoryData<string, string> WaysOut()
@@ -56,8 +56,6 @@ public sealed class DrawnRevealWaysOutTests
     public Task Each_way_out_takes_the_value_off_the_frame_and_out_of_what_holds_it(string surface, string way) => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-ways-out-", seed: SeedItems);
-        var clock = new ManualClock();
-        shell.Window.SetValue(RevealedValue.ClockProperty, clock);
         var opened = Open(shell, surface);
         var style = TextStyle.Of(opened.Cell);
 
@@ -66,7 +64,7 @@ public sealed class DrawnRevealWaysOutTests
         Assert.True(shown.Shows(opened.Drawn, style, shown.Of(opened.Cell, shell.Window)), "the value is not drawn before leaving");
         Assert.Equal(opened.Value, opened.Cell.Rendered);
 
-        Leave(shell, clock, opened, way);
+        Leave(shell, opened, way);
         RenderedShell.Drain();
 
         var after = shell.Frame();
@@ -192,15 +190,12 @@ public sealed class DrawnRevealWaysOutTests
         }
     }
 
-    private static void Leave(RenderedShell shell, ManualClock clock, Opened opened, string way)
+    private static void Leave(RenderedShell shell, Opened opened, string way)
     {
         switch (way)
         {
             case "hide":
                 shell.Tap(shell.ToggleOf(opened.Cell));
-                break;
-            case "time":
-                clock.Advance(RevealedValue.ShownFor);
                 break;
             case "window focus":
                 WindowInput.Deactivate(shell.Window);

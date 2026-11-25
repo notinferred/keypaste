@@ -552,7 +552,6 @@ public static class Strings
     public static string RestoreWindowSize => Manager.GetString("RestoreWindowSize", CultureInfo.CurrentUICulture)!;
     public static string Result => Manager.GetString("Result", CultureInfo.CurrentUICulture)!;
     public static string Reveal => Manager.GetString("Reveal", CultureInfo.CurrentUICulture)!;
-    public static string RevealForSeconds => Manager.GetString("RevealForSeconds", CultureInfo.CurrentUICulture)!;
     public static string ReviewAgain => Manager.GetString("ReviewAgain", CultureInfo.CurrentUICulture)!;
     public static string ReviewAndMerge => Manager.GetString("ReviewAndMerge", CultureInfo.CurrentUICulture)!;
     public static string ReviewValueAgain => Manager.GetString("ReviewValueAgain", CultureInfo.CurrentUICulture)!;

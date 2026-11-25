@@ -404,9 +404,9 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Threat.** People nearby, screen captures or remote sessions see a value the person revealed.
 
-**Mitigation.** A reveal shows one value for at most 30 seconds, and hides it when the row changes, a menu opens, or the window loses focus, minimizes or locks. The value is drawn, so the accessibility layer never carries it.
+**Mitigation.** A reveal shows one value at a time and hides it when the person hides it, the row changes, a menu opens, or the window loses focus, minimizes or locks, the idle lock included. The value is drawn, so the accessibility layer never carries it.
 
-**Limit.** The value is readable for up to 30 seconds, and hiding it cannot erase a capture.
+**Limit.** A value left revealed in a window that keeps focus stays readable until the idle lock, up to its limit of eight hours, and hiding it cannot erase a capture.
 
 **Status.** Unreleased.
 

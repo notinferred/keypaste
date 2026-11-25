@@ -351,7 +351,6 @@
   <data name="RestoreTag" xml:space="preserve"><value>Restore tag</value></data>
   <data name="RestoreValue" xml:space="preserve"><value>Restore {0}</value></data>
   <data name="Reveal" xml:space="preserve"><value>Reveal</value></data>
-  <data name="RevealForSeconds" xml:space="preserve"><value>Reveal for {0:0} seconds</value></data>
   <data name="ReviewAgain" xml:space="preserve"><value>Review again</value></data>
   <data name="ReviewValueAgain" xml:space="preserve"><value>Review {0} again</value></data>
   <data name="Revoke" xml:space="preserve"><value>Revoke</value></data>

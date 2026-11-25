@@ -279,7 +279,7 @@ public sealed class DrawnRevealTests
 
         foreach (var surface in Surfaces.Select(row => (string)row.Data))
         {
-            foreach (var way in new[] { "time", "window focus", "minimize", "another place" })
+            foreach (var way in new[] { "window focus", "minimize", "another place" })
             {
                 data.Add(surface, way);
             }
@@ -294,8 +294,6 @@ public sealed class DrawnRevealTests
     {
         using var shell = new RenderedShell();
         shell.Window.Width = _roomForValues;
-        var clock = new ManualClock();
-        shell.Window.SetValue(RevealedValue.ClockProperty, clock);
         var (cell, value) = shell.Open(surface);
         var style = TextStyle.Of(cell);
 
@@ -306,9 +304,6 @@ public sealed class DrawnRevealTests
 
         switch (way)
         {
-            case "time":
-                clock.Advance(RevealedValue.ShownFor);
-                break;
             case "window focus":
                 WindowInput.Deactivate(shell.Window);
                 break;

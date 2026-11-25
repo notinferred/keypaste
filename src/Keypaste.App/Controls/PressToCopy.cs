@@ -18,6 +18,10 @@ internal sealed class PressToCopy : Button
 {
     internal static readonly TimeSpan CheckShownFor = TimeSpan.FromSeconds(1);
 
+    /// <summary>The clock <see cref="CheckShownFor"/> runs on, inherited so a test can set it on a window.</summary>
+    internal static readonly AttachedProperty<TimeProvider> ClockProperty =
+        AvaloniaProperty.RegisterAttached<PressToCopy, Control, TimeProvider>("Clock", TimeProvider.System, inherits: true);
+
     /// <summary>The room its value has, for a secret drawn at a width a reveal cannot change.</summary>
     internal static readonly DirectProperty<PressToCopy, double> ValueWidthProperty =
         AvaloniaProperty.RegisterDirect<PressToCopy, double>(nameof(ValueWidth), control => control.ValueWidth);
@@ -74,7 +78,7 @@ internal sealed class PressToCopy : Button
 
         PseudoClasses.Set(":copied", true);
         _check?.Dispose();
-        _check = GetValue(RevealedValue.ClockProperty).CreateTimer(
+        _check = GetValue(ClockProperty).CreateTimer(
             _ => Dispatcher.UIThread.Post(() => PseudoClasses.Set(":copied", false)),
             null,
             CheckShownFor,
