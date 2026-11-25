@@ -4,8 +4,8 @@
 # What it refuses:
 #   - a file name other than the declared appimage pattern expanded for this version;
 #   - an image that is not a 64-bit little-endian ELF runtime followed by a squashfs;
-#   - a desktop entry or AppStream record that drops the full version, the internal and unsigned
-#     label or keypaste as developer, a desktop entry that does not declare .kdbx's MIME type or take
+#   - a desktop entry or AppStream record that drops the full version, the description
+#     or keypaste as developer, a desktop entry that does not declare .kdbx's MIME type or take
 #     the file it is handed, or an AppRun other than the repository's;
 #   - a payload whose files differ from the staged payload, whose binary reports another version
 #     or fails --selftest, or whose binaries do not publish as keypaste;
@@ -114,13 +114,13 @@ appdata="$root/usr/share/metainfo/$ID.appdata.xml"
 [ -f "$desktop" ] || die "the image holds no $ID.desktop"
 [ -f "$appdata" ] || die "the image holds no usr/share/metainfo/$ID.appdata.xml"
 has_line "$desktop" "Name=keypaste"
-has_line "$desktop" "Comment=keypaste $version internal unsigned candidate"
+has_line "$desktop" "Comment=AI agents get your secrets only when you say yes"
 has_line "$desktop" "X-AppImage-Version=$version"
 has_line "$desktop" "MimeType=application/x-keepass2;"
 has_line "$desktop" "Exec=keypaste-app %f"
 has_line "$appdata" "  <developer id=\"com.keypaste\">"
 has_line "$appdata" "    <name>keypaste</name>"
-has_line "$appdata" "    <p>keypaste $version internal unsigned candidate. Not for distribution.</p>"
+has_line "$appdata" "  <summary>AI agents get your secrets only when you say yes</summary>"
 cmp -s "$desktop" "$root/usr/share/applications/$ID.desktop" || die "the image's two desktop entries differ"
 cmp -s "$root/AppRun" "$ROOT/packaging/linux/AppRun" || die "the image's AppRun is not packaging/linux/AppRun"
 
@@ -139,4 +139,4 @@ cli="$("$root/AppRun" cli --version | tr -d '[:space:]')"
 case "$("$root/AppRun" cli mcp --help 2>&1)" in "the MCP server your AI tools start"*) ;; *) die "the image's AppRun cli does not start the bridge for mcp" ;; esac
 "$ROOT/scripts/verify-publisher-metadata.sh" "$root/usr/bin"
 
-echo "$(basename "$image"): keypaste $version, internal and unsigned; $(listing "$payload" | wc -l | tr -d ' ') payload files unpack byte-identical at offset $offset and pass --selftest."
+echo "$(basename "$image"): keypaste $version, unsigned and attested on release; $(listing "$payload" | wc -l | tr -d ' ') payload files unpack byte-identical at offset $offset and pass --selftest."

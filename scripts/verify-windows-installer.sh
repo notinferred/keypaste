@@ -3,8 +3,8 @@
 #
 # What it refuses:
 #   - a file name other than the declared msi pattern expanded for this version;
-#   - a ProductName, summary Subject or Keywords that drop the full version or the internal and
-#     unsigned labels, a ProductVersion other than the numeric prefix, or a publisher other than keypaste;
+#   - a ProductName, summary Subject or Keywords that drop the full version, a ProductVersion other than the
+#     numeric prefix, or a publisher other than keypaste;
 #   - a per-machine package, or a signature on a package the definition declares unsigned;
 #   - any Environment row but one appending the install folder to the per-user PATH, removed on
 #     uninstall, from the UserPath component rather than the payload's;
@@ -99,11 +99,11 @@ reading() {
 
 expect() { [ "$2" = "$3" ] || die "$(basename "$msi") reports $1 '$2', expected '$3'"; }
 
-expect ProductName "$(reading ProductName)" "keypaste $version (internal, unsigned)"
+expect ProductName "$(reading ProductName)" "keypaste $version"
 expect ProductVersion "$(reading ProductVersion)" "$numeric"
 expect Manufacturer "$(reading Manufacturer)" "keypaste"
-expect Subject "$(reading Subject)" "keypaste $version internal unsigned candidate"
-expect Keywords "$(reading Keywords)" "keypaste;$version;internal;unsigned"
+expect Subject "$(reading Subject)" "keypaste $version installer"
+expect Keywords "$(reading Keywords)" "keypaste;$version"
 expect ALLUSERS "$(reading ALLUSERS)" "<absent>"
 expect MSIINSTALLPERUSER "$(reading MSIINSTALLPERUSER)" "<absent>"
 if [ "$signed" = "false" ]; then
@@ -146,4 +146,4 @@ bridge="$(dirname "$host")/keypaste.exe"
 case "$("$bridge" mcp --help 2>&1)" in "the MCP server your AI tools start"*) ;; *) die "the extracted keypaste.exe does not answer mcp --help" ;; esac
 "$ROOT/scripts/verify-publisher-metadata.sh" "$extracted"
 
-echo "$(basename "$msi"): keypaste $version, per-user, internal and unsigned; $(listing "$payload" | wc -l | tr -d ' ') payload files extract byte-identical and pass --selftest."
+echo "$(basename "$msi"): keypaste $version, per-user, signed after this check as the definition says; $(listing "$payload" | wc -l | tr -d ' ') payload files extract byte-identical and pass --selftest."

@@ -1,8 +1,8 @@
 # Changelog
 
-Published versions are available at `https://dl.keypaste.com/v<version>/` with checksums and corresponding source. CLI/MCP binaries are unsigned and un-notarized; the desktop has no public release. [RELEASE.md](docs/RELEASE.md) records platform support and verification requirements. The release workflow requires a section matching each tag.
+Published versions are available at `https://dl.keypaste.com/v<version>/` with checksums and corresponding source. From 1.0.0, Windows programs and the installer are signed with keypaste's Authenticode identity, and macOS code is signed with its Developer ID and notarized; Linux binaries and the AppImage are unsigned and attested, and earlier CLI/MCP binaries are unsigned and un-notarized. [RELEASE.md](docs/RELEASE.md) records platform support and verification requirements. The release workflow requires a section matching each tag.
 
-## Unreleased
+## 1.0.0
 
 New's menu in the sidebar shows its choices again; it had opened empty. An item's notes can be selected, and copying a selection clears it from the clipboard after the countdown, as Copy password does. The Agents screen's list starts level with Items' instead of lower.
 
@@ -50,7 +50,7 @@ Conflicted copies OneDrive and iCloud Drive leave beside a vault are found as Sy
 
 `keypaste init` and restoring a backup from the desktop app's unlock screen are refused while another keypaste process holds the vault, naming it, as the commands that save already were, and both are refused while file locking is turned off (`DOTNET_SYSTEM_IO_DISABLEFILELOCKING`).
 
-The macOS app and CLI are signed with keypaste's Developer ID under the hardened runtime, and a release's app and disk image are notarized and stapled before they publish; the CLI is notarized too, but a bare program can't carry the ticket, so macOS checks it online.
+The macOS app and CLI are signed with keypaste's Developer ID under the hardened runtime and notarized before they publish. The disk image carries its ticket stapled, so macOS can check it offline; the CLI is a bare program that can't carry one, so macOS checks it online. On Windows, the programs keypaste compiles and the MSI are signed with keypaste's Authenticode identity and timestamped. The Linux AppImage is not signed; verify it with its published hash and GitHub's build attestation, as for the Linux CLI ([SECURITY](SECURITY.md#verifying-a-release)).
 
 A save no longer overwrites another program's save that lands while keypaste derives the vault's keys or writes the file: it is refused as a save over an earlier change is, and an overwrite you chose still replaces it.
 
@@ -575,7 +575,7 @@ The entry pane shows usernames, URLs and notes with their punctuation and line b
 
 The desktop creates vaults under the same rules as `keypaste init`, whose prompts, messages and exit codes are unchanged.
 
-The release workflow can publish the Windows MSI and Linux AppImage beside the CLI at the same version prefix, each with its own manifest and attestation, and refuses them while they are unsigned.
+The release workflow publishes the desktop packages beside the CLI at the same version prefix, with their own manifest and attestation, and refuses a package the release definition does not record as signed, except the Linux AppImage, which publishes unsigned on its build attestation. The macOS disk image it publishes is the notarized, stapled copy of the one the app workflow built for the tag.
 
 ## 0.3.0
 

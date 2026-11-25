@@ -24,7 +24,10 @@
 #   - a PACKAGE offered for publication that is not signed. A package is a thing a stranger
 #     double-clicks, so it is published signed or it is not published at all. The cli
 #     declares no packages, so this rule cannot reach it; it starts deciding the day the definition
-#     offers one.
+#     offers one. One exception, by name: the linux-x64 AppImage, which Linux gives no platform
+#     signature to check, publishes unsigned when it records unsigned_basis "attestation" and its
+#     component names the provenance that attests it, as the Linux CLI archives do. Any other
+#     package claiming that basis is refused.
 #
 # One invocation covers every component being published, because they share one directory and one
 # upload: asked about the cli alone, this would see the desktop packages as strays. The allowlist is
@@ -35,7 +38,7 @@
 #   require-release-assets.sh --component <c> --publishable
 #
 # --publishable answers whether a component may be published at all, without looking at a directory:
-#   0  every package it offers is signed and public, or it publishes archives
+#   0  every package it offers is public and signed, or is the attested AppImage, or it publishes archives
 #   2  it is declared and not yet publishable, in the one recorded shape: the policy is none, every
 #      package is internal and unsigned, and signing.until names the step that lifts it
 #   1  anything else, including a half-signed mixture. A component does not drop out of a release
@@ -86,7 +89,11 @@ if [ "$PUBLISHABLE" = true ]; then
   total="$(jqr --arg c "$c" "[$packages] | length" "$DEFINITION")"
   offered="$(jqr --arg c "$c" "[$packages | select(.internal == false)] | length" "$DEFINITION")"
   held="$(jqr --arg c "$c" "[$packages | select(.internal == true and .signed == false)] | length" "$DEFINITION")"
-  unsigned="$(jqr --arg c "$c" "[$packages | select(.internal == false and .signed != true)] | length" "$DEFINITION")"
+  # The attested AppImage is the one unsigned package that counts as publishable; attested_appimage below is the same rule.
+  unsigned="$(jqr --arg c "$c" '.components[$c] as $comp | [$comp.targets[] | .rid as $rid | (.packages // [])[]
+    | select(.internal == false and .signed != true)
+    | select((.kind == "appimage" and $rid == "linux-x64" and .signed == false and .unsigned_basis == "attestation"
+              and ($comp.provenance.workflow // "") != "") | not)] | length' "$DEFINITION")"
   policy="$(jqr --arg c "$c" '.components[$c].signing.policy // ""' "$DEFINITION")"
   origin="$(jqr --arg c "$c" '.components[$c].origin // ""' "$DEFINITION")"
   lifts="$(jqr --arg c "$c" '[.components[$c].signing.until // []] | flatten | length' "$DEFINITION")"
@@ -165,18 +172,26 @@ offered_packages() {
       .components[$c] as $comp
       | $comp.targets[] | . as $t
       | (.packages // [])[] | select(.internal == false)
-      | [$c, $t.rid, (.kind // ""), ($comp.signing.policy // ""), (.signed | tostring)]
+      | [$c, $t.rid, (.kind // ""), ($comp.signing.policy // ""), (.signed | tostring),
+         (.unsigned_basis // ""), ($comp.provenance.workflow // "")]
       | join("")' "$DEFINITION"
   done
 }
 
+# The one unsigned package that may publish: the linux-x64 AppImage, attested in place of a signature.
+attested_appimage() {
+  [ "$kind" = appimage ] && [ "$rid" = linux-x64 ] && [ "$signed" = false ] \
+    && [ "$basis" = attestation ] && [ -n "$attested_by" ]
+}
+
 bad=0
 
-while IFS="$US" read -r c rid kind policy signed; do
+while IFS="$US" read -r c rid kind policy signed basis attested_by; do
   [ -n "$c" ] || continue
   # One line each, so a fixture can delete either and get a working script that fails open, rather
   # than a syntax error. A control that cannot reproduce the old answer proves nothing.
-  [ "$signed" = "true" ] || { echo "::error::$c/$rid: the $kind package is offered for publication and is not recorded signed" >&2; bad=1; }
+  [ "$signed" = "true" ] || attested_appimage || { echo "::error::$c/$rid: the $kind package is offered for publication and is not recorded signed" >&2; bad=1; }
+  [ -z "$basis" ] || attested_appimage || { echo "::error::$c/$rid: the $kind package claims $basis in place of a signature, which only the attested linux-x64 AppImage may" >&2; bad=1; }
   [ "$policy" != none ] || { echo "::error::$c/$rid: the $kind package is offered for publication while the $c signing policy is none" >&2; bad=1; }
 done < <(offered_packages)
 

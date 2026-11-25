@@ -15,11 +15,7 @@ The packages are a Windows MSI, a Linux AppImage and a macOS DMG holding `keypas
 | Linux | `libx11-6 libice6 libsm6 libfontconfig1`, and an X11 or XWayland session: the app has no Wayland backend of its own, so a Wayland desktop without XWayland cannot start it. The AppImage also needs FUSE: `/dev/fuse` and a setuid-root `fusermount3`, which `fuse3` provides; its runtime carries libfuse 3, so `libfuse2` is not needed |
 | YubiKey on Linux | `libpcsclite1`, and access to the key's `/dev/hidraw*` device, which Yubico's udev rules grant |
 
-The internal macOS `keypaste.app` is signed with keypaste's Developer ID but not notarized, so macOS refuses a copy downloaded through a browser. Remove the quarantine from the whole bundle:
-
-```sh
-xattr -dr com.apple.quarantine /Applications/keypaste.app
-```
+The macOS `keypaste.app` is signed with keypaste's Developer ID and notarized, and the DMG carries its stapled ticket, so macOS opens a downloaded copy once you confirm it. The MSI and the programs in it are signed with keypaste's Authenticode identity. The AppImage is unsigned; check it against its checksum and attestation ([SECURITY](../SECURITY.md#verifying-a-release)).
 
 To upgrade, install a newer MSI, or replace the AppImage or `keypaste.app`. Upgrading or uninstalling never touches your vault or `~/.keypaste`.
 

@@ -255,9 +255,8 @@ classify() {
 powershell_out() { powershell -NoProfile -NonInteractive -Command "$1" | tr -d "$CR"; }
 
 candidate() { # candidate <version>
-  local ext
-  case "$PLATFORM" in windows) ext=msi ;; linux) ext=AppImage ;; macos) ext=dmg ;; esac
-  local name="keypaste-app-$1-$RID-internal-unsigned.$ext"
+  local name
+  name="$(bash "$ROOT/scripts/verify-desktop-candidate.sh" --name "$1" "$RID")" || return 1
   [ -f "$CANDIDATES/$name" ] || { echo "no candidate at $CANDIDATES/$name" >&2; return 1; }
   printf '%s' "$CANDIDATES/$name"
 }

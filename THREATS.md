@@ -582,7 +582,7 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Mitigation.** `release.yml` tests the binaries it uploads and checks the version and checksums, Actions and tools are pinned, and `publish-release.sh` publishes only to an empty destination. Every asset carries a Sigstore attestation, checkable with `gh attestation verify`.
 
-**Limit.** The attestation cannot detect a compromised workflow run, which attests what it built. Binaries are unsigned and builds are not reproducible.
+**Limit.** The attestation cannot detect a compromised workflow run, which attests what it built. Builds are not reproducible. Binaries up to `v0.3.0` are unsigned; from 1.0.0 the Windows and macOS ones are signed, the macOS ones notarized, and the Linux ones stay unsigned.
 
 **Status.** `v0.3.0`, the first release with an attestation; desktop packages unreleased ([RELEASE](docs/RELEASE.md)).
 
@@ -677,5 +677,5 @@ Each entry states its own limits. These cut across many of them.
 - **A released value stays released.** Locking does not revoke values already delivered, and nothing revokes a credential at its issuer or removes a client's copy (T-12, T-56).
 - **The audit log is tamper-evident, not tamper-proof**, and keypaste stores no anchor for it (T-5).
 - **Agent labels are not authenticated** (T-3, T-36).
-- **Binaries are unsigned and builds are not reproducible** (T-21).
+- **Builds are not reproducible, and Linux binaries are unsigned**, as are all binaries up to `v0.3.0` (T-21).
 - **One threat is unmitigated**: timing shows which categories are set to Allow (T-17).

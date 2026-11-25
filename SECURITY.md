@@ -59,7 +59,7 @@ Each version's downloads at `https://dl.keypaste.com/v<version>/` include:
 - From `v0.3.0`, a manifest, `keypaste-<version>-manifest.json`, and an attestation bundle, `keypaste-<version>-provenance.sigstore.jsonl`. `v0.2.0` and earlier have neither.
 - In a version that publishes the desktop packages, a second manifest and bundle, `keypaste-app-<version>-manifest.json` and `keypaste-app-<version>-provenance.sigstore.jsonl`.
 
-The binaries are unsigned and un-notarized, so Gatekeeper and SmartScreen may warn. [Install](docs/install.md) shows the macOS quarantine workaround, and its install blocks keep quarantine in place.
+Up to `v0.3.0`, the binaries are unsigned and un-notarized, so Gatekeeper and SmartScreen may warn. [Install](docs/install.md) shows the macOS quarantine workaround, and its install blocks keep quarantine in place. From 1.0.0, the Windows programs and MSI are signed with keypaste's Authenticode identity, and the macOS code is signed with its Developer ID and notarized, with the disk image's ticket stapled; Linux binaries stay unsigned. SmartScreen may still warn while the identity builds reputation.
 
 `release.yml` tests the NativeAOT binaries it uploads, including KeePassXC compatibility in both directions. `ci.yml` runs the unit suites against an ordinary build of the same commit.
 

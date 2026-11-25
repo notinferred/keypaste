@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Wraps the keypaste.app that build-macos-app.sh zipped and checked in the internal disk image release-targets.json
+# Wraps the keypaste.app that build-macos-app.sh zipped and checked in the disk image release-targets.json
 # declares: the bundle beside a link to /Applications, built by hdiutil and signed with KEYPASTE_MACOS_IDENTITY, which
 # the workflow then notarizes; an ad-hoc build leaves the image unsigned. The image is then attached read-only and checked as a person would open it: its entries,
 # the bundle's bytes and modes against the zip's, the plist versions, the binary's version, the bridge, and a

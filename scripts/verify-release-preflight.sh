@@ -158,19 +158,21 @@ run_case "weakened-takes-a-dropped-target" 0 "advertised assets, their checksums
 
 echo "== a desktop package is published signed, or it is not published"
 
-# The definition as signing will leave it: the policy on, both packages offered and signed, and the
-# internal-and-unsigned label gone from their names. Every desktop case below is a mutation of this
-# one, so the accepts describe the release that will actually happen rather than a shape invented here.
+# The definition as signing leaves it: the policy on, every package offered and signed but the attested
+# AppImage, and the internal-and-unsigned label gone from their names. Every desktop case below is a
+# mutation of this one, so the accepts describe the release that will actually happen rather than a
+# shape invented here.
 SIGNED="$WORK/signed.json"
 jq '.components.app.signing.policy = "authenticode"
     | .components.app.targets |= map(if .packages then
-        .packages |= map(.internal = false | .signed = true
-                         | .pattern = (.pattern | sub("-internal-unsigned"; ""))) else . end)' \
+        .packages |= map(if .unsigned_basis then . else (.internal = false | .signed = true
+                         | .pattern = (.pattern | sub("-internal-unsigned"; ""))) end) else . end)' \
    "$DEFINITION" > "$SIGNED"
 
 # Offered for publication while nothing signs them: the state release.yml must never reach.
 OFFERED_UNSIGNED="$WORK/offered-unsigned.json"
-jq '.components.app.targets |= map(if .packages then
+jq '.components.app.signing.policy = "none"
+    | .components.app.targets |= map(if .packages then
       .packages |= map(.internal = false
                        | .pattern = (.pattern | sub("-internal-unsigned"; ""))) else . end)' \
    "$DEFINITION" > "$OFFERED_UNSIGNED"
@@ -183,13 +185,21 @@ jq '.components.app.signing.policy = "authenticode"
                          | .pattern = (.pattern | sub("-internal-unsigned"; ""))) else . end)' \
    "$DEFINITION" > "$SIGNED_PARTLY"
 
-# One offered, one held back: not publishable, and not the recorded not-yet state either.
+# Some offered, one held back: not publishable, and not the recorded not-yet state either.
 HALF="$WORK/half.json"
-jq '.components.app.signing.policy = "authenticode"
-    | .components.app.targets |= map(if (.packages and .rid == "win-x64") then
-        .packages |= map(.internal = false | .signed = true
-                         | .pattern = (.pattern | sub("-internal-unsigned"; ""))) else . end)' \
-   "$DEFINITION" > "$HALF"
+jq '.components.app.targets |= map(if (.packages and .rid == "win-x64") then
+        .packages |= map(.internal = true | .signed = false) else . end)' \
+   "$SIGNED" > "$HALF"
+
+# The desktop before signing, the one recorded not-yet state: the policy none and every package internal,
+# unsigned and named so, until the step that lifts it.
+NOT_YET="$WORK/not-yet.json"
+jq '.components.app.signing = {policy: "none", macos: "developer-id", until: ["4.7c2"]}
+    | .components.app.targets |= map(if .packages then
+        .packages |= map(.internal = true | .signed = false | del(.unsigned_basis, .unsigned_disclosed_in)
+                         | .pattern = (if (.pattern | test("-internal-unsigned")) then .pattern
+                                       else (.pattern | sub("\\.(?<ext>[A-Za-z]+)$"; "-internal-unsigned.\(.ext)")) end)) else . end)' \
+   "$DEFINITION" > "$NOT_YET"
 
 packages_for() {
   jq -r --arg v "$V" '.components.app.targets[] | . as $t | (.packages // [])[]
@@ -232,9 +242,9 @@ run_case "assets-desktop-missing" 1 "is advertised and missing" \
 
 D="$WORK/desktop-stray"; stage "$D" "$SIGNED"; stage_desktop "$D" "$SIGNED"
 # The name that package had before it was signed, which is exactly what a re-run would leave
-# behind, and which the unmodified definition still spells out.
+# behind.
 stale="$(jq -r --arg v "$V" '.components.app.targets[] | . as $t | (.packages // [])[] | .pattern
-  | split("{version}") | join($v) | split("{rid}") | join($t.rid)' "$DEFINITION" | tr -d "$CR" | head -1)"
+  | split("{version}") | join($v) | split("{rid}") | join($t.rid)' "$NOT_YET" | tr -d "$CR" | head -1)"
 printf 'left over\n' > "$D/$stale"
 run_case "assets-desktop-stray-package" 1 "is not a release asset" \
   -- env KEYPASTE_RELEASE_DEFINITION="$SIGNED" bash "$ASSETS_CHECK" --component cli --component app "$V" "$D"
@@ -245,14 +255,47 @@ D="$WORK/desktop-not-asked-for"; stage "$D" "$SIGNED"; stage_desktop "$D" "$SIGN
 run_case "assets-desktop-not-asked-for" 1 "is not a release asset" \
   -- env KEYPASTE_RELEASE_DEFINITION="$SIGNED" bash "$ASSETS_CHECK" "$V" "$D"
 
+# The one unsigned package that publishes is the linux-x64 AppImage on its attestation, as the Linux
+# CLI does. The same basis claimed by the MSI or the DMG, or the AppImage without it, is refused.
+unsign() { jq --arg rid "$2" "(.components.app.targets[] | select(.rid == \$rid) | .packages[0]) |= ($3)" "$SIGNED" > "$WORK/$1.json"; echo "$WORK/$1.json"; }
+MSI_UNSIGNED="$(unsign msi-unsigned win-x64 '.signed = false')"
+DMG_UNSIGNED="$(unsign dmg-unsigned osx-arm64 '.signed = false')"
+MSI_ATTESTED="$(unsign msi-attested win-x64 '.signed = false | .unsigned_basis = "attestation"')"
+APPIMAGE_BARE="$(unsign appimage-bare linux-x64 'del(.unsigned_basis)')"
+APPIMAGE_UNATTESTED="$WORK/appimage-unattested.json"
+jq 'del(.components.app.provenance.workflow)' "$SIGNED" > "$APPIMAGE_UNATTESTED"
+
+[ "$(jq -r '.components.app.targets[] | select(.rid == "linux-x64") | .packages[0] | "\(.internal) \(.signed) \(.unsigned_basis)"' "$SIGNED" | tr -d "$CR")" = "false false attestation" ] \
+  || die "the definition no longer offers the linux-x64 AppImage unsigned on its attestation, so these cases test nothing"
+
+D="$WORK/attested-appimage"; stage "$D" "$SIGNED"; stage_desktop "$D" "$SIGNED"
+run_case "assets-attested-appimage" 0 "advertised assets, their checksums" \
+  -- env KEYPASTE_RELEASE_DEFINITION="$SIGNED" bash "$ASSETS_CHECK" --component cli --component app "$V" "$D"
+D="$WORK/unsigned-msi"; stage "$D" "$MSI_UNSIGNED"; stage_desktop "$D" "$MSI_UNSIGNED"
+run_case "assets-unsigned-msi" 1 "the msi package is offered for publication and is not recorded signed" \
+  -- env KEYPASTE_RELEASE_DEFINITION="$MSI_UNSIGNED" bash "$ASSETS_CHECK" --component cli --component app "$V" "$D"
+D="$WORK/unsigned-dmg"; stage "$D" "$DMG_UNSIGNED"; stage_desktop "$D" "$DMG_UNSIGNED"
+run_case "assets-unsigned-dmg" 1 "the dmg package is offered for publication and is not recorded signed" \
+  -- env KEYPASTE_RELEASE_DEFINITION="$DMG_UNSIGNED" bash "$ASSETS_CHECK" --component cli --component app "$V" "$D"
+D="$WORK/attested-msi"; stage "$D" "$MSI_ATTESTED"; stage_desktop "$D" "$MSI_ATTESTED"
+run_case "assets-msi-claims-attestation" 1 "which only the attested linux-x64 AppImage may" \
+  -- env KEYPASTE_RELEASE_DEFINITION="$MSI_ATTESTED" bash "$ASSETS_CHECK" --component cli --component app "$V" "$D"
+D="$WORK/appimage-bare"; stage "$D" "$APPIMAGE_BARE"; stage_desktop "$D" "$APPIMAGE_BARE"
+run_case "assets-appimage-without-basis" 1 "the appimage package is offered for publication and is not recorded signed" \
+  -- env KEYPASTE_RELEASE_DEFINITION="$APPIMAGE_BARE" bash "$ASSETS_CHECK" --component cli --component app "$V" "$D"
+
 run_case "publishable-cli" 0 "cli is publishable" \
   -- bash "$ASSETS_CHECK" --component cli --publishable
 run_case "publishable-app-is-not-yet" 2 "declared and not yet publishable" \
-  -- bash "$ASSETS_CHECK" --component app --publishable
+  -- env KEYPASTE_RELEASE_DEFINITION="$NOT_YET" bash "$ASSETS_CHECK" --component app --publishable
 run_case "publishable-app-when-signed" 0 "app is publishable" \
   -- env KEYPASTE_RELEASE_DEFINITION="$SIGNED" bash "$ASSETS_CHECK" --component app --publishable
 run_case "publishable-app-half-signed" 1 "neither publishable nor in the one recorded not-yet state" \
   -- env KEYPASTE_RELEASE_DEFINITION="$HALF" bash "$ASSETS_CHECK" --component app --publishable
+run_case "publishable-app-msi-claims-attestation" 1 "1 of those unsigned" \
+  -- env KEYPASTE_RELEASE_DEFINITION="$MSI_ATTESTED" bash "$ASSETS_CHECK" --component app --publishable
+run_case "publishable-app-appimage-unattested" 1 "1 of those unsigned" \
+  -- env KEYPASTE_RELEASE_DEFINITION="$APPIMAGE_UNATTESTED" bash "$ASSETS_CHECK" --component app --publishable
 
 WEAK_SIGNED="$WORK/weak-signed.sh"
 sed '/is not recorded signed/d' "$ASSETS_CHECK" > "$WEAK_SIGNED"
@@ -261,10 +304,18 @@ D="$WORK/weak-unsigned"; stage "$D" "$SIGNED_PARTLY"; stage_desktop "$D" "$SIGNE
 run_case "weakened-publishes-an-unsigned-package" 0 "advertised assets, their checksums" \
   -- env KEYPASTE_RELEASE_DEFINITION="$SIGNED_PARTLY" bash "$WEAK_SIGNED" --component cli --component app "$V" "$D"
 
+# The exception widened to any package must accept the unsigned MSI the repaired gate refuses.
+WEAK_EXCEPTION="$WORK/weak-exception.sh"
+sed 's/^attested_appimage() {$/attested_appimage() { return 0/' "$ASSETS_CHECK" > "$WEAK_EXCEPTION"
+grep -q '^attested_appimage() { return 0$' "$WEAK_EXCEPTION" || die "the weakened asset check still narrows the exception"
+D="$WORK/weak-exception"; stage "$D" "$MSI_ATTESTED"; stage_desktop "$D" "$MSI_ATTESTED"
+run_case "weakened-publishes-an-attested-msi" 0 "advertised assets, their checksums" \
+  -- env KEYPASTE_RELEASE_DEFINITION="$MSI_ATTESTED" bash "$WEAK_EXCEPTION" --component cli --component app "$V" "$D"
+
 DECLARED="$(declared_cases)"
 [ -n "$DECLARED" ] || die "no case lines found in $SELF; the count this gate checks itself against is derived from them"
 [ "$cases" -eq "$DECLARED" ] || die "$cases cases ran, but $DECLARED are written in $SELF; a case is defined and not driven"
-[ "$accepted" -eq 11 ] || die "$accepted cases were accepted, expected exactly 11"
+[ "$accepted" -eq 13 ] || die "$accepted cases were accepted, expected exactly 13"
 
 echo "ok: $cases cases across three decisions a tag used to be the first thing to run."
 echo "    A version with no section of its own, a tag naming a version the source does not"
@@ -272,7 +323,8 @@ echo "    declare, an unreadable version, a stray dotfile, a missing target, a c
 echo "    a checksum with no asset, an asset with no checksum and a release missing its manifest"
 echo "    or attestation bundle all refuse. So does a desktop package offered for publication"
 echo "    while nothing signs it, recorded unsigned, missing, left over under its old internal"
-echo "    name, or staged for a component the call never named. All three weakened copies"
-echo "    accept what the repaired ones refuse."
+echo "    name, or staged for a component the call never named; an unsigned MSI or DMG refuses"
+echo "    while the attested linux-x64 AppImage publishes, and no other package can claim its"
+echo "    basis. All four weakened copies accept what the repaired ones refuse."
 echo "not proved here: that release.yml reaches these on a tag, which only a tag shows; and that"
 echo "    the bytes a real build stages are the bytes it published, which is R.0b."

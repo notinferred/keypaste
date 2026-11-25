@@ -468,9 +468,9 @@
       "keypaste": {
         "type": "Project",
         "dependencies": {
-          "Keypaste.Browser": "[0.5.0, )",
-          "Keypaste.Core": "[0.5.0, )",
-          "Keypaste.Mcp": "[0.5.0, )"
+          "Keypaste.Browser": "[1.0.0, )",
+          "Keypaste.Core": "[1.0.0, )",
+          "Keypaste.Mcp": "[1.0.0, )"
         }
       },
       "keypaste-app": {
@@ -481,7 +481,7 @@
           "Avalonia.Fonts.Inter": "[12.1.5, )",
           "Avalonia.Themes.Fluent": "[12.1.5, )",
           "CommunityToolkit.Mvvm": "[8.4.2, )",
-          "Keypaste.Core": "[0.5.0, )",
+          "Keypaste.Core": "[1.0.0, )",
           "Tmds.DBus.Protocol": "[0.94.1, )",
           "Yubico.YubiKey": "[1.18.0, )"
         }
@@ -489,14 +489,14 @@
       "keypaste.browser": {
         "type": "Project",
         "dependencies": {
-          "Keypaste.Core": "[0.5.0, )"
+          "Keypaste.Core": "[1.0.0, )"
         }
       },
       "keypaste.core": {
         "type": "Project",
         "dependencies": {
           "KeePassLib": "[1.0.0, )",
-          "Keypaste.Infrastructure": "[0.5.0, )",
+          "Keypaste.Infrastructure": "[1.0.0, )",
           "Polly.Core": "[8.9.0, )"
         }
       },
@@ -509,7 +509,7 @@
       "keypaste.mcp": {
         "type": "Project",
         "dependencies": {
-          "Keypaste.Core": "[0.5.0, )",
+          "Keypaste.Core": "[1.0.0, )",
           "ModelContextProtocol.Core": "[1.4.1, )"
         }
       },

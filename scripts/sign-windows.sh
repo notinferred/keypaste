@@ -2,8 +2,13 @@
 # Authenticode-signs and timestamps the Windows files keypaste compiles, as the definition's signing
 # policy says.
 #
+# keypaste's identity signs only in a GitHub Actions run on main or a release tag, since Azure's federated
+# credentials admit keypaste-signing from nowhere else. Under authenticode, a run on any other ref, such as a
+# branch or a pull request, leaves the files unsigned and says so, as macOS signs ad hoc without its identity.
+#
 # Usage:
 #   sign-windows.sh --component <cli|app> [--rehearsal <thumbprint>] <file-or-directory>...
+#   sign-windows.sh --identity      prints identity=keypaste or identity=none for $GITHUB_OUTPUT
 #   sign-windows.sh --restore-dlib
 #   sign-windows.sh --selftest
 set -euo pipefail
@@ -90,6 +95,14 @@ select_files() {
 
 native_path() { if on_windows; then cygpath -w "$1"; else echo "$1"; fi; }
 
+# Off GitHub Actions the person signing supplies the identity themselves.
+identity_signs_here() {
+  [ "${GITHUB_ACTIONS:-}" = true ] || return 0
+  case "${GITHUB_REF:-}" in refs/heads/main | refs/tags/v*) return 0 ;; *) return 1 ;; esac
+}
+
+identity() { if identity_signs_here; then echo "identity=keypaste"; else echo "identity=none"; fi; }
+
 main() {
   local component="" rehearsal=""
   while [ $# -gt 0 ]; do
@@ -114,7 +127,8 @@ main() {
 
   local args=()
   if [ -n "$rehearsal" ]; then
-    [ "$policy" = "none" ] || die "a rehearsal signature is refused while the $component policy is $policy"
+    [ "$policy" = "none" ] || ! identity_signs_here \
+      || die "a rehearsal signature is refused on ${GITHUB_REF:-this machine}, where keypaste's identity signs under the $component policy $policy"
     case "${GITHUB_REF:-}" in refs/tags/*) die "a rehearsal signature is refused on tag $GITHUB_REF" ;; esac
     args=(/sha1 "$rehearsal" /s My)
   else
@@ -122,7 +136,11 @@ main() {
       none)
         echo "$component signing policy is none; ${#files[@]} files left unsigned"
         return 0 ;;
-      authenticode) ;;
+      authenticode)
+        if ! identity_signs_here; then
+          echo "::notice::keypaste's identity signs only on main and release tags, not $GITHUB_REF; ${#files[@]} $component files left unsigned, so nothing from this run is a release candidate"
+          return 0
+        fi ;;
       *) die "unknown $component signing policy '$policy'" ;;
     esac
     local var
@@ -160,6 +178,8 @@ selftest() {
   printf 'dlib' > "$work/packages/microsoft.artifactsigning.client/1.0.128/bin/x64/Azure.CodeSigning.Dlib.dll"
 
   export SIGNTOOL="$work/signtool" NUGET_PACKAGES="$work/packages" RUNNER_TEMP="$work"
+  # The run's own ref would otherwise decide which cases sign.
+  export GITHUB_ACTIONS=true GITHUB_REF=refs/heads/task/selftest
   printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> "%s/calls"\n' "$work" > "$SIGNTOOL"
   chmod +x "$SIGNTOOL"
 
@@ -223,7 +243,17 @@ selftest() {
   expect unknown-policy refuse "unknown app signing policy" -- --component app "$work/payload"
 
   definition authenticode "$dlib_sha"
-  expect rehearsal-under-a-real-policy refuse "while the app policy is authenticode" -- --component app --rehearsal ABC "$work/payload"
+  GITHUB_REF=refs/heads/main expect rehearsal-where-the-identity-signs refuse "where keypaste's identity signs" -- --component app --rehearsal ABC "$work/payload"
+  expect rehearsal-on-a-branch-under-a-real-policy pass "/sha1 ABC /s My" -- --component app --rehearsal ABC "$work/payload"
+  GITHUB_REF=refs/pull/1/merge expect authenticode-on-a-pull-request-signs-nothing pass "files left unsigned" -- --component app "$work/payload"
+  [ ! -f "$work/calls" ] || { echo "::error::a pull request's files were signed"; failures=$((failures + 1)); }
+  local ref want
+  for ref in refs/heads/main:keypaste refs/tags/v1.0.0:keypaste refs/heads/task/selftest:none refs/pull/1/merge:none refs/tags/other:none; do
+    want="identity=${ref#*:}"
+    cases=$((cases + 1))
+    [ "$(GITHUB_REF="${ref%%:*}" identity)" = "$want" ] || { echo "::error::${ref%%:*} did not print $want"; failures=$((failures + 1)); }
+  done
+  export GITHUB_REF=refs/heads/main
   export KEYPASTE_SIGNING_ENDPOINT=https://eus.codesigning.azure.net KEYPASTE_SIGNING_ACCOUNT=acct     KEYPASTE_SIGNING_PROFILE=prof KEYPASTE_SIGNING_CLIENT_ID=client KEYPASTE_SIGNING_TENANT_ID=tenant
   local var value
   for var in $IDENTITY_VARS; do
@@ -232,6 +262,7 @@ selftest() {
     expect "authenticode-without-$var" refuse "$var is absent" -- --component app "$work/payload"
     export "$var=$value"
   done
+  GITHUB_REF=refs/tags/v1.0.0 expect authenticode-on-a-release-tag-signs pass "/dlib" -- --component app "$work/payload"
   expect authenticode-signs-through-the-dlib pass "/dlib $work/packages/microsoft.artifactsigning.client/1.0.128/bin/x64/Azure.CodeSigning.Dlib.dll /dmdf $work/keypaste-signing-metadata.json" -- --component app "$work/payload"
   [ "$(jq -r '[.Endpoint, .CodeSigningAccountName, .CertificateProfileName] | join(" ")' "$work/keypaste-signing-metadata.json" 2>/dev/null)" = "https://eus.codesigning.azure.net acct prof" ]     || { echo "::error::metadata.json does not carry the identity"; failures=$((failures + 1)); }
   ENTRY=restore_dlib expect restore-accepts-the-pinned-package pass "matches its pin" --
@@ -259,6 +290,8 @@ selftest() {
 
 if [ "${1:-}" = "--selftest" ]; then
   selftest
+elif [ "${1:-}" = "--identity" ]; then
+  identity
 elif [ "${1:-}" = "--restore-dlib" ]; then
   on_windows || die "the Artifact Signing dlib loads only into x64 signtool on Windows"
   restore_dlib

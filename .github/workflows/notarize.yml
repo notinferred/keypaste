@@ -1,4 +1,6 @@
 name: notarize
+# release.yml finds the finish that notarized its packages by this name, since a run's inputs can't be listed.
+run-name: notarize ${{ inputs.mode }} app run ${{ inputs.app_run }} release run ${{ inputs.release_run }}
 
 # Notarizes the macOS code an app run signed, and a release run's CLI if named, in two dispatches so no job waits on
 # Apple: submit records Apple's submission IDs, and finish, dispatched again until Apple has answered every one,

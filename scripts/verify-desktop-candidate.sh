@@ -14,6 +14,7 @@
 #
 # Usage:
 #   verify-desktop-candidate.sh <package-file> <version> <rid>
+#   verify-desktop-candidate.sh --name <version> <rid>    # prints the candidate's file name
 #   verify-desktop-candidate.sh --selftest    # fake gh; no network, no credential
 #
 # Environment:
@@ -205,6 +206,11 @@ FAKE
 
 case "${1:-}" in
   --selftest) [ $# -eq 1 ] || die "usage: verify-desktop-candidate.sh --selftest"; selftest ;;
+  --name)
+    [ $# -eq 3 ] || die "usage: verify-desktop-candidate.sh --name <version> <rid>"
+    name="$(expected_name "$2" "$3")"
+    [ -n "$name" ] || die "$(definition) does not declare exactly one installation package for app/$3"
+    echo "$name" ;;
   '' | -*) die "usage: verify-desktop-candidate.sh <package-file> <version> <rid> | --selftest" ;;
   *) [ $# -eq 3 ] || die "usage: verify-desktop-candidate.sh <package-file> <version> <rid>"; verify "$1" "$2" "$3" ;;
 esac

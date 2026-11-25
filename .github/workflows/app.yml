@@ -498,10 +498,13 @@ jobs:
         id: signing
         if: matrix.rid == 'win-x64'
         shell: bash
-        run: echo "policy=$(jq -r '.components.app.signing.policy' release-targets.json | tr -d '\r')" | tee -a "$GITHUB_OUTPUT"
+        run: |
+          set -euo pipefail
+          echo "policy=$(jq -r '.components.app.signing.policy' release-targets.json | tr -d '\r')" | tee -a "$GITHUB_OUTPUT"
+          scripts/sign-windows.sh --identity | tee -a "$GITHUB_OUTPUT"
 
       - name: Sign in to Azure for Artifact Signing
-        if: matrix.rid == 'win-x64' && !inputs.signing_rehearsal && steps.signing.outputs.policy == 'authenticode'
+        if: matrix.rid == 'win-x64' && !inputs.signing_rehearsal && steps.signing.outputs.identity == 'keypaste' && steps.signing.outputs.policy == 'authenticode'
         uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
           client-id: ${{ vars.KEYPASTE_SIGNING_CLIENT_ID }}
@@ -624,7 +627,7 @@ jobs:
           printf '%s  %s\n' "$hash" "$name" > "artifacts/dist/$name.sha256"
           (cd artifacts/dist && sha256sum -c "$name.sha256")
 
-      - name: Build and check the internal AppImage the definition declares
+      - name: Build and check the AppImage the definition declares
         if: matrix.appimage
         shell: bash
         env:
@@ -697,7 +700,7 @@ jobs:
         with:
           subject-path: artifacts/dist/keypaste-app-*.msi
 
-      - name: Attest the internal AppImage
+      - name: Attest the AppImage
         if: github.ref_type == 'tag' && matrix.appimage && steps.rehearsal.outputs.trusted == ''
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:

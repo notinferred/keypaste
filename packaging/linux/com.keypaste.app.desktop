@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=keypaste
-Comment=keypaste {version} internal unsigned candidate
+Comment=AI agents get your secrets only when you say yes
 Exec=keypaste-app %f
 Icon=com.keypaste.app
 Terminal=false

@@ -111,13 +111,20 @@ refusals() {
   jq '.components.app.signing.policy = "authenticode" | .components.cli.signing.policy = "authenticode"' \
     "$HERE/../release-targets.json" > "$definition"
   before="$(sha256sum < "$work/authenticode/$(basename "$1")")"
+  # Asked as main, where keypaste's identity signs; the rehearsal's own ref leaves the files unsigned instead.
   if env -u KEYPASTE_SIGNING_ENDPOINT -u KEYPASTE_SIGNING_ACCOUNT -u KEYPASTE_SIGNING_PROFILE -u KEYPASTE_SIGNING_CLIENT_ID -u KEYPASTE_SIGNING_TENANT_ID \
-    KEYPASTE_RELEASE_DEFINITION="$definition" bash "$HERE/sign-windows.sh" --component app "$work/authenticode" > "$work/authenticode.log" 2>&1; then
+    GITHUB_REF=refs/heads/main KEYPASTE_RELEASE_DEFINITION="$definition" bash "$HERE/sign-windows.sh" --component app "$work/authenticode" > "$work/authenticode.log" 2>&1; then
     cat "$work/authenticode.log"
     die "a policy of authenticode with no identity signed"
   fi
   [ "$(sha256sum < "$work/authenticode/$(basename "$1")")" = "$before" ] || die "a refused authenticode run changed the file"
   echo "refused as expected: authenticode with no identity: $(head -n 1 "$work/authenticode.log")"
+
+  KEYPASTE_RELEASE_DEFINITION="$definition" bash "$HERE/sign-windows.sh" --component app "$work/authenticode" > "$work/branch.log" 2>&1 \
+    || { cat "$work/branch.log"; die "authenticode on $GITHUB_REF failed instead of leaving the files unsigned"; }
+  grep -q 'left unsigned' "$work/branch.log" || { cat "$work/branch.log"; die "authenticode on $GITHUB_REF did not say it left the files unsigned"; }
+  [ "$(sha256sum < "$work/authenticode/$(basename "$1")")" = "$before" ] || die "authenticode on $GITHUB_REF changed the file"
+  echo "left unsigned as expected on $GITHUB_REF: $(grep -m1 'left unsigned' "$work/branch.log")"
 }
 
 cleanup() {

@@ -169,6 +169,10 @@ jobs:
         shell: bash
         run: scripts/verify-green-gates.sh
 
+      - name: Verify the notarized macOS check refuses packages this release did not build
+        shell: bash
+        run: scripts/require-notarized-macos.sh --selftest
+
       - name: Verify the release destination check fails closed
         shell: bash
         run: scripts/verify-release-destination.sh --with-real-aws
@@ -374,10 +378,13 @@ jobs:
         id: signing
         if: runner.os == 'Windows'
         shell: bash
-        run: echo "policy=$(jq -r '.components.cli.signing.policy' release-targets.json | tr -d '\r')" | tee -a "$GITHUB_OUTPUT"
+        run: |
+          set -euo pipefail
+          echo "policy=$(jq -r '.components.cli.signing.policy' release-targets.json | tr -d '\r')" | tee -a "$GITHUB_OUTPUT"
+          scripts/sign-windows.sh --identity | tee -a "$GITHUB_OUTPUT"
 
       - name: Sign in to Azure for Artifact Signing
-        if: runner.os == 'Windows' && steps.signing.outputs.policy == 'authenticode'
+        if: runner.os == 'Windows' && steps.signing.outputs.identity == 'keypaste' && steps.signing.outputs.policy == 'authenticode'
         uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
           client-id: ${{ vars.KEYPASTE_SIGNING_CLIENT_ID }}
@@ -452,9 +459,72 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # Apple answers hours after a submission, so this job waits for nobody: it fails, naming the dispatches, until a
+  # notarize.yml finish for the tag's app run and this run has succeeded, and this run's failed jobs are then re-run.
+  notarized:
+    name: notarized macOS packages
+    needs: [guard, build]
+    if: needs.guard.outputs.publish == 'true'
+    runs-on: macos-15
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+      attestations: read
+    env:
+      VERSION: ${{ needs.guard.outputs.version }}
+      APP_RUN: ${{ needs.guard.outputs.app_run_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Find the notarize.yml run that finished this release's macOS packages
+        id: notarize
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo "rid=$(jq -r '.components.app.targets[] | select(.rid | startswith("osx-")) | .rid' release-targets.json)" >> "$GITHUB_OUTPUT"
+          scripts/require-notarized-macos.sh find "$APP_RUN" "$GITHUB_RUN_ID" "$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: app-${{ steps.notarize.outputs.rid }}
+          path: ${{ runner.temp }}/app
+          run-id: ${{ needs.guard.outputs.app_run_id }}
+          github-token: ${{ github.token }}
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist-${{ steps.notarize.outputs.rid }}
+          path: ${{ runner.temp }}/cli
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: notarized-${{ steps.notarize.outputs.rid }}
+          path: ${{ runner.temp }}/notarized
+          run-id: ${{ steps.notarize.outputs.run }}
+          github-token: ${{ github.token }}
+
+      - name: Check the notarized packages are this release's, as Gatekeeper meets them
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RID: ${{ steps.notarize.outputs.rid }}
+        run: scripts/require-notarized-macos.sh check "$VERSION" "$RID" "$RUNNER_TEMP/app" "$RUNNER_TEMP/cli" "$RUNNER_TEMP/notarized" "$RUNNER_TEMP/out"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: notarized-macos
+          path: ${{ runner.temp }}/out/*
+          if-no-files-found: error
+          retention-days: 7
+
   publish:
     name: publish to R2
-    needs: [guard, build]
+    needs: [guard, build, notarized]
     if: needs.guard.outputs.publish == 'true'
     runs-on: ubuntu-22.04
     timeout-minutes: 20
@@ -472,18 +542,10 @@ jobs:
           submodules: true
           fetch-depth: 0
 
-      # This run's macOS payloads are signed and not notarized; only a finished notarize.yml run holds notarized ones.
-      - name: Refuse macOS payloads no notarize.yml run finished
-        shell: bash
-        run: |
-          set -euo pipefail
-          if jq -e '[.components[] | select(.origin != null and .signing.macos == "developer-id") | (.targets // .platforms)[]? | select(.rid | startswith("osx-"))] | length > 0' release-targets.json > /dev/null; then
-            echo "::error::macOS payloads publish only from a finished notarize.yml run's notarized artifacts, which this workflow does not take yet (4.7c2)"
-            exit 1
-          fi
-
+      # The macOS CLI archive in dist-* is the one the notarized job found notarized; the notarized image arrives apart.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
+          pattern: dist-*
           path: dist
           merge-multiple: true
 
@@ -532,6 +594,12 @@ jobs:
           run-id: ${{ needs.guard.outputs.app_run_id }}
           github-token: ${{ github.token }}
 
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: contains(steps.components.outputs.list, 'app')
+        with:
+          name: notarized-macos
+          path: ${{ runner.temp }}/notarized
+
       # Every candidate is held to app.yml's own attestation for THIS tag before it is staged, so a
       # package from another run, another tag or a dispatch cannot enter the directory that uploads.
       # The names come from the definition: a literal .msi here would make verify-release-matrix.sh
@@ -548,7 +616,10 @@ jobs:
             [ -n "$name" ] || continue
             case "$name" in *.sha256) continue ;; esac
             scripts/verify-desktop-candidate.sh "$RUNNER_TEMP/app/$name" "$VERSION" "$rid"
-            cp "$RUNNER_TEMP/app/$name" "$RUNNER_TEMP/app/$name.sha256" dist/
+            # macOS publishes the stapled copy, which the notarized job found sealing this attested image's code.
+            from="$RUNNER_TEMP/app"
+            case "$rid" in osx-*) from="$RUNNER_TEMP/notarized" ;; esac
+            cp "$from/$name" "$from/$name.sha256" dist/
           done < <(scripts/release-completion.sh --component app assets "$VERSION")
           ls -l dist
 
@@ -711,7 +782,14 @@ jobs:
             echo ''
             echo "components published: ${COMPONENTS}"
             echo ''
-            echo 'Binaries are unsigned and un-notarized. Every asset is attested; see SECURITY.md.'
+            for c in $COMPONENTS; do
+              windows="$(jq -r --arg c "$c" '.components[$c].signing.policy' release-targets.json)"
+              macos="$(jq -r --arg c "$c" '.components[$c].signing.macos // "none"' release-targets.json)"
+              case "$windows" in authenticode) windows='Authenticode-signed' ;; *) windows='unsigned' ;; esac
+              case "$macos" in developer-id) macos='Developer ID signed and notarized' ;; *) macos='unsigned and un-notarized' ;; esac
+              echo "${c}: Windows files are ${windows}, macOS code is ${macos}, and Linux files are unsigned."
+            done
+            echo 'Every asset is attested; see SECURITY.md.'
             case "$COMPONENTS" in
               *app*) echo "Desktop packages came from app.yml run ${APP_RUN}, whose attestation was checked before staging." ;;
             esac

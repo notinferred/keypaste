@@ -456,7 +456,7 @@
           "Avalonia.Fonts.Inter": "[12.1.5, )",
           "Avalonia.Themes.Fluent": "[12.1.5, )",
           "CommunityToolkit.Mvvm": "[8.4.2, )",
-          "Keypaste.Core": "[0.5.0, )",
+          "Keypaste.Core": "[1.0.0, )",
           "Tmds.DBus.Protocol": "[0.94.1, )",
           "Yubico.YubiKey": "[1.18.0, )"
         }
@@ -465,7 +465,7 @@
         "type": "Project",
         "dependencies": {
           "KeePassLib": "[1.0.0, )",
-          "Keypaste.Infrastructure": "[0.5.0, )",
+          "Keypaste.Infrastructure": "[1.0.0, )",
           "Polly.Core": "[8.9.0, )"
         }
       },

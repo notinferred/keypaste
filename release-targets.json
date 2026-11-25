@@ -23,19 +23,8 @@
         "bundle_pattern": "keypaste-{version}-provenance.sigstore.jsonl"
       },
       "signing": {
-        "policy": "none",
-        "macos": "developer-id",
-        "reason": "no signing identity yet",
-        "until": [
-          "3.5a",
-          "3.6a"
-        ],
-        "disclosed_in": [
-          "docs/install.md",
-          "CHANGELOG.md",
-          "SECURITY.md",
-          "docs/RELEASE.md"
-        ]
+        "policy": "authenticode",
+        "macos": "developer-id"
       },
       "defects_disclosed_in": [
         "docs/install.md",
@@ -135,15 +124,8 @@
         "bundle_pattern": "keypaste-app-{version}-provenance.sigstore.jsonl"
       },
       "signing": {
-        "policy": "none",
-        "macos": "developer-id",
-        "reason": "no signing identity yet",
-        "until": [
-          "3.6a"
-        ],
-        "disclosed_in": [
-          "docs/RELEASE.md"
-        ]
+        "policy": "authenticode",
+        "macos": "developer-id"
       },
       "targets": [
         {
@@ -154,9 +136,14 @@
           "packages": [
             {
               "kind": "appimage",
-              "pattern": "keypaste-app-{version}-{rid}-internal-unsigned.AppImage",
-              "internal": true,
+              "pattern": "keypaste-app-{version}-{rid}.AppImage",
+              "internal": false,
               "signed": false,
+              "unsigned_basis": "attestation",
+              "unsigned_disclosed_in": [
+                "CHANGELOG.md",
+                "docs/RELEASE.md"
+              ],
               "tool": "appimagetool",
               "tool_version": "1.9.1",
               "tool_sha256": "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0",
@@ -179,9 +166,9 @@
           "packages": [
             {
               "kind": "dmg",
-              "pattern": "keypaste-app-{version}-{rid}-internal-unsigned.dmg",
-              "internal": true,
-              "signed": false
+              "pattern": "keypaste-app-{version}-{rid}.dmg",
+              "internal": false,
+              "signed": true
             }
           ],
           "advertised": false,
@@ -199,9 +186,9 @@
           "packages": [
             {
               "kind": "msi",
-              "pattern": "keypaste-app-{version}-{rid}-internal-unsigned.msi",
-              "internal": true,
-              "signed": false,
+              "pattern": "keypaste-app-{version}-{rid}.msi",
+              "internal": false,
+              "signed": true,
               "project": "packaging/windows/Keypaste.Installer.wixproj",
               "tool": "WixToolset.Sdk",
               "tool_version": "5.0.2",

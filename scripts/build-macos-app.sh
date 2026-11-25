@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Wraps a staged osx-arm64 desktop payload in the internal keypaste.app bundle and zips it as keypaste.app.zip,
+# Wraps a staged osx-arm64 desktop payload in the keypaste.app bundle and zips it as keypaste.app.zip,
 # the build intermediate build-macos-dmg.sh wraps in the DMG release-targets.json declares. The zip is no release
 # package: app.yml uploads it only for notarize.yml to notarize, and nothing attests it.
 #

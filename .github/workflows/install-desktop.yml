@@ -152,13 +152,16 @@ jobs:
           PACKAGE: ${{ matrix.package }}
         run: |
           set -euo pipefail
+          # The definition's name around a placeholder version gives what comes before and after it.
+          named="$(scripts/verify-desktop-candidate.sh --name VERSION "$RID")"
+          before="${named%%VERSION*}" after="${named#*VERSION}"
           # macOS runs this under its stock bash 3.2, which has no mapfile.
-          found="$(find "$RUNNER_TEMP/candidate" -maxdepth 1 -type f -name "keypaste-app-*-dryrun-$RID-internal-unsigned.$PACKAGE")"
+          found="$(find "$RUNNER_TEMP/candidate" -maxdepth 1 -type f -name "$before*-dryrun$after")"
           count="$(printf '%s' "$found" | grep -c . || true)"
           [ "$count" = 1 ] || { echo "::error::app-$RID holds $count -dryrun $PACKAGE packages, not one"; exit 1; }
           version="$(basename "$found")"
-          version="${version#keypaste-app-}"
-          version="${version%-"$RID"-internal-unsigned."$PACKAGE"}"
+          version="${version#"$before"}"
+          version="${version%"$after"}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Download and verify the tag's CLI/MCP release anonymously
@@ -241,7 +244,7 @@ jobs:
           PACKAGE: ${{ matrix.package }}
         run: |
           set -euo pipefail
-          candidate="$RUNNER_TEMP/candidate/keypaste-app-$VERSION-$RID-internal-unsigned.$PACKAGE"
+          candidate="$RUNNER_TEMP/candidate/$(scripts/verify-desktop-candidate.sh --name "$VERSION" "$RID")"
           if [ "$RUNNER_OS" = Linux ]; then
             dbus-run-session -- bash scripts/exercise-desktop-install.sh "$RID" "$candidate" "$VERSION" "$RUNNER_TEMP/cli" install-desktop
           else
@@ -289,7 +292,7 @@ jobs:
           set -euo pipefail
           PACKAGE_COMMIT="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$APP_RUN_ID" --jq .head_sha | tr -d '\r')"
           export PACKAGE_COMMIT
-          candidate="$RUNNER_TEMP/candidate/keypaste-app-$VERSION-$RID-internal-unsigned.$PACKAGE"
+          candidate="$RUNNER_TEMP/candidate/$(scripts/verify-desktop-candidate.sh --name "$VERSION" "$RID")"
           if [ "$RUNNER_OS" = Linux ]; then
             dbus-run-session -- bash scripts/exercise-desktop-acts.sh "$RID" "$candidate" install-desktop "$RUNNER_TEMP/cli" acts
           else

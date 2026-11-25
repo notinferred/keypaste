@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Wraps a staged linux-x64 desktop payload in the internal AppImage release-targets.json declares.
+# Wraps a staged linux-x64 desktop payload in the AppImage release-targets.json declares.
 #
 # appimagetool and the type2 runtime are both fetched against the definition's SHA-256 pins, and the
 # runtime is always passed with --runtime-file: without it appimagetool downloads the unpinned

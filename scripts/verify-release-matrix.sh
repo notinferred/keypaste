@@ -312,12 +312,22 @@ TARGETS
 
     # An installer carries its version and target in its name, and while nothing of the component is
     # signed or published it says internal and unsigned in that name and in its record.
-    local policy kind pattern internal signed tool_version tool_sha runtime_version runtime_sha tool_sha512
+    local policy kind pattern internal signed tool_version tool_sha runtime_version runtime_sha tool_sha512 basis disclosed attested_by
+    attested_by="$(jqr ".components.\"$c\".provenance.workflow // empty" "$def")"
     policy="$(jqr ".components.\"$c\".signing.policy // empty" "$def")"
     case "$policy" in none | authenticode) ;; *) note "$c: signing policy '$policy' is neither none nor authenticode" ;; esac
     case "$(jqr ".components.\"$c\".signing.macos // \"none\"" "$def")" in none | developer-id) ;; *) note "$c: macOS signing policy is neither none nor developer-id" ;; esac
-    while IFS=$'\037' read -r rid kind pattern internal signed tool_version tool_sha runtime_version runtime_sha tool_sha512; do
+    while IFS=$'\037' read -r rid kind pattern internal signed tool_version tool_sha runtime_version runtime_sha tool_sha512 basis disclosed; do
       [ -n "$rid" ] || continue
+      # The founder's one exception to signed-or-unpublished: the linux-x64 AppImage, attested as the Linux CLI is.
+      if [ -n "$basis" ]; then
+        [ "$basis" = attestation ] || note "$c/$rid: $kind package names unsigned_basis '$basis'; the only basis is attestation"
+        [ "$kind" = appimage ] && [ "$rid" = linux-x64 ] \
+          || note "$c/$rid: $kind package claims attestation in place of a signature, which only the linux-x64 AppImage may"
+        [ "$signed" = false ] || note "$c/$rid: $kind package names an unsigned_basis and is not recorded unsigned"
+        [ -n "$attested_by" ] || note "$c/$rid: $kind package is published on its attestation and $c names no provenance workflow"
+        [ "$disclosed" -ge 1 ] || note "$c/$rid: $kind package is published unsigned and names no page that discloses it"
+      fi
       case "$pattern" in *"{version}"*"{rid}"*) ;; *) note "$c/$rid: $kind package '$pattern' does not carry {version} and {rid}" ;; esac
       if [ "$policy" = "none" ]; then
         [ "$signed" = "false" ] || note "$c/$rid: $kind package is not recorded unsigned while the $c signing policy is none"
@@ -347,7 +357,7 @@ TARGETS
 $(jqr ".components.\"$c\".targets // [] | .[] | .rid as \$rid | .packages // [] | .[] | [
      \$rid, (.kind // \"\"), (.pattern // \"\"), (.internal | tostring), (.signed | tostring),
      (.tool_version // \"\"), (.tool_sha256 // \"\"), (.runtime_version // \"\"), (.runtime_sha256 // \"\"),
-     (.tool_sha512 // \"\")
+     (.tool_sha512 // \"\"), (.unsigned_basis // \"\"), (.unsigned_disclosed_in // [] | length | tostring)
    ] | join(\"\")" "$def" 2>/dev/null || true)
 PACKAGES
   done
@@ -682,6 +692,18 @@ EOF
     done
   done
 
+  # A package published unsigned says so on every page its record names, in the words a reader verifies it by.
+  local unsigned_kind
+  while IFS=$'\037' read -r c unsigned_kind page; do
+    [ -n "$page" ] || continue
+    [ -f "$root/$page" ] || { note "no page at $page to disclose that the $c $unsigned_kind package is unsigned"; continue; }
+    grep -qF "AppImage is not signed" "$root/$page" \
+      || note "$page no longer says the $c $unsigned_kind package is not signed"
+  done <<UNSIGNED
+$(jqr '.components | to_entries[] | .key as $c | .value.targets[] | (.packages // [])[]
+     | select(.unsigned_basis != null) | .kind as $k | (.unsigned_disclosed_in // [])[] | [$c, $k, .] | join("\u001f")' "$def" 2>/dev/null || true)
+UNSIGNED
+
   # What the advertised download is known to get wrong is disclosed where it is downloaded from, for
   # as long as it IS the advertised download. The list has ONE home - the definition, against the
   # version that carries it - because a list written out on three pages instead is three lists and
@@ -943,6 +965,11 @@ validate_signing() {
         *"'.components.$c.signing.policy'"*) ;;
         *) note "$workflow never resolves the $c signing policy from the definition" ;;
       esac
+      # Azure admits keypaste's identity only from main and release tags, so a login on any other ref fails the job.
+      case "$code" in
+        *"scripts/sign-windows.sh --identity"*) ;;
+        *) note "$workflow never asks sign-windows.sh whether keypaste's identity signs on this ref" ;;
+      esac
       # A refused signature must stop the job before a package exists, and an installer is signed before anything leaves the job.
       # Only an upload in the installer's own job can carry it, since nothing else leaves a job.
       local logins=0 index=0 payload_signed=0 packaged=0 installer_signed=0 signed_after_upload=0 job="" uploaded_jobs=" "
@@ -966,6 +993,10 @@ validate_signing() {
           *"steps.signing.outputs.policy == 'authenticode'"*"client-id: \${{ vars.KEYPASTE_SIGNING_CLIENT_ID }}"*"tenant-id: \${{ vars.KEYPASTE_SIGNING_TENANT_ID }}"*"allow-no-subscriptions: true"*)
             ;;
           *) note "$workflow signs in to Azure without the authenticode guard, the client and tenant variables and allow-no-subscriptions" ;;
+        esac
+        case "$step" in
+          *"steps.signing.outputs.identity == 'keypaste'"*) ;;
+          *) note "$workflow signs in to Azure on refs where keypaste's identity does not sign" ;;
         esac
       done < <(workflow_steps "$root/$workflow")
       [ "$logins" -ge 1 ] || note "$workflow has an authenticode path with no Azure login guarded by the resolved policy"
@@ -1221,6 +1252,14 @@ expect_repo_refusal() {
 
 mutate() { jq "$2" "$DEFINITION" > "$WORK/$1.json"; echo "$WORK/$1.json"; }
 
+# The desktop as it was before signing: the policy none and every package internal, unsigned and named so.
+# The rules for that state are proven on it, since the definition no longer holds it.
+UNSIGNED_APP='.components.app.signing.policy = "none"
+  | .components.app.targets |= map(if .packages then .packages |= map(.internal = true | .signed = false | del(.unsigned_basis, .unsigned_disclosed_in)
+      | .pattern = (if (.pattern | test("-internal-unsigned")) then .pattern
+                    else (.pattern | sub("\\.(?<ext>[A-Za-z]+)$"; "-internal-unsigned.\(.ext)")) end)) else . end)'
+mutate_unsigned() { mutate "$1" "$UNSIGNED_APP | $2"; }
+
 echo "== fixtures: definitions that must be refused"
 
 printf 'not json at all' > "$WORK/unparseable.json"
@@ -1261,27 +1300,39 @@ expect_refusal "nothing-advertised" "no published release is marked advertised" 
 expect_refusal "duplicate-published-version" "published lists 0.1.0 twice" \
   "$(mutate duplicate-published-version '.published[0].version = .published[1].version')"
 expect_refusal "installer-name-drops-the-label" "is not named internal and unsigned" \
-  "$(mutate installer-name-drops-the-label '(.components.app.targets[] | select(.rid == "win-x64") | .packages[0].pattern) = "keypaste-app-{version}-{rid}.msi"')"
+  "$(mutate_unsigned installer-name-drops-the-label '(.components.app.targets[] | select(.rid == "win-x64") | .packages[0].pattern) = "keypaste-app-{version}-{rid}.msi"')"
 expect_refusal "installer-recorded-signed" "is not recorded unsigned" \
-  "$(mutate installer-recorded-signed '(.components.app.targets[] | select(.rid == "win-x64") | .packages[0].signed) = true')"
+  "$(mutate_unsigned installer-recorded-signed '(.components.app.targets[] | select(.rid == "win-x64") | .packages[0].signed) = true')"
 expect_refusal "installer-recorded-public" "is not recorded internal" \
-  "$(mutate installer-recorded-public '(.components.app.targets[] | select(.rid == "win-x64") | .packages[0].internal) = false')"
+  "$(mutate_unsigned installer-recorded-public '(.components.app.targets[] | select(.rid == "win-x64") | .packages[0].internal) = false')"
 expect_refusal "installer-name-drops-the-version" "does not carry {version} and {rid}" \
   "$(mutate installer-name-drops-the-version '(.components.app.targets[] | select(.rid == "win-x64") | .packages[0].pattern) = "keypaste-app-{rid}-internal-unsigned.msi"')"
 expect_refusal "appimage-name-drops-the-label" "is not named internal and unsigned" \
-  "$(mutate appimage-name-drops-the-label '(.components.app.targets[] | select(.rid == "linux-x64") | .packages[0].pattern) = "keypaste-app-{version}-{rid}.AppImage"')"
+  "$(mutate_unsigned appimage-name-drops-the-label '(.components.app.targets[] | select(.rid == "linux-x64") | .packages[0].pattern) = "keypaste-app-{version}-{rid}.AppImage"')"
 expect_refusal "appimage-recorded-signed" "is not recorded unsigned" \
-  "$(mutate appimage-recorded-signed '(.components.app.targets[] | select(.rid == "linux-x64") | .packages[0].signed) = true')"
+  "$(mutate_unsigned appimage-recorded-signed '(.components.app.targets[] | select(.rid == "linux-x64") | .packages[0].signed) = true')"
 expect_refusal "appimage-recorded-public" "is not recorded internal" \
-  "$(mutate appimage-recorded-public '(.components.app.targets[] | select(.rid == "linux-x64") | .packages[0].internal) = false')"
+  "$(mutate_unsigned appimage-recorded-public '(.components.app.targets[] | select(.rid == "linux-x64") | .packages[0].internal) = false')"
 expect_refusal "appimage-tool-unpinned" "appimagetool is not pinned by SHA-256" \
   "$(mutate appimage-tool-unpinned '(.components.app.targets[] | select(.rid == "linux-x64") | .packages[0]) |= del(.tool_sha256)')"
 expect_refusal "appimage-runtime-unpinned" "runtime is not pinned by SHA-256" \
   "$(mutate appimage-runtime-unpinned '(.components.app.targets[] | select(.rid == "linux-x64") | .packages[0].runtime_sha256) = "continuous"')"
 expect_refusal "dmg-name-drops-the-label" "is not named internal and unsigned" \
-  "$(mutate dmg-name-drops-the-label '(.components.app.targets[] | select(.rid == "osx-arm64") | .packages[] | select(.kind == "dmg") | .pattern) = "keypaste-app-{version}-{rid}.dmg"')"
+  "$(mutate_unsigned dmg-name-drops-the-label '(.components.app.targets[] | select(.rid == "osx-arm64") | .packages[] | select(.kind == "dmg") | .pattern) = "keypaste-app-{version}-{rid}.dmg"')"
+expect_refusal "dmg-recorded-signed" "is not recorded unsigned" \
+  "$(mutate_unsigned dmg-recorded-signed '(.components.app.targets[] | select(.rid == "osx-arm64") | .packages[] | select(.kind == "dmg") | .signed) = true')"
 expect_refusal "dmg-recorded-public" "is not recorded internal" \
-  "$(mutate dmg-recorded-public '(.components.app.targets[] | select(.rid == "osx-arm64") | .packages[] | select(.kind == "dmg") | .internal) = false')"
+  "$(mutate_unsigned dmg-recorded-public '(.components.app.targets[] | select(.rid == "osx-arm64") | .packages[] | select(.kind == "dmg") | .internal) = false')"
+expect_refusal "attested-msi" "claims attestation in place of a signature" \
+  "$(mutate attested-msi '(.components.app.targets[] | select(.rid == "win-x64") | .packages[0]) |= (.signed = false | .unsigned_basis = "attestation" | .unsigned_disclosed_in = ["docs/RELEASE.md"])')"
+expect_refusal "attested-dmg" "claims attestation in place of a signature" \
+  "$(mutate attested-dmg '(.components.app.targets[] | select(.rid == "osx-arm64") | .packages[] | select(.kind == "dmg")) |= (.signed = false | .unsigned_basis = "attestation" | .unsigned_disclosed_in = ["docs/RELEASE.md"])')"
+expect_refusal "attested-appimage-recorded-signed" "names an unsigned_basis and is not recorded unsigned" \
+  "$(mutate attested-appimage-recorded-signed '(.components.app.targets[] | select(.rid == "linux-x64") | .packages[0].signed) = true')"
+expect_refusal "attested-appimage-other-basis" "the only basis is attestation" \
+  "$(mutate attested-appimage-other-basis '(.components.app.targets[] | select(.rid == "linux-x64") | .packages[0].unsigned_basis) = "checksum"')"
+expect_refusal "attested-appimage-undisclosed" "names no page that discloses it" \
+  "$(mutate attested-appimage-undisclosed '(.components.app.targets[] | select(.rid == "linux-x64") | .packages[0]) |= del(.unsigned_disclosed_in)')"
 expect_refusal "installer-sdk-unpinned" "WixToolset.Sdk is not pinned by SHA-512" \
   "$(mutate installer-sdk-unpinned '(.components.app.targets[] | select(.rid == "win-x64") | .packages[0]) |= del(.tool_sha512)')"
 expect_refusal "publishes-unstated" "does not say whether it publishes archives or packages" \
@@ -1395,9 +1446,14 @@ expect_repo_refusal "release-doc-drops-a-floor-value" "which docs/RELEASE.md doe
   "$FAKE/release-targets.json" "$FAKE"
 cp docs/RELEASE.md "$FAKE/docs/RELEASE.md"
 
+sed_inplace 's/AppImage is not signed/AppImage is fine/g' "$FAKE/docs/RELEASE.md"
+expect_repo_refusal "appimage-disclosure-deleted" "no longer says the app appimage package is not signed" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp docs/RELEASE.md "$FAKE/docs/RELEASE.md"
+
 sed_inplace 's/unsigned/perfectly ordinary/g' "$FAKE/docs/install.md"
 expect_repo_refusal "signing-disclosure-deleted" "no longer says the cli binaries are unsigned" \
-  "$FAKE/release-targets.json" "$FAKE"
+  "$(mutate cli-unsigned '.components.cli.signing |= (.policy = "none" | .disclosed_in = ["docs/install.md"])')" "$FAKE"
 cp docs/install.md "$FAKE/docs/install.md"
 
 sed_inplace 's/| \.packages\[\] | select(\.kind == "msi")/| .installer | select(.kind == "msi")/' "$FAKE/scripts/build-windows-installer.sh"
@@ -1496,6 +1552,16 @@ expect_repo_refusal "login-unguarded" "signs in to Azure without the authenticod
   "$FAKE/release-targets.json" "$FAKE"
 cp .github/workflows/release.yml "$FAKE/.github/workflows/release.yml"
 
+sed_inplace "s/ \&\& steps.signing.outputs.identity == 'keypaste'//" "$FAKE/.github/workflows/release.yml"
+expect_repo_refusal "login-on-every-ref" "signs in to Azure on refs where keypaste's identity does not sign" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp .github/workflows/release.yml "$FAKE/.github/workflows/release.yml"
+
+sed_inplace '/scripts\/sign-windows.sh --identity/d' "$FAKE/.github/workflows/app.yml"
+expect_repo_refusal "identity-never-asked" "never asks sign-windows.sh whether keypaste's identity signs" \
+  "$FAKE/release-targets.json" "$FAKE"
+cp .github/workflows/app.yml "$FAKE/.github/workflows/app.yml"
+
 sed_inplace '/tenant-id: /d' "$FAKE/.github/workflows/app.yml"
 expect_repo_refusal "login-without-tenant" "signs in to Azure without the authenticode guard" \
   "$FAKE/release-targets.json" "$FAKE"
@@ -1503,7 +1569,7 @@ cp .github/workflows/app.yml "$FAKE/.github/workflows/app.yml"
 
 printf '        run: signtool sign /fd SHA256 artifacts/release/win-x64/keypaste.exe\n' >> "$FAKE/.github/workflows/release.yml"
 expect_repo_refusal "workflow-signs-directly" "signs a payload while the cli signing policy is none" \
-  "$FAKE/release-targets.json" "$FAKE"
+  "$WORK/cli-unsigned.json" "$FAKE"
 cp .github/workflows/release.yml "$FAKE/.github/workflows/release.yml"
 
 printf 'readonly DLIB_SHA256=%s\n' "$(jqr '.signing.dlib.path_sha256' "$DEFINITION")" >> "$FAKE/scripts/sign-windows.sh"

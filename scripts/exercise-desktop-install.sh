@@ -231,9 +231,8 @@ checks() { if [ "$1" = macos ]; then echo "${CHECKS[*]:0:2} gatekeeper ${CHECKS[
 # A rehearsal's candidate: app.yml's package for this RID under the branch build's -dryrun version, intact
 # against the .sha256 that job wrote beside it. Nothing attests a branch build.
 verify_branch_build() {
-  local extension name recorded
-  case "$(platform)" in windows) extension=msi ;; linux) extension=AppImage ;; macos) extension=dmg ;; esac
-  name="keypaste-app-$VERSION-$RID-internal-unsigned.$extension"
+  local name recorded
+  name="$(bash "$ROOT/scripts/verify-desktop-candidate.sh" --name "$VERSION" "$RID")" || return 1
   [ "$(basename "$CANDIDATE")" = "$name" ] || { echo "$(basename "$CANDIDATE") is not the branch build's package name $name"; return 1; }
   [ -f "$CANDIDATE.sha256" ] || { echo "no $name.sha256 beside the candidate"; return 1; }
   recorded="$(awk 'NR == 1 {print $1}' "$CANDIDATE.sha256" | tr -d "$CR")"

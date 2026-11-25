@@ -1,6 +1,6 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package
-    Name="keypaste $(var.FullVersion) (internal, unsigned)"
+    Name="keypaste $(var.FullVersion)"
     Manufacturer="keypaste"
     Version="$(var.ProductVersion)"
     UpgradeCode="6f1d9a4e-2b7c-4c55-9d7e-1a3b5c7d9e01"
@@ -8,15 +8,14 @@
     Language="1033">
 
     <SummaryInformation
-      Description="keypaste $(var.FullVersion) internal unsigned candidate"
-      Keywords="keypaste;$(var.FullVersion);internal;unsigned"
+      Description="keypaste $(var.FullVersion) installer"
+      Keywords="keypaste;$(var.FullVersion)"
       Manufacturer="keypaste" />
 
     <!-- The previous version is removed only once this install commits, so a failure leaves it installed (F.14). -->
     <MajorUpgrade Schedule="afterInstallFinalize" DowngradeErrorMessage="A newer keypaste is already installed." />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
 
-    <Property Id="ARPCOMMENTS" Value="Internal candidate $(var.FullVersion); unsigned; not for distribution" />
     <Property Id="ARPNOMODIFY" Value="1" />
 
     <Icon Id="keypaste.ico" SourceFile="$(var.AppIcon)" />

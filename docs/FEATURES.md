@@ -3,7 +3,7 @@
 What keypaste can do, on which surface, and in which version, reviewed against source and tests on 2026-11-12. Versions use [RELEASE](RELEASE.md)'s states:
 
 - **`v0.3.0`**: Published, and installation-verified on runner images for all four targets ([RELEASE](RELEASE.md#published-releases)).
-- **1.0.0**: Implemented, in no download yet. Desktop capabilities are also in the internal, unsigned desktop packages.
+- **1.0.0**: Implemented, in no download yet. Desktop capabilities are also in the desktop packages CI builds: a signed MSI, a signed DMG that `notarize.yml` notarizes, and an unsigned AppImage that a release publishes with its build attestation.
 
 [SECURITY](../SECURITY.md#guarantees-and-limits) and [THREATS](../THREATS.md) own the guarantees and limits. [CHANGELOG](../CHANGELOG.md) lists each change.
 
