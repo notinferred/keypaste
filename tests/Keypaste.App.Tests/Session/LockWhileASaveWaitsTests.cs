@@ -13,7 +13,7 @@ namespace Keypaste.App.Tests.Session;
 /// <summary>
 /// A lock does not wait for a save queued behind another save in this process: the queued save writes nothing and
 /// its terminal edit is refused as locked, so the lock returns, its endpoint stopped, while the other still holds the
-/// save gate (F.35, D-0392).
+/// save gate.
 /// </summary>
 /// <remarks>Alone, because the save gate is the whole process's and this test holds it.</remarks>
 [Collection(nameof(SaveGateHeld))]

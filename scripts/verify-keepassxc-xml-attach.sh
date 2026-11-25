@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-#
-# verify-keepassxc-xml-attach.sh
-#
 # PERMANENT COMPATIBILITY GATE — SECURITY.md law 14.
 #
 # `keypaste access --new-keyfile` attaches a KeePass XML keyfile that KeePassXC wrote, and KeePassXC

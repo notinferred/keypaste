@@ -96,6 +96,22 @@ public sealed class SameNameItemsTests : IDisposable
     }
 
     [Fact]
+    public void A_uuid_spelt_other_than_as_its_upper_case_hex_reaches_nothing()
+    {
+        using var vault = Open();
+        var item = Item(vault, "alice");
+        var uuid = item.Uuid!;
+        string[] misspelt = [uuid.ToLowerInvariant(), uuid[..^1] + "G", uuid[..^1], "{" + uuid + "}"];
+
+        Assert.All(misspelt.Where(other => !string.Equals(other, uuid, StringComparison.Ordinal)), other =>
+        {
+            Assert.Null(vault.Find(item with { Uuid = other }));
+            Assert.Null(vault.EntryNameOf(other));
+        });
+        Assert.Equal("alice-password", vault.Find(item)!.Password);
+    }
+
+    [Fact]
     public void A_uuid_two_items_hold_reaches_only_the_one_its_name_says()
     {
         using (var seed = Open())

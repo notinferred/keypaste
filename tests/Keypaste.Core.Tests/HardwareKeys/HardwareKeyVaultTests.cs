@@ -252,7 +252,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
 
     /// <remarks>
     /// Windows can refuse a write for a moment and the save tries again, asking the key again, so this counts the
-    /// attempts rather than assuming one (F.53).
+    /// attempts rather than assuming one.
     /// </remarks>
     [Fact]
     public void Adding_a_hardware_key_makes_it_required_and_asks_it_once_per_attempt()
@@ -506,7 +506,7 @@ public sealed class HardwareKeyVaultTests : IDisposable
     /// <remarks>
     /// Off Windows a write's temporary file is <c>&lt;vault&gt;.tmp</c>, and a directory there refuses it. On Windows the
     /// write goes through Transactional NTFS, whose temporary name is random, so another transaction holds the vault's
-    /// own name instead, the refusal F.7 measured, which a volume without transactions cannot stage.
+    /// own name instead, the refusal <c>VaultSaveUnderATransactedNameTests</c> measures, which a volume without transactions cannot stage.
     /// </remarks>
     private sealed class RefusedWrite : IDisposable
     {

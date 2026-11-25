@@ -8,7 +8,7 @@ using Xunit;
 namespace Keypaste.App.Tests.Rendering;
 
 /// <summary>
-/// An item's title is words, drawn in the system's interface face, and a field's label takes the label face whatever it names, so the face never tells protected from plain (F.130).
+/// An item's title is words, drawn in the system's interface face, and a field's label takes the label face whatever it names, so the face never tells protected from plain.
 /// </summary>
 /// <remarks>
 /// Read from the frame: each claim that a text is drawn in one face sits beside the claim that the

@@ -4,7 +4,7 @@ using Xunit;
 namespace Keypaste.Processes.Tests;
 
 /// <summary>
-/// The owning session answers from the vault as last saved (U.3) when the save that changed it is another process's: the built keypaste
+/// The owning session answers from the vault as last saved when the save that changed it is another process's: the built keypaste
 /// under another home saves the vault the app holds, the built bridge's next request is refused as vault-changed, and once the app merges
 /// that save with its own edit the same session answers from the merged copy and asks again.
 /// </summary>

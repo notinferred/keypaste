@@ -1,6 +1,3 @@
-using Keypaste.App.Clipboard;
-using Keypaste.App.Session;
-using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Tests;
@@ -123,38 +120,5 @@ public sealed class HostileNameRenderingTests : IDisposable
         Assert.Contains(_bidi, row.Path, StringComparison.Ordinal);
     }
 
-    private Context New() => new(_vaultPath);
-
-    /// <summary>An unlocked session and the entries screen over it, mirroring EntriesViewModelTests.</summary>
-    private sealed class Context : IDisposable
-    {
-        internal Context(string vaultPath)
-        {
-            Session = new AppVaultSession(new ManualClock(AppClock.Start));
-
-            using (var master = TempVault.Secret(_master))
-            {
-                Assert.Equal(UnlockOutcome.Opened, Session.TryUnlock(vaultPath, master.Value));
-            }
-
-            Clipboard = new FakeClipboard();
-            Countdown = new ClipboardCountdown(Clipboard, new ManualClock(AppClock.Start));
-            Entries = new EntriesViewModel(Session, Countdown);
-        }
-
-        internal AppVaultSession Session { get; }
-
-        internal ClipboardCountdown Countdown { get; }
-
-        internal EntriesViewModel Entries { get; }
-
-        internal FakeClipboard Clipboard { get; }
-
-        public void Dispose()
-        {
-            Entries.Dispose();
-            Countdown.Dispose();
-            Session.Dispose();
-        }
-    }
+    private UnlockedScreens New() => new(_vaultPath, _master);
 }

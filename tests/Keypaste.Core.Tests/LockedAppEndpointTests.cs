@@ -92,7 +92,7 @@ public sealed class LockedAppEndpointTests : IDisposable
     public async Task BridgesInQuickSuccession_AreEachHeard()
     {
         // Each bridge hangs up as soon as it connects, which can be before the app waits again; on Windows that
-        // connection reaches the app already gone, 1 in 200 times in F.66's probe.
+        // connection reaches the app already gone, about 1 in 200 times when measured.
         const int bridges = 300;
         var heard = 0;
         string? unreachable = null;
@@ -117,7 +117,7 @@ public sealed class LockedAppEndpointTests : IDisposable
     [Fact]
     public async Task AListenerThatHangsUpAtOnce_FailsNoBridge()
     {
-        // On Windows the runtime checks who made the pipe after connecting, which a listener that has hung up fails: 178 of 200 times in F.70's probe.
+        // On Windows the runtime checks who made the pipe after connecting, which a listener that has hung up fails: 178 of 200 times when measured.
         const int bridges = 50;
         using var listener = new HangsUpAtOnce(_name);
 

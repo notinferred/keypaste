@@ -15,7 +15,7 @@ namespace Keypaste.App.Tests.Rendering;
 
 /// <summary>
 /// The icon alone on the welcome screen, drawn in the palette's ink with its amber dot at the end; the unlocked app and the
-/// lock screen show no mark (N.7, F.130).
+/// lock screen show no mark.
 /// </summary>
 public sealed class BrandMarksTests
 {

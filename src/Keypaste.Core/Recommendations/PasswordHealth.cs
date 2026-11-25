@@ -2,7 +2,7 @@ using System.Globalization;
 
 namespace Keypaste.Core.Recommendations;
 
-/// <summary>What is wrong with an item's password, or with the item, that Recommendations reports (V.9).</summary>
+/// <summary>What is wrong with an item's password, or with the item, that Recommendations reports.</summary>
 public enum PasswordProblem
 {
     /// <summary>KeePass's estimate rates the password below <see cref="PasswordHealthCheck.StrongBits"/>.</summary>
@@ -15,7 +15,7 @@ public enum PasswordProblem
     Expired,
 }
 
-/// <summary>One item whose password is weak or reused, or that has expired, named by item and never by value (V.9).</summary>
+/// <summary>One item whose password is weak or reused, or that has expired, named by item and never by value.</summary>
 /// <param name="Entry">The item.</param>
 /// <param name="EntryUuid">The item's KDBX identifier as hex, which survives a rename.</param>
 /// <param name="Problem">What is wrong.</param>
@@ -37,7 +37,7 @@ public sealed record PasswordFinding(
     };
 }
 
-/// <summary>Finds weak, reused and expired passwords in the process holding the vault, with no network request (V.9).</summary>
+/// <summary>Finds weak, reused and expired passwords in the process holding the vault, with no network request.</summary>
 /// <remarks>
 /// <para>
 /// It reads the password of every live item outside keypaste's own groups. KeePass's own estimator

@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.Json;
@@ -24,7 +25,7 @@ namespace Keypaste.Core.Audit;
 /// rewrites the file is the vault's owner's <see cref="AuditCompaction"/>, which keeps every line but old
 /// lookups and expired days byte for byte and seals the result. That is a statement about keypaste's own behaviour and
 /// nothing more: the file belongs to the user's account, so anything running as that user can
-/// rewrite it. Since Stage 2.4 every record also carries a <see cref="AuditChain"/> link to the one
+/// rewrite it. Every record also carries a <see cref="AuditChain"/> link to the one
 /// before it, so a rewrite that does not recompute the chain is detectable. Append-only by
 /// construction within keypaste; tamper-<em>evident</em>; never tamper-<em>proof</em>.
 /// </para>
@@ -427,6 +428,7 @@ public sealed class AuditLog : IDisposable
     {
         tail = new Tail(AuditChain.Genesis, 0, NeedsNewline: false);
         error = string.Empty;
+        byte[]? buffer = null;
 
         try
         {
@@ -439,12 +441,13 @@ public sealed class AuditLog : IDisposable
             }
 
             var window = (int)Math.Min(length, TailWindowBytes);
-            var buffer = new byte[window];
+            // Pooled: a new array this size per append is a large-object-heap allocation every time.
+            buffer = ArrayPool<byte>.Shared.Rent(window);
 
             stream.Seek(length - window, SeekOrigin.Begin);
             stream.ReadExactly(buffer, 0, window);
 
-            var span = buffer.AsSpan();
+            var span = buffer.AsSpan(0, window);
             var needsNewline = span[^1] != (byte)'\n';
 
             // Only the last segment can be unterminated. It is examined like any other line, because
@@ -501,6 +504,13 @@ public sealed class AuditLog : IDisposable
         {
             error = $"the audit log at '{Path}' could not be read: {ex.Message}";
             return false;
+        }
+        finally
+        {
+            if (buffer is not null)
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
         }
     }
 
@@ -786,10 +796,9 @@ public sealed class AuditLog : IDisposable
     };
 
     /// <remarks>
-    /// Every member is named, and the fallback is <c>unknown</c> rather than any real method. It
-    /// used to be <c>vault-locked</c>, which meant a member added without a case here would have
-    /// been recorded as a denial that never happened — the quietest possible way to make the log
-    /// law 3 requires say something untrue. It does not throw, because an audit write must not
+    /// Every member is named, and the fallback is <c>unknown</c> rather than any real method: a real
+    /// one would record a member added without a case here as something that never happened — the
+    /// quietest possible way to make the log law 3 requires say something untrue. It does not throw, because an audit write must not
     /// be the thing that takes the server down.
     /// </remarks>
     internal static string Wire(AuditMethod method) => method switch

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Resources;
 using Keypaste.App.Session;
@@ -12,8 +13,7 @@ namespace Keypaste.App.ViewModels;
 /// <para>
 /// <b>Everything here is rebuilt from the vault rather than cached across a lock.</b>
 /// <see cref="ShellViewModel"/> disposes its content on every navigation and on every lock, so this
-/// object's lifetime is bounded by an open vault — which is the rule 4.1 wrote down before there
-/// was anything to break it.
+/// object's lifetime is bounded by an open vault.
 /// </para>
 /// <para>
 /// <b>The list is flat.</b> An item keeps the group the file holds it in, which the CLI, search and agents read, but
@@ -30,6 +30,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     private readonly ClipboardCountdown _clipboard;
 
     private IReadOnlyList<EntryRow> _all = [];
+    private IReadOnlyList<EntryRow>? _sorted;
+    private TableOrder? _sortedBy;
     private readonly EntryActivitySource? _activity;
     private readonly IWebLauncher? _web;
     private readonly Action<Action>? _post;
@@ -144,6 +146,10 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// <summary>The vault a row's item is in.</summary>
     private AppVaultSession SessionOf(EntryRow row) => row.Vault ?? _session;
 
+    /// <summary>The vault of the open item when <paramref name="item"/> names it, UUID and all, or null.</summary>
+    internal AppVaultSession? VaultOfOpen(EntryName item) =>
+        Detail?.Name is { } open && open == item && string.Equals(open.Uuid, item.Uuid, StringComparison.Ordinal) ? _selectionVault : null;
+
     /// <summary>Whether a row's item is in this screen's own vault, which the list's forms change.</summary>
     private bool IsHome(EntryRow row) => ReferenceEquals(SessionOf(row), _session);
 
@@ -205,9 +211,12 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
     /// <summary>What matches the search and the place, in the table's order.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ListedRows), nameof(ShowsListEmpty), nameof(ShowsPlaceholder), nameof(Selected), nameof(DeletePrompt))]
+    [NotifyPropertyChangedFor(nameof(ListedRows), nameof(ListCount), nameof(ShowsListEmpty), nameof(ShowsPlaceholder), nameof(Selected), nameof(DeletePrompt))]
     [NotifyCanExecuteChangedFor(nameof(DeleteCommand), nameof(OrganizeCommand), nameof(DuplicateCommand))]
     internal partial IReadOnlyList<EntryRow> Rows { get; private set; } = [];
+
+    /// <summary>How many items the list shows, beside its title, as the sidebar counts a place; empty while it shows none.</summary>
+    internal string ListCount => Rows.Count > 0 ? Rows.Count.ToString(CultureInfo.InvariantCulture) : string.Empty;
 
     /// <summary>Whether the list has nothing to show, so it says why instead of standing blank.</summary>
     internal bool ShowsListEmpty => Rows.Count == 0 && _session.Unlocked is not null;
@@ -498,7 +507,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// <summary>Whether the add form is showing.</summary>
     internal bool IsAdding => _newItem is not null;
 
-    /// <summary>The New item form while it is open (N.4).</summary>
+    /// <summary>The New item form while it is open.</summary>
     internal NewItemViewModel? NewItem
     {
         get => _newItem;
@@ -636,6 +645,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         if (_session.Unlocked is not { } vault)
         {
             _all = [];
+            _sorted = null;
             Rows = [];
             Select(null);
             Forget();
@@ -650,6 +660,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         var wantedVault = _selectionVault;
 
         _all = [.. RowsOf(_session, vault), .. _alsoListed.SelectMany(other => other.Unlocked is { } open ? RowsOf(other, open) : [])];
+        _sorted = null;
         OnPropertyChanged(nameof(TotalCount));
         OnPropertyChanged(nameof(ListEmptyOffersImport));
         OnPropertyChanged(nameof(ListEmptyNote));
@@ -748,14 +759,35 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
 
         var now = _session.Clock.GetUtcNow();
+        var lastUseMoved = false;
+
+        // Rows holds rows of _all, or a query's copies of them, and each object takes the picture once.
+        HashSet<EntryRow> applied = new(ReferenceEqualityComparer.Instance);
 
         // The picture is this vault's own; another listed vault's items keep no dot.
         foreach (var row in _all.Concat(Rows).Where(IsHome))
         {
+            if (!applied.Add(row))
+            {
+                continue;
+            }
+
+            var lastUsed = row.LastUsedTicks;
             row.Apply(picture, now);
+            lastUseMoved |= lastUsed != row.LastUsedTicks;
         }
 
         Detail?.Apply(picture);
+
+        if (!lastUseMoved)
+        {
+            return;
+        }
+
+        if (_sortedBy?.Column == TableStates.LastUsed)
+        {
+            _sorted = null;
+        }
 
         if (Table.Order?.Column == TableStates.LastUsed && Listed() is var listed && !listed.Select(row => row.Uuid).SequenceEqual(Rows.Select(row => row.Uuid), StringComparer.Ordinal))
         {
@@ -775,8 +807,8 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// </summary>
     /// <remarks>
     /// A query is what somebody was looking for in this vault, and a result is a list of its entry
-    /// names; neither belongs to a locked app. Called from the locked branch above and from
-    /// <see cref="Dispose"/>, because the lock has to hold on whichever path runs.
+    /// names; neither belongs to a locked app. Called from <see cref="Reload"/> when the vault is
+    /// locked and from <see cref="Dispose"/>, because the lock has to hold on whichever path runs.
     /// </remarks>
     private void Forget()
     {
@@ -809,6 +841,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
 
         _all = [];
+        _sorted = null;
         Rows = [];
         Select(null);
         Forget();
@@ -898,19 +931,19 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
 
         Match(query);
 
-        List<EntryRow> rows =
-        [
-            .. TableSorting.Sorted(
-                _all
-                    .Where(row => (Place == ItemPlace.Favorites ? row.IsFavorite : ItemPlaces.Holds(Place, row.Kind)))
-                    .Where(row => query.Length == 0 || _matches.ContainsKey((SessionOf(row), row.Uuid, row.Name)))
-                    .Select(row => query.Length == 0
-                        ? row
-                        : row with { Fields = _matches[(SessionOf(row), row.Uuid, row.Name)].Fields, Tags = _matches[(SessionOf(row), row.Uuid, row.Name)].Tags }),
-                Table.Order,
-                SortValueOf,
-                TieBetween)
-        ];
+        List<EntryRow> rows = [];
+
+        foreach (var row in Sorted().Where(row => Place == ItemPlace.Favorites ? row.IsFavorite : ItemPlaces.Holds(Place, row.Kind)))
+        {
+            if (query.Length == 0)
+            {
+                rows.Add(row);
+            }
+            else if (_matches.TryGetValue((SessionOf(row), row.Uuid, row.Name), out var match))
+            {
+                rows.Add(row with { Fields = match.Fields, Tags = match.Tags });
+            }
+        }
 
         // An entry just renamed out of its own result stays where the person is looking at it. It is
         // held only until the query changes, which is when they asked a different question.
@@ -923,6 +956,19 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
 
         return rows;
+    }
+
+    /// <summary>Every row under the order in force, sorted once per reload, order or change of a sorted last use rather than per keystroke.</summary>
+    /// <remarks>The sort is stable and no key reads what a query's copy changes, so filtering this keeps the order sorting the filtered rows gives.</remarks>
+    private IReadOnlyList<EntryRow> Sorted()
+    {
+        if (_sorted is null || _sortedBy != Table.Order)
+        {
+            _sortedBy = Table.Order;
+            _sorted = [.. TableSorting.Sorted(_all, _sortedBy, SortValueOf, TieBetween)];
+        }
+
+        return _sorted;
     }
 
     /// <summary>What a row shows in a column, so the list reads in the order its words do. Only names and times: a row holds no value to read.</summary>

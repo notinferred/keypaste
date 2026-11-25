@@ -14,8 +14,7 @@ namespace Keypaste.Core.Clipboard;
 /// <para>
 /// <b>There is no clipboard here.</b> This namespace holds a decision, not a transport: the CLI
 /// reaches the clipboard through the tool the platform ships and the app reaches it through the
-/// windowing system it already depends on, and neither of those belongs in a library that has no
-/// <c>PackageReference</c> and opens no handle.
+/// windowing system it already depends on, and neither of those belongs in a library that opens no handle.
 /// </para>
 /// </remarks>
 public static class ClipboardClear
@@ -43,7 +42,7 @@ public static class ClipboardClear
     /// <para>
     /// <b>A read-back that failed means clear anyway.</b> Skipping the clear because verification
     /// was impossible would leave a password on the clipboard indefinitely, which is the worst
-    /// outcome available here — fail closed, SECURITY.md law 7. Clearing something the user copied
+    /// outcome available here, so it fails closed. Clearing something the user copied
     /// since is recoverable; leaving a secret behind is not.
     /// </para>
     /// <para>

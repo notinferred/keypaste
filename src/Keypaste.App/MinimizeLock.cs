@@ -33,7 +33,6 @@ internal sealed class MinimizeLock : IDisposable
 
     private bool _disposed;
 
-    /// <summary>Watches a window.</summary>
     /// <param name="window">The window whose state to follow.</param>
     /// <param name="enabled">Whether minimizing should lock, asked each time.</param>
     /// <param name="lockNow">What locking is.</param>
@@ -60,8 +59,8 @@ internal sealed class MinimizeLock : IDisposable
     /// </para>
     /// <para>
     /// It exists so the Settings screen can <b>omit</b> the checkbox anywhere else rather than
-    /// offer a security setting that does nothing (SECURITY.md law 7). An inactive one is the
-    /// defect F.2b repairs; shipping the same shape again somewhere else would repeat it.
+    /// offer a security setting that does nothing (SECURITY.md law 7), a defect this app has shipped
+    /// before.
     /// </para>
     /// </remarks>
     internal static bool IsSupported =>

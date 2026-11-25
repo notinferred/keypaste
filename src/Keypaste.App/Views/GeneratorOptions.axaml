@@ -6,7 +6,7 @@
              x:Class="Keypaste.App.Views.GeneratorOptions"
              x:DataType="vm:GeneratorViewModel">
 
-  <!-- What a generated password is made of (V.12): characters with their length and kinds, or words from the EFF list with their count and
+  <!-- What a generated password is made of: characters with their length and kinds, or words from the EFF list with their count and
        separator, and how strong that is, its bits in the tooltip. One markup for every form and the Generate password dialog. It holds no
        secret; the value goes straight into the field it was generated for. -->
 

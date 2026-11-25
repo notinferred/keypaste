@@ -24,7 +24,7 @@ namespace Keypaste.Cli.Commands;
 /// </para>
 /// <para>
 /// <b>The mark and the note appear only when something was actually altered</b>, so a vault of
-/// ordinary names prints exactly what it printed before. <c>--flat</c> never takes the mark, because
+/// ordinary names prints them as stored, with no mark and no note. <c>--flat</c> never takes the mark, because
 /// it is the form something else parses; it is told on stderr instead, which a parser does not read.
 /// A scrubbed row is still listed, because keypaste does not get to pretend the vault holds
 /// something other than what KeePassXC shows (SECURITY.md law 14).
@@ -35,7 +35,7 @@ namespace Keypaste.Cli.Commands;
 /// which reports what can be recovered and where each entry came from — rather than mixed back in
 /// with the live ones, where it would read as a credential somebody still uses. KeePassXC shows
 /// the bin as an ordinary group, so the two disagree about that group and about nothing else; a
-/// row this listing does print is still exactly what the vault holds (V.3a). keypaste's own groups
+/// row this listing does print is still exactly what the vault holds. keypaste's own groups
 /// (<see cref="ReservedGroups"/>) are left out on the same terms: they hold its records, not secrets.
 /// </para>
 /// </remarks>
@@ -52,7 +52,7 @@ internal static class ListCommand
     /// </remarks>
     private const int _displayDepth = 32;
 
-    /// <summary>The longest path drawn, for the same reason.</summary>
+    /// <summary>The longest path drawn: generous, because this lists the reader's own vault and cutting a real name is the worse failure.</summary>
     private const int _displayLength = 512;
 
     private static readonly Option<bool> _flat = Syntax.Flag("--flat", "one path per line, without the tree");

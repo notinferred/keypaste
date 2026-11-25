@@ -124,8 +124,7 @@ public sealed class UndoTests : IDisposable
         var write = _session.Write(vault => vault.RemoveEntry(new EntryName("other", "spare"), out _), _ => true);
         Assert.Equal(WriteOutcome.Saved, write.Outcome);
         Assert.False(_entries.CanUndo);
-
-        _entries.UndoCommand.Press();
+        Assert.False(_entries.UndoCommand.CanExecute(null));
 
         using var reopened = ClaimedVault.Open(_vaultPath, _master);
         Assert.NotNull(reopened.Find("servers/renamed"));

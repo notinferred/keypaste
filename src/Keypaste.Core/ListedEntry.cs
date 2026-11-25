@@ -9,6 +9,21 @@ namespace Keypaste.Core;
 /// <param name="Tags">Its own project tags as written, each one <see cref="ProjectTag"/> reads as a member.</param>
 public sealed record ListedEntry(EntryName Name, IReadOnlyList<string> Fields, IReadOnlyList<string> Tags)
 {
+    /// <summary>Its own project tags as written, each one <see cref="ProjectTag"/> reads as a member.</summary>
+    public IReadOnlyList<string> Tags
+    {
+        get;
+        init
+        {
+            field = value;
+            Projects = ProjectsOf(value);
+        }
+    } = Tags;
+
+    /// <summary>The projects its own tags make it a member of, ordinally and each once.</summary>
+    /// <remarks>Read once from <see cref="Tags"/> and again whenever they are set, since a search reads it for every pair of entries.</remarks>
+    internal IReadOnlyList<string> Projects { get; private init; } = ProjectsOf(Tags);
+
     /// <summary>This entry as a reach shows it: the fields the reach covers.</summary>
     /// <param name="reach">How much of the entry an exposure reaches.</param>
     /// <returns>The entry with only those fields.</returns>
@@ -26,4 +41,7 @@ public sealed record ListedEntry(EntryName Name, IReadOnlyList<string> Fields, I
 
     /// <inheritdoc/>
     public override int GetHashCode() => Name.GetHashCode();
+
+    private static IReadOnlyList<string> ProjectsOf(IReadOnlyList<string> tags) =>
+        [.. tags.Select(ProjectTag.Read).Select(tag => tag.Project).OfType<string>().Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)];
 }

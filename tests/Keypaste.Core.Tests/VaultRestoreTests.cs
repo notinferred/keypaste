@@ -23,8 +23,8 @@ namespace Keypaste.Core.Tests;
 /// </para>
 /// <para>
 /// Every backup restored here was made by a real save, for <c>VaultBackupTests</c>' reason. The
-/// exceptions are planted deliberately and say so: a backup under another password, which the core
-/// has no call to produce yet, and the damaged ones.
+/// exceptions are planted deliberately and say so: a backup under another password, as KeePassXC
+/// leaves one, and the damaged ones.
 /// </para>
 /// </remarks>
 [Collection(nameof(SavesThatSpawnProcesses))]
@@ -258,8 +258,7 @@ public sealed class VaultRestoreTests : IDisposable
     }
 
     /// <remarks>
-    /// Planted, because the core has no call that changes a master password until V.1a. The file is a
-    /// real vault made under another password and given a name <c>List</c> recognises, which is what a
+    /// Planted: the file is a real vault made under another password and given a name <c>List</c> recognises, which is what a
     /// backup taken before a password change in KeePassXC is.
     /// </remarks>
     [Fact]

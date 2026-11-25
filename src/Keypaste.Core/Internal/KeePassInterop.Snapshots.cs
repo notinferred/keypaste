@@ -98,17 +98,35 @@ internal sealed partial class KeePassInterop
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         List<PwGroup> groups = [_database.RootGroup, .. _database.RootGroup.GetGroups(true)];
+        List<EntrySnapshot> entries = [];
+        TakeEntries(_database.RootGroup);
 
         return new VaultSnapshot(
-            [
-                .. _database.RootGroup.GetEntries(true)
-                    .Select(entry => new EntrySnapshot(entry, entry.ParentGroup, entry.ParentGroup.Entries.IndexOf(entry), entry.CloneDeep())),
-            ],
+            entries,
             new HashSet<PwGroup>(groups, ReferenceEqualityComparer.Instance),
             [.. groups.Select(group => new GroupTimes(group, group.LastModificationTime, group.LastAccessTime, group.UsageCount))],
             [.. _database.DeletedObjects],
             _database.RecycleBinUuid,
             _database.RecycleBinChanged);
+
+        // Pre-order, as GetEntries(true) walks, so the entries come in the order they always did.
+        void TakeEntries(PwGroup group)
+        {
+            int index = 0;
+
+            foreach (PwEntry entry in group.Entries)
+            {
+                // An entry whose parent is another group is placed where that group holds it.
+                int position = ReferenceEquals(entry.ParentGroup, group) ? index : entry.ParentGroup.Entries.IndexOf(entry);
+                entries.Add(new EntrySnapshot(entry, entry.ParentGroup, position, entry.CloneDeep()));
+                index++;
+            }
+
+            foreach (PwGroup child in group.Groups)
+            {
+                TakeEntries(child);
+            }
+        }
     }
 
     /// <summary>Puts the vault back as <see cref="Checkpoint"/> found it, for an edit no save could keep.</summary>

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Adds the NativeAOT keypaste CLI to a published desktop payload, so a client the app connects has a bridge
-# to start from the installed package (2.6a). It is the same project release.yml publishes for the CLI/MCP
+# to start from the installed package. It is the same project release.yml publishes for the CLI/MCP
 # archives, built from this commit into a directory of its own and copied in alone, so no symbol file or
 # second runtime lands beside the app. The copy must then answer mcp --help, and its NaCl box, whose libsodium it links,
 # must give its known answers.

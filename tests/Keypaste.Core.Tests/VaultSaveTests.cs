@@ -195,12 +195,9 @@ public sealed class VaultSaveTests : IDisposable
         Assert.Throws<VaultException>(vault.Save);
         var elapsed = Environment.TickCount64 - started;
 
-        // A fixed floor, deliberately NOT computed from SaveAttempts and SaveRetryDelayMilliseconds.
-        // Deriving the expectation from the values under test makes it follow them down to zero:
-        // the first version of this line did exactly that and passed at one attempt, asserting
-        // nothing. 50ms is comfortably under the 75ms that the minimums pinned by
-        // TheRetryHasRoomToAbsorbATransientFailure already imply, and far above the ~0ms a single
-        // attempt takes.
+        // A fixed floor, not derived from SaveAttempts and SaveRetryDelayMilliseconds, which would
+        // follow them down to zero; 50 ms is under the 75 ms TheRetryHasRoomToAbsorbATransientFailure's
+        // minimums imply and far above one attempt's ~0 ms.
         Assert.True(
             elapsed >= 50,
             $"a doomed save returned in {elapsed}ms; it cannot have retried");
@@ -232,7 +229,7 @@ public sealed class VaultSaveTests : IDisposable
     /// <summary>
     /// Retrying must not turn a permanent failure into a hang. The retry sleeps are about 2.2
     /// seconds, but the caller also waits for the checks, the gate and every attempt's work
-    /// (F.10a), so the bound is on the whole wait and the failure names each part.
+    /// so the bound is on the whole wait and the failure names each part.
     /// </summary>
     [Fact]
     public void ASaveThatCannotSucceed_GivesUpQuickly()
@@ -256,7 +253,7 @@ public sealed class VaultSaveTests : IDisposable
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>F.9's measurement, and it is two readings rather than one on purpose.</b>
+    /// <b>Two readings rather than one, on purpose.</b>
     /// <see cref="ASaveThatCannotSucceed_GivesUpQuickly"/> overran at 6797 ms against a budget of
     /// about 2.2 seconds, and a single elapsed cannot say whether the retry was scheduled late or
     /// the work inside each attempt got slower. Those have different repairs, and one of them is not

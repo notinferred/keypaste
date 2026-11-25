@@ -18,7 +18,8 @@ using Xunit.Sdk;
 namespace Keypaste.App.Tests.Controls;
 
 /// <summary>
-/// The master-password field, asked what it publishes to the accessibility bus while it holds one.
+/// The master-password fields of the unlock screen, asked what they publish to the accessibility bus while they hold
+/// one.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -138,7 +139,7 @@ public sealed class MaskedInputAutomationTests
         });
 
     /// <summary>
-    /// The same differential, on the field a new vault's master password is typed into (4.8).
+    /// The same differential, on the field a new vault's master password is typed into.
     /// </summary>
     /// <remarks>
     /// A second and third <see cref="MaskedInput"/> inherit the control and its template, not its
@@ -169,7 +170,7 @@ public sealed class MaskedInputAutomationTests
             Assert.Equal(first, second);
         });
 
-    /// <summary>The same differential again, on the confirmation field (4.8).</summary>
+    /// <summary>The same differential again, on the confirmation field.</summary>
     [Fact]
     public Task The_confirmation_surface_depends_on_the_length_and_not_the_characters() =>
         HeadlessSession.On(async () =>
@@ -248,7 +249,7 @@ public sealed class MaskedInputAutomationTests
         });
 
     /// <summary>
-    /// The same differential, on the field a backup's master password is typed into (V.4b).
+    /// The same differential, on the field a backup's master password is typed into.
     /// </summary>
     /// <remarks>
     /// The fourth master-password field, and the one most likely to hold a password somebody no
@@ -367,7 +368,7 @@ public sealed class MaskedInputAutomationTests
     /// <summary>
     /// <c>AutomationProperties.Name="{Binding …}"</c> compiles, renders identically and publishes
     /// whatever it is bound to. The only names on this screen are these button and list labels, each a literal
-    /// in the view, so a screen reader does not announce a button by its content's type (F.25); a name
+    /// in the view, so a screen reader does not announce a button by its content's type; a name
     /// that is not one of them, or any other attached metadata, fails here.
     /// </summary>
     [Fact]
@@ -583,7 +584,7 @@ public sealed class MaskedInputAutomationTests
             Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         }
 
-        // By name, not Single(): there are four of these on the screen since V.4b.
+        // By name, not Single(): the unlock screen holds four of these.
         private MaskedInput Field(string name) =>
             Window.GetVisualDescendants().OfType<MaskedInput>().Single(input => input.Name == name);
 

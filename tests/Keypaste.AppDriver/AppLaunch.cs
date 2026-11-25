@@ -21,7 +21,7 @@ namespace Keypaste.AppDriver;
 /// <summary>
 /// Starts the app through <c>keypaste-app</c>'s own <c>Program.Run</c>, crash reports composed as its start composes them,
 /// on a headless display in place of the platform's, so <c>SessionLifecycleTests</c> can count the app's
-/// processes in a home and watch its window (F.38) and <c>CrashReportTests</c> can crash it (4.11c).
+/// processes in a home and watch its window and <c>CrashReportTests</c> can crash it.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -32,7 +32,7 @@ namespace Keypaste.AppDriver;
 /// A start the running app took prints nothing.
 /// While the app is locked, the notice an agent's request raises prints <c>locked-notice shown</c> with its
 /// heading and text, and <c>locked-notice closed</c> when it comes down; the line <c>notice open</c> presses its
-/// Unlock… once armed, by a click the display routes to the button (G.4b).
+/// Unlock… once armed, by a click the display routes to the button.
 /// </para>
 /// <para>
 /// The line <c>continue</c> presses the first-launch screen's Agree;

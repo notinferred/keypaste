@@ -775,7 +775,8 @@ internal sealed partial class ShellViewModel
     }
 
     /// <summary>Counts each vault's places and the projects of the vault in view for the sidebar, and its lock state.</summary>
-    private void Count()
+    /// <param name="edited">The vault an edit changed, which with any vault opened, closed, locked or unlocked since its count is all that is counted again; null counts every vault.</param>
+    private void Count(AppVaultSession? edited = null)
     {
         if (_disposed)
         {
@@ -791,7 +792,8 @@ internal sealed partial class ShellViewModel
             _itemsVault = inView;
         }
 
-        foreach (var section in sections)
+        // Every edit raises its own vault's count, so a vault neither edited nor opened again since its count still holds it.
+        foreach (var section in sections.Where(section => edited is null || ReferenceEquals(section.Session, edited) || !section.CountsVaultOpenNow))
         {
             section.Count();
         }
@@ -808,16 +810,15 @@ internal sealed partial class ShellViewModel
 
         IReadOnlyList<ProjectListing> projects = [];
 
-        try
+        if (_itemsVault.Session.IsUnlocked)
         {
-            if (_itemsVault.Session.Unlocked is { } vault)
+            // Null when the vault locked as its section read it.
+            if (_itemsVault.Projects is not { } listed)
             {
-                projects = ProjectCatalog.Read(vault).Projects;
+                return;
             }
-        }
-        catch (ObjectDisposedException)
-        {
-            return;
+
+            projects = listed;
         }
 
         _projects = [.. projects.Select(project => new ProjectRow(project.Name, project.Environments.SelectMany(environment => environment.Members).Distinct().Count()))];
@@ -829,6 +830,12 @@ internal sealed partial class ShellViewModel
     /// <summary>Counts again when another vault opened, locked or closed since the last count; the status tick asks.</summary>
     private void CountWhenAVaultChanged()
     {
+        // The share dialog holds its item's title and a typed passphrase, so it closes with its vault's lock whichever count saw the lock first.
+        if (_shareVault is { IsUnlocked: false })
+        {
+            CloseShare();
+        }
+
         if (Vaults is null || string.Equals(LockStates([.. Vaults.Listed.Select(vault => SectionOf(vault.Session))]), _lockStates, StringComparison.Ordinal))
         {
             return;

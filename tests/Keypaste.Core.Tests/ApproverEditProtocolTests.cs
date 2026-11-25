@@ -71,17 +71,25 @@ public sealed class ApproverEditProtocolTests
         Assert.DoesNotContain("\"value\":", frame, StringComparison.Ordinal);
     }
 
+    private const string _set = """{"kind":"edit","vault":"/v","session":"s","action":"set","group":"work","title":"github","value":"x"}""";
+    private const string _rotate = """{"kind":"edit","vault":"/v","session":"s","action":"rotate","group":"work","title":"github","generate":{"kind":"characters","length":20,"alphabet":15}}""";
+    private const string _setFields = """{"kind":"edit","vault":"/v","session":"s","action":"set-fields","group":"work","title":"github","fields":[{"name":"KEY","value":"v"}]}""";
+    private const string _remove = """{"kind":"edit","vault":"/v","session":"s","action":"rm","item":"x"}""";
+
+    /// <summary>Each malformed frame is the well-formed one beside it, which decodes, with one defect.</summary>
     [Theory]
-    [InlineData("""{"v":2,"kind":"edit","vault":"/v","session":"s","action":"set","group":"work","title":"github"}""")]
-    [InlineData("""{"v":2,"kind":"edit","vault":"/v","session":"s","action":"set","group":"work","title":"github","value":"x","generate":{"kind":"characters","length":20,"alphabet":15}}""")]
-    [InlineData("""{"v":2,"kind":"edit","vault":"/v","session":"s","action":"set","group":"work","title":"github","value":null}""")]
-    [InlineData("""{"v":2,"kind":"edit","vault":"/v","session":"s","action":"rotate","group":"work","title":"github","generate":{"kind":"characters","length":2,"alphabet":15}}""")]
-    [InlineData("""{"v":2,"kind":"edit","vault":"/v","session":"s","action":"set-fields","group":"work","title":"github","fields":[]}""")]
-    [InlineData("""{"v":2,"kind":"edit","vault":"/v","session":"s","action":"chmod","item":"x"}""")]
-    [InlineData("""{"v":2,"kind":"edit","vault":"/v","session":"s","action":"rm","item":"x","item":"y"}""")]
-    public void A_malformed_edit_is_refused(string frame)
+    [InlineData(_set, """{"kind":"edit","vault":"/v","session":"s","action":"set","group":"work","title":"github"}""")]
+    [InlineData(_set, """{"kind":"edit","vault":"/v","session":"s","action":"set","group":"work","title":"github","value":"x","generate":{"kind":"characters","length":20,"alphabet":15}}""")]
+    [InlineData(_set, """{"kind":"edit","vault":"/v","session":"s","action":"set","group":"work","title":"github","value":null}""")]
+    [InlineData(_rotate, """{"kind":"edit","vault":"/v","session":"s","action":"rotate","group":"work","title":"github","generate":{"kind":"characters","length":2,"alphabet":15}}""")]
+    [InlineData(_setFields, """{"kind":"edit","vault":"/v","session":"s","action":"set-fields","group":"work","title":"github","fields":[]}""")]
+    [InlineData(_remove, """{"kind":"edit","vault":"/v","session":"s","action":"chmod","item":"x"}""")]
+    [InlineData(_remove, """{"kind":"edit","vault":"/v","session":"s","action":"rm","item":"x","item":"y"}""")]
+    public void A_malformed_edit_is_refused(string wellFormed, string malformed)
     {
-        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out EditRequest? _));
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned(wellFormed), out EditRequest? _));
+
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(malformed), out EditRequest? _));
     }
 
     [Fact]
@@ -112,8 +120,8 @@ public sealed class ApproverEditProtocolTests
         Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(refused), out EditReply? decoded));
         Assert.Equal(EditRefusalKind.NotFound, decoded.Refusal);
 
-        var unknown = """{"v":2,"kind":"edit","decision":"granted","method":999,"reason":"?"}""";
-        Assert.True(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(unknown), out EditReply? future));
+        var unknown = ApproverFrame.Versioned("""{"kind":"edit","decision":"granted","method":999,"reason":"?"}""");
+        Assert.True(ApproverProtocol.TryDecode(unknown, out EditReply? future));
         Assert.Equal((AuditDecision.Denied, AuditMethod.Failed), (future.Decision, future.Method));
     }
 

@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
-#
-# verify-keepassxc-writeback.sh
-#
 # PERMANENT COMPATIBILITY GATE — SECURITY.md law 14, the write-back half.
 #
 # verify-keepassxc-compat.sh proves that a vault keypaste CREATES opens correctly in
 # KeePassXC. That is one direction, and one moment in a file's life. This script covers the
-# things Stage 1.1 added that it cannot see:
+# things that check cannot see:
 #
 #   A. keypaste MODIFIES an entry that already exists, which makes KeePassLib write a
 #      <History> element for the first time. KeePassXC must still read the file.
@@ -16,7 +13,7 @@
 #      entry and list it as no variable of the project.
 #   D. KeePassXC titles an entry with a SEPARATOR in it -> while it shares a path with another
 #      entry, keypaste get must refuse that path rather than release either secret, keypaste
-#      add must refuse to put a third entry on it (task F.1e), and keypaste rm must
+#      add must refuse to put a third entry on it, and keypaste rm must
 #      remove neither.
 #
 # B, C and D are law 14 in the direction compat cannot see: what KeePassXC writes into a vault
@@ -61,11 +58,10 @@ printf '%s\n%s\n' "$pw" "$pw" | "$kp" init "$db"
 project_var "$kp" "$db" "$pw" "$project" "$key" v1-initial
 
 # ---------------------------------------------------------------------------------------
-# A. keypaste modifies an entry — the first KDBX <History> element this codebase ever writes.
+# A. keypaste modifies an entry, which writes a KDBX <History> element.
 #
 # Setting the same variable twice makes KeePassLib snapshot the previous value into the
-# entry's history. That serialization path was unreachable before Stage 1.1, so nothing had
-# ever checked that KeePassXC can read the result. If the two disagree, keypaste ships a file
+# entry's history. If the two disagree, keypaste ships a file
 # that its own compatibility promise says must open, and does not.
 # ---------------------------------------------------------------------------------------
 step "A: keypaste rewrites the value (writes entry history)"
@@ -150,7 +146,7 @@ diff -u <(printf '%s\n' "$project" '  dev' "    ${home}") <(printf '%s\n' "$proj
 #
 # `nested/TOKEN` sitting directly in env/<project> and `TOKEN` sitting in
 # env/<project>/nested are two entries with one path between them. keypaste used to list the
-# first and delete the second, reporting success (task F.1a).
+# first and delete the second, reporting success.
 #
 # The collision is authored HERE, by KeePassXC, rather than by the code under test: `add`
 # splits its argument on the last slash and would make the group, so the entry is added under
@@ -187,9 +183,9 @@ kp_run ls --json --vault "$db" | jq -e --arg group "env/${project}" '
   and any(.[]; .type == "entry" and .group == ($group + "/nested") and .title == "NESTED_KEY")' >/dev/null \
   || die "keypaste ls --json does not list both entries KeePassXC authored"
 
-# F.1e: two entries answer to env/<project>/nested/NESTED_KEY. A read of that path cannot pick
+# Two entries answer to env/<project>/nested/NESTED_KEY. A read of that path cannot pick
 # one — whichever the file lists first is a guess, and a guessed read hands the wrong secret over
-# and says nothing; a guessed removal deletes the wrong entry (F.1a). None of the refused acts may
+# and says nothing; a guessed removal deletes the wrong entry. None of the refused acts may
 # write, so the bytes say so.
 before_ambiguous=$(bytes "$db")
 

@@ -20,7 +20,7 @@ step() {
   if [ -n "${WATCHDOG_PHASE:-}" ]; then printf '%s\n' "$*" >"$WATCHDOG_PHASE" || true; fi
 }
 
-# Fails the gate past $1 seconds, printing the phase it reached and every process (F.63); $2... are its programs.
+# Fails the gate past $1 seconds, printing the phase it reached and every process; $2... are its programs.
 watchdog() {
   local seconds=$1 winpid='' before=''
   shift
@@ -44,7 +44,7 @@ watch_gate() {
   echo "::error::the gate ran past ${seconds}s, in: $(cat "$WATCHDOG_PHASE")"
   if [ -n "$winpid" ]; then
     targets=$(windows_targets "$winpid" "$@")
-    # Git Bash's kill, since a Git Bash process ended by taskkill gives its parent exit status 0 (F.63).
+    # Git Bash's kill, since a Git Bash process ended by taskkill gives its parent exit status 0.
     kill -9 "$gate" 2>/dev/null
     while read -r kind pid; do
       [ -n "$pid" ] || continue

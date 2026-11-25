@@ -1,6 +1,4 @@
 using Keypaste.Core;
-using Keypaste.Core.Audit;
-using Keypaste.Core.Ownership;
 using Keypaste.Core.Tests;
 using Xunit;
 
@@ -8,8 +6,8 @@ namespace Keypaste.Cli.Tests;
 
 /// <summary>
 /// <c>keypaste set</c> creates an entry or replaces only its password, keeps the old value in
-/// history, never prints the value, never writes keypaste's own groups and never saves under a
-/// running owner.
+/// history, never prints the value and never writes keypaste's own groups. A held vault is
+/// <c>HeldVaultRefusalTests</c>'s.
 /// </summary>
 public sealed class SetVerbTests : IDisposable
 {
@@ -80,7 +78,7 @@ public sealed class SetVerbTests : IDisposable
         Assert.NotNull(password);
         Assert.Equal(40, password.Length);
         Assert.DoesNotContain(password, _harness.Out + _harness.Err, StringComparison.Ordinal);
-        Assert.Equal(["Master password: "], _harness.Prompt.PromptsSeen);
+        Assert.Equal([CliHarness.MasterPasswordPrompt], _harness.Prompt.PromptsSeen);
     }
 
     [Fact]
@@ -92,7 +90,7 @@ public sealed class SetVerbTests : IDisposable
         _harness.AssertExit(CliApp.ExitSuccess, Set("solo"));
 
         Assert.Equal(_value, Read(string.Empty, "solo")?.Password);
-        Assert.Equal(["Master password: ", "Value: "], _harness.Prompt.PromptsSeen);
+        Assert.Equal([CliHarness.MasterPasswordPrompt, "Value: "], _harness.Prompt.PromptsSeen);
     }
 
     [Fact]
@@ -104,7 +102,7 @@ public sealed class SetVerbTests : IDisposable
         _harness.AssertExit(CliApp.ExitUsageError, Set("solo"));
 
         Assert.Null(Read(string.Empty, "solo"));
-        Assert.Equal(["Master password: ", "Value: ", "Confirm value: "], _harness.Prompt.PromptsSeen);
+        Assert.Equal([CliHarness.MasterPasswordPrompt, "Value: ", "Confirm value: "], _harness.Prompt.PromptsSeen);
         Assert.Contains("did not match; nothing was saved", _harness.Err, StringComparison.Ordinal);
 
         _harness.Prompt.Enqueue(_master, _value, _value);
@@ -162,7 +160,7 @@ public sealed class SetVerbTests : IDisposable
         Assert.Empty(_harness.Prompt.PromptsSeen);
     }
 
-    /// <summary>The titles the app's new item refuses are refused here too, by the same Core check (F.55).</summary>
+    /// <summary>The titles the app's new item refuses are refused here too, by the same Core check.</summary>
     [Theory]
     [InlineData("Banking/Chase ")]
     [InlineData("Banking/ Chase")]
@@ -188,7 +186,7 @@ public sealed class SetVerbTests : IDisposable
         _harness.AssertExit(CliApp.ExitUsageError, Set("Banking/Chase "));
 
         Assert.Contains("keypaste set: The item title cannot begin or end with whitespace.", _harness.Err, StringComparison.Ordinal);
-        Assert.Equal(["Master password: "], _harness.Prompt.PromptsSeen);
+        Assert.Equal([CliHarness.MasterPasswordPrompt], _harness.Prompt.PromptsSeen);
         Assert.Equal(before, File.ReadAllBytes(_harness.VaultPath));
     }
 
@@ -202,25 +200,6 @@ public sealed class SetVerbTests : IDisposable
         _harness.AssertExit(CliApp.ExitUsageError, _harness.Run("add", "/Banking/Chase", "--vault", _harness.VaultPath));
 
         Assert.Contains("keypaste add: 'Banking/Chase' already exists", _harness.Err, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Set_WhileTheVaultIsHeld_IsRefused_BeforeThePassword()
-    {
-        var home = KeypasteHome.Resolve(_harness.Environment[KeypasteHome.EnvironmentVariable]);
-        Assert.True(VaultClaim.TryAcquire(home, _harness.VaultPath, OwnerKind.TerminalAgent, out var claim, out var refusal), refusal);
-        var before = File.ReadAllBytes(_harness.VaultPath);
-
-        using (claim)
-        {
-            _harness.Prompt.Enqueue(_master, _value);
-            _harness.AssertExit(CliApp.ExitInternalError, Set("Banking/Chase"));
-        }
-
-        Assert.Contains("keypaste: this vault is already unlocked in keypaste approve", _harness.Err, StringComparison.Ordinal);
-        Assert.Contains("Run `keypaste lock` and try again.", _harness.Err, StringComparison.Ordinal);
-        Assert.Empty(_harness.Prompt.PromptsSeen);
-        Assert.Equal(before, File.ReadAllBytes(_harness.VaultPath));
     }
 
     [Theory]

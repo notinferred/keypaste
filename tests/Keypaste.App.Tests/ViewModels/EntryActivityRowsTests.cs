@@ -1,8 +1,10 @@
+using System.Collections.Concurrent;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
+using Keypaste.Core.Activity;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
@@ -13,7 +15,7 @@ namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
 /// The Secrets rows' dot and last-used time, and the detail's Agent access card, read from this
-/// vault's audit lines and what the authority holds now (D-0361). Never a value.
+/// vault's audit lines and what the authority holds now. Never a value.
 /// </summary>
 public sealed class EntryActivityRowsTests
 {
@@ -68,14 +70,57 @@ public sealed class EntryActivityRowsTests
         Assert.Equal("never", entries.Rows[^1].Title);
     }
 
-    /// <summary>
-    /// The card belongs to an item agents can see: with nothing released and no bridge attached it is
-    /// absent, a bridge whose agent's settings do not reach the item leaves it absent, and one whose
-    /// settings do brings it, saying which agent can see the item (N.5).
-    /// </summary>
+    /// <summary>A use read while the list is sorted by Last used moves its row, under a query and once the query is cleared.</summary>
+    [Fact]
+    public async Task SortingByLastUsed_FollowsAUseReadAfterTheListIsSorted()
+    {
+        await using var app = await App.StartAsync();
+        var key = app.Authority.Session.Identity!.Key;
+        Assert.True(app.Authority.Session.Write(
+            vault =>
+            {
+                vault.AddEntry(new VaultEntry { Title = "alpha days" });
+                vault.AddEntry(new VaultEntry { Title = "alpha minutes" });
+                return true;
+            },
+            _ => true).Problem("add them") is null);
+        app.Audit("alpha days", key, ago: TimeSpan.FromDays(3));
+        app.Audit("alpha minutes", key, ago: TimeSpan.FromMinutes(30));
+
+        using var screen = app.Screen();
+        var entries = screen.Entries;
+        entries.Table.Press(TableStates.LastUsed);
+        entries.Search = "alpha";
+        Assert.Equal(["alpha minutes", "alpha days"], entries.Rows.Select(row => row.Title));
+
+        app.Audit("alpha days", key, ago: TimeSpan.FromMinutes(1));
+        screen.Activity.Refresh();
+        Assert.Equal(["alpha days", "alpha minutes"], entries.Rows.Select(row => row.Title));
+
+        entries.Search = string.Empty;
+        Assert.Equal(["alpha days", "alpha minutes", "example"], entries.Rows.Select(row => row.Title));
+    }
+
+    /// <summary>A line that passes the horizon on a refresh that read nothing new is dropped, though the last fold is reused until lines change.</summary>
+    [Fact]
+    public async Task ALinePastTheHorizon_IsDropped_WhenNoNewLineWasRead()
+    {
+        await using var app = await App.StartAsync();
+        app.Audit("example", app.Authority.Session.Identity!.Key, ago: EntryActivitySource.Horizon - TimeSpan.FromMinutes(1));
+
+        using var screen = app.Screen();
+        var row = screen.Entries.Rows.Single(entry => entry.Path == "example");
+        screen.Activity.Refresh();
+        Assert.NotEqual("never", row.LastUsedText);
+
+        app.Clock.Advance(TimeSpan.FromMinutes(2));
+        screen.Activity.Refresh();
+        Assert.Equal("never", screen.Entries.Rows.Single(entry => entry.Path == "example").LastUsedText);
+    }
+
     /// <summary>
     /// Of two items sharing a name, each row and card shows only what names its own UUID: a line naming the path alone,
-    /// as every line did before the picker, is neither's, and one naming an item is that item's (F.76).
+    /// as an older line does, is neither's, and one naming an item is that item's.
     /// </summary>
     [Fact]
     public async Task TwoItemsOfOneName_ShowOnlyWhatIsRecordedForEachItem()
@@ -115,6 +160,11 @@ public sealed class EntryActivityRowsTests
         Assert.Empty(screen.Entries.Detail!.AgentAccess!.Clients);
     }
 
+    /// <summary>
+    /// The card belongs to an item agents can see: with nothing released and no bridge attached it is
+    /// absent, a bridge whose agent's settings do not reach the item leaves it absent, and one whose
+    /// settings do brings it, saying which agent can see the item.
+    /// </summary>
     [Fact]
     public async Task TheAgentAccessCard_ShowsOnceAnAgentThatCanSeeTheItemIsAttached()
     {
@@ -153,6 +203,47 @@ public sealed class EntryActivityRowsTests
         Assert.Equal("claude-code", screen.Entries.Detail.AgentAccessSummary);
         Assert.False(screen.Entries.Detail.ShowsAgentAccessSummary);
         Assert.Equal(["claude-code · 5m ago · 1×", "cursor · 15m ago · 1×"], screen.Entries.Detail.AgentLines);
+    }
+
+    /// <summary>
+    /// With a post, the first read of the whole log runs off the post's thread: nothing is built until its picture is posted,
+    /// and the interval starts only once that picture is built.
+    /// </summary>
+    [Fact]
+    public async Task TheFirstRead_RunsOffThePostsThread_AndPostsItsPicture()
+    {
+        await using var app = await App.StartAsync();
+        var key = app.Authority.Session.Identity!.Key;
+        app.Audit("example", key, ago: TimeSpan.FromMinutes(30));
+        var posted = new ConcurrentQueue<Action>();
+        var changed = 0;
+
+        using var activity = new EntryActivitySource(app.Authority, KeypasteHome.AuditPath(app.Fixture.Home), key, app.Clock, posted.Enqueue);
+        activity.Changed += (_, _) => changed++;
+        Assert.Null(activity.Current);
+
+        await WaitUntilAsync(() => !posted.IsEmpty);
+        Assert.True(posted.TryDequeue(out var first));
+        app.Clock.Advance(EntryActivitySource.Interval);
+        Assert.Empty(posted);
+
+        first();
+        Assert.Equal(1, changed);
+        Assert.Equal(EntryUseState.Recent, activity.Current!.Use(new EntryName(string.Empty, "example")).State);
+
+        app.Clock.Advance(EntryActivitySource.Interval);
+        Assert.Single(posted);
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        var deadline = DateTime.UtcNow + _connect;
+
+        while (!condition())
+        {
+            Assert.True(DateTime.UtcNow < deadline, "the condition never held");
+            await Task.Delay(20, Token);
+        }
     }
 
     private sealed class Screen(EntryActivitySource activity, ClipboardCountdown countdown, EntriesViewModel entries) : IDisposable

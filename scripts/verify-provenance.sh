@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Checks that a keypaste release was built by this repository's release workflow for its own tag, and
-# that every published asset is the one it attested (3.8).
+# that every published asset is the one it attested.
 #
 # release.yml attests every asset of a release and its manifest in one Sigstore bundle, and publishes
 # the bundle and the manifest beside them. This script needs no GitHub login: with a bundle on disk,
@@ -21,7 +21,7 @@
 #   verify-provenance.sh --selftest                  # fake gh and curl; no network, no credential
 #
 # A release publishes one manifest and one bundle per component into one prefix, so this is run once
-# per component and each call checks only the assets its own manifest names (4.7c). The workflow it
+# per component and each call checks only the assets its own manifest names. The workflow it
 # holds an attestation to is provenance.workflow: release.yml attests what it PUBLISHES, including
 # the desktop packages app.yml built, whose own build attestation verify-desktop-candidate.sh checks
 # before they are staged.
@@ -257,7 +257,7 @@ FAKE
   #
   # The release attests what it PUBLISHES, so the app's published bundle must name release.yml. A
   # bundle naming app.yml is the build attestation, which verify-desktop-candidate.sh checks before
-  # the packages are staged - correct in its place and refused here (4.7c).
+  # the packages are staged - correct in its place and refused here.
   local appdef="$work/publishable-app.json"
   jq '.components.app.signing.policy = "authenticode"
       | .components.app.targets |= map(if .packages then

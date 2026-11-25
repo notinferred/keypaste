@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests.Browser;
 
-/// <summary>Which matched items a page may fill and which KeePassXC's browser settings or an expiry keep out, and why (8.3a2).</summary>
+/// <summary>Which matched items a page may fill and which KeePassXC's browser settings or an expiry keep out, and why.</summary>
 public sealed class LoginCandidatesTests
 {
     private static readonly DateTimeOffset _now = new(2026, 11, 16, 12, 0, 0, TimeSpan.Zero);

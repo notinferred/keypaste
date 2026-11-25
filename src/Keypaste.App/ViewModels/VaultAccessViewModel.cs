@@ -325,7 +325,7 @@ internal sealed partial class VaultAccessViewModel : ObservableObject, IDisposab
         }
     }
 
-    /// <summary>What the change costs the copies already taken (V.1a2).</summary>
+    /// <summary>What the change costs the copies already taken.</summary>
     internal string BackupCost => _session.VaultPath is { } path
         ? $"The vault as it is now is kept in {VaultBackups.DirectoryFor(path)} before it changes. That copy, and every " +
           $"copy already there{string.Concat(VaultBackups.Directories(path).Skip(1).Select(folder => $" and in {folder}"))}, still opens with the current password, key file and YubiKey, not the new ones. If those " +

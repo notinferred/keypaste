@@ -16,8 +16,8 @@ namespace Keypaste.App.Tests.Views;
 /// </summary>
 /// <remarks>
 /// <para>
-/// "Launch, type your password, press Enter, never touch the mouse" is 4.1's acceptance criterion
-/// for the unlock screen, and it is exactly the kind of claim that quietly stops being true. These
+/// "Launch, type your password, press Enter, never touch the mouse" is what the unlock screen
+/// promises, and it is exactly the kind of claim that quietly stops being true. These
 /// run headless, in process, so they do not depend on which window happens to be in the foreground —
 /// which is precisely why driving the real app with synthetic keystrokes proved nothing.
 /// </para>
@@ -62,7 +62,7 @@ public sealed class UnlockFocusTests
 
         var window = Show(model);
 
-        // By name: the restore panel has a list of its own since V.4b.
+        // By name: the restore panel has a list of its own.
         var list = window.GetVisualDescendants().OfType<ListBox>().Single(box => box.Name == "RecentList");
 
         Assert.False(list.IsFocused);
@@ -159,8 +159,7 @@ public sealed class UnlockFocusTests
     private static MaskedInput Field(Window window, string name) =>
         window.GetVisualDescendants().OfType<MaskedInput>().Single(input => input.Name == name);
 
-    // By name, not Single(): the screen carries the two create fields as well since 4.8, and they
-    // are in the tree whether or not the create form is showing.
+    // By name, not Single(): the two create fields are in the tree too, even with the form hidden.
     private static MaskedInput Password(Window window) =>
         window.GetVisualDescendants().OfType<MaskedInput>().Single(input => input.Name == "Password");
 
@@ -169,8 +168,7 @@ public sealed class UnlockFocusTests
         var window = new Window { Content = new UnlockView { DataContext = model } };
         window.Show();
 
-        // Focus is posted at Background priority, so let the dispatcher drain before asking — the
-        // same ordering the real window goes through.
+        // Focus is posted at Background priority, so drain the jobs first, as the real window does.
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         return window;
     }

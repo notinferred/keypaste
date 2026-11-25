@@ -16,7 +16,7 @@ using Xunit;
 namespace Keypaste.App.Tests.Views;
 
 /// <summary>
-/// What a screen reader finds on the welcome and the lock screen (V-N.2): KeePassXC's databases by
+/// What a screen reader finds on the welcome and the lock screen: KeePassXC's databases by
 /// name, no word about agents, the YubiKey beside the key file, and Windows Hello or Touch ID alone where it can unlock.
 /// </summary>
 public sealed class LockScreenTreeTests

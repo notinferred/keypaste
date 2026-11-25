@@ -8,7 +8,6 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Input;
 using Avalonia.VisualTree;
-using Keypaste.App.Notifications;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Controls;
 using Keypaste.App.Tests.Rendering;
@@ -77,7 +76,7 @@ public sealed class DesktopApprovalTests
 
     /// <summary>
     /// A request two items answer to opens the picker with neither picked: after the arming second the allows stay off
-    /// until the person picks one, and Allow once then releases that item's field alone, which no control exposes (F.76).
+    /// until the person picks one, and Allow once then releases that item's field alone, which no control exposes.
     /// </summary>
     [Theory]
     [InlineData(0, "alice")]
@@ -282,7 +281,7 @@ public sealed class DesktopApprovalTests
 
     /// <summary>
     /// A withdrawal requested before the prompt is drawn stops the draw while its callback still
-    /// waits on the thread pool, where <c>CancelAsync</c>, which the gate withdraws with, runs it (F.20).
+    /// waits on the thread pool, where <c>CancelAsync</c>, which the gate withdraws with, runs it.
     /// </summary>
     [Fact]
     public Task A_withdrawal_requested_before_the_draw_stops_it_before_its_callback_runs() =>
@@ -313,7 +312,7 @@ public sealed class DesktopApprovalTests
     /// <summary>
     /// A bridge that hangs up while its prompt waits to be drawn keeps it off the screen, though the
     /// listener's <c>CancelAsync</c> leaves the tokens linked below the exchange's live until the
-    /// thread pool runs its callbacks (F.32).
+    /// thread pool runs its callbacks.
     /// </summary>
     [Fact]
     public Task A_bridge_that_hangs_up_before_the_draw_keeps_the_prompt_off_the_screen() =>
@@ -449,21 +448,124 @@ public sealed class DesktopApprovalTests
             Assert.Empty(app.Windows);
         });
 
-    /// <summary>A click on Allow once in a prompt already in front answers at once: the arming second holds back keys alone.</summary>
-    [Fact]
-    public Task A_click_on_Allow_once_in_a_prompt_in_front_answers_at_once() =>
+    /// <summary>A click on the allow of a prompt already in front answers at once, for every kind of request: the arming second holds back keys alone.</summary>
+    [Theory]
+    [MemberData(nameof(PromptedKinds))]
+    public Task A_click_on_the_allow_in_a_prompt_in_front_answers_at_once(string kind) =>
         HeadlessSession.On(async () =>
         {
             await using var app = await PromptedApp.StartAsync();
-            var reply = app.Ask();
+            var reply = app.AskAsync(kind);
             var window = await app.PromptAsync();
 
             Assert.True(IsInFront(window));
             AssertDisarmed(window);
             Click(window, "AllowOnce");
 
-            Assert.Equal(AuditDecision.Granted, (await reply.WaitAsync(_wait, Token))!.Decision);
+            AssertAllowed(await reply.WaitAsync(_wait, Token));
         });
+
+    /// <summary>Focus starts on Deny, and Return still means the allow, which a keystroke landing as the prompt appears cannot press.</summary>
+    [Theory]
+    [MemberData(nameof(PromptedKinds))]
+    public Task Return_does_nothing_before_the_prompt_is_armed_and_then_allows_once(string kind) =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            var reply = app.AskAsync(kind);
+            var window = await app.PromptAsync();
+
+            Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
+            Key(window, PhysicalKey.Enter);
+            Assert.False(IsAnswered(window), "Return before the prompt was armed answered it");
+
+            await app.ArmAsync();
+            Key(window, PhysicalKey.Enter);
+
+            AssertAllowed(await reply.WaitAsync(_wait, Token));
+        });
+
+    [Theory]
+    [MemberData(nameof(PromptedKinds))]
+    public Task Escape_denies_whether_or_not_the_prompt_is_armed(string kind) =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            var reply = app.AskAsync(kind);
+            var window = await app.PromptAsync();
+            Key(window, PhysicalKey.Escape);
+
+            AssertDenied(await reply.WaitAsync(_wait, Token));
+        });
+
+    /// <summary>Allow once keeps nothing: the same request asks again.</summary>
+    [Theory]
+    [MemberData(nameof(PromptedKinds))]
+    public Task Allow_once_releases_and_the_next_request_asks_again(string kind) =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            var reply = app.AskAsync(kind);
+            var window = await app.PromptAsync();
+            await app.ArmAsync();
+            Click(window, "AllowOnce");
+
+            AssertAllowed(await reply.WaitAsync(_wait, Token));
+            await PromptedApp.WithdrawnAsync(window);
+
+            var again = app.AskAsync(kind);
+            var second = await app.PromptAsync(count: 2);
+            Click(second, "Deny");
+
+            AssertDenied(await again.WaitAsync(_wait, Token));
+            Assert.Equal(2, app.Windows.Count);
+        });
+
+    /// <summary>The reply released the vault's one value, as a person allowed it at the prompt.</summary>
+    private static void AssertAllowed(object? reply)
+    {
+        switch (reply)
+        {
+            case CredentialReply credential:
+                Assert.Equal((AuditDecision.Granted, AuditMethod.Prompt), (credential.Decision, credential.Method));
+                Assert.Equal(Sentinel, credential.Value);
+                break;
+            case EnvReply env:
+                Assert.Equal(EnvOutcome.Resolved, env.Set.Outcome);
+                Assert.Equal(Sentinel, Assert.Single(env.Set.Variables).Value);
+                break;
+            case RunReply run:
+                Assert.Equal((EnvOutcome.Resolved, AuditMethod.Prompt), (run.Set.Outcome, run.Method));
+                Assert.Equal(Sentinel, Assert.Single(run.Set.Variables).Value);
+                break;
+            default:
+                Assert.Fail("the request had no reply");
+                break;
+        }
+    }
+
+    /// <summary>The reply released nothing, as a person refused it at the prompt.</summary>
+    private static void AssertDenied(object? reply)
+    {
+        switch (reply)
+        {
+            case CredentialReply credential:
+                Assert.Equal((AuditDecision.Denied, AuditMethod.Prompt), (credential.Decision, credential.Method));
+                Assert.Null(credential.Value);
+                break;
+            case EnvReply env:
+                Assert.Equal(EnvOutcome.Declined, env.Set.Outcome);
+                Assert.Empty(env.Set.Variables);
+                break;
+            case RunReply run:
+                Assert.Equal((EnvOutcome.Declined, AuditMethod.Prompt), (run.Set.Outcome, run.Method));
+                Assert.Empty(run.Set.Variables);
+                break;
+            default:
+                Assert.Fail("the request had no reply");
+                break;
+        }
+    }
 
     /// <summary>
     /// A click on Allow once in a prompt behind another window only brings the prompt forward, focused on Deny: its allows
@@ -482,9 +584,8 @@ public sealed class DesktopApprovalTests
             Assert.False(IsInFront(window));
             Assert.False(window.FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled);
             Click(window, "AllowOnce");
-            await Task.Delay(100, Token);
 
-            Assert.False(reply.IsCompleted, "a click on a prompt not in front answered it");
+            Assert.False(IsAnswered(window), "a click on a prompt not in front answered it");
             Assert.True(window.IsActive);
             Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
 
@@ -513,9 +614,8 @@ public sealed class DesktopApprovalTests
             window.MouseDown(centre, MouseButton.Left);
             window.MouseUp(centre, MouseButton.Left);
             WindowInput.Drain();
-            await Task.Delay(100, Token);
 
-            Assert.False(reply.IsCompleted, "a press that came with the activation answered the prompt");
+            Assert.False(IsAnswered(window), "a press that came with the activation answered the prompt");
             Click(window, "Deny");
             await reply.WaitAsync(_wait, Token);
         });
@@ -543,11 +643,9 @@ public sealed class DesktopApprovalTests
             Assert.Equal(places, Places(window));
 
             Key(window, PhysicalKey.Enter);
-            app.Clock.Advance(PromptViewModel.ArmingDelay - TimeSpan.FromMilliseconds(1));
-            await Task.Delay(200, Token);
-            WindowInput.Drain();
+            await PromptedApp.AdvanceAsync(app.Clock, PromptViewModel.ArmingDelay - TimeSpan.FromMilliseconds(1));
             Key(window, PhysicalKey.Enter);
-            Assert.False(reply.IsCompleted, "Return within a second of bringing the prompt forward answered it");
+            Assert.False(IsAnswered(window), "Return within a second of bringing the prompt forward answered it");
 
             app.Clock.Advance(TimeSpan.FromMilliseconds(1));
             await PromptedApp.UntilAsync(() => IsArmed(window));
@@ -577,9 +675,7 @@ public sealed class DesktopApprovalTests
             AssertDisarmed(window);
             Assert.Equal(places, Places(window));
 
-            app.Clock.Advance(PromptViewModel.ArmingDelay * 5);
-            await Task.Delay(100, Token);
-            WindowInput.Drain();
+            await PromptedApp.AdvanceAsync(app.Clock, PromptViewModel.ArmingDelay * 5);
             AssertDisarmed(window);
 
             window.Activate();
@@ -590,12 +686,10 @@ public sealed class DesktopApprovalTests
             AssertDisarmed(window);
             Key(window, PhysicalKey.Enter);
 
-            app.Clock.Advance(PromptViewModel.ArmingDelay - TimeSpan.FromMilliseconds(1));
-            await Task.Delay(100, Token);
-            WindowInput.Drain();
+            await PromptedApp.AdvanceAsync(app.Clock, PromptViewModel.ArmingDelay - TimeSpan.FromMilliseconds(1));
             AssertDisarmed(window);
             Key(window, PhysicalKey.Enter);
-            Assert.False(reply.IsCompleted, "Return within a second of activating the prompt answered it");
+            Assert.False(IsAnswered(window), "Return within a second of activating the prompt answered it");
 
             app.Clock.Advance(TimeSpan.FromMilliseconds(1));
             await PromptedApp.UntilAsync(() => IsArmed(window));
@@ -616,9 +710,7 @@ public sealed class DesktopApprovalTests
 
             app.Clock.Advance(PromptViewModel.ArmingDelay / 2);
             WindowInput.Deactivate(window);
-            app.Clock.Advance(PromptViewModel.ArmingDelay);
-            await Task.Delay(100, Token);
-            WindowInput.Drain();
+            await PromptedApp.AdvanceAsync(app.Clock, PromptViewModel.ArmingDelay);
             AssertDisarmed(window);
 
             window.Activate();
@@ -627,9 +719,7 @@ public sealed class DesktopApprovalTests
             WindowInput.Deactivate(window);
             window.Activate();
             WindowInput.Drain();
-            app.Clock.Advance(PromptViewModel.ArmingDelay / 2);
-            await Task.Delay(100, Token);
-            WindowInput.Drain();
+            await PromptedApp.AdvanceAsync(app.Clock, PromptViewModel.ArmingDelay / 2);
             AssertDisarmed(window);
 
             app.Clock.Advance(PromptViewModel.ArmingDelay / 2);
@@ -712,6 +802,9 @@ public sealed class DesktopApprovalTests
     /// <summary>Whether a key can press the prompt's allows.</summary>
     internal static bool IsArmed(Window window) => ((PromptViewModel)window.DataContext!).IsArmed;
 
+    /// <summary>Whether anything has answered the prompt: its answer is a latch set as a press or key decides it, before any reply goes out.</summary>
+    internal static bool IsAnswered(Window window) => ((PromptViewModel)window.DataContext!).IsAnswered;
+
     /// <summary>Whether the prompt's window has had focus long enough for a click to press its allows.</summary>
     internal static bool IsInFront(Window window) => ((PromptWindow)window).HasBeenInFront;
 
@@ -730,10 +823,7 @@ public sealed class DesktopApprovalTests
             app.Clock.Advance(half);
             Assert.True(app.Authority.ShowPrompt());
             WindowInput.Drain();
-            app.Clock.Advance(half);
-            WindowInput.Drain();
-            await Task.Delay(200, Token);
-            WindowInput.Drain();
+            await PromptedApp.AdvanceAsync(app.Clock, half);
 
             Assert.False(IsArmed(window), "the first showing's wait armed the prompt within a second of bringing it forward");
 
@@ -772,46 +862,7 @@ public sealed class DesktopApprovalTests
             Assert.Equal(2, app.Windows.Count);
         });
 
-    [Fact]
-    public Task Return_does_nothing_before_the_prompt_is_armed_and_then_allows_once() =>
-        HeadlessSession.On(async () =>
-        {
-            await using var app = await PromptedApp.StartAsync();
-            var reply = app.Ask();
-            var window = await app.PromptAsync();
-
-            // Focus starts on Deny, and Return still means Allow once, which a keystroke landing as the prompt appears cannot press.
-            Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
-            Key(window, PhysicalKey.Enter);
-            await Task.Delay(100, Token);
-            Assert.False(reply.IsCompleted, "Return before the prompt was armed answered it");
-
-            await app.ArmAsync();
-            Key(window, PhysicalKey.Enter);
-
-            var answered = await reply.WaitAsync(_wait, Token);
-
-            Assert.NotNull(answered);
-            Assert.Equal(AuditDecision.Granted, answered.Decision);
-        });
-
-    [Fact]
-    public Task Escape_denies_whether_or_not_the_prompt_is_armed() =>
-        HeadlessSession.On(async () =>
-        {
-            await using var app = await PromptedApp.StartAsync();
-            var reply = app.Ask();
-            var window = await app.PromptAsync();
-            Key(window, PhysicalKey.Escape);
-
-            var answered = await reply.WaitAsync(_wait, Token);
-
-            Assert.NotNull(answered);
-            Assert.Equal(AuditDecision.Denied, answered.Decision);
-            Assert.Null(answered.Value);
-        });
-
-    /// <summary>A second request while the prompt is up waits its turn behind it, one window on screen, and is shown once the first is answered (F.80).</summary>
+    /// <summary>A second request while the prompt is up waits its turn behind it, one window on screen, and is shown once the first is answered.</summary>
     [Fact]
     public Task A_second_request_while_the_prompt_is_up_waits_its_turn() =>
         HeadlessSession.On(async () =>
@@ -822,8 +873,7 @@ public sealed class DesktopApprovalTests
 
             await using var other = await app.ConnectAsync();
             var second = app.Ask(other);
-            await Task.Delay(200, Token);
-            WindowInput.Drain();
+            await PromptedApp.UntilAsync(() => app.Turns.Waiting == 1);
 
             Assert.Single(app.Windows);
             Assert.False(second.IsCompleted);
@@ -862,30 +912,6 @@ public sealed class DesktopApprovalTests
 
             ordinary.Close();
             imitating.Close();
-        });
-
-    [Fact]
-    public Task AllowOnce_Releases_AndTheNextRequestAsksAgain() =>
-        HeadlessSession.On(async () =>
-        {
-            await using var app = await PromptedApp.StartAsync();
-            var reply = app.Ask();
-            var window = await app.PromptAsync();
-            await app.ArmAsync();
-            Click(window, "AllowOnce");
-
-            var answered = await reply.WaitAsync(_wait, Token);
-            Assert.NotNull(answered);
-            Assert.Equal(AuditDecision.Granted, answered.Decision);
-            Assert.Equal(Sentinel, answered.Value);
-            await PromptedApp.WithdrawnAsync(window);
-
-            var again = app.Ask();
-            var second = await app.PromptAsync(count: 2);
-            Click(second, "Deny");
-
-            Assert.Equal(AuditMethod.Prompt, (await again.WaitAsync(_wait, Token))!.Method);
-            Assert.Equal(2, app.Windows.Count);
         });
 
     [Fact]
@@ -935,12 +961,10 @@ public sealed class DesktopApprovalTests
             Key(window, PhysicalKey.Enter);
             window.FindControl<Button>("AllowOnce")!.Focus();
             Tap(window, PhysicalKey.Space);
-            app.Clock.Advance(PromptViewModel.ArmingDelay - TimeSpan.FromMilliseconds(1));
-            await Task.Delay(200, Token);
-            WindowInput.Drain();
+            await PromptedApp.AdvanceAsync(app.Clock, PromptViewModel.ArmingDelay - TimeSpan.FromMilliseconds(1));
             Key(window, PhysicalKey.Enter);
             Tap(window, PhysicalKey.Space);
-            Assert.False(reply.IsCompleted, "a key within the arming second answered the prompt");
+            Assert.False(IsAnswered(window), "a key within the arming second answered the prompt");
 
             await app.ArmAsync();
             Key(window, PhysicalKey.Enter);
@@ -997,7 +1021,7 @@ public sealed class DesktopApprovalTests
     }
 
     /// <summary>The window's own answers on view; a scrolling reason box adds its scroll bar's, and Details its disclosure, which answer nothing.</summary>
-    private static List<Button> Buttons(Window window) =>
+    internal static List<Button> Buttons(Window window) =>
         [.. window.GetVisualDescendants().OfType<Button>().Where(button => button is not RepeatButton and not ToggleButton && button.IsEffectivelyVisible)];
 
     internal static string? Text(Window window, string name) => window.FindControl<TextBlock>(name)!.Text;
@@ -1147,222 +1171,5 @@ public sealed class DesktopApprovalTests
         }
 
         public void Dispose() => _pipe.Dispose();
-    }
-
-    /// <summary>The app's authority, composed with its own prompt, holding a vault with one credential in it.</summary>
-    internal sealed class PromptedApp : IAsyncDisposable
-    {
-        private readonly TempVault _fixture;
-        private ApproverClient? _client;
-
-        private PromptedApp(TempVault fixture, string vault, Func<IApprovalChannel, IApprovalChannel>? around, FakeNotifications? notifications, Func<bool>? inFront)
-        {
-            var notices = notifications is null ? null : new RequestNotices(notifications, Clock, inFront ?? (() => false));
-
-            _fixture = fixture;
-            Vault = vault;
-
-            // The authority owns the session, as it does at launch.
-#pragma warning disable CA2000
-            Authority = new AppAuthority(new AppVaultSession(Clock, home: fixture.Home), null, () =>
-            {
-                var channel = new WindowApprovalChannel(Clock, ApprovalLimits.Default.Window, notices: notices);
-                channel.Shown += (_, window) => Windows.Add(window);
-                return around is null ? channel : around(channel);
-            });
-#pragma warning restore CA2000
-        }
-
-        internal ManualClock Clock { get; } = new(AppClock.Start);
-
-        internal AppAuthority Authority { get; }
-
-        internal string Vault { get; }
-
-        /// <summary>The keypaste home the app's session reads <c>clients.toml</c> from.</summary>
-        internal string Home => _fixture.Home;
-
-        internal string SessionId { get; private set; } = string.Empty;
-
-        internal List<Window> Windows { get; } = [];
-
-        /// <param name="around">What the gate asks instead of the app's prompt, given that prompt.</param>
-        /// <param name="notifications">The system the app's notifications go to, or null to post none.</param>
-        /// <param name="inFront">Whether keypaste is in front when a prompt appears; it is not, unless this says so.</param>
-        /// <param name="seed">What else the vault holds, written before it is saved.</param>
-        internal static async Task<PromptedApp> StartAsync(Func<IApprovalChannel, IApprovalChannel>? around = null, FakeNotifications? notifications = null, Func<bool>? inFront = null, Action<Core.Vault>? seed = null)
-        {
-            var fixture = new TempVault();
-            var vault = Path.Combine(fixture.Home, "agents.kdbx");
-
-            using (var created = ClaimedVault.Create(vault, TempVault.Password))
-            {
-                created.AddEntry(new VaultEntry { GroupPath = "env/ci", Title = "DEPLOY_KEY", Password = Sentinel });
-                Assert.True(created.SetFields(new EntryName("env/ci", "DEPLOY_KEY"), [new FieldWrite("DEPLOY_KEY", Sentinel)]));
-                created.AddTag(new EntryName("env/ci", "DEPLOY_KEY"), "env:ci");
-                created.AddEntry(new VaultEntry { GroupPath = "env/ci/prod", Title = "DEPLOY_KEY", Password = Sentinel });
-                created.AddEntry(new VaultEntry { GroupPath = "services", Title = "Stripe", Password = Sentinel });
-                created.AddTag(new EntryName("services", "Stripe"), "env:ci:prod");
-                created.AddEntry(new VaultEntry { GroupPath = "api", Title = "OpenAI", Password = Sentinel });
-                Assert.True(created.SetFields(new EntryName("api", "OpenAI"), [new FieldWrite("OPENAI_API_KEY", ApiKeySentinel)]));
-                TempVault.Sees(created, Label);
-                seed?.Invoke(created);
-                created.Save();
-            }
-
-            var app = new PromptedApp(fixture, vault, around, notifications, inFront);
-
-            using (var master = TempVault.Secret(TempVault.Password))
-            {
-                Assert.Equal(UnlockOutcome.Opened, app.Authority.Session.TryUnlock(vault, master.Value));
-            }
-
-            app._client = await app.ConnectAsync();
-            app.SessionId = app.Authority.Session.SessionId!;
-            return app;
-        }
-
-        /// <summary>Unlocks the vault once more, into a new session, and attaches this app's bridge to it.</summary>
-        internal async Task UnlockAgainAsync()
-        {
-            using (var master = TempVault.Secret(TempVault.Password))
-            {
-                Assert.Equal(UnlockOutcome.Opened, Authority.Session.TryUnlock(Vault, master.Value));
-            }
-
-            await _client!.DisposeAsync();
-            _client = await ConnectAsync();
-            SessionId = Authority.Session.SessionId!;
-        }
-
-        /// <summary>Another bridge, attached to the session.</summary>
-        internal async Task<ApproverClient> ConnectAsync()
-        {
-            var endpoint = Assert.IsType<AuthorityStatus.Serving>(Authority.Status).Endpoint;
-            var client = await ApproverClient.TryConnectAsync(endpoint, _wait, Token);
-            Assert.NotNull(client);
-            Assert.True((await client.AttachAsync(new AttachRequest(Vault), Token))!.Attached);
-            return client;
-        }
-
-        internal Task<CredentialReply?> Ask(CancellationToken? cancellationToken = null, string entry = EntryPath, string exposure = "env/**", string field = "password") =>
-            Ask(_client!, cancellationToken, entry, exposure, field);
-
-        internal Task<CredentialReply?> Ask(ApproverClient client, CancellationToken? cancellationToken = null, string entry = EntryPath, string exposure = "env/**", string field = "password") =>
-            client.RequestAsync(Credential(entry, exposure, field), cancellationToken ?? Token).AsTask();
-
-        internal CredentialRequest Credential(string entry = EntryPath, string exposure = "env/**", string field = "password") => new()
-        {
-            Entry = entry,
-            Field = field,
-            Reason = "deploy the billing service",
-            Exposure = [exposure],
-            ClientName = "claude-code",
-            ClientLabel = Label,
-            Vault = Vault,
-            Session = SessionId,
-        };
-
-        /// <summary>Waits for the prompt a request raised to be on screen, in front long enough to take a click, and drawn.</summary>
-        /// <param name="count">How many prompts this app has raised once that one is up.</param>
-        internal async Task<Window> PromptAsync(int count = 1)
-        {
-            await Until(() => Windows.Count >= count && (IsInFront(Windows[^1]) || !Windows[^1].IsVisible));
-            var window = Windows[^1];
-            DrawnFrame.Capture(window);
-            return window;
-        }
-
-        /// <summary>Lets the arming delay pass, as a person reading the prompt does, and waits for its keys to arm.</summary>
-        /// <remarks>The delay's continuation runs on the thread pool, so the arming is posted some time after the clock moves.</remarks>
-        internal async Task ArmAsync()
-        {
-            Clock.Advance(PromptViewModel.ArmingDelay);
-            await Until(() => IsArmed(Windows[^1]));
-        }
-
-        internal static async Task WithdrawnAsync(Window window) => await Until(() => !window.IsVisible);
-
-        /// <summary>A <c>keypaste run --session</c> request for the <c>ci</c> project on this bridge's connection.</summary>
-        internal Task<EnvReply?> AskEnv(CancellationToken? cancellationToken = null) =>
-            _client!.ReleaseEnvAsync(Env(), cancellationToken ?? Token).AsTask();
-
-        internal EnvRequest Env() =>
-            new("ci", ["deploy", "--to", "staging area"], Path.Combine(_fixture.Home, "work")) { Vault = Vault, Session = SessionId };
-
-        /// <summary>An agent's run of the <c>ci</c> set on this bridge's connection.</summary>
-        internal Task<RunReply?> AskRun(CancellationToken? cancellationToken = null) =>
-            _client!.ReleaseRunAsync(Run(), cancellationToken ?? Token).AsTask();
-
-        internal RunRequest Run() => new()
-        {
-            Program = OperatingSystem.IsWindows() ? @"C:\tools\deploy.exe" : "/usr/bin/deploy",
-            Command = ["deploy", "--to", "staging"],
-            Directory = Path.Combine(_fixture.Home, "work"),
-            Project = "ci",
-            Reason = "deploy the billing service",
-            Exposure = ["env/**"],
-            ClientName = "claude-code",
-            ClientLabel = Label,
-            Vault = Vault,
-            Session = SessionId,
-        };
-
-        /// <summary>The frame a bridge sends for one kind of prompted request: <c>credential</c>, <c>env</c> or <c>run</c>.</summary>
-        internal byte[] Frame(string kind) => kind switch
-        {
-            "credential" => ApproverProtocol.Encode(Credential()),
-            "env" => ApproverProtocol.Encode(Env()),
-            _ => ApproverProtocol.Encode(Run()),
-        };
-
-        /// <summary>Asks for one kind of prompted request on the attached bridge, and says whether anything was released.</summary>
-        internal async Task<bool> ReleasedAsync(string kind) => kind switch
-        {
-            "credential" => (await Ask())?.Value is not null,
-            "env" => (await AskEnv())?.Set.Outcome == EnvOutcome.Resolved,
-            _ => (await AskRun())?.Set.Outcome == EnvOutcome.Resolved,
-        };
-
-        /// <summary>Another bridge, attached without awaiting anything, so the UI thread runs nothing meanwhile.</summary>
-        internal Peer Attach()
-        {
-            var peer = new Peer(Assert.IsType<AuthorityStatus.Serving>(Authority.Status).Endpoint);
-            peer.Send(ApproverProtocol.Encode(new AttachRequest(Vault)));
-            Assert.True(ApproverProtocol.TryDecode(peer.Receive(), out AttachReply? attached) && attached.Attached, "the peer was not attached");
-            return peer;
-        }
-
-        internal async Task HangUpAsync()
-        {
-            await _client!.DisposeAsync();
-            _client = null;
-        }
-
-        internal static Task UntilAsync(Func<bool> condition) => Until(condition);
-
-        private static async Task Until(Func<bool> condition)
-        {
-            var deadline = DateTime.UtcNow + _wait;
-
-            while (!condition())
-            {
-                Assert.True(DateTime.UtcNow < deadline, "the prompt never reached that state");
-                WindowInput.Drain();
-                await Task.Delay(20, Token);
-            }
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            if (_client is not null)
-            {
-                await _client.DisposeAsync();
-            }
-
-            Authority.Dispose();
-            WindowInput.Drain();
-            _fixture.Dispose();
-        }
     }
 }

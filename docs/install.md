@@ -18,6 +18,12 @@ mkdir -p ~/.local/bin && mv keypaste keypaste-mcp ~/.local/bin/
 
 **macOS 14 or later.** The floor follows [.NET 10 support](https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md); no run backs this floor. Intel Macs need a [source build](#building-from-source). If macOS blocks the binary, run `xattr -d com.apple.quarantine ~/.local/bin/keypaste`.
 
+A Mac's `PATH` leaves out `~/.local/bin`, so a terminal can't find `keypaste` until you add it once and open a new terminal:
+
+```sh
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zprofile
+```
+
 ## Linux
 
 x64 and arm64.
@@ -33,6 +39,12 @@ mkdir -p ~/.local/bin && mv keypaste keypaste-mcp ~/.local/bin/
 <!-- /install:linux -->
 
 For arm64, substitute `linux-arm64` in all three filenames. Both are built against glibc 2.35. The x64 binary is checked on a clean Debian 12 container; the equivalent container check is not implemented for arm64. Alpine and other musl distributions need a [source build](#building-from-source).
+
+Many distributions put `~/.local/bin` on `PATH` at your next login once the folder exists. If a terminal still can't find `keypaste`, add it and log in again:
+
+```sh
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile
+```
 
 ## Windows
 

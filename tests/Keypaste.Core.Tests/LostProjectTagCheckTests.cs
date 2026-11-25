@@ -6,7 +6,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// V.11: a project tag an entry lost in a version that changed more than its tags is found, and one
+/// A project tag an entry lost in a version that changed more than its tags is found, and one
 /// removed alone, by keypaste or by another program, is not.
 /// </summary>
 /// <remarks>

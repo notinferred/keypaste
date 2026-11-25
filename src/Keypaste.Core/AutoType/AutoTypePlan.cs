@@ -463,7 +463,7 @@ public sealed class AutoTypePause : AutoTypeStep
     /// <summary>How long.</summary>
     public TimeSpan Duration { get; }
 
-    /// <summary>The pause.</summary>
+    /// <summary>The pause in words.</summary>
     /// <returns>Such as <c>pause 500 ms</c>.</returns>
     public override string ToString() => $"pause {Duration.TotalMilliseconds} ms";
 }
@@ -476,7 +476,7 @@ public sealed class AutoTypeKeyDelay : AutoTypeStep
     /// <summary>The wait between keys.</summary>
     public TimeSpan Delay { get; }
 
-    /// <summary>The wait.</summary>
+    /// <summary>The wait between keys in words.</summary>
     /// <returns>Such as <c>50 ms between keys</c>.</returns>
     public override string ToString() => $"{Delay.TotalMilliseconds} ms between keys";
 }
@@ -492,7 +492,7 @@ public sealed class AutoTypeClearField : AutoTypeStep
     {
     }
 
-    /// <summary>The step.</summary>
+    /// <summary>The step in words.</summary>
     /// <returns><c>clear the field</c>.</returns>
     public override string ToString() => "clear the field";
 }

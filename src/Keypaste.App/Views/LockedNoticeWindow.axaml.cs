@@ -70,7 +70,9 @@ internal sealed partial class LockedNoticeWindow : PromptWindow
 
     private async Task ArmAsync(TimeProvider clock)
     {
+        // Read here on the UI thread: first read on a pool thread, Dispatcher.UIThread can make that thread the UI thread.
+        var ui = Dispatcher.UIThread;
         await Task.Delay(PromptViewModel.ArmingDelay, clock).ConfigureAwait(false);
-        Dispatcher.UIThread.Post(Arm);
+        ui.Post(Arm);
     }
 }

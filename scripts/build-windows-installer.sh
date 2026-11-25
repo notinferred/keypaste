@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Wraps a staged win-x64 desktop payload in the internal per-user MSI release-targets.json declares (4.7a1).
+# Wraps a staged win-x64 desktop payload in the internal per-user MSI release-targets.json declares.
 #
 # WixToolset.Sdk resolves outside packages.lock.json, so its restored package is held to the definition's
 # SHA-512 before anything is built. The built MSI is then held to the definition by

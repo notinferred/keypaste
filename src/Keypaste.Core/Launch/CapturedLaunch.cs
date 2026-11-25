@@ -162,7 +162,11 @@ public static class CapturedLaunch
             }
 
             var exited = process.WaitForExitAsync(CancellationToken.None);
-            var finished = await Task.WhenAny(exited, Task.Delay(timeout, cancellationToken)).ConfigureAwait(false);
+
+            // Cancelled once either side wins, so a run that exits early does not keep its timeout's timer alive.
+            using var running = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var finished = await Task.WhenAny(exited, Task.Delay(timeout, running.Token)).ConfigureAwait(false);
+            await running.CancelAsync().ConfigureAwait(false);
 
             if (cancellationToken.IsCancellationRequested && !exited.IsCompleted)
             {

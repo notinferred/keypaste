@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# The macOS steps of the desktop exercises (4.7e): a DMG quarantined as a browser download, attached and its
+# The macOS steps of the desktop exercises: a DMG quarantined as a browser download, attached and its
 # keypaste.app copied to /Applications, what Gatekeeper shows for that copy, the installed app started and quit
 # through LaunchServices, and a bundle moved to the Trash by Finder. Sourced after lib/desktop-drive.sh and once the exercise defines ROOT, OUT and fact;
 # written for the stock bash 3.2.
@@ -9,7 +9,7 @@
 #                               volume left attached is never uploaded with them: the image links /Applications
 #   mac_attach <dmg> <dir>      attaches it read-only and unbrowsed at <dir>, and detaches it again when it is not
 #                               mounted there
-#   mac_detach <dir>            detaches; a refusal is kept with what holds the volume, never retried (F.64)
+#   mac_detach <dir>            detaches; a refusal is kept with what holds the volume, never retried
 #   mac_install <dmg> <app>     attaches the image at a mount point of its own, copies its keypaste.app to <app> with
 #                               ditto, which keeps the quarantine a Finder drag keeps, and detaches it
 #   mac_trash <app>             has Finder move it to the Trash, as a person deletes an app

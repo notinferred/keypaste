@@ -54,7 +54,7 @@ public enum McpLinkChange
 }
 
 /// <summary>The Linux link a client registered inside an AppImage starts, made before any client is told about it.</summary>
-/// <param name="Link">The link, G.5's <c>~/.local/bin/keypaste</c>.</param>
+/// <param name="Link">The link, keypaste's <c>~/.local/bin/keypaste</c>.</param>
 /// <param name="Image">The AppImage the link will start.</param>
 /// <param name="Change">What happens to the link.</param>
 /// <param name="Was">What the link path holds now, as the person reads it; null for <see cref="McpLinkChange.Create"/>.</param>
@@ -434,7 +434,7 @@ public static class McpClientSetup
         { Outcome: CliLinkOutcome.Cancelled } => "the system's dialog was dismissed",
         { Refusal: CliLinkRefusal.BackupExists } => $"{link.BackupPath} already exists, and keypaste never overwrites it",
         { Refusal: CliLinkRefusal.NotKeypaste } => "it changed before keypaste linked it",
-        { Refusal: CliLinkRefusal.Translocated } => "macOS runs this copy from a temporary location",
+        { Refusal: CliLinkRefusal.Translocated } => "this copy runs from the disk image or from a temporary copy macOS made",
         { Refusal: CliLinkRefusal.UnsafeProgram } => "this copy's path holds a line break",
         _ => result.Reason ?? "the link was not made",
     };

@@ -14,14 +14,14 @@ using Xunit;
 namespace Keypaste.App.Tests;
 
 /// <summary>
-/// What minimizing the window does, which until F.2b was nothing at all.
+/// What minimizing the window does.
 /// </summary>
 /// <remarks>
 /// <para>
 /// <b>A real window, whose state really changes.</b> The setting round-tripped through
 /// <c>app.toml</c> correctly for as long as it existed and was still a lie on the screen, because
 /// no window state ever reached it — so a test that asserts the file is the test that already
-/// passed against the defect (V-F.2b: "persistence-only tests cannot pass this task").
+/// passed against the defect.
 /// </para>
 /// <para>
 /// These run <see cref="App.Watch"/> and <see cref="App.Compose"/> themselves, for the reason
@@ -69,7 +69,7 @@ public sealed class MinimizeLockTests
     });
 
     /// <summary>
-    /// "Repeat after restart": a fresh <see cref="DesktopPreferences"/>, a fresh session and a
+    /// After a restart: a fresh <see cref="DesktopPreferences"/>, a fresh session and a
     /// fresh watch, reading nothing but the file.
     /// </summary>
     [Fact]
@@ -172,8 +172,8 @@ public sealed class MinimizeLockTests
 
     /// <summary>
     /// The switch is offered exactly where a minimize can be observed, and both answers come from
-    /// one place — an inactive security setting is the defect this task repairs, and a second
-    /// opinion about where it works would rebuild it.
+    /// one place: a security setting offered where it has no effect is the defect this guards
+    /// against, and a second opinion about where it works would rebuild it.
     /// </summary>
     [Fact]
     public Task The_switch_is_offered_exactly_where_minimizing_is_observed() => Started(fixture =>

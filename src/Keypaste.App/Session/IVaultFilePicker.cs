@@ -41,7 +41,7 @@ internal interface IVaultFilePicker
     /// <param name="suggestedName">The file name the dialog starts with.</param>
     /// <remarks>
     /// The dialog does not offer to replace a file: <see cref="Keypaste.Core.VaultKeyfile.Create"/> writes only where
-    /// nothing is (D-0287).
+    /// nothing is.
     /// </remarks>
     Task<string?> PickNewKeyfileAsync(string suggestedName) => Task.FromResult<string?>(null);
 
@@ -70,7 +70,7 @@ internal interface IVaultFilePicker
     /// <param name="suggestedName">The file name the dialog starts with, already safe to be one.</param>
     /// <remarks>
     /// The dialog does not offer to replace a file: <c>Vault.SaveAttachment</c> writes only where
-    /// nothing is (D-0534).
+    /// nothing is.
     /// </remarks>
     Task<string?> PickAttachmentDestinationAsync(string suggestedName) => Task.FromResult<string?>(null);
 }

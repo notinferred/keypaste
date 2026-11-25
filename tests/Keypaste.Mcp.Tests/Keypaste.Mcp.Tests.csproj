@@ -23,9 +23,9 @@
     <Compile Include="../Keypaste.Core.Tests/OwnerLog.cs" Link="OwnerLog.cs" />
     <!-- Agents' settings in memory, for the owners these tests start. -->
     <Compile Include="../Keypaste.Core.Tests/FakeAgentRules.cs" Link="FakeAgentRules.cs" />
-    <!-- The core's hand-moved clock and time zones a test names on any runner, for an agent's end to Automatic. -->
     <Compile Include="../Keypaste.Core.Tests/ManualClock.cs" Link="ManualClock.cs" />
-    <Compile Include="../Keypaste.Core.Tests/TestZones.cs" Link="TestZones.cs" />
+    <!-- The core's owner on a real pipe, for the owners these tests start. -->
+    <Compile Include="../Keypaste.Core.Tests/ServedOwner.cs" Link="ServedOwner.cs" />
     <!-- Every vault these tests create takes a token Argon2 cost. -->
     <Compile Include="../Keypaste.Core.Tests/CheapKeyDerivation.cs" Link="CheapKeyDerivation.cs" />
   </ItemGroup>

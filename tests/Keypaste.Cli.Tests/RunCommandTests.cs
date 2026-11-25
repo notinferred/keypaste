@@ -200,8 +200,6 @@ public sealed class RunCommandTests
         Assert.Single(harness.ProcessLauncher.Started);
     }
 
-    // ---- fail closed -------------------------------------------------------------------
-
     // ---- exit codes --------------------------------------------------------------------
 
     [Theory]

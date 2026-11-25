@@ -14,7 +14,7 @@ namespace Keypaste.App.Tests;
 /// What counts as a person at the app, and so moves the idle deadline.
 /// </summary>
 /// <remarks>
-/// F.13: on Windows a restore raises a pointer move at the resting cursor, and that move used to
+/// On Windows a restore raises a pointer move at the resting cursor, and that move must not
 /// postpone the idle lock with nobody at the keyboard.
 /// </remarks>
 public sealed class ActivityWatchTests

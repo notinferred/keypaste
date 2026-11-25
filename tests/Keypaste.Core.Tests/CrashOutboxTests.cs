@@ -4,7 +4,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// 4.11a: the crash-report outbox keeps only what the scrubber wrote, owner-only, merged, within its limits, and nothing once
+/// The crash-report outbox keeps only what the scrubber wrote, owner-only, merged, within its limits, and nothing once
 /// cleared.
 /// </summary>
 /// <remarks>

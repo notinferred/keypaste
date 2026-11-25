@@ -53,7 +53,7 @@ public sealed record WaitingChange(ItemChangePrompt Prompt, TimeSpan Remaining);
 /// concurrently — measured, and pinned by <c>ServerToolsTests.TwoToolCalls_RunAtTheSameTime</c> —
 /// so without this two agents, or one agent twice, really can race two prompts onto one screen. An
 /// agent's second request waits its turn behind the first, at most <see cref="ApprovalLimits.MaximumWaiting"/>
-/// for each agent, so a looping agent cannot pile prompts up; any other is refused at once (F.80, THREATS.md T-11).
+/// for each agent, so a looping agent cannot pile prompts up; any other is refused at once (THREATS.md T-11).
 /// </para>
 /// <para>
 /// <b>Nothing here throws for an answer it does not like.</b> Cancellation comes back as
@@ -140,7 +140,7 @@ public sealed class ApprovalGate : IDisposable
             + $"try again in {ApprovalLimits.Describe(Math.Max(seconds, 1))}, or {otherwise}";
     }
 
-    /// <summary>Who an agent's request waits its turn as: the bridge's label, or its connection when it gives none (F.80).</summary>
+    /// <summary>Who an agent's request waits its turn as: the bridge's label, or its connection when it gives none.</summary>
     /// <param name="label">The bridge's raw label, or null.</param>
     /// <param name="connectionId">The connection the request came on.</param>
     /// <returns>The key its requests are bounded under.</returns>
@@ -403,9 +403,10 @@ public sealed class ApprovalGate : IDisposable
                 return ApprovalAnswer.Cooldown;
             }
 
-            _asking = new Asking(listed, Deadline.Starting(_clock, Limits.Window));
+            var deadline = Deadline.Starting(_clock, Limits.Window);
+            _asking = new Asking(listed, deadline);
 
-            var answer = await AskOnceAsync(ask, cancellationToken).ConfigureAwait(false);
+            var answer = await AskOnceAsync(ask, deadline, cancellationToken).ConfigureAwait(false);
 
             if (!always && answer is ApprovalAnswer.AlwaysAllowed)
             {
@@ -433,6 +434,7 @@ public sealed class ApprovalGate : IDisposable
 
     private async ValueTask<ApprovalAnswer> AskOnceAsync(
         Func<CancellationToken, ValueTask<ApprovalAnswer>> ask,
+        Deadline deadline,
         CancellationToken cancellationToken)
     {
         using var withdraw = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -479,7 +481,15 @@ public sealed class ApprovalGate : IDisposable
             return ApprovalAnswer.Cancelled;
         }
 
-        return first == asking ? settled : ApprovalAnswer.TimedOut;
+        if (first != asking)
+        {
+            return ApprovalAnswer.TimedOut;
+        }
+
+        // The window's timer stops while the machine sleeps, so the deadline is read on both clocks too; a late no stays a no.
+        return (settled is ApprovalAnswer.ApprovedOnce or ApprovalAnswer.AlwaysAllowed) && deadline.HasExpired(_clock)
+            ? ApprovalAnswer.TimedOut
+            : settled;
     }
 
     private static async ValueTask<ApprovalAnswer> SettleAsync(

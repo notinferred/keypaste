@@ -66,8 +66,7 @@ public sealed class ShareStore(Vault vault)
     /// <summary>Every recorded share, soonest to expire first. A record that does not parse is left out.</summary>
     public IReadOnlyList<ShareInfo> List() =>
     [
-        .. _vault.ReadEntries(includeReserved: true)
-            .Where(entry => string.Equals(entry.GroupPath, ReservedGroups.Shares, StringComparison.Ordinal))
+        .. _vault.ReadEntriesIn(ReservedGroups.Shares, out _)
             .Select(Read)
             .OfType<ShareInfo>()
             .OrderBy(info => info.Expires)

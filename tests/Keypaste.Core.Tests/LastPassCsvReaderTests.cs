@@ -5,7 +5,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// 9.1c's LastPass CSV reader over exports written by hand: every row lands as an item with its folder, fields, TOTP and
+/// The LastPass CSV reader over exports written by hand: every row lands as an item with its folder, fields, TOTP and
 /// favorite, a typed secure note is expanded as LastPass's <c>lpass</c> expands one, and every row or part that does not
 /// land is named with why, never by value.
 /// </summary>
@@ -230,15 +230,7 @@ public sealed class LastPassCsvReaderTests : IDisposable
         using var source = ExportImport.Open(Write("lastpass_export.csv", Export()), ExportImport.Readers)!;
         var plan = source.Plan(vault, "LastPass");
 
-        List<string?> said = [plan.Into, plan.Refusal];
-        said.AddRange(plan.Rows.SelectMany(row => new[] { row.Item, row.Note, row.ToString() }));
-        said.AddRange(plan.Losses.SelectMany(loss => new[] { loss.Part, loss.Reason, loss.ToString() }));
-        said.AddRange(source.Unread.Select(unread => unread.ToString()));
-        said.AddRange(source.Items.Select(item => item.ToString()));
-        said.AddRange(source.Items.SelectMany(item => item.Fields).Select(field => field.ToString()));
-        said.AddRange(source.Items.SelectMany(item => item.Omitted).Select(omitted => omitted.ToString()));
-
-        Assert.All(_values, value => Assert.DoesNotContain(said, text => text is not null && text.Contains(value, StringComparison.Ordinal)));
+        ExportLeakCheck.AssertNothingSaidHoldsAValue(source, plan, _values);
     }
 
     /// <summary>An item's parts in one line, each field with its value and whether it is protected, and what the reader omitted by name.</summary>

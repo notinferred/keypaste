@@ -20,8 +20,7 @@ internal static class RemoveCommand
         var assumeYes = line.GetValue(CliOptions.Yes);
 
         // A delete is not something to have answered by whatever the next line of stdin happens
-        // to be, so a piped run says so explicitly. In a vault with no recycle bin it is still
-        // irreversible; in one with a bin it is two thirds of the way there.
+        // to be, so a piped run says so explicitly; in a vault with no recycle bin it cannot be undone.
         if (!assumeYes && !context.Prompt.IsInteractive)
         {
             context.Stderr.WriteLine("keypaste rm: --yes is required when stdin is not a terminal");

@@ -6,7 +6,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// 9.1a's import contract over a fake reader: every item and part of an export lands or is named with why, a taken
+/// The import contract over a fake reader: every item and part of an export lands or is named with why, a taken
 /// name is kept beside the other or skipped as decided, and a commit adds everything, or nothing when adding or
 /// saving fails or the vault changed since the preview.
 /// </summary>
@@ -139,6 +139,28 @@ public sealed class ExportImportTests : IDisposable
         Assert.Null(plan.Rows[1].Lands);
         Assert.Equal("export-pw-first", _vault.Find(new EntryName("imported", "Twice"))!.Password);
         Assert.Null(_vault.Find(new EntryName("imported", "Twice (2)")));
+    }
+
+    [Fact]
+    public void Each_further_copy_of_a_title_takes_the_next_free_number_under_whichever_group_is_named()
+    {
+        using var source = Open(
+        [
+            new ExportItem { Title = "Twice", Password = "export-pw-first" },
+            new ExportItem { Title = "Twice (3)", Password = "export-pw-first" },
+            new ExportItem { Title = "Twice", Password = "export-pw-second" },
+            new ExportItem { Title = "Twice", Password = "export-pw-second" },
+            new ExportItem { Title = "Twice", Folder = ["Sub"], Password = "export-pw-second" },
+        ]);
+
+        foreach (var into in new[] { "imported", "elsewhere" })
+        {
+            var plan = source.Plan(_vault, into);
+
+            Assert.Equal(
+                [new EntryName(into, "Twice"), new EntryName(into, "Twice (3)"), new EntryName(into, "Twice (2)"), new EntryName(into, "Twice (4)"), new EntryName($"{into}/Sub", "Twice")],
+                plan.Rows.Select(row => row.Lands));
+        }
     }
 
     // ---------------------------------------------------------------- the commit

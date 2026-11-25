@@ -45,8 +45,8 @@ internal enum DestinationKind
 /// <param name="Says">What the sidebar, or the Back button of a screen under it, shows.</param>
 /// <param name="Icon">The Lucide icon's name, drawn from <c>Icon.&lt;name&gt;</c> in Theme/Icons.axaml.</param>
 /// <param name="OwnsHeader">
-/// Whether the screen draws its own title and padding. Until a screen is restyled the shell draws an
-/// h1 with its title above it; a restyled screen that lays out edge to edge sets this.
+/// Whether the screen draws its own title and padding; for one that does not, the shell draws an h1
+/// with its title above it.
 /// </param>
 /// <param name="Parent">The screen a screen sits under, or null for one of the four places the rail lists.</param>
 /// <param name="InSidebar">Whether the screen is reached from its place's own list, a vault's sidebar or Settings' sections, rather than by Back.</param>

@@ -16,7 +16,17 @@ public sealed class NpmShimLaunchTests : IDisposable
 
     private static McpClient Tool => new("probe", "Probe", McpWiring.OwnCli, _command);
 
-    public void Dispose() => Directory.Delete(_root, recursive: true);
+    public void Dispose()
+    {
+        try
+        {
+            Directory.Delete(_root, recursive: true);
+        }
+        catch (Exception ex) when (OperatingSystem.IsWindows() && (ex is IOException or UnauthorizedAccessException))
+        {
+            // Another process, such as a virus scan, can still hold the copied program; the runner's temp cleanup takes it.
+        }
+    }
 
     [Fact]
     public void A_script_behind_npms_launcher_gets_every_argument_as_it_was_given()

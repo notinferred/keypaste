@@ -1,16 +1,13 @@
 name: dco
 
-# CONTRIBUTING.md requires the Developer Certificate of Origin. Every other
-# rule in this repository names an enforcer; until this file existed that one named none, which
-# made it aspiration rather than a rule.
+# CONTRIBUTING.md requires the Developer Certificate of Origin; this workflow enforces it on each
+# pull request.
 #
-# WHAT IT COSTS ON EVERY PUSH: nothing. There is no `push` trigger. A pull request already pays
-# for ci.yml, and this adds one bash step of a few seconds to that.
+# No push trigger: it runs only on pull requests, as one bash step of a few seconds.
 #
 # IT CHECKS ONLY THE COMMITS THE PULL REQUEST ADDS. Sign-off began when the DCO was adopted; the history before
-# it is unsigned and rewriting it is not on the table (see H-0003 for what rewriting this history
-# already cost). A gate that judged the whole log would be red forever and would be switched off
-# within a week, which is worse than no gate.
+# it is unsigned, and rewriting published history would break every clone and pinned submodule. A gate that
+# judged the whole log would be red forever and would be switched off within a week, which is worse than no gate.
 on:
   pull_request:
 

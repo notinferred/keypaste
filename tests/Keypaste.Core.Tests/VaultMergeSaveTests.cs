@@ -11,7 +11,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// Another program's save of the open vault's own file merged with the open copy and saved over it atomically (1.4b2):
+/// Another program's save of the open vault's own file merged with the open copy and saved over it atomically:
 /// the file read once, parsed with the unlock's key and refused from its bytes below KDBX 4, a save landing meanwhile merged on the
 /// next attempt, and every refusal or failure leaving the open copy and the file as they were. The other program's saves are made
 /// through KeePassLib directly, a revision of the entry before each change as KeePass saves one.

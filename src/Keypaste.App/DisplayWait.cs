@@ -16,7 +16,7 @@ internal interface IMacSession
 }
 
 /// <summary>
-/// Holds a start on macOS, showing nothing, until a display is awake, because Avalonia cannot initialize without one (F.96).
+/// Holds a start on macOS, showing nothing, until a display is awake, because Avalonia cannot initialize without one.
 /// </summary>
 /// <remarks>
 /// The wait has no bound: a Mac can sit with its display asleep for days, and a start that gave up would leave a login with no app.
@@ -31,7 +31,6 @@ internal sealed class DisplayWait
     private readonly TextWriter _stderr;
     private readonly TimeSpan _poll;
 
-    /// <summary>Initializes the wait.</summary>
     /// <param name="session">The login session asked.</param>
     /// <param name="stderr">Where a start that waits or fails says so.</param>
     /// <param name="poll">How long to wait between looks at the display.</param>

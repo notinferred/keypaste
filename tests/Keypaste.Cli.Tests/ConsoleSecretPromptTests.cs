@@ -28,13 +28,12 @@ public sealed class ConsoleSecretPromptTests
         using var prompts = new StringWriter(CultureInfo.InvariantCulture);
         var prompt = Build(prompts, "hunter2" + Enter);
 
-        using var secret = prompt.ReadSecret("Master password: ");
+        using var secret = prompt.ReadSecret(CliHarness.MasterPasswordPrompt);
 
         Assert.NotNull(secret);
         Assert.Equal("hunter2", new string(secret.Value));
 
-        // The prompt appears; the password does not.
-        Assert.Contains("Master password: ", prompts.ToString(), StringComparison.Ordinal);
+        Assert.Contains(CliHarness.MasterPasswordPrompt, prompts.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain("hunter2", prompts.ToString(), StringComparison.Ordinal);
     }
 
@@ -108,7 +107,7 @@ public sealed class ConsoleSecretPromptTests
         using var input = Piped("first-line\nsecond-line\n");
         var prompt = new ConsoleSecretPrompt(prompts, ThrowingKeySource, () => true, input);
 
-        using var first = prompt.ReadSecret("Master password: ");
+        using var first = prompt.ReadSecret(CliHarness.MasterPasswordPrompt);
         using var second = prompt.ReadSecret("Password: ");
 
         Assert.Equal("first-line", new string(first!.Value));
@@ -129,7 +128,7 @@ public sealed class ConsoleSecretPromptTests
         using var input = Piped("master-password\nthis belongs to the child\nand this\n");
         var prompt = new ConsoleSecretPrompt(prompts, ThrowingKeySource, () => true, input);
 
-        using var secret = prompt.ReadSecret("Master password: ");
+        using var secret = prompt.ReadSecret(CliHarness.MasterPasswordPrompt);
         Assert.Equal("master-password", new string(secret!.Value));
 
         using var rest = new StreamReader(input, Encoding.UTF8);
@@ -181,7 +180,7 @@ public sealed class ConsoleSecretPromptTests
         using var input = Piped(string.Empty);
         var prompt = new ConsoleSecretPrompt(prompts, ThrowingKeySource, () => true, input);
 
-        Assert.Null(prompt.ReadSecret("Master password: "));
+        Assert.Null(prompt.ReadSecret(CliHarness.MasterPasswordPrompt));
     }
 
     [Fact]

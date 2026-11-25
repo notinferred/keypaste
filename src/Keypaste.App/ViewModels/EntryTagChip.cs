@@ -4,9 +4,9 @@ namespace Keypaste.App.ViewModels;
 
 /// <summary>One of an entry's own tags, or a new item's, as a chip the pane or the form draws and can remove.</summary>
 /// <remarks>
-/// A project tag (D-0370) reads as its project and environment, with a shield when the environment is
+/// A project tag reads as its project and environment, with a shield when the environment is
 /// protected; a tag that starts <c>env:</c> and breaks the grammar is drawn as written, flagged, with
-/// the reason as its tip, and still carries the shield when it protects (D-0371).
+/// the reason as its tip, and still carries the shield when it protects.
 /// </remarks>
 internal sealed class EntryTagChip
 {

@@ -41,6 +41,15 @@ public sealed record EntryAgentAccess(EntryUse Use, IReadOnlyList<ClientAccess> 
 /// <param name="Reach">Whether it can name an entry, given the entry's own tags: the least of its bridge's announced exposure and its settings.</param>
 public sealed record AgentReach(string Agent, Func<EntryName, IReadOnlyList<string>, ExposureReach> Reach);
 
+/// <summary>Who received each entry by name and by UUID, folded from granted audit lines alone.</summary>
+/// <remarks>Never changed once <see cref="EntryActivity.Fold"/> returns it, so one fold serves every refresh until new lines are read.</remarks>
+public sealed class AuditReleases
+{
+    internal Dictionary<string, Dictionary<string, ClientAccess>> ByName { get; } = new(StringComparer.Ordinal);
+
+    internal Dictionary<string, Dictionary<string, ClientAccess>> ByItem { get; } = new(StringComparer.Ordinal);
+}
+
 /// <summary>
 /// Which entries agents use, from what is already recorded: this vault's granted audit lines, the
 /// owner's release ledger for this session and its waiting prompts.
@@ -83,14 +92,19 @@ public sealed class EntryActivity
         ApproverActivity live,
         IReadOnlyList<ReleaseSeen> session,
         DateTimeOffset now,
-        IReadOnlyList<AgentReach>? reach = null)
+        IReadOnlyList<AgentReach>? reach = null) =>
+        Build(Fold(audit, vaultKey), live, session, now, reach);
+
+    /// <summary>Folds this vault's granted audit lines into who received each entry, which a refresh that read no new line can reuse.</summary>
+    /// <param name="audit">Audit entries read so far.</param>
+    /// <param name="vaultKey">The open vault's identity key.</param>
+    /// <returns>What the lines released.</returns>
+    public static AuditReleases Fold(IReadOnlyList<AuditEntry> audit, string vaultKey)
     {
         ArgumentNullException.ThrowIfNull(audit);
         ArgumentNullException.ThrowIfNull(vaultKey);
-        ArgumentNullException.ThrowIfNull(live);
-        ArgumentNullException.ThrowIfNull(session);
 
-        var activity = new EntryActivity(live, reach ?? [], now);
+        var folded = new AuditReleases();
 
         foreach (var entry in audit)
         {
@@ -112,14 +126,41 @@ public sealed class EntryActivity
 
             foreach (var named in entry.Entries.Count > 0 ? entry.Entries : entry.Entry.Length > 0 ? [entry.Entry] : [])
             {
-                Released(activity._released, Key(named), client, how, at, counted: true);
+                Released(folded.ByName, Key(named), client, how, at, counted: true);
             }
 
             if (entry.Item.Length > 0)
             {
-                Released(activity._releasedItems, entry.Item, client, how, at, counted: true);
+                Released(folded.ByItem, entry.Item, client, how, at, counted: true);
             }
         }
+
+        return folded;
+    }
+
+    /// <summary>Builds the picture from audit lines already folded and what this session and the owner hold now.</summary>
+    /// <param name="released">What the audit lines released, from <see cref="Fold"/>, which this leaves as it was.</param>
+    /// <param name="live">What the owner holds now.</param>
+    /// <param name="session">What the owner released this session.</param>
+    /// <param name="now">The time the recent window is measured from.</param>
+    /// <param name="reach">What each attached agent can name without having asked yet.</param>
+    /// <returns>The picture.</returns>
+    public static EntryActivity Build(
+        AuditReleases released,
+        ApproverActivity live,
+        IReadOnlyList<ReleaseSeen> session,
+        DateTimeOffset now,
+        IReadOnlyList<AgentReach>? reach = null)
+    {
+        ArgumentNullException.ThrowIfNull(released);
+        ArgumentNullException.ThrowIfNull(live);
+        ArgumentNullException.ThrowIfNull(session);
+
+        var activity = new EntryActivity(live, reach ?? [], now);
+
+        // Copied, because the session's releases below change counts and times the fold is reused for.
+        CopyInto(activity._released, released.ByName);
+        CopyInto(activity._releasedItems, released.ByItem);
 
         // Every other release the ledger holds is also an audit line: it moves the time, not the count.
         foreach (var seen in session)
@@ -199,7 +240,7 @@ public sealed class EntryActivity
 
     /// <summary>
     /// Whether agents can see an entry: an attached agent's reach covers it,
-    /// or it has been released or is waiting on a person (N.5).
+    /// or it has been released or is waiting on a person.
     /// </summary>
     /// <param name="entry">The entry.</param>
     /// <param name="tags">The entry's own tags, which a <c>tag:</c> pattern reads.</param>
@@ -269,6 +310,14 @@ public sealed class EntryActivity
 
         var key = KeyOf(entry);
         return (_released.GetValueOrDefault(key), _waiting.Contains(key));
+    }
+
+    private static void CopyInto(Dictionary<string, Dictionary<string, ClientAccess>> target, Dictionary<string, Dictionary<string, ClientAccess>> folded)
+    {
+        foreach (var (key, byClient) in folded)
+        {
+            target[key] = new Dictionary<string, ClientAccess>(byClient, StringComparer.Ordinal);
+        }
     }
 
     private static void Released(Dictionary<string, Dictionary<string, ClientAccess>> released, string key, string client, string how, DateTimeOffset at, bool counted)

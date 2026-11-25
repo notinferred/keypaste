@@ -12,7 +12,7 @@ namespace Keypaste.Cli.Tests;
 /// <para>
 /// <see cref="EntryNameSanitizer"/> exists for this, and its own documentation says
 /// <c>WasAltered</c> is there "so a listing can mark an entry whose displayed name is not what the
-/// vault holds". These are the listings, and they did not call it. Titles and group paths are
+/// vault holds", and these are those listings. Titles and group paths are
 /// attacker-reachable: anything with write access to the vault chooses them, which includes
 /// KeePassXC, a vault shared with a teammate, and <c>keypaste add</c> itself.
 /// </para>

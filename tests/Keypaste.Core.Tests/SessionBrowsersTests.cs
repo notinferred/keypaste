@@ -693,23 +693,17 @@ public sealed class SessionBrowsersTests : IDisposable
     /// <summary>An owner of the test's vault on its own pipe, pairing through <see cref="SessionBrowsers"/>.</summary>
     private sealed class Owner : IAsyncDisposable
     {
-        private readonly CancellationTokenSource _stop = new();
-        private readonly ApproverListener _listener;
-        private readonly Task _running;
+        private readonly ServedOwner _served;
         private readonly string _vault;
 
-        private Owner(string pipeName, SessionAuthority authority, SessionBrowsers browsers, string vault)
+        private Owner(ServedOwner served, SessionBrowsers browsers, string vault)
         {
-            PipeName = pipeName;
+            _served = served;
             Browsers = browsers;
             _vault = vault;
-            _listener = new ApproverListener(pipeName, authority);
-            _running = _listener.RunAsync(_stop.Token);
         }
 
         internal SessionBrowsers Browsers { get; }
-
-        private string PipeName { get; }
 
         internal OwnerPairings Pairings { get; private init; } = null!;
 
@@ -736,12 +730,12 @@ public sealed class SessionBrowsersTests : IDisposable
                 browsers: browsers);
             browsers.Removed += (_, pairing) => authority.Unbind(pairing);
 
-            return new("keypaste-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8)), authority, browsers, test.VaultPath) { Pairings = pairings };
+            return new(ServedOwner.Serve(authority), browsers, test.VaultPath) { Pairings = pairings };
         }
 
         internal async Task<BrowserLink> ConnectAsync()
         {
-            var link = await BrowserLink.TryConnectAsync(PipeName, _wait, Token);
+            var link = await BrowserLink.TryConnectAsync(_served.PipeName, _wait, Token);
             Assert.NotNull(link);
             return link;
         }
@@ -754,22 +748,7 @@ public sealed class SessionBrowsersTests : IDisposable
             return link;
         }
 
-        public async ValueTask DisposeAsync()
-        {
-            await _stop.CancelAsync();
-
-            try
-            {
-                await _running;
-            }
-            catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
-            {
-                // Tearing the listener down is how it stops.
-            }
-
-            _listener.Dispose();
-            _stop.Dispose();
-        }
+        public ValueTask DisposeAsync() => _served.DisposeAsync();
     }
 
     /// <summary>A second vault unlocked in the same owner process, with its own unlock, rules and browsers.</summary>

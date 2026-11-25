@@ -22,14 +22,14 @@ internal enum AuditReadKind
 }
 
 /// <summary>
-/// The audit log read, checked and rendered the way <c>keypaste log</c> does it, for every screen that shows it.
+/// The audit log read and checked the way <c>keypaste log</c> does it, for every screen that shows it.
 /// </summary>
 /// <remarks>
 /// The reader and the verifier are two passes over the same file on purpose: the verifier works on
 /// bytes and the reader on JSON, so a parser difference can drop a row from a table but can never
 /// change a verdict. Each screen says what a kind means in its own words.
 /// </remarks>
-internal sealed record AuditHistory(AuditReadKind Kind, IReadOnlyList<string> Lines, IReadOnlyList<string> Verdict, string Error)
+internal sealed record AuditHistory(AuditReadKind Kind, string Error)
 {
     /// <summary>The records the table holds, in file order, as the core's reader parsed and sanitized them.</summary>
     internal IReadOnlyList<AuditEntry> Entries { get; init; } = [];
@@ -49,18 +49,6 @@ internal sealed record AuditHistory(AuditReadKind Kind, IReadOnlyList<string> Li
     /// <summary>What the chain check found, for a screen that states the verdict in its own layout.</summary>
     internal AuditChainReport? Report { get; init; }
 
-    /// <summary>A path with the home folder written as <c>~</c>, as every screen shows the log's.</summary>
-    /// <param name="path">The path.</param>
-    /// <returns>The shorter form, or <paramref name="path"/> when it is not under the home folder.</returns>
-    internal static string ShortPath(string path)
-    {
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-
-        return home.Length > 0 && path.StartsWith(home + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-            ? "~" + path[home.Length..]
-            : path;
-    }
-
     /// <summary>Reads the log at <paramref name="path"/>.</summary>
     /// <param name="path">The log.</param>
     /// <param name="checkpoints">The unlocked vault's checkpoint key, to check the checkpoints naming it, or null.</param>
@@ -68,12 +56,12 @@ internal sealed record AuditHistory(AuditReadKind Kind, IReadOnlyList<string> Li
     {
         if (!Path.Exists(path))
         {
-            return new AuditHistory(AuditReadKind.Missing, [], [], string.Empty);
+            return new AuditHistory(AuditReadKind.Missing, string.Empty);
         }
 
         if (!AuditReader.TryRead(path, out var entries, out var unreadable, out var error))
         {
-            return new AuditHistory(AuditReadKind.Unreadable, [], [], error);
+            return new AuditHistory(AuditReadKind.Unreadable, error);
         }
 
         var report = AuditChainVerifier.Verify(path, checkpoints: checkpoints);
@@ -81,26 +69,17 @@ internal sealed record AuditHistory(AuditReadKind Kind, IReadOnlyList<string> Li
         // A table drawn from a file nothing checked must not be handed over as though something had.
         if (report.Verdict == AuditChainVerdict.Unreadable)
         {
-            return new AuditHistory(AuditReadKind.Unchecked, [], [], report.Error);
+            return new AuditHistory(AuditReadKind.Unchecked, report.Error);
         }
-
-        var unverified = report.Unverified;
-
-        IReadOnlyList<string> lines =
-        [
-            AuditText.Heading(ShortPath(path), entries.Count, entries.Count, []),
-            .. AuditText.Table(entries, unverified),
-            .. AuditText.Notes(entries, unreadable, unverified),
-        ];
 
         var kind = report.Verdict == AuditChainVerdict.Broken ? AuditReadKind.Broken : AuditReadKind.Intact;
 
-        return new AuditHistory(kind, lines, AuditText.Verdict(report), string.Empty)
+        return new AuditHistory(kind, string.Empty)
         {
             Entries = entries,
             Total = entries.Count,
             Unreadable = unreadable,
-            Unverified = unverified,
+            Unverified = report.Unverified,
             Edited = report.Findings.Where(finding => finding.IsBreak).Select(finding => finding.Line).ToHashSet(),
             Report = report,
         };

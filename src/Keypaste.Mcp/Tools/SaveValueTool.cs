@@ -8,7 +8,7 @@ using ModelContextProtocol.Server;
 namespace Keypaste.Mcp.Tools;
 
 /// <summary>
-/// The tool an agent uses to ask the person to save a value it never sees, at a place it names (F.79). The person enters
+/// The tool an agent uses to ask the person to save a value it never sees, at a place it names. The person enters
 /// the value where the vault is unlocked; the agent learns only whether it was saved.
 /// </summary>
 /// <remarks>

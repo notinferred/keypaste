@@ -7,7 +7,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// 4.11a: nothing an exception carries but its type, HResult and code frames reaches a crash report, the outbox's file or
+/// Nothing an exception carries but its type, HResult and code frames reaches a crash report, the outbox's file or
 /// the request that sends it.
 /// </summary>
 /// <remarks>

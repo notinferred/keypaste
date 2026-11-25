@@ -9,7 +9,7 @@ namespace Keypaste.Core.Tests;
 /// <summary>
 /// A request two items answer to puts both in front of the person, who picks one: exactly that item's field is released,
 /// by its UUID, and the owner's line names it; a refusal, a lock or an allow with no pick releases nothing, and a request
-/// one item answers to is asked as it always was (F.76).
+/// one item answers to is asked as it always was.
 /// </summary>
 public sealed class ItemPickerTests : IDisposable
 {

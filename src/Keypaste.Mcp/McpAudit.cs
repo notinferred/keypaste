@@ -128,30 +128,28 @@ internal static class McpAudit
     /// <remarks>
     /// <para>
     /// Both client-supplied strings are sanitized by <see cref="AuditClient.Of"/> before they are
-    /// recorded. They are attacker-chosen text that Stage 2.2 renders in an approval dialog and
-    /// <c>keypaste log</c> renders in a table — the two places an injection payload would most like to land.
+    /// recorded. They are attacker-chosen text that the approval dialog and <c>keypaste log</c>'s
+    /// table render — the two places an injection payload would most like to land.
     /// Absent values are recorded as absent rather than as the word "unknown": that a client said
     /// nothing is a different fact from a client calling itself nothing.
     /// </para>
     /// <para>
-    /// <b>It waits, and the reason is F.5.</b> A client that writes <c>initialize</c>,
+    /// <b>It waits, because a tool call can overtake the handshake.</b> A client that writes <c>initialize</c>,
     /// <c>notifications/initialized</c> and a tool call in one go — which is legal, and which
     /// <c>verify-approval-e2e.sh</c> and <c>verify-policy-e2e.sh</c> both do — was being refused as
     /// though it had never introduced itself, because nothing orders the tool call after the
-    /// handler that publishes <c>ClientInfo</c>. Observed on macOS NativeAOT twice in two attempts
-    /// of release dispatch 34387033087, and once before that, when the response was to make
-    /// <c>verify-mcp-stdio.sh</c> wait for the initialize response rather than to fix this.
+    /// handler that publishes <c>ClientInfo</c>; this has been observed on macOS NativeAOT builds.
     /// </para>
     /// <para>
     /// <b>The identity is read once, after the wait, and both answers come from that read</b>: the
     /// question "do we know who this is" and the answer "here is who this is" must not be able to
     /// disagree. Read before the wait, a client that named itself while its call waited was put to
-    /// the owner and logged as an unnamed client (F.61). The protocol makes <c>clientInfo</c>
+    /// the owner and logged as an unnamed client. The protocol makes <c>clientInfo</c>
     /// required in <c>initialize</c>, so a null here means either the handshake has not happened or
     /// the client broke the rule, and both are cases to refuse.
     /// </para>
     /// <para>
-    /// The guarantee is unchanged: a request is never answered for a client that cannot be named.
+    /// The guarantee holds: a request is never answered for a client that cannot be named.
     /// Waiting only stops a client that <em>did</em> name itself from being told it did not. This
     /// is not authentication — a client can still call itself anything (THREATS.md T-3).
     /// </para>

@@ -12,7 +12,7 @@ namespace Keypaste.App.Tests.Session;
 
 /// <summary>
 /// A request arriving while keypaste is in the background also posts a notification that says nothing of the request,
-/// whose only action brings the prompt forward disarmed, and which is gone, press included, once the request is (Q.14).
+/// whose only action brings the prompt forward disarmed, and which is gone, press included, once the request is.
 /// </summary>
 public sealed class SystemNotificationTests
 {
@@ -85,7 +85,7 @@ public sealed class SystemNotificationTests
             }
 
             Assert.True(window.IsVisible);
-            Assert.False(reply.IsCompleted, "posting a notification answered the request");
+            Assert.False(IsAnswered(window), "posting a notification answered the request");
             Click(window, "Deny");
             Assert.Equal(AuditDecision.Denied, (await reply.WaitAsync(_wait, Token))!.Decision);
         });
@@ -124,8 +124,7 @@ public sealed class SystemNotificationTests
             Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
             Assert.True(window.IsVisible);
             Key(window, Avalonia.Input.PhysicalKey.Enter);
-            await Task.Delay(200, Token);
-            Assert.False(reply.IsCompleted, "a press of the notification or Return within its second answered the request");
+            Assert.False(IsAnswered(window), "a press of the notification or Return within its second answered the request");
 
             app.Clock.Advance(PromptViewModel.ArmingDelay);
             await PromptedApp.UntilAsync(() => IsArmed(window));

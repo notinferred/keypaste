@@ -46,7 +46,6 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
     private readonly TimeSpan _window;
     private readonly TimeProvider _clock;
 
-    /// <summary>Builds the channel.</summary>
     /// <param name="prompt">Where the answer is read.</param>
     /// <param name="console">Where the dialog is written.</param>
     /// <param name="window">The gate's window, which the countdown shows.</param>
@@ -124,8 +123,21 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
             if (how == 't')
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                using var typed = await Task.Run(() => _prompt.ReadSecret("  value: "), CancellationToken.None).WaitAsync(cancellationToken).ConfigureAwait(false)
-                    ?? throw new EndOfStreamException();
+                var reading = Task.Run(() => _prompt.ReadSecret("  value: "), CancellationToken.None);
+                SecretBuffer? read;
+
+                try
+                {
+                    read = await reading.WaitAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    // The abandoned read still fills a buffer once Enter is pressed, and nothing else would zero it.
+                    _ = reading.ContinueWith(static finished => finished.Result?.Dispose(), CancellationToken.None, TaskContinuationOptions.OnlyOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                    throw;
+                }
+
+                using var typed = read ?? throw new EndOfStreamException();
                 value = typed is { Length: > 0 } ? new string(typed.Value) : null;
             }
             else if (how == 'g')
@@ -388,11 +400,13 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
             if (always is not null && choice == 'a')
             {
+                var agent = AgentArgument(always.Agent);
                 _console.WriteLine(string.Join(
                     Environment.NewLine,
                     string.Empty,
                     $"  From now on keypaste gives {always.Agent} {always.What} without asking you.",
-                    "  Remove it on the agent's page in the keypaste app to be asked again."));
+                    $"  To be asked again, forget it with `keypaste clients {agent} --forget <key>`, the key that `keypaste clients {agent}` lists,",
+                    "  or remove it on the agent's page in the keypaste app."));
 
                 return Said(ApprovalAnswer.AlwaysAllowed);
             }
@@ -427,6 +441,27 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
     {
         internal static Always? Of(ApprovalPrompt prompt, string what) =>
             prompt.OffersAlways && prompt.Label is { } agent ? new Always(agent, what) : null;
+    }
+
+    /// <summary>
+    /// The agent as the hint's command names it: bare when it holds only ASCII letters, digits, <c>_</c>, <c>.</c> and
+    /// <c>-</c>, in double quotes when every common shell reads it the same way inside them, and otherwise, or when it
+    /// starts with <c>-</c> and would be read as an option, <c>&lt;agent&gt;</c> for the person to fill in.
+    /// </summary>
+    private static string AgentArgument(string agent)
+    {
+        if (agent.StartsWith('-'))
+        {
+            return "<agent>";
+        }
+
+        if (agent.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '.' or '-'))
+        {
+            return agent;
+        }
+
+        // Inside double quotes the POSIX shells act on $, ` and \, bash and zsh on !, PowerShell on $, ` and its typographic quotes, Command Prompt on %.
+        return agent.Any(c => c is '"' or '$' or '!' or '%' or '`' or '\\' or '\u201C' or '\u201D' or '\u201E' || char.IsControl(c)) ? "<agent>" : $"\"{agent}\"";
     }
 
     /// <summary>Reads one choice under a countdown, the choice line drawn and cleared around it.</summary>

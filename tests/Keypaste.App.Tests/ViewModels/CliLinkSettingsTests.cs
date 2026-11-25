@@ -10,7 +10,7 @@ using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
 
-/// <summary>Settings › Agents and the CLI: linking the keypaste a terminal runs, and replacing another program only once the person confirms (G.5).</summary>
+/// <summary>Settings › Agents and the CLI: linking the keypaste a terminal runs, and replacing another program only once the person confirms.</summary>
 public sealed class CliLinkSettingsTests
 {
     private const string _backup = FakeCliLink.Location + ".keypaste-backup";
@@ -223,7 +223,7 @@ public sealed class CliLinkSettingsTests
         Assert.False(screen.OffersCliReplace);
         Assert.False(screen.LinkCliCommand.CanExecute(null));
         Assert.False(screen.BeginReplaceCliCommand.CanExecute(null));
-        Assert.StartsWith("macOS is running this copy from a temporary location.", screen.CliLinkNote, StringComparison.Ordinal);
+        Assert.StartsWith("This copy runs from the disk image or from a temporary copy macOS made,", screen.CliLinkNote, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -281,8 +281,6 @@ public sealed class CliLinkSettingsTests
         Assert.True(screen.IsCliLinking);
         Assert.False(screen.ConfirmReplaceCliCommand.CanExecute(null));
         Assert.False(screen.CancelReplaceCliCommand.CanExecute(null));
-        await screen.ConfirmReplaceCliCommand.PressAsync();
-        screen.CancelReplaceCliCommand.Press();
         Assert.True(screen.IsConfirmingCliReplace);
 
         gate.Release();

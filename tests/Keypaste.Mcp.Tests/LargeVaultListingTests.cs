@@ -22,7 +22,7 @@ namespace Keypaste.Mcp.Tests;
 /// </para>
 /// <para>
 /// Two thousand entries is an unremarkable vault for anyone who has imported from a password
-/// manager, and it is well over what one sixty-four kibibyte frame holds. Until F.3c that vault
+/// manager, and it is well over what one sixty-four kibibyte frame holds. Before a listing was bounded to one frame, that vault
 /// could not be listed at all: the write threw, the connection went down, and it took with it the
 /// grants scoped to it — so listing your own entries silently revoked an approval you had just
 /// given. That is what <see cref="OnALargeVault_AConnectionSurvivesAListing"/> is about, and it is the
@@ -43,10 +43,7 @@ public sealed class LargeVaultListingTests : IAsyncLifetime
     private Vault? _vault;
     private OwnerLog? _log;
     private readonly ScriptedHuman _human = new();
-    private ApprovalGate? _gate;
-    private ApproverListener? _listener;
-    private CancellationTokenSource? _stop;
-    private Task? _serving;
+    private RealOwner? _owner;
 
     private string PipeName { get; } =
         "keypaste-large-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
@@ -76,48 +73,19 @@ public sealed class LargeVaultListingTests : IAsyncLifetime
         // What an agent is answered from is the vault as saved.
         _vault.Save();
 
-        _gate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);
         _log = new OwnerLog(Path.Combine(_directory, "home"));
-
-        _stop = new CancellationTokenSource();
-        _listener = new ApproverListener(
-            PipeName,
-            TestSession.Over(
-                _vault,
-                new ApproverHandler(
-                    new VaultCredentialSource(() => _vault),
-                    new VaultEntryNameLister(() => _vault),
-                    _gate,
-                    TestSession.Settings()),
-                _log.Log));
-
-        _serving = _listener.RunAsync(_stop.Token);
+        _owner = RealOwner.Start(_vault, _human, _log.Log, pipeName: PipeName);
 
         return ValueTask.CompletedTask;
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (_stop is not null)
+        if (_owner is not null)
         {
-            await _stop.CancelAsync();
+            await _owner.DisposeAsync();
         }
 
-        if (_serving is not null)
-        {
-            try
-            {
-                await _serving;
-            }
-            catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
-            {
-                // Tearing the listener down is how it stops.
-            }
-        }
-
-        _listener?.Dispose();
-        _stop?.Dispose();
-        _gate?.Dispose();
         _vault?.Dispose();
         _log?.Dispose();
 

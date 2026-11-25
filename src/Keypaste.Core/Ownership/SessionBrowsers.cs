@@ -530,9 +530,11 @@ public sealed class SessionBrowsers : IBrowserRequests
 
         foreach (var vault in Serving())
         {
-            if (vault.Holds(lookup, request.Uuid))
+            var waiting = vault._lifetime.Waiting;
+
+            if (vault.Holds(lookup, request.Uuid, out var read))
             {
-                return vault.ReleaseOwn(lookup, request, pairing, browser);
+                return vault.ReleaseOwn(lookup, read, request, pairing, browser, waiting);
             }
         }
 
@@ -593,22 +595,29 @@ public sealed class SessionBrowsers : IBrowserRequests
         return [.. read.Candidates.Select(item => new BrowserLoginName(item.Name.Uuid!, Sanitized(item.Name.Title), Sanitized(item.Username)) { Vault = vault })];
     }
 
-    /// <summary>Whether this vault holds an item of that UUID the page matches, offered or kept out.</summary>
-    private bool Holds(LoginLookup lookup, string uuid) =>
-        _lifetime.IsLive
-        && Match(lookup, out var read) is null
-        && (read.Candidates.Any(item => IsItem(item, uuid)) || read.Refused.Any(refused => IsItem(refused.Item, uuid)));
-
-    /// <summary>Releases one of this vault's logins at the person's pick in the page's list.</summary>
-    private BrowserFillReply ReleaseOwn(LoginLookup lookup, BrowserReleaseRequest request, BrowserPairing pairing, BrowserIdentity browser)
+    /// <summary>Whether this vault holds an item of that UUID the page matches, offered or kept out, with the page's match it read.</summary>
+    private bool Holds(LoginLookup lookup, string uuid, out (IReadOnlyList<BrowserItem> Candidates, IReadOnlyList<RefusedMatch> Refused) read)
     {
-        var waiting = _lifetime.Waiting;
-        var origin = lookup.Page.ToString();
+        read = ([], []);
 
-        if (Match(lookup, out var read) is { } unread)
-        {
-            return Refuse(browser, pairing.Id, unread.Method, unread.Reason, origin);
-        }
+        return _lifetime.IsLive
+            && Match(lookup, out read) is null
+            && (read.Candidates.Any(item => IsItem(item, uuid)) || read.Refused.Any(refused => IsItem(refused.Item, uuid)));
+    }
+
+    /// <summary>
+    /// Releases one of this vault's logins at the person's pick in the page's list, from the match <see cref="Holds"/> read after
+    /// <paramref name="waiting"/>; reading the login by its UUID checks the file again before it is released.
+    /// </summary>
+    private BrowserFillReply ReleaseOwn(
+        LoginLookup lookup,
+        (IReadOnlyList<BrowserItem> Candidates, IReadOnlyList<RefusedMatch> Refused) read,
+        BrowserReleaseRequest request,
+        BrowserPairing pairing,
+        BrowserIdentity browser,
+        CancellationToken waiting)
+    {
+        var origin = lookup.Page.ToString();
 
         if (read.Candidates.FirstOrDefault(candidate => IsItem(candidate, request.Uuid)) is not { } item)
         {

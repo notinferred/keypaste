@@ -8,7 +8,7 @@
     <AssemblyName>keypaste-app</AssemblyName>
 
     <!-- The Windows package is the Windows target, which reaches Windows Hello through the Windows SDK's
-         WinRT projection; Linux and macOS are the plain one (D-0549). Targeting is enabled so every
+         WinRT projection; Linux and macOS are the plain one. Targeting is enabled so every
          machine builds both. -->
     <TargetFramework></TargetFramework>
     <TargetFrameworks>net10.0;net10.0-windows10.0.19041.0</TargetFrameworks>
@@ -18,14 +18,14 @@
       Compiled bindings are not a style preference. They are Avalonia's stated prerequisite for
       NativeAOT, and they turn a mistyped binding path into a build error rather than a silently
       blank label — which is the failure mode a repository building with TreatWarningsAsErrors
-      should least tolerate. Setting it now costs nothing and keeps the AOT door open (D-0044).
+      should least tolerate. It costs nothing and keeps NativeAOT possible for the app.
     -->
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
     <MvvmToolkitEnableINotifyPropertyChangingSupport>false</MvvmToolkitEnableINotifyPropertyChangingSupport>
 
     <!--
-      Declared in the plural, and never passed as `-r` to restore, for the reason D-0040 gives: a
+      Declared in the plural, and never passed as `-r` to restore, because a
       RID on the restore command line narrows the project's set to one, which can never match a lock
       file recording four, and locked mode then fails NU1004. Restore the solution whole, publish
       per RID with no restore. app.yml publishes three of these; the fourth is here so the set
@@ -34,15 +34,13 @@
     <RuntimeIdentifiers>linux-x64;linux-arm64;osx-arm64;win-x64</RuntimeIdentifiers>
 
     <!--
-      Deliberately NOT set in 4.1: PublishAot, IlcTreatWarningsAsErrors and
-      ILLinkTreatWarningsAsErrors. The app ships no release artifact in this stage, AOT's failure
-      mode is a runtime NotSupportedException rather than a build error, and turning it on before
-      the shell is proven would make every Avalonia problem look like an AOT problem. The
-      repo-wide IsAotCompatible in Directory.Build.props still runs the analyzers over this
-      project's own code, which is the part worth gating today.
+      Deliberately not set: PublishAot, IlcTreatWarningsAsErrors and ILLinkTreatWarningsAsErrors.
+      AOT's failure mode is a runtime NotSupportedException rather than a build error, and it would
+      make every Avalonia problem look like an AOT problem. The repo-wide IsAotCompatible in
+      Directory.Build.props still runs the analyzers over this project's own code.
     -->
 
-    <!-- The one project with a real culture; everything else stays invariant under Directory.Build.props (Q.16). Globalization/IcuFallback.cs covers a Linux machine with no ICU. -->
+    <!-- The one project with a real culture; everything else stays invariant under Directory.Build.props. Globalization/IcuFallback.cs covers a Linux machine with no ICU. -->
     <InvariantGlobalization>false</InvariantGlobalization>
 
     <NoWarn>$(NoWarn);CS1591</NoWarn>
@@ -59,7 +57,7 @@
     <EmbeddedResource Include="Terms/terms-of-use.txt" LogicalName="Keypaste.App.Terms.terms-of-use.txt" />
   </ItemGroup>
 
-  <!-- Only app.yml's packages name where crash reports go; a source build sends none (D-0598). -->
+  <!-- Only app.yml's packages name where crash reports go; a source build sends none. -->
   <ItemGroup Condition="'$(KeypasteCrashEndpoint)' != ''">
     <AssemblyMetadata Include="KeypasteCrashEndpoint" Value="$(KeypasteCrashEndpoint)" />
   </ItemGroup>

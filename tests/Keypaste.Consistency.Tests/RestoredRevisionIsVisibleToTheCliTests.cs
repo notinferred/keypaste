@@ -13,7 +13,7 @@ namespace Keypaste.Consistency.Tests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// V.2b's claim is not that <c>RestoreRevision</c> works — <c>VaultHistoryTests</c> establishes
+/// The claim here is not that <c>RestoreRevision</c> works — <c>VaultHistoryTests</c> establishes
 /// that — but that the button on the pane reaches it, saves, and leaves a vault the shipped reader
 /// agrees about. Only a test holding both front ends can ask that: the restore is a GUI action and
 /// <c>keypaste get --reveal</c> is the reader.

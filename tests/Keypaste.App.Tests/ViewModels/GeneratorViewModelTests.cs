@@ -8,7 +8,7 @@ namespace Keypaste.App.Tests.ViewModels;
 /// The generator choice both new-secret forms share.
 /// </summary>
 /// <remarks>
-/// V.6 asks that the list's provenance, its size and the entropy per word be readable where
+/// The list's provenance, its size and the entropy per word must be readable where
 /// somebody chooses a count. On a screen that means two lines beside the control, and it means
 /// they move when the count moves — a figure that only updates on reopen is a figure somebody
 /// chose against.

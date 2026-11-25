@@ -5,7 +5,7 @@ using Xunit;
 namespace Keypaste.Processes.Tests;
 
 /// <summary>
-/// The app asks in its own prompt window (4.4), across real processes: a built keypaste mcp's request raises the prompt
+/// The app asks in its own prompt window, across real processes: a built keypaste mcp's request raises the prompt
 /// tests/Keypaste.AppDriver draws on a headless display and clicks, and a terminal's keypaste set or rm is asked about there.
 /// </summary>
 /// <remarks>

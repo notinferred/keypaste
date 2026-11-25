@@ -9,7 +9,7 @@ namespace Keypaste.Mcp.Tests;
 
 /// <summary>
 /// What a second tool call gets while the first one is still in front of a person: a lane of its own to the owner, whose
-/// queue it waits in (F.80), until every lane this bridge may open is busy, when the next comes back busy at once.
+/// queue it waits in, until every lane this bridge may open is busy, when the next comes back busy at once.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -18,7 +18,7 @@ namespace Keypaste.Mcp.Tests;
 /// what the bridge does with a second call.
 /// </para>
 /// <para>
-/// The cancellation and disconnection halves of F.3b are in <c>ApproverConnectionTests</c>
+/// Cancellation and disconnection are tested in <c>ApproverConnectionTests</c>
 /// instead: the SDK client does not carry its own cancellation through to the server's token, so
 /// driving them from this end would test nothing. <c>OneLinePerRequestTests</c> sends the
 /// cancellation notification itself.

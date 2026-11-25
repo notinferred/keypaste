@@ -76,7 +76,6 @@ internal sealed record ProjectRow(string Name, int Count)
     /// <summary>The row's name for a screen reader.</summary>
     internal string Title => Name;
 
-    /// <summary>The row's automation id.</summary>
     internal string AutomationId => $"Project:{Name}";
 
     /// <summary>The row's name for a screen reader, which reads a list item by its content's text.</summary>

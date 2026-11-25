@@ -11,8 +11,9 @@ namespace Keypaste.App.Tests;
 /// <see cref="HeadlessSession.On(Action)"/> was the only overload, and an <c>async</c> lambda binds
 /// to it as <c>async void</c>: the returned task completes at the body's first <c>await</c>, so
 /// every assertion after that point runs outside the lifetime xunit observes. Four tests in
-/// <c>MaskedInputAutomationTests</c> were written that way, two of them D-0099 differentials, and
-/// they had been reported green without their assertions ever being watched (task F.16).
+/// <c>MaskedInputAutomationTests</c> were written that way, two of them differentials proving a masked field
+/// publishes only its length, and
+/// they had been reported green without their assertions ever being watched.
 /// </para>
 /// <para>
 /// <b>Two shapes were tried and rejected before this one, because a regression that does not

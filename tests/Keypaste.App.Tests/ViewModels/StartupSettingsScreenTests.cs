@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
 
-/// <summary>Settings › Startup: staying in the menu bar or tray, and opening at login (G.4a).</summary>
+/// <summary>Settings › Startup: staying in the menu bar or tray, and opening at login.</summary>
 public sealed class StartupSettingsScreenTests
 {
     [Fact]
@@ -76,6 +76,22 @@ public sealed class StartupSettingsScreenTests
     }
 
     [Fact]
+    public void A_copy_in_a_temporary_location_stays_off_and_says_to_move_it_to_Applications()
+    {
+        using var fixture = new TempVault();
+        using var session = new AppVaultSession(new ManualClock());
+        using var screen = new SettingsViewModel(session, fixture.Home, new DesktopPreferences(fixture.Home), _ => { })
+        {
+            Login = new FakeLoginItem { RunsFromTemporaryLocation = true },
+        };
+
+        screen.OpenAtLogin = true;
+
+        Assert.False(screen.OpenAtLogin);
+        Assert.Contains("Move keypaste to Applications", screen.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void With_no_login_mechanism_the_row_is_not_offered()
     {
         using var fixture = new TempVault();
@@ -91,12 +107,14 @@ public sealed class StartupSettingsScreenTests
     {
         internal bool Refuses { get; init; }
 
+        public bool RunsFromTemporaryLocation { get; init; }
+
         public bool IsEnabled { get; private set; }
 
         public bool Enable()
         {
-            IsEnabled = !Refuses;
-            return !Refuses;
+            IsEnabled = !Refuses && !RunsFromTemporaryLocation;
+            return IsEnabled;
         }
 
         public bool Disable()

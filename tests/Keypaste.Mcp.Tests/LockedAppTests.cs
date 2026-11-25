@@ -1,3 +1,4 @@
+using System.IO.Pipes;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Keypaste.Core.Audit;
@@ -19,7 +20,6 @@ public sealed class LockedAppTests
     private const string _nobody = "no keypaste process holds the vault unlocked";
 
     private static readonly TimeSpan _wait = TimeSpan.FromSeconds(10);
-    private static readonly TimeSpan _quiet = TimeSpan.FromSeconds(1);
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -64,6 +64,48 @@ public sealed class LockedAppTests
         results.Add(await client.CallToolAsync(ToolText.ListToolName, cancellationToken: Token));
 
         return results;
+    }
+
+    /// <summary>How many knocks besides two of the test's own the app on <paramref name="endpoint"/> has heard, taking each from <paramref name="heard"/> so none is counted twice.</summary>
+    /// <remarks>
+    /// The app hears a knock before it hangs up on it, so the test's own are always counted. The app answers knocks in the
+    /// order its pipe instances were made, and a knock made after one of the test's has been answered waits on a later
+    /// instance than any knock before it, so every earlier knock is counted.
+    /// </remarks>
+    private static async Task<int> KnocksHeardAsync(string endpoint, SemaphoreSlim heard)
+    {
+        await KnockAsync(endpoint);
+        await KnockAsync(endpoint);
+        var knocks = 0;
+
+        while (await heard.WaitAsync(0, Token))
+        {
+            knocks++;
+        }
+
+        // Without the two knocks the test made itself.
+        return knocks - 2;
+    }
+
+    /// <summary>Knocks on <paramref name="endpoint"/> and waits for the app to hang up.</summary>
+    private static async Task KnockAsync(string endpoint)
+    {
+        await using (var pipe = new NamedPipeClientStream(".", endpoint, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly))
+        {
+            await pipe.ConnectAsync(_wait, Token);
+            var discarded = new byte[1];
+
+            try
+            {
+                while (await pipe.ReadAsync(discarded, Token) > 0)
+                {
+                }
+            }
+            catch (IOException)
+            {
+                // A broken pipe is the app hanging up too.
+            }
+        }
     }
 
     [Fact]
@@ -112,7 +154,8 @@ public sealed class LockedAppTests
         Assert.Single(approver.Received);
         Assert.Equal(1, approver.Runs);
         Assert.DoesNotContain(results, result => TextOf(result).Contains("keypaste app is open", StringComparison.Ordinal));
-        Assert.False(await heard.WaitAsync(_quiet, Token), "an owner's answer told the locked app");
+
+        Assert.True(await KnocksHeardAsync(harness.LockedAppName!, heard) == 0, "an owner's answer told the locked app");
     }
 
     [Fact]
@@ -130,6 +173,7 @@ public sealed class LockedAppTests
 
         Assert.NotEqual(harness.LockedAppName, another);
         Assert.Equal([ToolText.NoApprover, ToolText.NoApprover, ToolText.NoApproverForListing], results.Select(TextOf));
-        Assert.False(await heard.WaitAsync(_quiet, Token), "a bridge told the app locked on another vault");
+
+        Assert.True(await KnocksHeardAsync(another, heard) == 0, "a bridge told the app locked on another vault");
     }
 }

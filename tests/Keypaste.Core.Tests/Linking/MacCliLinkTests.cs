@@ -7,7 +7,7 @@ namespace Keypaste.Core.Tests.Linking;
 
 /// <summary>
 /// The macOS link is made by a fixed program run as root behind the administrator dialog, every path an argument, and it
-/// replaces only what keypaste linked unless the person confirms (G.5).
+/// replaces only what keypaste linked unless the person confirms.
 /// </summary>
 public sealed class MacCliLinkTests : IDisposable
 {
@@ -59,13 +59,14 @@ public sealed class MacCliLinkTests : IDisposable
         Assert.Equal(administrator, arguments[3].EndsWith(" with administrator privileges", StringComparison.Ordinal));
     }
 
-    [Fact]
-    public void A_translocated_copy_is_refused_without_asking()
+    [Theory]
+    [InlineData("/private/var/folders/x/AppTranslocation/0A1B/d/keypaste.app/Contents/MacOS/keypaste")]
+    [InlineData("/Volumes/keypaste/keypaste.app/Contents/MacOS/keypaste")]
+    public void A_copy_translocated_or_on_a_disk_image_is_refused_without_asking(string target)
     {
         var runner = new Runner(Succeeds);
-        var link = For("/private/var/folders/x/AppTranslocation/0A1B/d/keypaste.app/Contents/MacOS/keypaste", runner);
+        var link = For(target, runner);
 
-        Assert.True(MacCliLink.IsTranslocated("/private/var/folders/x/AppTranslocation/0A1B/d/keypaste.app/Contents/MacOS/keypaste"));
         Assert.False(MacCliLink.IsTranslocated("/Applications/keypaste.app/Contents/MacOS/keypaste"));
         Assert.True(link.Read().Translocated);
         Assert.Equal(Refused(CliLinkRefusal.Translocated), link.Link());

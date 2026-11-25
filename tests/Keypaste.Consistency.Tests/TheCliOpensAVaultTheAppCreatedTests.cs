@@ -12,7 +12,7 @@ namespace Keypaste.Consistency.Tests;
 /// <remarks>
 /// <para>
 /// The inverse of <see cref="VaultFixture"/>, which seeds through the CLI and then asks the app.
-/// 4.8 makes the app a vault <i>creator</i> for the first time, and the claim that needs holding is
+/// The app is also a vault <i>creator</i>, and the claim that needs holding is
 /// the other direction: the file the Create button produces is an ordinary keypaste vault, not
 /// something only the app can read.
 /// </para>
@@ -36,7 +36,7 @@ public sealed class TheCliOpensAVaultTheAppCreatedTests : IDisposable
     private readonly AppVaultSession _session = new(TimeProvider.System);
     private readonly StubPicker _picker = new();
 
-    /// <summary>The app chooses the first vault it creates, and the CLI then opens it with no flag (G.1).</summary>
+    /// <summary>The app chooses the first vault it creates, and the CLI then opens it with no flag.</summary>
     [Fact]
     public async Task The_cli_uses_the_vault_the_app_chose_without_a_flag()
     {

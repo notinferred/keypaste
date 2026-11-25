@@ -187,17 +187,17 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.DoesNotContain(_prodValue, File.ReadAllText(path), StringComparison.Ordinal);
     }
 
-    /// <summary>The copied command asks the app holding the vault through <c>--session</c> (D-0453) and names the selected environment.</summary>
+    /// <summary>The copied command asks the app holding the vault through <c>--session</c>, names that vault and names the selected environment.</summary>
     [Fact]
     public void RunCommand_NamesTheProfile()
     {
         using var screen = new EnvSetsViewModel(_session, _countdown);
         var project = Open(screen);
 
-        Assert.Equal("keypaste run --session -p dev acme-api -- npm start", project.RunCommand);
+        Assert.Equal($"keypaste run --session {NamedVault} -p dev acme-api -- npm start", project.RunCommand);
 
         project.SelectedProfile = "prod";
-        Assert.Equal("keypaste run --session -p prod acme-api -- npm start", project.RunCommand);
+        Assert.Equal($"keypaste run --session {NamedVault} -p prod acme-api -- npm start", project.RunCommand);
         Assert.Equal("prod", project.Launch.Profile);
         Assert.Equal("prod", project.Import.Profile);
 
@@ -209,7 +209,7 @@ public sealed class EnvProfilesTests : IDisposable
                 [new ProjectMapping(Path.GetFullPath(_fixture.Path_), "acme-api", directory, "dotnet run")]));
 
             screen.OpenCommand.Press("acme-api");
-            Assert.Equal("keypaste run --session -p dev acme-api -- dotnet run", screen.OpenProject!.RunCommand);
+            Assert.Equal($"keypaste run --session {NamedVault} -p dev acme-api -- dotnet run", screen.OpenProject!.RunCommand);
         }
         finally
         {
@@ -217,27 +217,27 @@ public sealed class EnvProfilesTests : IDisposable
         }
     }
 
-    /// <summary>A project whose name starts with <c>-</c> is copied by <c>--project=</c>, which <c>keypaste run</c> takes whole on every platform, and any other name as the operand (D-0453).</summary>
+    /// <summary>A project whose name starts with <c>-</c> is copied by <c>--project=</c>, which <c>keypaste run</c> takes whole on every platform, and any other name as the operand.</summary>
     [Fact]
     public void RunCommand_NamesAProjectStartingWithADashByTheProjectOption()
     {
         using var screen = new EnvSetsViewModel(_session, _countdown);
 
         screen.OpenCommand.Press("-web");
-        Assert.Equal("keypaste run --session -p dev --project=-web -- npm start", screen.OpenProject!.RunCommand);
+        Assert.Equal($"keypaste run --session {NamedVault} -p dev --project=-web -- npm start", screen.OpenProject!.RunCommand);
 
         screen.OpenCommand.Press("acme-api");
-        Assert.Equal("keypaste run --session -p dev acme-api -- npm start", screen.OpenProject!.RunCommand);
+        Assert.Equal($"keypaste run --session {NamedVault} -p dev acme-api -- npm start", screen.OpenProject!.RunCommand);
 
-        Assert.Equal("keypaste run --session --project=--help -- ", EnvSetsViewModel.RunCommandFor("--help"));
-        Assert.Equal("keypaste run --session acme-api -- ", EnvSetsViewModel.RunCommandFor("acme-api"));
+        Assert.Equal($"keypaste run --session {NamedVault} --project=--help -- ", screen.RunCommandFor("--help"));
+        Assert.Equal($"keypaste run --session {NamedVault} acme-api -- ", screen.RunCommandFor("acme-api"));
     }
 
     /// <summary>
     /// A name holding anything but ASCII letters, digits, <c>_</c>, <c>.</c> and <c>-</c> is quoted so that every shell
     /// commonly used on the platform reads it alike: on macOS and Linux in single quotes, each run of single quotes,
     /// typographic ones included, alone in double quotes, and on Windows in double quotes, unless the name holds a
-    /// character one of Windows' shells reads inside them, when there is no line (D-0453).
+    /// character one of Windows' shells reads inside them, when there is no line.
     /// </summary>
     [Theory]
     [InlineData("acme-api", "acme-api", "acme-api")]
@@ -264,19 +264,53 @@ public sealed class EnvProfilesTests : IDisposable
     [InlineData("it's $(id)", "--project='it'\"'\"'s $(id)'", null)]
     public void ACopiedRunCommand_QuotesTheNameForEachPlatformsShells_OrHasNone(string project, string posix, string? windows)
     {
+        const string posixVault = "/v/w.kdbx";
+        const string windowsVault = @"C:\v\w.kdbx";
+
         Assert.True(CopiedRunCommand.IsCopyable(project, windows: false));
-        Assert.Equal($"keypaste run --session -p dev {posix} -- npm start", CopiedRunCommand.For(project, "dev", "npm start", windows: false));
-        Assert.Equal($"keypaste run --session {posix} -- ", CopiedRunCommand.For(project, environment: null, command: string.Empty, windows: false));
+        Assert.Equal($"keypaste run --session --vault '{posixVault}' -p dev {posix} -- npm start", CopiedRunCommand.For(posixVault, project, "dev", "npm start", windows: false));
+        Assert.Equal($"keypaste run --session --vault '{posixVault}' {posix} -- ", CopiedRunCommand.For(posixVault, project, environment: null, command: string.Empty, windows: false));
 
         Assert.Equal(windows is not null, CopiedRunCommand.IsCopyable(project, windows: true));
-        Assert.Equal(windows is null ? null : $"keypaste run --session -p dev {windows} -- npm start", CopiedRunCommand.For(project, "dev", "npm start", windows: true));
-        Assert.Equal(windows is null ? null : $"keypaste run --session {windows} -- ", CopiedRunCommand.For(project, environment: null, command: string.Empty, windows: true));
+        Assert.Equal(windows is null ? null : $"keypaste run --session --vault \"{windowsVault}\" -p dev {windows} -- npm start", CopiedRunCommand.For(windowsVault, project, "dev", "npm start", windows: true));
+        Assert.Equal(windows is null ? null : $"keypaste run --session --vault \"{windowsVault}\" {windows} -- ", CopiedRunCommand.For(windowsVault, project, environment: null, command: string.Empty, windows: true));
+    }
+
+    /// <summary>
+    /// The line names the vault it was copied from, so a run asks that vault's session and not the chosen vault's: on
+    /// macOS and Linux in single quotes, each run of single quotes alone in double quotes behind <c>--vault=</c>, and on
+    /// Windows in double quotes. A path one of the platform's shells would run or change however it is quoted, or one
+    /// holding a control character a terminal may act on as it is pasted, gets no line.
+    /// </summary>
+    [Theory]
+    [InlineData("/Users/dan/Work.kdbx", false, "--vault '/Users/dan/Work.kdbx'")]
+    [InlineData("/Users/dan/My Vaults/Work $(id) `id` 100% !x \"q\".kdbx", false, "--vault '/Users/dan/My Vaults/Work $(id) `id` 100% !x \"q\".kdbx'")]
+    [InlineData("/Users/dan/Dan's ‘x’/Work.kdbx", false, "--vault='/Users/dan/Dan'\"'\"'s '\"‘\"'x'\"’\"'/Work.kdbx'")]
+    [InlineData("/Users/dan/a\\b.kdbx", false, null)]
+    [InlineData("/Users/dan/a\\'b.kdbx", false, null)]
+    [InlineData("/Users/dan/a\nb.kdbx", false, null)]
+    [InlineData("/Users/dan/\u001b[201~; id\n.kdbx", false, null)]
+    [InlineData(@"C:\Users\Dan Ochoa\Work.kdbx", true, @"--vault ""C:\Users\Dan Ochoa\Work.kdbx""")]
+    [InlineData(@"C:\Users\Dan\Dan's (1) & co; ^x\Work.kdbx", true, @"--vault ""C:\Users\Dan\Dan's (1) & co; ^x\Work.kdbx""")]
+    [InlineData(@"C:\Users\Dan\100%\Work.kdbx", true, null)]
+    [InlineData(@"C:\Users\Dan\$HOME\Work.kdbx", true, null)]
+    [InlineData(@"C:\Users\Dan\`id`\Work.kdbx", true, null)]
+    [InlineData(@"C:\Users\Dan\Hey!\Work.kdbx", true, null)]
+    [InlineData(@"C:\Users\Dan\“x”\Work.kdbx", true, null)]
+    [InlineData(@"\\server\share\Work.kdbx", true, null)]
+    [InlineData(@"C:\Users\Dan\\Work.kdbx", true, null)]
+    [InlineData(@"C:\Users\Dan\", true, null)]
+    [InlineData("C:\\Users\\Dan\tWork.kdbx", true, null)]
+    public void ACopiedRunCommand_QuotesTheVaultForEachPlatformsShells_OrHasNone(string vault, bool windows, string? named)
+    {
+        Assert.Equal(named is not null, CopiedRunCommand.IsCopyableVault(vault, windows));
+        Assert.Equal(named is null ? null : $"keypaste run --session {named} -p dev acme-api -- npm start", CopiedRunCommand.For(vault, "acme-api", "dev", "npm start", windows));
     }
 
     /// <summary>
     /// The copied run command hands <c>keypaste</c> the project whole in every shell here it is for, whatever the name
     /// holds, and a project whose name one of them would run or change however it is quoted gets no command: the card
-    /// shows none and says why in its place (D-0453, T-1).
+    /// shows none and says why in its place (T-1).
     /// </summary>
     [Theory]
     [InlineData("acme-api")]
@@ -314,7 +348,7 @@ public sealed class EnvProfilesTests : IDisposable
             Assert.Null(card.RunCommand);
             Assert.Equal(CopiedRunCommand.NoCommandNote, card.RunCommandNote);
             Assert.False(card.CopyRunCommandCommand.CanExecute(null));
-            Assert.Null(EnvSetsViewModel.RunCommandFor(project));
+            Assert.Null(screen.RunCommandFor(project));
             return;
         }
 
@@ -324,8 +358,57 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.True(card.HasRunCommand);
         Assert.Empty(card.RunCommandNote);
         Assert.True(card.CopyRunCommandCommand.CanExecute(null));
-        Assert.Equal(["run", "--session", "-p", "dev", named, "--", "npm", "start"], Pasted(card.RunCommand!));
-        Assert.Equal(["run", "--session", named, "--", "npm", "start"], Pasted(EnvSetsViewModel.RunCommandFor(project) + "npm start"));
+        Assert.Equal(["run", "--session", "--vault", _fixture.Path_, "-p", "dev", named, "--", "npm", "start"], Pasted(card.RunCommand!));
+        Assert.Equal(["run", "--session", "--vault", _fixture.Path_, named, "--", "npm", "start"], Pasted(screen.RunCommandFor(project) + "npm start"));
+    }
+
+    /// <summary>
+    /// With a second vault open beside the chosen one, its project's copied line names the second vault, whatever its
+    /// path holds, and each shell here hands <c>keypaste</c> that path whole; a path one of them would run or change
+    /// however it is quoted gets no line, and the card says why in its place.
+    /// </summary>
+    [Theory]
+    [InlineData("Work")]
+    [InlineData("My Vaults")]
+    [InlineData("Dan's ‘work’ (1) & co; ^x ~#")]
+    [InlineData("it''s ‘’ ‚y‛ café ☕ 日本 –dash—")]
+    [InlineData("$HOME `id` $(id) ${x} @(1)")]
+    [InlineData("100% !x !!")]
+    public void ACopiedRunCommand_NamesItsOwnVaultWhole_WhenAnotherIsOpen(string folder)
+    {
+        var vault = Path.Combine(_fixture.Home, folder, "work.kdbx");
+        Directory.CreateDirectory(Path.GetDirectoryName(vault)!);
+        using (var created = ClaimedVault.Create(vault, TempVault.Password))
+        {
+            ProjectVariables.Set(created, "acme-api", "DATABASE_URL", "work-db");
+            created.Save();
+        }
+
+        using var work = new AppVaultSession(new ManualClock(AppClock.Start), home: _fixture.Home);
+        using (var master = TempVault.Secret(TempVault.Password))
+        {
+            Assert.Equal(UnlockOutcome.Opened, work.TryUnlock(vault, master.Value));
+        }
+
+        using var screen = new EnvSetsViewModel(work, _countdown);
+        var card = Open(screen);
+
+        if (!CopiedRunCommand.IsCopyableVault(vault, OperatingSystem.IsWindows()))
+        {
+            Assert.False(card.HasRunCommand);
+            Assert.Null(card.RunCommand);
+            Assert.Equal(CopiedRunCommand.NoCommandForVaultNote, card.RunCommandNote);
+            Assert.False(card.CopyRunCommandCommand.CanExecute(null));
+            Assert.Null(screen.RunCommandFor("acme-api"));
+            return;
+        }
+
+        string[] named = !OperatingSystem.IsWindows() && vault.Any(c => c is '\'' or '‘' or '’' or '‚' or '‛') ? ["--vault=" + vault] : ["--vault", vault];
+
+        Assert.True(card.HasRunCommand);
+        Assert.Empty(card.RunCommandNote);
+        Assert.Equal(["run", "--session", .. named, "-p", "dev", "acme-api", "--", "npm", "start"], Pasted(card.RunCommand!));
+        Assert.Equal(["run", "--session", .. named, "acme-api", "--", "npm", "start"], Pasted(screen.RunCommandFor("acme-api") + "npm start"));
     }
 
     [Fact]
@@ -658,7 +741,7 @@ public sealed class EnvProfilesTests : IDisposable
 
         Assert.False(project.Launch.IsSupported);
         Assert.True(project.StartRunCommand.CanExecute(null));
-        await project.StartRunCommand.ExecuteAsync(null);
+        await project.StartRunCommand.PressAsync();
 
         Assert.Equal(project.RunCommand, clipboard.Content);
         Assert.Contains(toasts, toast => toast.Contains("copied the run command", StringComparison.Ordinal));
@@ -836,6 +919,9 @@ public sealed class EnvProfilesTests : IDisposable
         vault.Save();
         return stripe;
     }
+
+    /// <summary>How the copied line names the fixture's vault, whose temporary path holds no quote.</summary>
+    private string NamedVault => OperatingSystem.IsWindows() ? $"--vault \"{_fixture.Path_}\"" : $"--vault '{_fixture.Path_}'";
 
     private static EnvProjectViewModel Open(EnvSetsViewModel screen)
     {

@@ -6,7 +6,7 @@ namespace Keypaste.App.ViewModels;
 
 /// <summary>
 /// Imports a <c>.env</c> into the open project: read and checked whole, previewed by name, and
-/// written only on Import (E.1b).
+/// written only on Import.
 /// </summary>
 /// <remarks>
 /// <para>

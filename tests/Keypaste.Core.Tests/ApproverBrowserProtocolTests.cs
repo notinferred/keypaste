@@ -21,14 +21,19 @@ public sealed class ApproverBrowserProtocolTests
         Assert.Null(decoded.Exposure);
     }
 
+    /// <summary>Each row is a browser's attachment, which decodes, with one defect.</summary>
     [Theory]
-    [InlineData("""{"v":2,"kind":"attach","vault":"/v.kdbx","browser":"browser@keypaste.com","client_name":"claude-code"}""")]
-    [InlineData("""{"v":2,"kind":"attach","vault":"/v.kdbx","browser":"browser@keypaste.com","client_label":"cursor"}""")]
-    [InlineData("""{"v":2,"kind":"attach","vault":"/v.kdbx","browser":"browser@keypaste.com","exposure":["**"]}""")]
-    [InlineData("""{"v":2,"kind":"attach","vault":"/v.kdbx","browser":""}""")]
-    [InlineData("""{"v":2,"kind":"attach","vault":"/v.kdbx","browser":"chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/"}""")]
-    public void An_attachment_that_names_a_browser_and_an_agent_or_a_browser_out_of_bounds_is_refused(string frame) =>
-        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out AttachRequest? _));
+    [InlineData("""{"kind":"attach","vault":"/v.kdbx","browser":"browser@keypaste.com","client_name":"claude-code"}""")]
+    [InlineData("""{"kind":"attach","vault":"/v.kdbx","browser":"browser@keypaste.com","client_label":"cursor"}""")]
+    [InlineData("""{"kind":"attach","vault":"/v.kdbx","browser":"browser@keypaste.com","exposure":["**"]}""")]
+    [InlineData("""{"kind":"attach","vault":"/v.kdbx","browser":""}""")]
+    [InlineData("""{"kind":"attach","vault":"/v.kdbx","browser":"chrome-extension://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/"}""")]
+    public void An_attachment_that_names_a_browser_and_an_agent_or_a_browser_out_of_bounds_is_refused(string frame)
+    {
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned("""{"kind":"attach","vault":"/v.kdbx","browser":"browser@keypaste.com"}"""), out AttachRequest? _));
+
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(frame), out AttachRequest? _));
+    }
 
     [Fact]
     public void An_attach_reply_carries_the_database_hash_it_was_given()
@@ -42,12 +47,20 @@ public sealed class ApproverBrowserProtocolTests
         Assert.Null(untold.DatabaseHash);
     }
 
+    /// <summary>Each row is an attachment carrying a hash, or a refusal carrying none, which decode, with one defect.</summary>
     [Theory]
-    [InlineData("""{"v":2,"kind":"attach","session":"s","reason":"","database_hash":"ABCDEF0000000000000000000000000000000000000000000000000000000000"}""")]
-    [InlineData("""{"v":2,"kind":"attach","session":"s","reason":"","database_hash":"abc"}""")]
-    [InlineData("""{"v":2,"kind":"attach","method":0,"reason":"locked","database_hash":"0000000000000000000000000000000000000000000000000000000000000000"}""")]
-    public void A_database_hash_that_is_not_a_lowercase_sha_256_or_beside_a_refusal_is_refused(string frame) =>
-        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out AttachReply? _));
+    [InlineData("""{"kind":"attach","session":"s","reason":"","database_hash":"ABCDEF0000000000000000000000000000000000000000000000000000000000"}""")]
+    [InlineData("""{"kind":"attach","session":"s","reason":"","database_hash":"abc"}""")]
+    [InlineData("""{"kind":"attach","method":0,"reason":"locked","database_hash":"abcdef0000000000000000000000000000000000000000000000000000000000"}""")]
+    public void A_database_hash_that_is_not_a_lowercase_sha_256_or_beside_a_refusal_is_refused(string frame)
+    {
+        Assert.True(ApproverProtocol.TryDecode(
+            ApproverFrame.Versioned("""{"kind":"attach","session":"s","reason":"","database_hash":"abcdef0000000000000000000000000000000000000000000000000000000000"}"""),
+            out AttachReply? _));
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned("""{"kind":"attach","method":0,"reason":"locked"}"""), out AttachReply? _));
+
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(frame), out AttachReply? _));
+    }
 
     [Fact]
     public void The_requests_round_trip_as_their_own_kinds()

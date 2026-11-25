@@ -43,7 +43,7 @@ public sealed class ShareServiceTests : IDisposable
         return joint;
     }
 
-    /// <summary>The rules a front end checks its flags against are the ones a request is refused by (F.55).</summary>
+    /// <summary>The rules a front end checks its flags against are the ones a request is refused by.</summary>
     [Fact]
     public void The_front_end_checks_are_the_requests_rules()
     {

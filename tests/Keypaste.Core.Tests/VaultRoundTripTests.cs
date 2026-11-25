@@ -3,7 +3,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// The Stage 0.2 secret-path tests: a vault keypaste writes must be a real KDBX4 container,
+/// The secret-path tests: a vault keypaste writes must be a real KDBX4 container,
 /// must give every field back unchanged when reopened, and must refuse a wrong password.
 /// CONTRIBUTING.md makes tests on this path mandatory; law 7 is what the wrong-password
 /// test enforces.
@@ -29,7 +29,7 @@ public sealed class VaultRoundTripTests : IDisposable
     }
 
     /// <summary>
-    /// The core promise of Stage 0.2: create, add, save, reopen, read back — with every field
+    /// The vault's core promise: create, add, save, reopen, read back — with every field
     /// identical, including a multi-line value and non-ASCII text.
     /// </summary>
     [Fact]

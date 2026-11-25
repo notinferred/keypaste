@@ -22,7 +22,7 @@ public sealed record SanitizedName(string Text, bool WasAltered);
 /// <para>
 /// Entry titles are attacker-reachable: anything with write access to the vault chooses them —
 /// KeePassXC, a colleague on a shared file, a synced copy. <c>keypaste env pull</c> is <b>not</b> one
-/// of them, though this paragraph used to say it was: <c>DotEnv</c> refuses any key outside
+/// of them: <c>DotEnv</c> refuses any key outside
 /// <c>EnvConvention.IsValidKey</c>, so an imported name is always
 /// <c>[A-Za-z_][A-Za-z0-9_]*</c>. What a hostile <c>.env</c> reaches is a terminal, through the
 /// message that quotes the rejected key back. When the MCP bridge lists titles, they land in a

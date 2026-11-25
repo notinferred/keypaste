@@ -9,7 +9,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// A project's environment is its tagged entries' variable fields, released whole or refused naming
-/// each cause and entry (C.1b); an untagged entry under <c>env/&lt;project&gt;</c> is none of them.
+/// each cause and entry; an untagged entry under <c>env/&lt;project&gt;</c> is none of them.
 /// </summary>
 public sealed class TaggedEnvResolutionTests : IDisposable
 {

@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# What a new terminal's keypaste is, for the desktop exercises and the macOS link check (G.5). The shell starts as
+# What a new terminal's keypaste is, for the desktop exercises and the macOS link check. The shell starts as
 # a new terminal would, never with this process's PATH: on Windows a PowerShell whose PATH is HKLM's then HKCU's,
 # as a new session composes it; on Linux a login bash from an empty environment whose PATH lacks ~/.local/bin, so
 # it finds keypaste only through the account's profile; on macOS a login zsh from an empty environment whose PATH

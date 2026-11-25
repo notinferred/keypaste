@@ -10,7 +10,7 @@ namespace Keypaste.App.ViewModels;
 /// <param name="Rows">Each item with it.</param>
 internal sealed record ReminderGroup(string Heading, string Reason, IReadOnlyList<ReminderRow> Rows);
 
-/// <summary>One item expiring soon or marked as needing an update, as Items › Recommendations lists it, with where to make a new one.</summary>
+/// <summary>One item expiring soon or marked as needing an update, as Security lists it, with where to make a new one.</summary>
 internal sealed class ReminderRow : IRecommendationRow
 {
     internal ReminderRow(RecommendationsViewModel owner, ItemReminder finding, bool isDismissed)

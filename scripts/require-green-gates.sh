@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # Refuses a commit whose gates have not gone green, and does it somewhere a fixture can reach.
 #
-# The decision lives here rather than in release.yml's guard for the reason F.4a paid for: a step
+# The decision lives here rather than in release.yml's guard because a step
 # body is only reachable by the event that runs it, and this one runs on `if: ref_type == 'tag'`.
-# A check that only a real tag can execute is a check nobody has watched fail. F.4a's destination
-# guard fell open for two releases exactly that way, and the repair was to move the
+# A check that only a real tag can execute is a check nobody has watched fail. The release destination
+# guard once fell open for two releases exactly that way, and the repair was to move the
 # decision into a script and drive it with a fake `aws`. This is the same move with a fake `gh`.
 #
 # WHAT IT DECIDES. release-targets.json advertises seven targets across two components, and three
 # of them are checked by app.yml alone. A guard that reads `ci` and not `app` lets a tag publish
 # while the desktop gate is red or never ran, which makes "every advertised target has a matching
-# check" false rather than incomplete (R.0a).
+# check" false rather than incomplete.
 #
 # WHICH WORKFLOWS ARE REQUIRED is read from the definition, not written out here: every component's
 # workflow except the release workflow itself, plus `ci`. Self-exclusion is the point - requiring a
@@ -35,7 +35,7 @@
 #
 # A TAG'S OWN RUN IS WAITED FOR, NOT READ EARLY. release.yml starts with the tag push, as app.yml's run at the
 # tag does, and asked at once the guard found that run still going and refused, so every tag needed a release
-# re-run (G.5). --wait polls the workflow's push runs at the ref until each has finished, and refuses when none
+# re-run. --wait polls the workflow's push runs at the ref until each has finished, and refuses when none
 # of them succeeded, when none appeared, or when one is still going after the last poll; the guard calls it
 # before either question below.
 #
@@ -46,7 +46,7 @@
 #
 # --run-id answers a second question off the same reply: WHICH run of a component's own workflow
 # built the commit being released, so release.yml can take that run's packages rather than rebuild
-# them (4.7c). It refuses unless exactly one successful run matches the workflow and the ref: two
+# them. It refuses unless exactly one successful run matches the workflow and the ref: two
 # green runs at one commit is an ambiguity a release must not settle by picking.
 #
 # Environment:

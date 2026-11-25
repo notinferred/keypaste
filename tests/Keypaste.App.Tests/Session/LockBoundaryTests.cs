@@ -11,7 +11,7 @@ namespace Keypaste.App.Tests.Session;
 
 /// <summary>
 /// Every kind of lock the app takes is the one transition that withdraws what an agent has waiting,
-/// zeroes its grants and refuses what has not been released, over the app's real endpoint (D-0313).
+/// zeroes its grants and refuses what has not been released, over the app's real endpoint.
 /// </summary>
 public sealed class LockBoundaryTests
 {

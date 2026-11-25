@@ -30,7 +30,7 @@ public static class AuditTools
     /// <summary>A browser's pairing granted, denied, refused or removed, and a pairing check refused.</summary>
     public const string Browser = "browser";
 
-    /// <summary>An agent's request that the person save a value it never receives (F.79).</summary>
+    /// <summary>An agent's request that the person save a value it never receives.</summary>
     public const string Save = "request_save";
 
     /// <summary>An agent's request that the person allow a change to an item, such as moving it to Trash.</summary>

@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Puts the AI tools keypaste connects on a hosted runner, each at a pinned version, for ci.yml's real-tools job
-# (G.2).
+# Puts the AI tools keypaste connects on a hosted runner, each at a pinned version, for ci.yml's real-tools job.
 #
 # One owner for every version and digest, as install-keepassxc.sh is for KeePassXC. Every
 # download goes through fetch-pinned-asset.sh against a SHA-256 kept below: the vendor's own where it publishes
@@ -9,13 +8,13 @@
 # carries, the digest of the file at its versioned URL when it was pinned. Codex and Gemini CLI come from npm
 # through scripts/real-tools, whose lock pins every package by integrity and whose install scripts never run.
 # No vendor's moving install script runs, and no tool's own setup step. On Linux, Ubuntu's bubblewrap is added for
-# Codex's sandbox, which verify-real-tools.sh drives as the safe-agent guide sets it (L.3).
+# Codex's sandbox, which verify-real-tools.sh drives as the safe-agent guide sets it.
 #
 # Logs go to stderr; each directory to put on PATH is a line on stdout, in the runner's own form.
 #
 # Usage: install-real-tools.sh [--claude-code-only] <dest-dir>
 #   --claude-code-only  only Claude Code, into <dest-dir>/bin, as its native installer puts it in ~/.local/bin; the
-#                       desktop acts connect it from the app (R.1a)
+#                       desktop acts connect it from the app
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -28,9 +27,9 @@ readonly PINS='
 claude-code    linux    https://downloads.claude.ai/claude-code-releases/2.1.296/linux-x64/claude                24972e3bc859fab2b46ed4c1e51f7d6130f06d3bd550811a114640de3370d0de
 claude-code    macos    https://downloads.claude.ai/claude-code-releases/2.1.296/darwin-arm64/claude             c9b5341637becbd423ddffc5b254afb645682a3868cb708bbc6cc0e7bb419937
 claude-code    windows  https://downloads.claude.ai/claude-code-releases/2.1.296/win32-x64/claude.exe            76de74f7694a5bdc03378a5f837c9e132827bf004c98c276bc4e9094ff06769a
-devin          linux    https://static.devin.ai/cli/3000.11.3/devin-3000.11.3-x86_64-unknown-linux.tar.gz         83b3b113c01bf2a3e9e100db08d77e6b086806a7754f091e20831bdfe215157e
-devin          macos    https://static.devin.ai/cli/3000.11.3/devin-3000.11.3-aarch64-apple-darwin.tar.gz         c08cc3f3507d103246b8c601a584fcc719fd77f6cc10f26cc90e9f4186640df2
-devin          windows  https://static.devin.ai/cli/3000.11.3/devin-3000.11.3-x86_64-pc-windows.zip              dded69a40dc54012612eda47e0935f2fb394b97cd38cb4d7d84b1e1d71c5f7ea
+devin          linux    https://static.devin.ai/cli/3000.14.30821/devin-3000.14.30821-x86_64-unknown-linux.tar.gz  4dc43e3e4388bace60fe2aa8010cbb399402e724892d7175845b1cdef00e7ddb
+devin          macos    https://static.devin.ai/cli/3000.14.30821/devin-3000.14.30821-aarch64-apple-darwin.tar.gz  46ef1a75d8bd851665179e136b7e39ad597d3d7913b95d67fd2b88e9c8af0061
+devin          windows  https://static.devin.ai/cli/3000.14.30821/devin-3000.14.30821-x86_64-pc-windows.zip       23e723a68f4bebe4c5f57f42e0f9d8b069c91407d62584afefa05e246c51cf4d
 vscode         linux    https://update.code.visualstudio.com/1.141.0/linux-deb-x64/stable                         d0ff4f7702957d897d2e06956f8d42a08250c5df8339de3bec8190e56f726277
 vscode         macos    https://update.code.visualstudio.com/1.141.0/darwin-arm64/stable                          9b4ae386e3cf738d7ba990237ddf0a18092c924a1bcae465ed4697964745f42d
 vscode         windows  https://update.code.visualstudio.com/1.141.0/win32-x64-user/stable                        e377a8e2e081a4b59dfd19514abdf4f35aa95aa697e217ad819a0fccff11c602

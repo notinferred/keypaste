@@ -13,7 +13,7 @@ namespace Keypaste.App.Tests.ViewModels;
 /// <summary>
 /// Agents lists what the app's session authority holds, the AI tools found on this computer with the agents
 /// that asked, and what the audit file says was answered since the unlock, over the app's real endpoint, and
-/// says so when any of it cannot be read. Nothing on it answers a request (D-0456).
+/// says so when any of it cannot be read. Nothing on it answers a request.
 /// </summary>
 public sealed class AgentActivityViewModelTests
 {

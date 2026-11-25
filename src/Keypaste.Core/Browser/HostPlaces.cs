@@ -91,7 +91,7 @@ public sealed record HostPlaces(
 
     /// <summary>
     /// The browser whose manifest <paramref name="browser"/> reads, else itself: Brave reads Chrome's, the key on Windows, having none
-    /// of its own, and the folder on macOS, as Brave 1.99 was seen to in 8.3a3. LibreWolf reads Firefox's everywhere: Mozilla's
+    /// of its own, and the folder on macOS, as Brave 1.99 was seen to. LibreWolf reads Firefox's everywhere: Mozilla's
     /// registry key on Windows, its only one, and Mozilla's folders after its own on macOS and Linux (LibreWolf's mozilla-dirs.patch).
     /// </summary>
     /// <param name="browser">The browser.</param>

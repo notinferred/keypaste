@@ -1,12 +1,12 @@
 name: dev
 
-# F.66: runs one verify.sh profile on one runner on a pushed branch, to retry a failure only that runner showed; scripts/dev.sh
+# Runs one verify.sh profile on one runner on a pushed branch, to retry a failure only that runner showed; scripts/dev.sh
 # dispatches it. It is never a release gate or integration evidence, so no dev run stands in for a full ci or app run.
 #
-# R.1a: acts mode installs an existing app.yml run's packages, at any commit, through install-desktop.yml and performs
-# the install exercise and R.1a's acts with this branch's scripts, to iterate on them without a new package build.
+# Acts mode installs an existing app.yml run's packages, at any commit, through install-desktop.yml and performs
+# the install exercise and the desktop acts (exercise-desktop-acts.sh) with this branch's scripts, to iterate on them without a new package build.
 #
-# 8.3a3: browsers mode fills logins in the runner's own branded browsers (verify-browser-fill.sh --branded), whose versions
+# Browsers mode fills logins in the runner's own branded browsers (verify-browser-fill.sh --branded), whose versions
 # change with the runner's image, so it is evidence for a record and never a gate.
 
 on:
@@ -136,7 +136,7 @@ jobs:
         shell: bash
         run: bash scripts/verify-browser-fill.sh --branded
 
-  # install-desktop.yml's install exercise and R.1a's acts on app_run's packages, with this branch's scripts (R.1a).
+  # install-desktop.yml's install exercise and the desktop acts on app_run's packages, with this branch's scripts.
   acts:
     name: acts
     if: inputs.mode == 'acts'

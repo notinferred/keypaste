@@ -10,7 +10,7 @@ public enum NoteKeyKind
     Token,
 }
 
-/// <summary>One key left in an entry's notes, named by entry and key, never by value (C.2).</summary>
+/// <summary>One key left in an entry's notes, named by entry and key, never by value.</summary>
 /// <remarks>
 /// It holds where the key is and which field it would become. The value stays in the notes; the
 /// move reads it again under the vault's lock, and only while the notes are still what

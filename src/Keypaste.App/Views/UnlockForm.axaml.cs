@@ -68,7 +68,7 @@ internal sealed partial class UnlockForm : UserControl
         };
     }
 
-    // Set, not bound, so the button is announced by one of the screen's literal labels (F.25).
+    // Set, not bound, so the button is announced by one of the screen's literal labels.
     private void LabelQuickUnlock()
     {
         var label = Model?.QuickUnlockLabel ?? Strings.UnlockWithWindowsHello;

@@ -13,10 +13,10 @@ namespace Keypaste.App.Clipboard;
 /// <remarks>
 /// <para>
 /// <b>The secret markers are the reason this is not a subprocess.</b> Windows Clipboard History and
-/// Cloud Clipboard keep a copy of everything copied, which clearing does not remove — O-0008. A
+/// Cloud Clipboard keep a copy of everything copied, which clearing does not remove. A
 /// clipboard owner can opt out by putting three well-known formats on the data object, and
 /// <c>clip.exe</c> has no way to express them, so <c>keypaste get</c> cannot. This can, and does,
-/// and on the same item asks macOS pasteboard managers and KDE's Klipper to keep no copy (O-0019).
+/// and on the same item asks macOS pasteboard managers and KDE's Klipper to keep no copy.
 /// </para>
 /// <para>
 /// <b>All of it in one <c>SetDataAsync</c>.</b> The history service acts on the notification
@@ -33,7 +33,7 @@ namespace Keypaste.App.Clipboard;
 /// <para>
 /// <b>This file is the only place a clipboard string enters this process.</b>
 /// Avalonia's clipboard has <c>TryGetTextAsync</c>, which is exactly the member
-/// <c>Keypaste.Cli.Clipboard.IClipboard</c> refused to declare (D-0011). Two callers need it and
+/// <c>Keypaste.Cli.Clipboard.IClipboard</c> refused to declare. Two callers need it and
 /// neither hands it on: <see cref="TryReadHashAsync"/>, where the auto-clear equality guard has no
 /// ownership API to use instead, hashes it at once; and <see cref="TryPasteIntoAsync"/>, where the
 /// characters go straight into the caller's buffer through <see cref="SecretInput.Accept"/>. Both
@@ -47,7 +47,7 @@ internal sealed class AvaloniaClipboard(TopLevel topLevel) : IAppClipboard
     /// <remarks>
     /// <para>
     /// The Windows names are the registered clipboard format names, spelled exactly. KeePassXC
-    /// shipped one of these with a trailing space for three releases (O-0008), which is the kind of
+    /// shipped one of these with a trailing space for three releases, which is the kind of
     /// defect no review catches in a string literal — <c>SecretMarkerTests</c> is why this
     /// one will not last three releases. Four zero bytes are the documented "no" for
     /// CanIncludeInClipboardHistory and CanUploadToCloudClipboard, a DWORD of zero; the

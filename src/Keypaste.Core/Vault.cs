@@ -538,10 +538,14 @@ public sealed class Vault : IDisposable
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     public EntryTimes? ReadTimes(EntryName name)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(name);
 
-        return _interop.ReadTimes(name);
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return _interop.ReadTimes(name);
+        }
     }
 
     /// <summary>The KDBX UUID of the entry called <paramref name="name"/>, as hex, or
@@ -549,10 +553,14 @@ public sealed class Vault : IDisposable
     /// <remarks>For showing where an entry sits in the file, as KeePassXC knows it.</remarks>
     public string? EntryUuid(EntryName name)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(name);
 
-        return _interop.EntryUuid(name);
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return _interop.EntryUuid(name);
+        }
     }
 
     /// <summary>Whether more than one live entry answers to this name, which a <c>kp://</c> reference to it would then find refused.</summary>
@@ -560,10 +568,14 @@ public sealed class Vault : IDisposable
     /// <returns>Whether the name is shared.</returns>
     public bool NameIsShared(EntryName name)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(name);
 
-        return _interop.NameIsShared(name);
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return _interop.NameIsShared(name);
+        }
     }
 
     /// <summary>The name a live item has now, found by the KDBX UUID a check such as Recommendations' carries.</summary>
@@ -571,15 +583,19 @@ public sealed class Vault : IDisposable
     /// <returns>The item's name now, a rename since the check having changed it, addressing that item alone; null when no item outside the recycle bin and keypaste's own groups has that UUID, or when two do, which a UUID then cannot tell apart.</returns>
     public EntryName? EntryNameOf(string entryUuid)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(entryUuid);
 
-        return _interop.EntryNameOf(entryUuid);
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return _interop.EntryNameOf(entryUuid);
+        }
     }
 
     /// <summary>How many deleted-object tombstones the vault carries.</summary>
     /// <remarks>
-    /// A test seam, for the reason <see cref="EntryUuid"/> gives. V-V.3a has to be able to say
+    /// A test seam, for the reason <see cref="EntryUuid"/> gives. A test has to be able to say
     /// that recycling writes no tombstone and purging writes one, and no keypaste surface prints
     /// them. The compatibility gate asks KeePassXC the same question about the saved file.
     /// </remarks>
@@ -999,10 +1015,14 @@ public sealed class Vault : IDisposable
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     public IReadOnlyList<EntryField>? Fields(EntryName name)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(name);
 
-        return _interop.ReadFields(name);
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return _interop.ReadFields(name);
+        }
     }
 
     /// <summary>One custom field's value.</summary>
@@ -1014,7 +1034,6 @@ public sealed class Vault : IDisposable
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     public string? ReadField(EntryName name, string field)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(field);
 
@@ -1023,7 +1042,12 @@ public sealed class Vault : IDisposable
             throw new ArgumentException($"'{field}' is a standard field, not a custom one.", nameof(field));
         }
 
-        return _interop.ReadCustomField(name, field);
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return _interop.ReadCustomField(name, field);
+        }
     }
 
     /// <summary>The item's TOTP, read in KeePassXC's order from its <c>TOTP Settings</c> and <c>TOTP Seed</c>, its <c>otp</c> field or KeePass 2's <c>TimeOtp-*</c> fields.</summary>
@@ -1036,14 +1060,18 @@ public sealed class Vault : IDisposable
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     public TotpSpec? ReadTotp(EntryName name, out string? refusal)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(name);
 
         refusal = null;
 
-        return _interop.ReadCustomFields(name, TotpSpec.IsSourceField) is { } fields
-            ? TotpSpec.Read(fields, out refusal)
-            : null;
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return _interop.ReadCustomFields(name, TotpSpec.IsSourceField) is { } fields
+                ? TotpSpec.Read(fields, out refusal)
+                : null;
+        }
     }
 
     /// <summary>
@@ -1095,10 +1123,14 @@ public sealed class Vault : IDisposable
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     public bool MayHoldTotp(EntryName name)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(name);
 
-        return _interop.MayHoldTotp(name);
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return _interop.MayHoldTotp(name);
+        }
     }
 
     /// <summary>
@@ -1495,11 +1527,15 @@ public sealed class Vault : IDisposable
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     internal IReadOnlyList<string>? FieldsNaming(EntryName name, string field)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(field);
 
-        return _interop.FieldsNaming(name, field);
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return _interop.FieldsNaming(name, field);
+        }
     }
 
     /// <summary>
@@ -1512,10 +1548,14 @@ public sealed class Vault : IDisposable
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     internal IReadOnlyList<KeyValuePair<string, PlantedPlaceholders>>? PlaceholdersHeld(EntryName name, int? revision = null)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(name);
 
-        return _interop.ReadPlantedPlaceholders(name, revision, EnvConvention.IsEnvNamedField);
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return _interop.ReadPlantedPlaceholders(name, revision, EnvConvention.IsEnvNamedField);
+        }
     }
 
     /// <summary>Moves keys found in notes into protected fields. Call <see cref="Save"/> to persist it.</summary>
@@ -1609,19 +1649,26 @@ public sealed class Vault : IDisposable
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     public IReadOnlyList<string>? Tags(EntryName name)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(name);
 
-        return _interop.ReadTags(name);
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return _interop.ReadTags(name);
+        }
     }
 
     /// <summary>Every entry outside the recycle bin that carries a tag of its own, with those tags.</summary>
     /// <returns>Each such entry depth-first; two entries sharing a name are both listed.</returns>
     public IReadOnlyList<EntryTags> ReadTags()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
 
-        return _interop.ReadTags();
+            return _interop.ReadTags();
+        }
     }
 
     /// <summary>Adds one tag to an entry as an edit with one history revision. Call <see cref="Save"/> to persist it.</summary>
@@ -1675,10 +1722,14 @@ public sealed class Vault : IDisposable
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     public IReadOnlyList<EntryRevision>? ReadHistory(EntryName name)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(name);
 
-        return _interop.ReadHistory(name);
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return _interop.ReadHistory(name);
+        }
     }
 
     /// <summary>Makes the revision at <paramref name="index"/> in <see cref="ReadHistory"/>'s order
@@ -1711,27 +1762,36 @@ public sealed class Vault : IDisposable
     /// <param name="includeReserved">Whether entries in <see cref="ReservedGroups"/> are read too, for keypaste's own record stores.</param>
     public IReadOnlyList<VaultEntry> ReadEntries(bool includeReserved = false)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
 
-        var entries = _interop.ReadEntries();
+            var entries = _interop.ReadEntries();
 
-        return includeReserved ? entries : [.. entries.Where(entry => !ReservedGroups.IsReserved(entry.GroupPath))];
+            return includeReserved ? entries : [.. entries.Where(entry => !ReservedGroups.IsReserved(entry.GroupPath))];
+        }
     }
 
     /// <summary>When each item outside the recycle bin and keypaste's own groups last changed, by its UUID as hex; no field is read.</summary>
     public IReadOnlyDictionary<string, DateTimeOffset> ReadModifiedTimes()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
 
-        return _interop.ReadModifiedTimes();
+            return _interop.ReadModifiedTimes();
+        }
     }
 
     /// <summary>Each distinct username an entry outside the recycle bin and keypaste's own groups holds, in ordinal order, for a username box to suggest; no other field is read.</summary>
     public IReadOnlyList<string> ReadUsernames()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
 
-        return _interop.ReadUsernames();
+            return _interop.ReadUsernames();
+        }
     }
 
     /// <summary>Every entry, keypaste's own records included, but only while this vault holds exactly what its file holds.</summary>
@@ -1776,12 +1836,19 @@ public sealed class Vault : IDisposable
         }
     }
 
-    /// <summary><see cref="ReadSaved(out IReadOnlyList{VaultEntry}?)"/>, with <see cref="ReadTombstoned"/> read from the same state.</summary>
-    /// <param name="entries">The entries when the answer is <see cref="SavedRead.Current"/>, otherwise null.</param>
+    /// <summary>
+    /// <see cref="ReadEntriesIn"/>, but only while this vault holds exactly what its file holds, the file compared and the
+    /// group read under one lock.
+    /// </summary>
+    /// <param name="groupPath">The reserved group, matched as <see cref="VaultEntry.GroupPath"/> joins it.</param>
+    /// <param name="entries">Its entries in traversal order when the answer is <see cref="SavedRead.Current"/>, otherwise null.</param>
     /// <param name="tombstoned">Under the same condition, the name of each of those entries whose UUID the vault also holds a tombstone for.</param>
     /// <returns>Whether the vault matches its file, and if not, why.</returns>
-    internal SavedRead ReadSavedWithTombstones(out IReadOnlyList<VaultEntry>? entries, out IReadOnlySet<EntryName>? tombstoned)
+    /// <exception cref="ArgumentException"><paramref name="groupPath"/> is not reserved.</exception>
+    internal SavedRead ReadSavedIn(string groupPath, out IReadOnlyList<VaultEntry>? entries, out IReadOnlySet<EntryName>? tombstoned)
     {
+        Reserved(groupPath);
+
         entries = null;
         tombstoned = null;
 
@@ -1795,21 +1862,30 @@ public sealed class Vault : IDisposable
                 return read;
             }
 
-            entries = _interop.ReadEntries();
-            tombstoned = _interop.ReadTombstoned();
+            entries = _interop.ReadEntriesIn(groupPath, out var found);
+            tombstoned = found;
             return SavedRead.Current;
         }
     }
 
-    /// <summary>The name of each entry <see cref="ReadEntries"/> returns whose UUID the vault also holds a tombstone for, as this vault holds it now, saved or not.</summary>
+    /// <summary>
+    /// Each entry <see cref="ReadEntries"/> returns from one of keypaste's own groups, as this vault holds it now, saved or not,
+    /// and the name of each of them whose UUID the vault also holds a tombstone for; no other entry's value is read.
+    /// </summary>
+    /// <param name="groupPath">The reserved group, matched as <see cref="VaultEntry.GroupPath"/> joins it.</param>
+    /// <param name="tombstoned">The name of each entry returned whose UUID the vault also holds a tombstone for.</param>
+    /// <returns>The entries in traversal order.</returns>
+    /// <exception cref="ArgumentException"><paramref name="groupPath"/> is not reserved.</exception>
     /// <remarks>KeePassXC's default merge applies no deletion, so a file it merged can hold an object beside its own tombstone.</remarks>
-    internal IReadOnlySet<EntryName> ReadTombstoned()
+    internal IReadOnlyList<VaultEntry> ReadEntriesIn(string groupPath, out IReadOnlySet<EntryName> tombstoned)
     {
+        Reserved(groupPath);
+
         lock (_state)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
-            return _interop.ReadTombstoned();
+            return _interop.ReadEntriesIn(groupPath, out tombstoned);
         }
     }
 
@@ -2106,8 +2182,6 @@ public sealed class Vault : IDisposable
         ArgumentNullException.ThrowIfNull(field);
         ArgumentNullException.ThrowIfNull(value);
 
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
         KeePassInterop.RecordSnapshot before;
         bool wasPending;
         bool written;
@@ -2116,6 +2190,8 @@ public sealed class Vault : IDisposable
         // Change<T>'s steps, with what it changes taken first under the same lock.
         lock (_state)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
             before = _interop.Snapshot(name, idOf);
             wasPending = _pending;
             written = _interop.WriteRecord(name, idOf, field, value);
@@ -2255,7 +2331,7 @@ public sealed class Vault : IDisposable
     /// <see cref="EntryName"/>, a <see cref="MatchedFields"/> and the tags matched, none of which is a
     /// value. The password and the notes are not compared at all: notes routinely hold recovery
     /// codes, connection strings and second passwords, so matching them would make a query a way to
-    /// confirm a secret without ever opening the entry that holds it (task V.5b).
+    /// confirm a secret without ever opening the entry that holds it.
     /// </para>
     /// <para>
     /// Here rather than in a front end because it is a rule about what may be read out of a vault,
@@ -2271,12 +2347,16 @@ public sealed class Vault : IDisposable
     /// <param name="includeReserved">Whether entries in <see cref="ReservedGroups"/> are found too.</param>
     public IReadOnlyList<EntryMatch> Search(string query, bool includeReserved = false)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(query);
 
-        var matches = _interop.Search(query.Trim());
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
 
-        return includeReserved ? matches : [.. matches.Where(match => !ReservedGroups.IsReserved(match.Name.GroupPath))];
+            var matches = _interop.Search(query.Trim());
+
+            return includeReserved ? matches : [.. matches.Where(match => !ReservedGroups.IsReserved(match.Name.GroupPath))];
+        }
     }
 
     /// <summary>Finds the one entry with this group path and title, or <see langword="null"/>.</summary>
@@ -2288,10 +2368,14 @@ public sealed class Vault : IDisposable
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     public VaultEntry? Find(EntryName name)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(name);
 
-        return _interop.FindEntry(name);
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return _interop.FindEntry(name);
+        }
     }
 
     /// <summary>Finds the one entry at <paramref name="entryPath"/>, for example
@@ -2304,10 +2388,14 @@ public sealed class Vault : IDisposable
     /// <exception cref="VaultException">More than one entry answers to that path.</exception>
     public VaultEntry? Find(string entryPath)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(entryPath);
 
-        return ResolveByPath(entryPath);
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return ResolveByPath(entryPath);
+        }
     }
 
     /// <summary>Every group path in the vault except the root and keypaste's own groups, slash-separated.</summary>
@@ -2318,11 +2406,14 @@ public sealed class Vault : IDisposable
     /// </remarks>
     public IReadOnlyList<string> ReadGroupPaths(bool includeReserved = false)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
 
-        var groups = _interop.ReadGroupPaths();
+            var groups = _interop.ReadGroupPaths();
 
-        return includeReserved ? groups : [.. groups.Where(group => !ReservedGroups.IsReserved(group))];
+            return includeReserved ? groups : [.. groups.Where(group => !ReservedGroups.IsReserved(group))];
+        }
     }
 
     /// <summary>Whether a master password is one of the factors this vault opens with.</summary>
@@ -2330,8 +2421,12 @@ public sealed class Vault : IDisposable
     {
         get
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-            return _interop.KeyHasPassword;
+            lock (_state)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+
+                return _interop.KeyHasPassword;
+            }
         }
     }
 
@@ -2340,8 +2435,12 @@ public sealed class Vault : IDisposable
     {
         get
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-            return _interop.KeyfilePath;
+            lock (_state)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+
+                return _interop.KeyfilePath;
+            }
         }
     }
 
@@ -2350,8 +2449,12 @@ public sealed class Vault : IDisposable
     {
         get
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-            return _interop.HardwareKey;
+            lock (_state)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+
+                return _interop.HardwareKey;
+            }
         }
     }
 
@@ -2360,8 +2463,12 @@ public sealed class Vault : IDisposable
     {
         get
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-            return _interop.KeyDerivation;
+            lock (_state)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+
+                return _interop.KeyDerivation;
+            }
         }
     }
 
@@ -2408,9 +2515,12 @@ public sealed class Vault : IDisposable
     {
         get
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            lock (_state)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
 
-            return _interop.RecyclesDeletedEntries;
+                return _interop.RecyclesDeletedEntries;
+            }
         }
     }
 
@@ -2482,10 +2592,17 @@ public sealed class Vault : IDisposable
     /// <exception cref="VaultException">More than one entry answers to that path.</exception>
     public DeletionOutcome RemoveEntry(string entryPath)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(entryPath);
 
-        return ResolveByPath(entryPath) is { } found
+        VaultEntry? found;
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            found = ResolveByPath(entryPath);
+        }
+
+        return found is not null
             ? RemoveEntry(EntryName.Of(found), out _)
             : DeletionOutcome.NothingMatched;
     }
@@ -2611,17 +2728,21 @@ public sealed class Vault : IDisposable
     /// <returns>The outcome of the refusal, <see cref="OrganizeOutcome.DestinationAmbiguous"/> where more than one entry answers to <paramref name="name"/>, which <see cref="Relocate"/> throws for; or null.</returns>
     public OrganizeOutcome? RelocationRefusal(EntryName name, EntryName target)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(target);
 
-        try
+        lock (_state)
         {
-            return _interop.RelocationRefusal(name, target);
-        }
-        catch (VaultException)
-        {
-            return OrganizeOutcome.DestinationAmbiguous;
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            try
+            {
+                return _interop.RelocationRefusal(name, target);
+            }
+            catch (VaultException)
+            {
+                return OrganizeOutcome.DestinationAmbiguous;
+            }
         }
     }
 
@@ -2836,7 +2957,7 @@ public sealed class Vault : IDisposable
 
     /// <summary>Every live entry in the group at this path or under it, keypaste's own included.</summary>
     private List<EntryName> Beneath(string groupPath) =>
-        [.. _interop.ReadEntries().Select(EntryName.Of).Where(entry => IsBeneath(entry.GroupPath, groupPath))];
+        [.. _interop.ReadListing().Select(listed => listed.Name).Where(entry => IsBeneath(entry.GroupPath, groupPath))];
 
     /// <summary>Copies groups of another vault into this one, all or none. Call <see cref="Save"/> to persist it.</summary>
     /// <param name="source">The vault copied from; <see cref="ImportSource.ApplyTo"/> has checked every destination.</param>
@@ -2858,14 +2979,22 @@ public sealed class Vault : IDisposable
             },
             names => edit = VaultEdit.Of(names));
 
-        var shared = _interop.Search(string.Empty)
-            .CountBy(match => match.Name)
-            .Where(pair => pair.Value > 1)
-            .Select(pair => pair.Key)
-            .ToHashSet();
+        HashSet<EntryName> shared;
+        int groupsAfter;
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            shared = _interop.Search(string.Empty)
+                .CountBy(match => match.Name)
+                .Where(pair => pair.Value > 1)
+                .Select(pair => pair.Key)
+                .ToHashSet();
+            groupsAfter = _interop.ReadGroupPaths().Count;
+        }
 
         return new ImportResult(
-            copied.Count, _interop.ReadGroupPaths().Count - groupsBefore, copied.Count(shared.Contains), edit);
+            copied.Count, groupsAfter - groupsBefore, copied.Count(shared.Contains), edit);
     }
 
     /// <summary>Adds the items an export import built, each whole, in one change with no history item of their own. Call <see cref="Save"/> to persist them.</summary>
@@ -2907,10 +3036,14 @@ public sealed class Vault : IDisposable
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     internal string? AgentThatCreated(EntryName name)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(name);
 
-        return _interop.AgentThatCreated(name);
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            return _interop.AgentThatCreated(name);
+        }
     }
 
     /// <summary>Sets an entry's expiry. A test seam; KeePassXC is what writes expiry.</summary>
@@ -2945,9 +3078,12 @@ public sealed class Vault : IDisposable
     /// </remarks>
     public IReadOnlyList<RecycledEntry> ReadRecycled()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
 
-        return _interop.ReadRecycled();
+            return _interop.ReadRecycled();
+        }
     }
 
     /// <summary>Puts a recycled entry back. Call <see cref="Save"/> to persist it.</summary>
@@ -2998,8 +3134,8 @@ public sealed class Vault : IDisposable
     /// a file that could not be read at all — see <see cref="SourceSnapshot.Digest"/>, and KeePassInterop.Save for
     /// the transient-failure absorption that depends on it.
     /// On Windows a file another process holds open for writing cannot be read, so a save racing a
-    /// concurrent writer narrowly is not detected here. <b>The retry is not what saves that case —
-    /// it used to be what lost it.</b> The replace fails, and a retry that merely outlasted the
+    /// concurrent writer narrowly is not detected here. <b>The retry is not what saves that case;
+    /// on its own it would lose it.</b> The replace fails, and a retry that merely outlasted the
     /// other writer would then revert it; what makes the race survivable is that
     /// <see cref="Internal.KeePassInterop.Save"/> asks this question again across every wait and
     /// immediately before each rename, leaving only a writer that commits between that last read
@@ -3396,33 +3532,21 @@ public sealed class Vault : IDisposable
     /// </summary>
     private VaultEntry? ResolveByPath(string entryPath)
     {
-        VaultEntry? found = null;
+        var found = _interop.ReadEntriesAt(entryPath);
 
-        foreach (VaultEntry entry in _interop.ReadEntries())
+        if (found.Count > 1)
         {
-            if (!string.Equals(entry.Path, entryPath, StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            if (found is not null)
-            {
-                throw new VaultException(
-                    $"'{entryPath}' names more than one item: a title containing a separator and " +
-                    "a group of that name produce the same path. Rename one of them in KeePassXC.");
-            }
-
-            found = entry;
+            throw new VaultException(
+                $"'{entryPath}' names more than one item: a title containing a separator and " +
+                "a group of that name produce the same path. Rename one of them in KeePassXC.");
         }
 
-        return found;
+        return found.Count == 0 ? null : found[0];
     }
 
-    /// <summary>
-    /// Saves, resolving a conflict from inside the retry wait rather than on a timer.
-    /// </summary>
+    /// <summary>Saves, resolving a conflict from inside the retry wait rather than on a timer.</summary>
     /// <remarks>
-    /// Exists so the regression for task F.7 can hold the vault's name, and then release
+    /// Exists so a test of a save racing another program's save can hold the vault's name, and then release
     /// or commit at the one instant that makes the outcome deterministic: after an attempt has been
     /// refused and before the vault is re-read. A timer cannot do it: which of a save's checks a
     /// commit at an unknown instant meets decides the outcome, and the test flakes.
@@ -3431,10 +3555,10 @@ public sealed class Vault : IDisposable
     /// Called instead of sleeping, so a test can act at the one deterministic instant.
     /// </param>
     /// <param name="attempts">
-    /// The retry budget. Defaults to the shipped one; V-F.6 pins it to 1, so a green run proves the
-    /// fix removed the contention rather than that the budget outlasted it. Reachable only through
+    /// The retry budget. Defaults to the shipped one; a test pins it to 1, so a green run proves the
+    /// contention is gone rather than that the budget outlasted it. Reachable only through
     /// <c>InternalsVisibleTo</c> — it is not a knob a consumer or a command line can turn, because
-    /// a smaller budget is strictly worse in production and a larger one hides what V-F.6 catches.
+    /// a smaller budget is strictly worse in production and a larger one hides the contention that test catches.
     /// </param>
     /// <param name="duringAttempt">
     /// Called inside each attempt, after the gate is taken and before it writes, so a test can hold
@@ -3621,13 +3745,13 @@ public sealed class Vault : IDisposable
     /// </remarks>
     private T Change<T>(Func<T> apply, Func<T, VaultEdit?> touched)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
         T outcome;
         VaultEdit? edit;
 
         lock (_state)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
             outcome = apply();
             edit = touched(outcome);
 
@@ -3717,10 +3841,10 @@ public sealed class Vault : IDisposable
     /// <summary>Every live entry's lost project memberships, for <see cref="LostProjectTagCheck"/>.</summary>
     internal IReadOnlyList<LostProjectTag> ReadLostProjectTags()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
         lock (_state)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
             return _interop.ReadLostProjectTags();
         }
     }
@@ -3728,10 +3852,10 @@ public sealed class Vault : IDisposable
     /// <summary>Every live entry with notes, for <see cref="NoteKeyCheck"/>.</summary>
     internal IReadOnlyList<EntryNotes> ReadNotes()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
         lock (_state)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
             return _interop.ReadNotes();
         }
     }
@@ -3739,10 +3863,10 @@ public sealed class Vault : IDisposable
     /// <summary>Every live entry's password rating and expiry outside keypaste's own groups, for <see cref="PasswordHealthCheck"/>.</summary>
     internal IReadOnlyList<EntryPasswordHealth> ReadPasswordHealth()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
         lock (_state)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
             return _interop.ReadPasswordHealth();
         }
     }
@@ -3750,10 +3874,10 @@ public sealed class Vault : IDisposable
     /// <summary>Every live entry's expiry, URL, kind and needs-update tag outside keypaste's own groups, for <see cref="ItemReminderCheck"/>.</summary>
     internal IReadOnlyList<EntryReminderFacts> ReadReminderFacts()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
         lock (_state)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
             return _interop.ReadReminderFacts();
         }
     }

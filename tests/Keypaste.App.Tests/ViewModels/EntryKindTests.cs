@@ -18,6 +18,18 @@ public sealed class EntryKindTests
         Assert.True(ItemPlaces.Holds(ItemPlace.All, kind));
     }
 
+    /// <summary>Every kind but an environment, which Environments lists by its project, is in exactly one place besides All items, so no item is counted twice or nowhere.</summary>
+    [Fact]
+    public void Each_kind_but_an_environment_is_in_one_place_besides_All_items()
+    {
+        foreach (var kind in Enum.GetValues<EntryKind>().Where(kind => kind != EntryKind.Environment))
+        {
+            Assert.Single(ItemPlaces.InOrder, place => place != ItemPlace.All && ItemPlaces.Holds(place, kind));
+        }
+
+        Assert.DoesNotContain(ItemPlaces.InOrder, place => place != ItemPlace.All && ItemPlaces.Holds(place, EntryKind.Environment));
+    }
+
     [Fact]
     public void A_login_a_project_holds_stays_a_login()
     {

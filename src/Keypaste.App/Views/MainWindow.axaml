@@ -30,18 +30,19 @@
             WindowDecorationProperties.ElementRole="TitleBar" />
 
     <!-- Windows and Linux have no menu bar, so the menus open from here, over the titlebar's empty first column
-         and the drag strip alike (Q.2); macOS draws its traffic lights where this would sit. -->
-    <Button Name="MenuButton"
-            Classes="icon ghost sm"
-            IsVisible="False"
-            HorizontalAlignment="Left"
-            VerticalAlignment="Top"
-            Margin="8,12,0,0"
-            ToolTip.Tip="{x:Static res:Strings.ShowTheMenu}"
-            AutomationProperties.Name="{x:Static res:Strings.Menu}"
-            WindowDecorationProperties.ElementRole="User">
-      <ctl:KpIcon Icon="menu" Size="16" />
-    </Button>
+         and the drag strip alike; macOS draws its traffic lights where this would sit. -->
+    <Panel Height="{x:Static views:WindowChrome.TitleBarHeight}" HorizontalAlignment="Left" VerticalAlignment="Top">
+      <Button Name="MenuButton"
+              Classes="icon ghost sm"
+              IsVisible="False"
+              VerticalAlignment="Center"
+              Margin="8,0,0,0"
+              ToolTip.Tip="{x:Static res:Strings.ShowTheMenu}"
+              AutomationProperties.Name="{x:Static res:Strings.Menu}"
+              WindowDecorationProperties.ElementRole="User">
+        <ctl:KpIcon Icon="menu" Size="16" />
+      </Button>
+    </Panel>
   </Panel>
 
 </Window>

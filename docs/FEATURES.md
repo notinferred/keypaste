@@ -28,7 +28,7 @@ The guides use the 1.0.0 names.
 | Key files: `--keyfile` or `KEYPASTE_KEYFILE`, all four KeePass forms | 1.0.0 | `init` takes none; a YubiKey vault is refused, pointing to the desktop |
 | `keypaste access`: change the master password, add, replace or remove a key file | 1.0.0 | Keeps the replaced file as a backup; never removes the password ([T-28]) |
 | Items: `add`, `ls`, `get` to a clipboard cleared after twenty seconds, `rm` | `v0.3.0` | |
-| Items: `search`, `show`, `rotate`, custom fields, `attachment` up to 5 MiB, `get <entry> totp` | 1.0.0 | Trash, groups and backups are the desktop's |
+| Items: `search`, `show`, `rotate`, custom fields, `attachment` up to 5 MiB, `get <entry> totp` | 1.0.0 | Trash and backups are the desktop's |
 | Passwords: `--generate`, `--length`, `--no-symbols`, `--no-lookalikes` | `v0.3.0` | |
 | Passphrases: `--words`, `--separator`, and `keypaste generate`, which stores nothing | 1.0.0 | EFF word list |
 | Projects: `env pull`, `set`, `ls`, `rm`, `export --dotenv`, and `run <project> -- <command>` | `v0.3.0` | `--dotenv` writes plaintext ([plaintext limits](../SECURITY.md#plaintext-and-file-limits)) |
@@ -39,7 +39,7 @@ The guides use the 1.0.0 names.
 | Edits while the vault is held go to its holder, which asks you | 1.0.0 | At most 64 KiB per request ([T-43]) |
 | `keypaste import` of a KDBX file or another manager's export | 1.0.0 | Not a YubiKey vault; the desktop's import can |
 | Share links: `keypaste share` uploads only ciphertext; links expire, count opens and can be revoked | 1.0.0 | [T-33] |
-| `keypaste lock`, `status`, `doctor` | 1.0.0 | |
+| `keypaste` alone (status), `lock`, `doctor` | 1.0.0 | |
 | Audit log: `log`, `log verify` | `v0.3.0` | 1.0.0 adds `--json`, `--expect <hash>` and `--checkpoints` ([T-5]) |
 
 ## MCP bridge and approvals
@@ -55,7 +55,7 @@ The guides use the 1.0.0 names.
 | Agent settings: each kind of value is Ask, Allow or Block, with per-agent rules; passkeys always blocked | 1.0.0 | Allow releases with nobody asked ([T-13], [T-14]) |
 | Exposure: `--expose` globs | `v0.3.0` | 1.0.0: `setup` and Connect register `--expose '**'` ([T-4]) |
 | Client setup: `keypaste setup` for Claude Code and Codex, printed configuration for Cursor and Claude Desktop | `v0.3.0` | |
-| Client setup for Gemini CLI, Devin, VS Code, Cursor and Claude Desktop; the desktop's Add an agent | 1.0.0 | On Windows, pnpm or yarn installs are refused; the macOS app opened from Finder misses Node version manager installs ([T-40]) |
+| Client setup for Gemini CLI, Devin, VS Code, Cursor and Claude Desktop; the desktop's Connect an AI tool… | 1.0.0 | On Windows, pnpm or yarn installs are refused; the macOS app opened from Finder misses Node version manager installs ([T-40]) |
 | One vault, one holder: a second desktop or `keypaste approve` is refused | 1.0.0 | `keypaste approve` has no idle lock; a KeePassXC save behind the holder stops agents until it merges ([T-29]) |
 | Audit log: every call in `~/.keypaste/audit.jsonl`, hash-chained, without the released value | `v0.3.0` | 1.0.0 summarizes lookups older than 30 days ([T-5]) |
 
@@ -78,7 +78,7 @@ Every row is 1.0.0. [The desktop guide](desktop.md) describes the app. Screens a
 | Lock: manual, idle (30 minutes by default), optionally on minimize | Delivered values stay delivered ([T-23]) |
 | Security: secrets in notes, dropped project tags, weak, reused or expiring passwords, weak key derivation, sync conflicts | YAML-style or multi-line values in notes are not found |
 | Environments: stages, masked variables, import, export, Run and Open terminal | Locking does not stop a started terminal ([T-23]) |
-| Agents: Add an agent, settings, kept answers, the waiting request, Activity | |
+| Agents: Connect an AI tool…, settings, kept answers, the waiting request, Activity | |
 | Prompt window, saying Verified when keypaste checked who asks | Verified never shown for a real AI tool ([T-3]) |
 | Share links and scoped tokens | |
 | Import from KeePass and other managers, with an editable plan | Not observed in an installed app |
@@ -139,7 +139,7 @@ These tests run against source; `v0.3.0` passed its own release's gate. This is 
 [T-37]: ../THREATS.md#t-37--a-yubikey-protects-a-copied-vault-not-an-unlocked-one-and-a-lost-key-locks-it
 [T-40]: ../THREATS.md#t-40--setup-edits-another-programs-configuration-file-and-starts-its-command
 [T-43]: ../THREATS.md#t-43--a-terminal-asks-the-owner-to-change-the-vault
-[T-44]: ../THREATS.md#t-44--windows-hello-stands-in-for-the-master-password-after-a-lock
+[T-44]: ../THREATS.md#t-44--quick-unlock-stands-in-for-the-master-password-after-a-lock
 [T-48]: ../THREATS.md#t-48--the-browser-relay-holds-released-passwords-in-plaintext-and-anything-can-start-it-or-ask-to-pair
 [T-51]: ../THREATS.md#t-51--a-notification-is-read-by-more-than-the-person
 [T-54]: ../THREATS.md#t-54--an-agent-asks-the-person-to-save-a-value

@@ -10,13 +10,13 @@ namespace Keypaste.Processes.Tests;
 
 /// <summary>
 /// A browser pairs once the person confirms the code its request carries, and fills the login the person picks in its list at
-/// once (8.3a2), across real processes: tests/Keypaste.FakeBrowser
+/// once, across real processes: tests/Keypaste.FakeBrowser
 /// starts the built keypaste as each browser starts KeePassXC-Browser's native messaging host and speaks the extension's protocol to it,
 /// and tests/Keypaste.AppDriver holds the vault, its pairing confirmation drawn and clicked.
 /// </summary>
 /// <remarks>
 /// Pairing's rules over a real pipe are Core.Tests' <c>SessionBrowsersTests</c>, and the relay's Browser.Tests' <c>RelayTests</c>.
-/// Settings' Turn on and Turn off (8.1e) are driven the same way, and the fake browser's <c>find</c> finds the host where each
+/// Settings' Turn on and Turn off are driven the same way, and the fake browser's <c>find</c> finds the host where each
 /// browser looks under a test's own folders and registry key, and starts it as that browser does.
 /// </remarks>
 public sealed class BrowserHostTests

@@ -118,9 +118,8 @@ public static class TerminalEdits
     {
         var path = TerminalEdit.PathOf(add.Name);
 
-        // An entry is its group and its title. Asking the joined form whether one exists said
-        // "already exists" about identities nothing had — a title of `b/c` in `a` refused a
-        // genuinely different `c` in `a/b` (task F.1e).
+        // An entry is its group and its title, so it is looked up by both: a title `b/c` in `a`
+        // is not the entry `c` in `a/b`.
         if (vault.Find(add.Name) is not null)
         {
             return Refused(EditRefusalKind.Invalid, $"'{path}' already exists");
@@ -533,8 +532,7 @@ public static class TerminalEdits
 
     private static EditResult ApplyRemove(Vault vault, RemoveItem remove)
     {
-        // Nothing removed means nothing to save. Something wrote to the file between the check and
-        // here, and the honest answer is that this run did not do it.
+        // Nothing removed means another writer changed the file after the check, so this run says it removed nothing.
         return vault.RemoveEntry(remove.Item) switch
         {
             DeletionOutcome.NothingMatched => Refuse(EditRefusalKind.NotFound, $"'{remove.Item}' was not removed; the vault is unchanged"),

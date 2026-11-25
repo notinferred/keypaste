@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Accepts a Windows file only when signtool's Authenticode policy accepts it, its chain ends at the
-# named root and it carries an RFC 3161 timestamp (task 3.6b).
+# named root and it carries an RFC 3161 timestamp.
 #
 # Usage:
 #   verify-windows-signature.sh <root-thumbprint> <file>...

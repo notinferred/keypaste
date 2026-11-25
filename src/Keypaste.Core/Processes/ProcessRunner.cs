@@ -21,8 +21,7 @@ public readonly record struct ProcessResult(
 /// Runs an external tool, writing text to its standard input.
 /// </summary>
 /// <remarks>
-/// A seam so the CLI's clipboard tools and each MCP client's own registration command can be
-/// unit-tested without spawning <c>clip.exe</c> or a real client.
+/// A seam so code that runs an external tool can be unit-tested without spawning it.
 /// </remarks>
 public interface IProcessRunner
 {
@@ -111,8 +110,8 @@ public sealed class SystemProcessRunner(IReadOnlyDictionary<string, string>? env
                 process.StandardInput.Write(stdin);
             }
 
-            // Closing stdin is not optional: clip.exe, pbcopy, wl-copy and xclip all read to
-            // EOF and will never exit without it.
+            // Closing stdin is not optional: pbcopy, wl-copy, xclip and xsel read to EOF and never
+            // exit without it.
             process.StandardInput.Close();
 
             if (!process.WaitForExit((int)timeout.TotalMilliseconds))

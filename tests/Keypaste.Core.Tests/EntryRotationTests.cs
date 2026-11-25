@@ -72,12 +72,10 @@ public sealed class EntryRotationTests : IDisposable
     [Fact]
     public void LastRotated_IsWhenTheCurrentPasswordWasSet()
     {
-        Thread.Sleep(1100);
         EntryRotation.Rotate(_vault, _name, SecretRecipe.Default);
         _vault.Save();
         var rotated = _vault.ReadTimes(_name)!.Modified;
 
-        Thread.Sleep(1100);
         _vault.UpdateEntry(_vault.Find(_name)! with { Username = "someone-else" });
         _vault.Save();
 

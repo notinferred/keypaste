@@ -14,6 +14,9 @@ public sealed class ApproverRunProtocolTests
 {
     private const string _sentinel = "sk_live_RUN_PROTOCOL_SENTINEL";
 
+    /// <summary>A refusal, left open for a member to be added.</summary>
+    private const string _refused = """{"kind":"run","project":"p","profile":"dev","outcome":7,"reason":"no","method":5,"entries":[],"problems":[]""";
+
     private static RunRequest SetRun() => new()
     {
         Program = OperatingSystem.IsWindows() ? @"C:\tools\npm.cmd" : "/usr/bin/npm",
@@ -99,34 +102,31 @@ public sealed class ApproverRunProtocolTests
     [Fact]
     public void AReplyWithVariablesOnARefusal_IsRejected()
     {
-        const string frame = """{"v":2,"kind":"run","project":"p","profile":"dev","outcome":7,"reason":"no","method":5,"entries":[],"problems":[],"variables":[{"key":"A","value":"leaked"}]}""";
-
-        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out RunReply? _));
+        Assert.True(Decodes(_refused + "}"));
+        Assert.False(Decodes(_refused + ""","variables":[{"key":"A","value":"leaked"}]}"""));
     }
 
     [Fact]
     public void FillsOnARefusalOrUnderAnotherVariable_AreRejected()
     {
-        const string released = """{"v":2,"kind":"run","project":"p","profile":"dev","outcome":0,"reason":"ok","method":5,"entries":[],"problems":[],"variables":[{"key":"A","value":"pre-x-post"}]""";
-        const string refused = """{"v":2,"kind":"run","project":"p","profile":"dev","outcome":7,"reason":"no","method":5,"entries":[],"problems":[]""";
+        const string released = """{"kind":"run","project":"p","profile":"dev","outcome":0,"reason":"ok","method":5,"entries":[],"problems":[],"variables":[{"key":"A","value":"pre-x-post"}]""";
 
         Assert.True(Decodes(released + "}"));
         Assert.True(Decodes(released + ""","fills":[{"key":"A","value":"x"}]}"""));
         Assert.False(Decodes(released + ""","fills":[{"key":"B","value":"x"}]}"""));
         Assert.False(Decodes(released + ""","fills":{"key":"A","value":"x"}}"""));
-        Assert.True(Decodes(refused + "}"));
-        Assert.False(Decodes(refused + ""","fills":[{"key":"A","value":"leaked"}]}"""));
-
-        static bool Decodes(string frame) => ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out RunReply? _);
+        Assert.True(Decodes(_refused + "}"));
+        Assert.False(Decodes(_refused + ""","fills":[{"key":"A","value":"leaked"}]}"""));
     }
 
     [Fact]
     public void AReplyWithAnUndefinedMethod_IsRejected()
     {
-        const string frame = """{"v":2,"kind":"run","project":"p","profile":"dev","outcome":7,"reason":"no","method":999,"entries":[],"problems":[]}""";
-
-        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out RunReply? _));
+        Assert.True(Decodes(_refused + "}"));
+        Assert.False(Decodes("""{"kind":"run","project":"p","profile":"dev","outcome":7,"reason":"no","method":999,"entries":[],"problems":[]}"""));
     }
+
+    private static bool Decodes(string frame) => ApproverProtocol.TryDecode(ApproverFrame.Versioned(frame), out RunReply? _);
 
     [Fact]
     public void OversizedFields_AreRejected()
@@ -177,7 +177,7 @@ public sealed class ApproverRunProtocolTests
         Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(sent), out AttachRequest? received));
         Assert.Equal(sent.Client, received.Client);
 
-        Assert.True(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes("""{"v":2,"kind":"attach","vault":"/v.kdbx"}"""), out AttachRequest? old));
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned("""{"kind":"attach","vault":"/v.kdbx"}"""), out AttachRequest? old));
         Assert.Null(old.Client);
     }
 

@@ -15,7 +15,7 @@ using Xunit;
 
 namespace Keypaste.App.Tests.Views;
 
-/// <summary>What a screen no longer says twice (Q.19 stage 2), each drawn in the real shell.</summary>
+/// <summary>Each fact a screen says once and not twice, each drawn in the real shell.</summary>
 public sealed class EachFactOnceTests
 {
     private const string _github = "github";

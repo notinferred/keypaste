@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-#
-# verify-run-signals.sh
-#
 # Proves that `keypaste run` relays SIGTERM to its child and reports the child's exit status,
 # rather than dying and orphaning it.
 #

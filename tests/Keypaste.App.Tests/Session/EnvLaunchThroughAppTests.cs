@@ -24,7 +24,7 @@ namespace Keypaste.App.Tests.Session;
 /// <summary>
 /// The Env Sets screen imports a <c>.env</c> and starts a project's command in a real terminal with
 /// its set in the child's environment, only after the person confirms it and only while the unlock
-/// that asked is live (E.1b, V-E.1b).
+/// that asked is live.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -34,11 +34,11 @@ namespace Keypaste.App.Tests.Session;
 /// what its own environment holds over a pipe, so nothing is taken from the view model's word.
 /// </para>
 /// <para>
-/// On macOS the set reaches the child through Terminal (E.1d): the app's real authority on its own
+/// On macOS the set reaches the child through Terminal: the app's real authority on its own
 /// endpoint, an assembled <c>keypaste.app</c> whose launcher is the real one and whose <c>keypaste</c>
 /// is the built CLI, and <see cref="TerminalStandIn"/> for <c>open</c>. The launcher reads the
 /// person's own request folder, so these tests run alone. On every platform the app's real authority
-/// writes each Run's History line, on Windows and Linux before the terminal starts (D-0496).
+/// writes each Run's History line, on Windows and Linux before the terminal starts.
 /// </para>
 /// </remarks>
 [Collection(nameof(TerminalRequestFolder))]
@@ -156,7 +156,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
     /// <remarks>
     /// The child outlives its terminal and, after the test hangs up, lingers longer than disposal
     /// retries the delete, so the project directory can be removed only once the test has waited for
-    /// the child itself (F.42).
+    /// the child itself.
     /// </remarks>
     [Fact]
     public async Task A_command_run_in_the_background_has_the_set_in_the_directory_after_its_terminal_returns()
@@ -394,7 +394,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
     /// <summary>
     /// A Run asks the app's own launch endpoint, so it starts and is recorded while agents cannot reach
     /// the vault: a <c>KEYPASTE_APPROVER</c> naming no pipe, or a vault's endpoint whose socket path
-    /// something else holds (D-0451).
+    /// something else holds.
     /// </summary>
     [Theory]
     [InlineData("names no pipe")]
@@ -473,7 +473,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         AssertNothingStarted();
     }
 
-    /// <summary>A Run of the longest command a mapping holds starts through Terminal, though its request's command line is longer than the owner's prompt shows: its pass holds it to the card (D-0452).</summary>
+    /// <summary>A Run of the longest command a mapping holds starts through Terminal, though its request's command line is longer than the owner's prompt shows: its pass holds it to the card.</summary>
     [Fact]
     [SupportedOSPlatform("macos")]
     public async Task On_macOS_the_longest_command_a_mapping_holds_runs_through_Terminal()
@@ -539,7 +539,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.DoesNotContain(report, line => line.Contains(_stagingKey, StringComparison.Ordinal));
     }
 
-    /// <summary>The window's <c>keypaste run</c> names the project by <c>--project=</c>, so a name starting with <c>-</c> runs through Terminal like any other and its History line names its items (D-0453).</summary>
+    /// <summary>The window's <c>keypaste run</c> names the project by <c>--project=</c>, so a name starting with <c>-</c> runs through Terminal like any other and its History line names its items.</summary>
     [Fact]
     [SupportedOSPlatform("macos")]
     public async Task On_macOS_a_project_whose_name_starts_with_a_dash_runs_through_Terminal_like_any_other()
@@ -576,7 +576,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.Equal(["env/--help/.env"], line.RootElement.GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()).Distinct());
     }
 
-    /// <summary>The request carries any path, so a project directory holding a line break and other control characters runs through Terminal as a launch on Linux does, the window's run starting in it with the set (D-0451).</summary>
+    /// <summary>The request carries any path, so a project directory holding a line break and other control characters runs through Terminal as a launch on Linux does, the window's run starting in it with the set.</summary>
     [Fact]
     [SupportedOSPlatform("macos")]
     public async Task On_macOS_a_directory_holding_a_line_break_runs_through_Terminal_like_any_other()
@@ -610,7 +610,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.True(File.Exists(Path.Combine(directory, "ran")), "the command did not run in the directory");
     }
 
-    /// <summary>A Run is recorded in one History line, which names each of thirty wide items, more than 2 KiB of names, on every platform (D-0454, D-0496).</summary>
+    /// <summary>A Run is recorded in one History line, which names each of thirty wide items, more than 2 KiB of names, on every platform.</summary>
     [Fact]
     public async Task A_set_from_thirty_wide_items_runs_and_its_History_line_names_every_one()
     {
@@ -644,7 +644,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
             line.RootElement.GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()!).Distinct().Order(StringComparer.Ordinal));
     }
 
-    /// <summary>A set whose items one History line could not name is refused unasked, before the card, on every platform, since every Run writes a line (D-0496).</summary>
+    /// <summary>A set whose items one History line could not name is refused unasked, before the card, on every platform, since every Run writes a line.</summary>
     [Fact]
     public async Task A_set_whose_items_one_History_line_could_not_name_is_refused_before_anyone_is_asked()
     {
@@ -715,7 +715,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.Null(_authority!.AuditFailure);
     }
 
-    /// <summary>The owner hands a set to Terminal's run in the one reply bounded past an ordinary frame, so a set of 200 KiB, a certificate bundle, runs through Terminal (D-0454).</summary>
+    /// <summary>The owner hands a set to Terminal's run in the one reply bounded past an ordinary frame, so a set of 200 KiB, a certificate bundle, runs through Terminal.</summary>
     [Fact]
     [SupportedOSPlatform("macos")]
     public async Task On_macOS_a_set_of_200_KiB_runs_through_Terminal()
@@ -1194,7 +1194,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         return JsonDocument.Parse(reader.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries)[^1]);
     }
 
-    /// <summary>Requires that the newest History line is the Run's release, as a macOS Run's window and a Windows or Linux Run each write it (D-0452, D-0496).</summary>
+    /// <summary>Requires that the newest History line is the Run's release, as a macOS Run's window and a Windows or Linux Run each write it.</summary>
     private void AssertRecorded(int variables, params string[] entries)
     {
         using var line = LastAuditLine();

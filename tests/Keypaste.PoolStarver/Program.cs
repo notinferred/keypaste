@@ -4,7 +4,7 @@ using Keypaste.Mcp.Tests;
 
 namespace Keypaste.PoolStarver;
 
-/// <summary>Runs one F.9 scenario in a pool of exactly two workers, and says what the product answered.</summary>
+/// <summary>Runs one thread-pool shortage scenario in a pool of exactly two workers, and says what the product answered.</summary>
 /// <remarks>
 /// <para>
 /// <b>Launched with its pool already pinned.</b> The parent sets

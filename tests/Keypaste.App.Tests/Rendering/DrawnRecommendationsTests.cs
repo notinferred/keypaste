@@ -9,7 +9,7 @@ using Xunit;
 namespace Keypaste.App.Tests.Rendering;
 
 /// <summary>
-/// V-C.2 and V.9 on screen: Security draws the keys left in each item's notes and each weak or reused
+/// Security on screen: it draws the keys left in each item's notes and each weak or reused
 /// password by item, and no frame or automation name carries a value.
 /// </summary>
 public sealed class DrawnRecommendationsTests

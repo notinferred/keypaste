@@ -11,7 +11,7 @@ using Xunit;
 namespace Keypaste.App.Tests.Session;
 
 /// <summary>
-/// Drives the app as launch composes it (D-0342): controls pressed where the window draws them and
+/// Drives the app as launch composes it: controls pressed where the window draws them and
 /// keys typed into it, so a control that is hidden, covered or unbound fails; no command is called.
 /// </summary>
 internal static class JourneyDriver

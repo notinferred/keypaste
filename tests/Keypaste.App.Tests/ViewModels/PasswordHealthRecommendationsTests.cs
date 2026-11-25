@@ -10,7 +10,7 @@ using Xunit;
 namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
-/// V.9 in the app: weak, reused and expired passwords are listed under Settings by item and never by
+/// Weak, reused and expired passwords are listed under Settings by item and never by
 /// value, counted quietly, checked against the session's clock, and a dismissal is remembered.
 /// </summary>
 public sealed class PasswordHealthRecommendationsTests : IDisposable

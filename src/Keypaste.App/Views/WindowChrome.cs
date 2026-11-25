@@ -3,12 +3,12 @@ using Avalonia;
 namespace Keypaste.App.Views;
 
 /// <summary>
-/// The app draws its own 52px title bar, Outlook's way, holding the idle countdown and the save state, and keeps the platform's caption
+/// The app draws its own 32px title bar, Outlook's way, holding the idle countdown and the save state, and keeps the platform's caption
 /// buttons: on the right on Windows and Linux, the traffic lights on the left on macOS.
 /// </summary>
 internal static class WindowChrome
 {
-    public const double TitleBarHeight = 52;
+    public const double TitleBarHeight = 32;
 
     /// <summary>The size the window opens at with nothing kept.</summary>
     public const double DefaultWidth = 1000;
@@ -28,10 +28,9 @@ internal static class WindowChrome
     /// <summary>Under this width the content is as tight as it is beside the rail: the log's table needs 744 to reach its Result, with a margin for a longer word.</summary>
     public const double ContentTightBelow = 768;
 
-    /// <summary>Where toasts sit: in the band of Items' list header and the open item's title, above its actions.</summary>
-    public static Thickness ToastMargin { get; } = new(20, TitleBarHeight + 52, 20, 20);
+    /// <summary>Where toasts sit: in the band of Items' list title and the open item's title, above the search and the item's actions.</summary>
+    public static Thickness ToastMargin { get; } = new(20, TitleBarHeight + 6, 20, 20);
 
-    /// <summary>The sidebar's width.</summary>
     public const double SidebarWidth = 240;
 
     /// <summary>The width of the rail of places, at every width.</summary>

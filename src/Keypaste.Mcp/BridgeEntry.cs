@@ -12,7 +12,7 @@ namespace Keypaste.Mcp;
 
 /// <summary>
 /// The MCP bridge, which <c>keypaste mcp</c> enters through <see cref="RunAsync"/> before any vault
-/// access: five tools, or six with <c>--allow-run</c>, over stdio, denying everything.
+/// access: seven tools, or eight with <c>--allow-run</c>, over stdio, denying everything.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -88,12 +88,36 @@ public static class BridgeEntry
     {
         using var inputEnded = new CancellationTokenSource();
 
-        // Nothing connects here. The vault's owner is reached on the first call that needs an answer,
-        // because a client spawns this server long before anybody unlocks the vault, and a bridge that
-        // refused to start would look broken in the client's log rather than saying so in an
-        // answer an agent can act on.
+        // Nothing connects here: a client spawns the bridge long before anybody unlocks the vault, so
+        // each owner is reached on the first call that needs it.
         await using var vaults = BridgeVaults.Connect(options, inputEnded.Token);
 
+        if (options.AllowRun)
+        {
+            // Every child of this process is a run's, so orphans a run leaves behind can be found.
+            CapturedLaunch.AdoptOrphans();
+        }
+
+        var serverOptions = McpOptionsFor(options, vaults, audit);
+
+        await using var transport = new StdioServerTransport(serverOptions, loggerFactory: null);
+        await using var server = McpServer.Create(transport, serverOptions, loggerFactory: null, serviceProvider: null);
+        vaults.Describe(() => McpAudit.AttachIdentity(server.ClientInfo, options), options.Exposure.Globs);
+
+        // The server waits for the calls in flight once the client closes standard input, so a call
+        // still waiting for the owner is withdrawn then, as one the client gives up on is.
+        _ = EndWithInputAsync(transport.MessageReader.Completion, inputEnded);
+
+        await server.RunAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>What the bridge tells an MCP client it is, and the whole set of tools it serves over <paramref name="vaults"/>.</summary>
+    /// <param name="options">How the bridge was started, which decides whether the run tool is served.</param>
+    /// <param name="vaults">The vaults every tool reaches.</param>
+    /// <param name="audit">Where each tool records the calls no owner recorded.</param>
+    /// <param name="listing">Where the listing tool reads entry names, when not from <paramref name="vaults"/>.</param>
+    internal static McpServerOptions McpOptionsFor(ServerOptions options, BridgeVaults vaults, AuditLog audit, BridgeVaults? listing = null)
+    {
         var serverOptions = new McpServerOptions
         {
             ServerInfo = new Implementation { Name = "keypaste", Version = CoreInfo.Version },
@@ -107,13 +131,13 @@ public static class BridgeEntry
         // Registered explicitly rather than by scanning the assembly: these are the whole
         // surface, and run another only when the person started this bridge with --allow-run, so
         // no existing configuration gains command execution on upgrade.
-        serverOptions.ToolCollection.Add(new ListEntryNamesTool(vaults, options, audit));
+        serverOptions.ToolCollection.Add(new ListEntryNamesTool(listing ?? vaults, options, audit));
         serverOptions.ToolCollection.Add(new FindAccessTool(vaults, options, audit));
         serverOptions.ToolCollection.Add(new RequestCredentialTool(options, vaults, audit));
         serverOptions.ToolCollection.Add(new RequestCredentialTool(options, vaults, audit, attachments: true));
         serverOptions.ToolCollection.Add(new RequestLinkedSetTool(options, vaults, audit));
 
-        // Offered to every agent: each save is the person's, who enters the value, and the agent never receives one (F.79).
+        // Offered to every agent: each save is the person's, who enters the value, and the agent never receives one.
         serverOptions.ToolCollection.Add(new SaveValueTool(options, vaults, audit));
 
         // Offered to every agent: each change is asked about every time and made only once the person allows it (T-57).
@@ -121,20 +145,10 @@ public static class BridgeEntry
 
         if (options.AllowRun)
         {
-            // Every child of this process is a run's, so orphans a run leaves behind can be found.
-            CapturedLaunch.AdoptOrphans();
             serverOptions.ToolCollection.Add(new RunTool(options, vaults, audit));
         }
 
-        await using var transport = new StdioServerTransport(serverOptions, loggerFactory: null);
-        await using var server = McpServer.Create(transport, serverOptions, loggerFactory: null, serviceProvider: null);
-        vaults.Describe(() => McpAudit.AttachIdentity(server.ClientInfo, options), options.Exposure.Globs);
-
-        // The server waits for the calls in flight once the client closes standard input, so a call
-        // still waiting for the owner is withdrawn then, as one the client gives up on is.
-        _ = EndWithInputAsync(transport.MessageReader.Completion, inputEnded);
-
-        await server.RunAsync().ConfigureAwait(false);
+        return serverOptions;
     }
 
     /// <summary>Cancels <paramref name="inputEnded"/> once the transport has handed over the last message the client sent.</summary>

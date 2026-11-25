@@ -6,7 +6,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// A Transactional NTFS transaction holding a move onto one name, so a save for that name meets the
-/// refusal task F.7 is about.
+/// refusal Windows gives a plain move onto a name a pending transaction reserves.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -75,8 +75,8 @@ internal sealed class HeldTransactedName : IDisposable
     /// Whether this machine actually refuses a plain move onto the held name.
     /// </summary>
     /// <remarks>
-    /// Task F.7 says the refusal stands on the Windows 10 floor this project advertises
-    /// and is unobserved on Server 2025. A runner where the move simply succeeds does not reproduce
+    /// The refusal is seen on Windows 10, the floor this project advertises, and not on Server
+    /// 2025. A runner where the move simply succeeds does not reproduce
     /// the defect, and a test there must say so rather than pass having exercised nothing.
     /// </remarks>
     internal static bool ReproducesTheRefusal(string held)

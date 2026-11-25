@@ -102,8 +102,8 @@ internal sealed record EntryNameListing(
 /// </summary>
 /// <remarks>
 /// <para>
-/// It yields <see cref="EntryName"/>, which holds a group path and a title and has no other members, and for a search
-/// <see cref="IndexedEntry"/>, which adds only an origin and a username. So no implementation — including the one that
+/// It yields <see cref="ListedEntry"/>, whose every member is a name, and for a search <see cref="IndexedEntry"/>, which
+/// adds only its kind, its web origin and, when Settings shows it, its username. So no implementation — including the one that
 /// reads a real unlocked vault — can return a password through the listing or search path even by mistake. That is a structural guarantee, not a promise (THREATS.md T-8).
 /// </para>
 /// <para>
@@ -130,16 +130,16 @@ internal interface IEntryNameSource
 /// <summary>Asks the process holding the vault which names may be shown.</summary>
 /// <remarks>
 /// <para>
-/// This is what closes THREATS.md T-7. The bridge still cannot unlock anything — its stdin and
-/// stdout <em>are</em> the protocol stream and Claude Desktop starts it with no terminal — so it
-/// asks the process that a human unlocked in their own terminal. The listing, exposure and
-/// sanitization code that used to be unreachable in the shipped binary is on the live path now.
+/// This is what closes THREATS.md T-7. The bridge cannot unlock anything — its stdin and stdout
+/// <em>are</em> the protocol stream and Claude Desktop starts it with no terminal — so it asks the
+/// process a person unlocked the vault in.
 /// </para>
 /// <para>
-/// <b>The separation of listing from release survives the move onto a socket.</b> What comes back over the
-/// wire is a group path and a title per entry and nothing else, decoded into <see cref="EntryName"/>
-/// — a type with two members and nowhere to put a secret. Sharing one pipe with the credential
-/// path does not fuse them; sharing an interface would have.
+/// <b>Listing stays separate from release over the pipe.</b> What comes back over the wire is names
+/// alone — each entry's group path, title, field names and tags, and for a search its kind, origin
+/// and username — decoded into <see cref="ListedEntry"/> and <see cref="IndexedEntry"/>, types with
+/// nowhere to put a secret. Sharing one pipe with the credential path does not fuse them; sharing
+/// an interface would.
 /// </para>
 /// </remarks>
 /// <param name="approver">The link to the vault's owner.</param>
@@ -199,8 +199,8 @@ internal sealed class ApproverEntryNameSource(ApproverConnection approver, Serve
         AttachReply? refusal,
         CancellationToken cancellationToken)
     {
-        // Sharing the pipe with the credential path means sharing its one-at-a-time rule, and
-        // refusing is the answer that does not queue. The refusals below say they are complete
+        // With every lane busy the listing is refused rather than queued, as a credential request
+        // is. The refusals below say they are complete
         // because each returns before anything is rendered: saying otherwise would attach "some names
         // are missing" to an answer that never claimed to have any.
         if (outcome == ApproverOutcome.Busy)

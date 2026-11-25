@@ -1,4 +1,5 @@
 using Keypaste.App.Session;
+using Keypaste.Core;
 using Keypaste.Core.Tests;
 using Xunit;
 
@@ -186,7 +187,7 @@ public sealed class AppVaultSessionTests
     }
 
     /// <summary>
-    /// F.13: activity that arrives before the window's re-check must not revive a session whose
+    /// Activity that arrives before the window's re-check must not revive a session whose
     /// deadline has already passed.
     /// </summary>
     [Fact]
@@ -411,6 +412,34 @@ public sealed class AppVaultSessionTests
         clock.Advance(TimeSpan.FromSeconds(1));
 
         Assert.False(session.IsUnlocked);
+    }
+
+    /// <summary>
+    /// What a reload would discard names each item once, in the order it was first changed, and a save forgets every name,
+    /// so an item changed again afterwards is named again.
+    /// </summary>
+    [Fact]
+    public void Unsaved_names_each_item_once_in_first_changed_order_until_a_save()
+    {
+        using var fixture = new TempVault();
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home);
+        Unlock(session, fixture.Path_, TempVault.Password);
+        var vault = session.Unlocked!;
+        Assert.False(session.HasUnsaved);
+
+        vault.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "FIRST", Password = "a" });
+        vault.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "SECOND", Password = "b" });
+        Assert.Equal(OrganizeOutcome.Renamed, vault.RenameEntry(new EntryName("env/app", "FIRST"), "THIRD", out _));
+
+        Assert.Equal([new EntryName("env/app", "FIRST"), new EntryName("env/app", "SECOND"), new EntryName("env/app", "THIRD")], session.Unsaved);
+        Assert.True(session.HasUnsaved);
+
+        vault.Save();
+        Assert.Empty(session.Unsaved);
+        Assert.False(session.HasUnsaved);
+
+        vault.AddEntry(new VaultEntry { GroupPath = "env/app", Title = "FIRST", Password = "c" });
+        Assert.Equal([new EntryName("env/app", "FIRST")], session.Unsaved);
     }
 
     /// <summary>Opens a vault the way a caller should: the buffer is owned, and it is disposed.</summary>

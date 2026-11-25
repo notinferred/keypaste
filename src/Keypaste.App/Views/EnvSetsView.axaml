@@ -37,7 +37,7 @@
       <Setter Property="Opacity" Value="1" />
     </Style>
 
-    <!-- Add variable and Set value are the accent as text, as the design draws them, and not links, so they keep the arrow (rule 15). -->
+    <!-- Add variable and Set value are actions drawn as accent text, not links, so they keep the arrow cursor. -->
     <Style Selector="Button.link.accent.table-action">
       <Setter Property="Cursor" Value="Arrow" />
     </Style>

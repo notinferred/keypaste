@@ -9,7 +9,7 @@ namespace Keypaste.Cli.Tests;
 /// </summary>
 /// <remarks>
 /// Each vault-touching test derives a key to create the vault and again per command that opens it, so
-/// assertions are grouped by behaviour rather than split one per fact. The vaults take the token cost of
+/// assertions are grouped by behaviour rather than split one per fact. The vaults take the token
 /// cost; <c>KeyDerivationCostTests</c> holds the production one.
 /// </remarks>
 public sealed class EnvVerbTests

@@ -21,8 +21,6 @@ namespace Keypaste.App.Tests.Session;
 /// </summary>
 public sealed class LockedNoticeWindowTests
 {
-    private static CancellationToken Token => TestContext.Current.CancellationToken;
-
     [Fact]
     public Task The_notice_names_the_vault_and_holds_no_field() =>
         HeadlessSession.On(() =>
@@ -75,9 +73,7 @@ public sealed class LockedNoticeWindowTests
             var open = notice.FindControl<Button>("Open")!;
 
             Click(notice, "Open");
-            clock.Advance(PromptViewModel.ArmingDelay - TimeSpan.FromMilliseconds(1));
-            await Task.Delay(200, Token);
-            WindowInput.Drain();
+            await PromptedApp.AdvanceAsync(clock, PromptViewModel.ArmingDelay - TimeSpan.FromMilliseconds(1));
 
             Assert.False(open.IsEffectivelyEnabled, "Unlock… was armed before the notice had been up a moment");
             Assert.Equal(0, opened);

@@ -1,8 +1,6 @@
 namespace Keypaste.Core;
 
-/// <summary>
-/// Raised when a vault cannot be created, opened, or saved.
-/// </summary>
+/// <summary>Raised when a vault cannot be created, opened, or saved.</summary>
 /// <remarks>
 /// Every failure on the vault path surfaces as this type or a derived one. Nothing on that
 /// path returns a degraded result — an empty vault, a null entry, a silently unencrypted
@@ -31,9 +29,7 @@ public class VaultException : Exception
     }
 }
 
-/// <summary>
-/// Raised when something else wrote to the vault file after it was opened.
-/// </summary>
+/// <summary>Raised when something else wrote to the vault file after it was opened.</summary>
 /// <remarks>
 /// <para>
 /// A vault is held in memory and written back whole, so a save made from a stale copy does not
@@ -71,9 +67,7 @@ public sealed class VaultChangedOnDiskException : VaultException
     }
 }
 
-/// <summary>
-/// Raised when the supplied master password does not open the vault.
-/// </summary>
+/// <summary>Raised when the supplied master password does not open the vault.</summary>
 /// <remarks>
 /// Distinct from <see cref="VaultException"/> so a caller can tell "you typed it wrong" from
 /// "the file is damaged" without parsing a message. The distinction is deliberately the only

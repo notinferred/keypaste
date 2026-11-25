@@ -11,7 +11,7 @@ namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
 /// The item pane shows an expiry KeePassXC set beside Created, and reads it as expired once the session's clock, the one
-/// a run from the app judges it by, has reached it (D-0337).
+/// a run from the app judges it by, has reached it.
 /// </summary>
 /// <remarks>
 /// The session's clock starts at <see cref="AppClock.Start"/>, months before this machine's, so an item the machine's

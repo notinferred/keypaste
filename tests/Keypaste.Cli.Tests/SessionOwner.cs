@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
@@ -22,15 +21,13 @@ internal sealed class SessionOwner : IAsyncDisposable
     internal const string Sentinel = "sk_live_session_owner_sentinel";
 
     private readonly ApprovalGate _gate;
-    private readonly ApproverListener _listener;
-    private readonly CancellationTokenSource _stop = new();
-    private readonly Task _running;
+    private readonly ServedOwner _served;
     private readonly AuditLog? _log;
 
     private SessionOwner(CliHarness harness, LockKind locking, bool records)
     {
-        Pipe = "keypaste-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
-        harness.Environment[ApproverEndpoint.EnvironmentVariable] = Pipe;
+        var pipe = ServedOwner.NewPipeName();
+        harness.Environment[ApproverEndpoint.EnvironmentVariable] = pipe;
 
         if (records && !AuditLog.TryOpen(KeypasteHome.AuditPath(harness.Environment[KeypasteHome.EnvironmentVariable]), TimeProvider.System, out _log, out var error))
         {
@@ -39,12 +36,6 @@ internal sealed class SessionOwner : IAsyncDisposable
 
         _gate = new ApprovalGate(Asked, TimeProvider.System, ApprovalLimits.Default);
 
-        var handler = new ApproverHandler(
-            new VaultCredentialSource(() => null),
-            new VaultEntryNameLister(() => null),
-            _gate,
-            Settings);
-
         Action? lockNow = locking switch
         {
             LockKind.StopsListening => StopListening,
@@ -52,15 +43,14 @@ internal sealed class SessionOwner : IAsyncDisposable
             _ => null,
         };
 
-        Authority = new SessionAuthority(
-            VaultIdentity.Of(KeypasteHome.Resolve(harness.Environment[KeypasteHome.EnvironmentVariable]), harness.VaultPath),
-            () => Lifetime,
-            handler,
-            audit: () => _log,
-            lockNow: lockNow);
-
-        _listener = new ApproverListener(Pipe, Authority);
-        _running = _listener.RunAsync(_stop.Token);
+        _served = ServedOwner.Serve(
+            new SessionAuthority(
+                VaultIdentity.Of(KeypasteHome.Resolve(harness.Environment[KeypasteHome.EnvironmentVariable]), harness.VaultPath),
+                () => Lifetime,
+                ServedOwner.VaultHandler(() => null, _gate, Settings),
+                audit: () => _log,
+                lockNow: lockNow),
+            pipe);
     }
 
     /// <summary>What <c>keypaste lock</c> does to this owner.</summary>
@@ -76,7 +66,7 @@ internal sealed class SessionOwner : IAsyncDisposable
         KeepsListening,
     }
 
-    internal string Pipe { get; }
+    internal string Pipe => _served.PipeName;
 
     /// <summary>The agents' rules this owner decides by.</summary>
     internal FakeAgentRules Settings { get; } = new();
@@ -84,39 +74,27 @@ internal sealed class SessionOwner : IAsyncDisposable
     /// <summary>Where a person would be asked: every credential is refused, and a change is answered as a test says.</summary>
     internal NobodyAsked Asked { get; } = new();
 
-    internal SessionAuthority Authority { get; }
+    internal SessionAuthority Authority => _served.Authority;
 
     internal SessionLifetime Lifetime { get; } = new();
 
     /// <summary>Stops listening once the lifetime has ended and the listener has wound down.</summary>
-    internal Task Stopped => _running;
+    internal Task Stopped => _served.Stopped;
 
     internal static SessionOwner Start(CliHarness harness, LockKind locking = LockKind.None, bool records = false) => new(harness, locking, records);
 
     private void StopListening()
     {
         Lifetime.End();
-        _stop.Cancel();
+        _served.StopListening();
     }
 
     public async ValueTask DisposeAsync()
     {
-        await _stop.CancelAsync();
-
-        try
-        {
-            await _running;
-        }
-        catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
-        {
-            // Tearing the listener down is how it stops.
-        }
-
-        _listener.Dispose();
+        await _served.DisposeAsync();
         Lifetime.Dispose();
         _gate.Dispose();
         _log?.Dispose();
-        _stop.Dispose();
     }
 
     internal sealed class NobodyAsked : IApprovalChannel

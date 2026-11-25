@@ -7,7 +7,7 @@ using Xunit;
 namespace Keypaste.App.Tests.Clipboard;
 
 /// <summary>
-/// V-N.12's first half: a secret reaches the platform as one item holding the text and every marker,
+/// A secret reaches the platform as one item holding the text and every marker,
 /// and a plain copy as the text alone.
 /// </summary>
 /// <remarks>
@@ -66,7 +66,7 @@ public sealed class SecretMarkerTests
     /// around them.
     /// </summary>
     /// <remarks>
-    /// O-0008 records KeePassXC shipping one of these names with a trailing space for three releases, 2.7.10 to 2.7.12, which
+    /// KeePassXC shipped one of these names with a trailing space for three releases, 2.7.10 to 2.7.12, which
     /// silently turned the opt-out off while the code looked right. Whether anything honours them needs a real Windows session
     /// or a pasteboard manager, which docs/desktop-checklist.md's manual checklist and <c>verify-clipboard-markers.sh</c> hold.
     /// </remarks>

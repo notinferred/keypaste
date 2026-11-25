@@ -6,7 +6,7 @@ using Polly.Retry;
 namespace Keypaste.Cli.Clipboard;
 
 /// <summary>
-/// The four Win32 clipboard calls, as a seam.
+/// The Win32 clipboard calls keypaste makes, as a seam.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -84,7 +84,7 @@ internal sealed class Win32Clipboard : IWin32Clipboard
 
     // Another process can hold the clipboard for a few milliseconds at a time. Retrying is the documented approach; failing
     // on the first attempt would make copying flaky in a way the user would read as keypaste being broken. The wait blocks
-    // this thread rather than waiting on a pool timer, as Keypaste.Core's retries do (F.9).
+    // this thread rather than waiting on a pool timer, as Keypaste.Core's retries do.
     private static readonly ResiliencePipeline _opening = new ResiliencePipelineBuilder()
         .AddRetry(new RetryStrategyOptions
         {

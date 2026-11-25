@@ -17,7 +17,7 @@ using static Keypaste.App.Tests.Session.JourneyDriver;
 
 namespace Keypaste.App.Tests.Views;
 
-/// <summary>The window opens as it was left and on a screen, and a narrow one lays Items out whole (Q.10).</summary>
+/// <summary>The window opens as it was left and on a screen, and a narrow one lays Items out whole.</summary>
 public sealed class WindowLayoutTests
 {
     private static readonly Size _minimum = new(WindowChrome.MinimumWidth, WindowChrome.MinimumHeight);

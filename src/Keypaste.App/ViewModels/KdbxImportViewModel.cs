@@ -20,7 +20,7 @@ namespace Keypaste.App.ViewModels;
 /// <para>
 /// A file that also needs a YubiKey slot is asked through the session's keys, once, by a key of the
 /// dialog's own, so its touch is said here rather than as a save waiting in the shell; the CLI's import
-/// cannot ask one (D-0366).
+/// cannot ask one.
 /// </para>
 /// <para>
 /// Nothing here names a value: rows carry group paths, titles' counts and problems, and the password
@@ -55,7 +55,7 @@ internal sealed partial class KdbxImportViewModel : ObservableObject, ISecretSin
     /// <param name="announce">Says what an import did, once it is saved.</param>
     /// <param name="pickKeyfile">Asks which keyfile opens the file; null where nothing can ask.</param>
     /// <param name="chooseAnother">Asks for another file when this one cannot be read; null where nothing can ask.</param>
-    /// <param name="paste">Reads the clipboard into a buffer under D-0225's rule, as for the master-password fields; null where nothing can paste.</param>
+    /// <param name="paste">Reads the clipboard into the <c>SecretBuffer</c> it is handed, as for the master-password fields; null where nothing can paste.</param>
     /// <param name="post">Runs an action on the UI thread, where a lock, which may run on another, closes the dialog; null closes it where the lock runs.</param>
     /// <param name="exportFormats">The exports the import also reads, which a file that is no KeePass database is named as none of; null where only KeePass files are offered.</param>
     internal KdbxImportViewModel(
@@ -375,7 +375,7 @@ internal sealed partial class KdbxImportViewModel : ObservableObject, ISecretSin
     Task ISecretSink.Paste() => PastePasswordAsync();
 
     /// <summary>
-    /// Reads the clipboard into a buffer of the paste's own, as the master-password fields do (D-0495), and appends
+    /// Reads the clipboard into a buffer of the paste's own, as the master-password fields do, and appends
     /// it only once the clipboard has answered and while the file still waits for its password and is not being unlocked.
     /// </summary>
     internal async Task PastePasswordAsync()
@@ -465,7 +465,7 @@ internal sealed partial class KdbxImportViewModel : ObservableObject, ISecretSin
         }
     }
 
-    /// <summary>The refusal of a password, worded for the factors that went with it, since which one was wrong is not knowable (D-0284).</summary>
+    /// <summary>The refusal of a password, worded for the factors that went with it, since which one was wrong is not knowable.</summary>
     private string WrongFactors(bool withKeyfile, bool withHardwareKey) => (withKeyfile, withHardwareKey) switch
     {
         (false, false) => $"That password does not open {FileName}. Type it again, or choose a key file if it needs one.",
@@ -563,7 +563,7 @@ internal sealed partial class KdbxImportViewModel : ObservableObject, ISecretSin
         var plan = Plan();
 
         // The commit saves for itself and takes its copies back when the save fails, so the open vault
-        // never holds an import its file does not, and Confirm can be pressed again (D-0567).
+        // never holds an import its file does not, and Confirm can be pressed again.
         var write = _session.WriteWhole((vault, save) => source.Commit(vault, plan, save));
 
         switch (write.Outcome)

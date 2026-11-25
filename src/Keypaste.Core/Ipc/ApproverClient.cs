@@ -19,10 +19,10 @@ namespace Keypaste.Core.Ipc;
 /// the bridge writes for a call nothing answered.
 /// </para>
 /// <para>
-/// A listing, credential or run request the caller gives up on once it was written is withdrawn, not
-/// abandoned: the owner still answers it, and that reply, which says whether the owner recorded the
-/// request, is returned, so the bridge records one the owner could not (THREATS.md T-6). The connection
-/// is spent after a withdrawal.
+/// A listing, find, set, credential, save, item change, edit or run request the caller gives up on once
+/// it was written is withdrawn, not abandoned: the owner still answers it, and that reply, which says
+/// whether the owner recorded the request, is returned, so the bridge records one the owner could not
+/// (THREATS.md T-6). The connection is spent after a withdrawal.
 /// </para>
 /// <para>
 /// Requests are serialised, one at a time per connection, because the protocol is a plain
@@ -31,7 +31,7 @@ namespace Keypaste.Core.Ipc;
 /// </para>
 /// <para>
 /// <b>The one thing that throws is a second exchange arriving while the first is still running.</b>
-/// The caller that owns this connection refuses that before it reaches here (F.3b), so contention
+/// The caller that owns this connection refuses that before it reaches here, so contention
 /// means the guarantee above has already been broken and two exchanges are about to interleave
 /// frames on a stream that cannot tell their replies apart. Returning null would hand that to the
 /// bridge as an ordinary failed exchange — one more refusal an agent is invited to retry — and a
@@ -71,7 +71,7 @@ public sealed class ApproverClient : IAsyncDisposable
     /// here becomes a refusal telling a person to start <c>keypaste approve</c>, so it may only mean that
     /// nothing answered. <c>NamedPipeClientStream.ConnectAsync</c> queues its whole connect loop as a pool
     /// work item and a <c>CancelAfter</c> budget is a pool timer; with no worker free, the expired timer
-    /// is taken before the queued connect, which then never tries the pipe at all (F.9, runtime
+    /// is taken before the queued connect, which then never tries the pipe at all (runtime
     /// v10.0.10). That turned a running approver into a missing one, and a longer budget would not have
     /// helped, because nothing was measuring it. The synchronous <c>Connect</c> times itself and needs
     /// no worker, so <paramref name="timeout"/> is enforced where it is spent.
@@ -271,26 +271,26 @@ public sealed class ApproverClient : IAsyncDisposable
 
     /// <summary>Asks the owner to put an agent's request to save a value to the person.</summary>
     /// <param name="request">Where the value goes and why, and the attachment it is made under.</param>
-    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <param name="cancellationToken">Withdraws the request once it was sent, and the question with it; its reply is still returned.</param>
     /// <returns>The reply, or null when the owner could not be reached or understood.</returns>
     public async ValueTask<SaveReply?> SaveAsync(SaveRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
+        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken, withdrawable: true).ConfigureAwait(false);
 
         return ApproverProtocol.Decoded<SaveReply>(frame, ApproverProtocol.TryDecode);
     }
 
     /// <summary>Asks the owner to put an agent's request to change an item to the person.</summary>
     /// <param name="request">The item, the change and why, and the attachment it is made under.</param>
-    /// <param name="cancellationToken">Cancels the exchange.</param>
+    /// <param name="cancellationToken">Withdraws the request once it was sent, and the question with it; its reply is still returned.</param>
     /// <returns>The reply, or null when the owner could not be reached or understood.</returns>
     public async ValueTask<ItemChangeReply?> ChangeItemAsync(ItemChangeRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken).ConfigureAwait(false);
+        var frame = await ExchangeAsync(ApproverProtocol.Encode(request), cancellationToken, withdrawable: true).ConfigureAwait(false);
 
         return frame is not null && ApproverProtocol.TryDecode(frame, out ItemChangeReply? reply) ? reply : null;
     }

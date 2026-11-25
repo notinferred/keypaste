@@ -4,8 +4,8 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// The <c>.env</c> grammar, exhaustively. These tests open no vault, so thoroughness costs
-/// nothing here — unlike in <see cref="EnvStoreTests"/>, where every case pays for Argon2.
+/// The <c>.env</c> grammar, exhaustively. It parses text alone, so its cases live here, and
+/// <see cref="EnvStoreTests"/> covers where a vault keeps the parsed keys.
 /// </summary>
 public sealed class DotEnvTests
 {
@@ -78,7 +78,7 @@ public sealed class DotEnvTests
     /// <summary>
     /// The same promise, in the encoding it was hardest to keep. <see cref="Encoding.Unicode"/> and
     /// <see cref="Encoding.BigEndianUnicode"/> use the <em>replacement</em> decoder fallback, so
-    /// this originally returned <see langword="true"/> with the secret rewritten to
+    /// a decoder built from them returns <see langword="true"/> with the secret rewritten to
     /// <c>U+FFFD</c> — in the branch that exists for Windows PowerShell 5.1, which is exactly where
     /// an ill-formed file comes from.
     /// </summary>

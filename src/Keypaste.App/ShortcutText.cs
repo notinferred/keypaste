@@ -1,6 +1,6 @@
 namespace Keypaste.App;
 
-/// <summary>Copy that names a chord, written with this platform's key: ⌘ on macOS and Ctrl elsewhere (Q.2).</summary>
+/// <summary>Copy that names a chord, written with this platform's key: ⌘ on macOS and Ctrl elsewhere.</summary>
 internal static class ShortcutText
 {
     /// <summary>A chord as the copy writes it, such as ⌘L or Ctrl+L.</summary>

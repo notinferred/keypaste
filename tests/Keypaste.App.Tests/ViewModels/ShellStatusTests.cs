@@ -16,7 +16,7 @@ namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
 /// The titlebar says whether the file holds what is open, another program's save is merged and named in the notice or,
-/// refused, offered for Reload, and the MCP card counts the distinct clients attached to the live session (D-0361, D-0542);
+/// refused, offered for Reload, and the MCP card counts the distinct clients attached to the live session;
 /// Lock gives the window back before the endpoint has stopped.
 /// </summary>
 public sealed class ShellStatusTests
@@ -132,7 +132,7 @@ public sealed class ShellStatusTests
 
     /// <summary>
     /// Another program's save, written beside the vault and renamed over it, is noticed from the vault's
-    /// folder before the five-second poll would have read the file (N.16).
+    /// folder before the five-second poll would have read the file.
     /// </summary>
     [Fact]
     public async Task AnotherProgramsSave_IsNoticedBeforeThePollReadsTheFile()
@@ -191,14 +191,7 @@ public sealed class ShellStatusTests
     {
         using var fixture = new TempVault();
         var clock = new ManualClock(AppClock.Start);
-#pragma warning disable CA2000
-        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
-#pragma warning restore CA2000
-
-        using (var master = TempVault.Secret(TempVault.Password))
-        {
-            Assert.Equal(UnlockOutcome.Opened, authority.Session.TryUnlock(fixture.Path_, master.Value));
-        }
+        using var authority = Opened(fixture, clock);
 
         using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
         Assert.Equal("none connected", shell.AgentsDetail);
@@ -230,14 +223,7 @@ public sealed class ShellStatusTests
         using var fixture = new TempVault();
         fixture.Sees("cc");
         var clock = new ManualClock(AppClock.Start);
-#pragma warning disable CA2000
-        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NeverAnswers());
-#pragma warning restore CA2000
-
-        using (var master = TempVault.Secret(TempVault.Password))
-        {
-            Assert.Equal(UnlockOutcome.Opened, authority.Session.TryUnlock(fixture.Path_, master.Value));
-        }
+        using var authority = Opened(fixture, clock, new NeverAnswers());
 
         using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
         var serving = Assert.IsType<AuthorityStatus.Serving>(authority.Status);
@@ -290,7 +276,7 @@ public sealed class ShellStatusTests
 
     /// <summary>
     /// Lock returns to its caller, the window, at once, and completes only once the endpoint has stopped, which waits
-    /// here for a prompt that comes down after its withdrawal, as F.35 found the pool can make any delivery wait (D-0392).
+    /// here for a prompt that comes down after its withdrawal, since the thread pool can make any delivery wait.
     /// </summary>
     [Fact]
     public async Task Lock_GivesTheWindowBackBeforeTheEndpointHasStopped()
@@ -299,10 +285,7 @@ public sealed class ShellStatusTests
         fixture.Sees("cc");
         var clock = new ManualClock(AppClock.Start);
         var prompt = new ComesDownWhenTold();
-#pragma warning disable CA2000
-        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => prompt);
-#pragma warning restore CA2000
-        Unlock(authority.Session, fixture);
+        using var authority = Opened(fixture, clock, prompt);
         using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
         var serving = Assert.IsType<AuthorityStatus.Serving>(authority.Status);
 
@@ -430,18 +413,15 @@ public sealed class ShellStatusTests
 
     /// <summary>
     /// The app's edit whose save another program's refused is merged with that save and saved once, and the notice names it
-    /// as saved, never by value (D-0542).
+    /// as saved, never by value.
     /// </summary>
     [Fact]
     public async Task AnotherProgramsSave_IsMergedWithTheEditItRefused_AndTheNoticeNamesIt()
     {
         using var fixture = new TempVault();
         var clock = new ManualClock(AppClock.Start);
-#pragma warning disable CA2000
-        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
-#pragma warning restore CA2000
+        using var authority = Opened(fixture, clock);
         var session = authority.Session;
-        Unlock(session, fixture);
         using var shell = new ShellViewModel(session, fixture.Home, authority, clock: clock);
         var name = Path.GetFileName(fixture.Path_);
 
@@ -542,11 +522,8 @@ public sealed class ShellStatusTests
     {
         using var fixture = new TempVault();
         var clock = new ManualClock(AppClock.Start);
-#pragma warning disable CA2000
-        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
-#pragma warning restore CA2000
+        using var authority = Opened(fixture, clock);
         var session = authority.Session;
-        Unlock(session, fixture);
         using var shell = new ShellViewModel(session, fixture.Home, authority, clock: clock);
         var name = Path.GetFileName(fixture.Path_);
 
@@ -577,11 +554,8 @@ public sealed class ShellStatusTests
     {
         using var fixture = new TempVault();
         var clock = new ManualClock(AppClock.Start);
-#pragma warning disable CA2000
-        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
-#pragma warning restore CA2000
+        using var authority = Opened(fixture, clock);
         var session = authority.Session;
-        Unlock(session, fixture);
         using var shell = new ShellViewModel(session, fixture.Home, authority, clock: clock);
         using var countdown = new ClipboardCountdown(new FakeClipboard(), clock);
         using var entries = new EntriesViewModel(session, countdown);
@@ -614,18 +588,15 @@ public sealed class ShellStatusTests
 
     /// <summary>
     /// An item both programs changed is named in the notice, which a later merge adds to and which stays until it is
-    /// dismissed, while the item's History holds the other program's version (D-0542).
+    /// dismissed, while the item's History holds the other program's version.
     /// </summary>
     [Fact]
     public async Task AConflict_StaysInTheNoticeUntilDismissed()
     {
         using var fixture = new TempVault();
         var clock = new ManualClock(AppClock.Start);
-#pragma warning disable CA2000
-        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
-#pragma warning restore CA2000
+        using var authority = Opened(fixture, clock);
         var session = authority.Session;
-        Unlock(session, fixture);
         using var shell = new ShellViewModel(session, fixture.Home, authority, clock: clock);
         var name = Path.GetFileName(fixture.Path_);
 
@@ -666,18 +637,15 @@ public sealed class ShellStatusTests
 
     /// <summary>
     /// A file that now holds another vault is not merged: the notice says why and offers Reload, the poll does not merge the
-    /// same bytes again, and Reload opens what the file holds (D-0543).
+    /// same bytes again, and Reload opens what the file holds.
     /// </summary>
     [Fact]
     public async Task AFileHoldingAnotherVault_IsNotMerged_AndReloadIsOffered()
     {
         using var fixture = new TempVault();
         var clock = new ManualClock(AppClock.Start);
-#pragma warning disable CA2000
-        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
-#pragma warning restore CA2000
+        using var authority = Opened(fixture, clock);
         var session = authority.Session;
-        Unlock(session, fixture);
         using var shell = new ShellViewModel(session, fixture.Home, authority, clock: clock);
         var name = Path.GetFileName(fixture.Path_);
         var merges = 0;
@@ -713,17 +681,14 @@ public sealed class ShellStatusTests
         Assert.NotNull(session.Unlocked!.Find("env/app/OTHER"));
     }
 
-    /// <summary>An item open for editing when the poll merges another program's save is left as typed, and its save writes into the merged copy (D-0542).</summary>
+    /// <summary>An item open for editing when the poll merges another program's save is left as typed, and its save writes into the merged copy.</summary>
     [Fact]
     public async Task AnItemOpenForEditing_IsLeftAsTyped_AndItsSaveWritesToTheMergedCopy()
     {
         using var fixture = new TempVault();
         var clock = new ManualClock(AppClock.Start);
-#pragma warning disable CA2000
-        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
-#pragma warning restore CA2000
+        using var authority = Opened(fixture, clock);
         var session = authority.Session;
-        Unlock(session, fixture);
         using var shell = new ShellViewModel(session, fixture.Home, authority, clock: clock);
 
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
@@ -755,10 +720,7 @@ public sealed class ShellStatusTests
     {
         using var fixture = new TempVault();
         var clock = new ManualClock(AppClock.Start);
-#pragma warning disable CA2000
-        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
-#pragma warning restore CA2000
-        Unlock(authority.Session, fixture);
+        using var authority = Opened(fixture, clock);
         using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
         entries.Selected = entries.Rows.Single(row => row.Title == "example");
@@ -793,10 +755,7 @@ public sealed class ShellStatusTests
     {
         using var fixture = new TempVault();
         var clock = new ManualClock(AppClock.Start);
-#pragma warning disable CA2000
-        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
-#pragma warning restore CA2000
-        Unlock(authority.Session, fixture);
+        using var authority = Opened(fixture, clock);
         using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
         entries.Selected = entries.Rows.Single(row => row.Title == "example");
@@ -825,10 +784,7 @@ public sealed class ShellStatusTests
     {
         using var fixture = new TempVault();
         var clock = new ManualClock(AppClock.Start);
-#pragma warning disable CA2000
-        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
-#pragma warning restore CA2000
-        Unlock(authority.Session, fixture);
+        using var authority = Opened(fixture, clock);
         using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
         entries.Selected = entries.Rows.Single(row => row.Title == "example");
@@ -854,10 +810,7 @@ public sealed class ShellStatusTests
     {
         using var fixture = new TempVault();
         var clock = new ManualClock(AppClock.Start);
-#pragma warning disable CA2000
-        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
-#pragma warning restore CA2000
-        Unlock(authority.Session, fixture);
+        using var authority = Opened(fixture, clock);
         using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
         entries.Selected = entries.Rows.Single(row => row.Title == "example");
@@ -1102,10 +1055,7 @@ public sealed class ShellStatusTests
     {
         using var fixture = new TempVault();
         var clock = new ManualClock(AppClock.Start);
-#pragma warning disable CA2000
-        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
-#pragma warning restore CA2000
-        Unlock(authority.Session, fixture);
+        using var authority = Opened(fixture, clock);
         using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
         shell.Current = Destinations.Of(DestinationKind.Tokens);
         var tokens = Assert.IsType<ScopedTokensViewModel>(shell.Content);
@@ -1125,10 +1075,7 @@ public sealed class ShellStatusTests
     {
         using var fixture = new TempVault();
         var clock = new ManualClock(AppClock.Start);
-#pragma warning disable CA2000
-        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
-#pragma warning restore CA2000
-        Unlock(authority.Session, fixture);
+        using var authority = Opened(fixture, clock);
         using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
         var tokens = Minted(shell);
         var token = tokens.Minted!.Reveal();
@@ -1145,15 +1092,12 @@ public sealed class ShellStatusTests
     {
         using var fixture = new TempVault();
         var clock = new ManualClock(AppClock.Start);
-#pragma warning disable CA2000
-        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
-#pragma warning restore CA2000
-        Unlock(authority.Session, fixture);
+        using var authority = Opened(fixture, clock);
         using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
         var tokens = Minted(shell);
         var minted = tokens.Minted!;
 
-        MintElsewhere(fixture, "from-elsewhere");
+        MintElsewhere(fixture, clock, "from-elsewhere");
         await MergedByThePoll(shell, clock);
         Assert.DoesNotContain(tokens.Rows, row => row.Name == "from-elsewhere");
 
@@ -1169,15 +1113,12 @@ public sealed class ShellStatusTests
     {
         using var fixture = new TempVault();
         var clock = new ManualClock(AppClock.Start);
-#pragma warning disable CA2000
-        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
-#pragma warning restore CA2000
-        Unlock(authority.Session, fixture);
+        using var authority = Opened(fixture, clock);
         using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clipboard: new FakeClipboard(), clock: clock);
         var tokens = Minted(shell);
         var token = tokens.Minted!.Reveal();
 
-        MintElsewhere(fixture, "from-elsewhere");
+        MintElsewhere(fixture, clock, "from-elsewhere");
         await MergedByThePoll(shell, clock);
         await tokens.CopyMintedCommand.PressAsync();
 
@@ -1196,10 +1137,7 @@ public sealed class ShellStatusTests
     {
         using var fixture = new TempVault();
         var clock = new ManualClock(AppClock.Start);
-#pragma warning disable CA2000
-        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
-#pragma warning restore CA2000
-        Unlock(authority.Session, fixture);
+        using var authority = Opened(fixture, clock);
         using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
         var tokens = Minted(shell);
         var minted = tokens.Minted!;
@@ -1223,10 +1161,7 @@ public sealed class ShellStatusTests
     {
         using var fixture = new TempVault();
         var clock = new ManualClock(AppClock.Start);
-#pragma warning disable CA2000
-        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
-#pragma warning restore CA2000
-        Unlock(authority.Session, fixture);
+        using var authority = Opened(fixture, clock);
         using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clipboard: new FakeClipboard(), clock: clock);
         var tokens = Minted(shell);
         var minted = tokens.Minted!;
@@ -1244,10 +1179,7 @@ public sealed class ShellStatusTests
     {
         using var fixture = new TempVault();
         var clock = new ManualClock(AppClock.Start);
-#pragma warning disable CA2000
-        using var authority = new AppAuthority(new AppVaultSession(clock, home: fixture.Home), null, () => new NobodyAnswers());
-#pragma warning restore CA2000
-        Unlock(authority.Session, fixture);
+        using var authority = Opened(fixture, clock);
         using var shell = new ShellViewModel(authority.Session, fixture.Home, authority, clock: clock);
         var minted = Minted(shell).Minted!;
 
@@ -1270,11 +1202,11 @@ public sealed class ShellStatusTests
         return tokens;
     }
 
-    private static void MintElsewhere(TempVault fixture, string name)
+    private static void MintElsewhere(TempVault fixture, ManualClock clock, string name)
     {
         Assert.True(TokenScope.TryParseList("read:billing/dev/*", out var scopes, out var refused), refused);
         using var other = ClaimedVault.Open(fixture.Path_, TempVault.Password);
-        Assert.True(new TokenStore(other).TryCreate(name, scopes, TimeSpan.FromDays(7), false, DateTimeOffset.UtcNow, out _, out _, out var error), error);
+        Assert.True(new TokenStore(other).TryCreate(name, scopes, TimeSpan.FromDays(7), false, clock.GetUtcNow(), out _, out _, out var error), error);
         other.Save();
     }
 

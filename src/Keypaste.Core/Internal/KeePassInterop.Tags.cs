@@ -8,7 +8,7 @@ namespace Keypaste.Core.Internal;
 internal sealed partial class KeePassInterop
 {
     /// <summary>The one entry's own tags, or null when there is no such entry.</summary>
-    /// <remarks>Never <c>GetTagsInherited</c>: a group's tags are not the entry's (C.1a).</remarks>
+    /// <remarks>Never <c>GetTagsInherited</c>: a group's tags are not the entry's.</remarks>
     /// <exception cref="VaultException">More than one entry answers to that name.</exception>
     internal IReadOnlyList<string>? ReadTags(EntryName name)
     {
@@ -68,7 +68,7 @@ internal sealed partial class KeePassInterop
         return 1;
     }
 
-    /// <summary>Held for every read and write of a KeePassLib tag list, since Security's scan reads tags on a worker thread while the window reads and writes them.</summary>
+    /// <summary>Held for every read and write of a KeePassLib tag list, whose getter sorts it in place, for the reads one vault's state lock does not cover, such as an import reading its source database under the destination vault's lock alone.</summary>
     private static readonly Lock _tagsGate = new();
 
     /// <summary>When the version that added <paramref name="tag"/> to the entry was saved, or null when every version its history keeps carries it.</summary>

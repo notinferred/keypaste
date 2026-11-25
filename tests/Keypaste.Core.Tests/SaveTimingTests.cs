@@ -6,9 +6,9 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// V-F.10a: the save instrument tells a save held at the gate from a save whose own work is slow.
-/// V-F.10b: a save that cannot transact never waits at that gate.
-/// V-F.12: a save sleeping between attempts does not hold that gate, and a save that waited for it re-reads.
+/// The save instrument tells a save held at the gate from a save whose own work is slow; a save that cannot transact
+/// never waits at that gate; and a save sleeping between attempts does not hold that gate, and a save that waited for it
+/// re-reads.
 /// </summary>
 /// <remarks>
 /// Serialised against every other collection, because any other save in this process would take
@@ -238,7 +238,7 @@ public sealed class SaveTimingTests : IDisposable
 
     /// <summary>
     /// Runs <paramref name="waiter"/> while <paramref name="holder"/> blocks in its retry wait, after a
-    /// refused attempt that outlasts that wait as a stalled Windows runner made one in F.34.
+    /// refused attempt that outlasts that wait, as one did on a stalled Windows runner.
     /// </summary>
     [SupportedOSPlatform("windows")]
     private static (SaveTiming Holding, SaveTiming Waited) WhileTheHolderSleeps(

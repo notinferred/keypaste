@@ -15,12 +15,8 @@ namespace Keypaste.Mcp.Tests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>What changed in Stage 2.2, and what it means for these tests.</b> Until this stage
-/// <c>request_credential</c> was hard-coded to deny, so every denial test here would have passed
-/// whether or not validation, scoping and audit logging existed — the separation says so
-/// outright and said they would earn their keep in 2.2. They have: a real approver now answers over
-/// a real pipe, so a denial is one outcome among several rather than the only one the code can
-/// produce, and a test that asserts one is distinguishing it from the others.
+/// <b>A denial here is one outcome among several.</b> An approver answers over a real pipe, so a
+/// test that asserts a denial is telling it apart from the other outcomes the code can produce.
 /// </para>
 /// <para>
 /// The listing path is still driven through a fake source <em>here</em>, because these tests are
@@ -420,10 +416,10 @@ public sealed class ServerToolsTests
     }
 
     /// <summary>
-    /// The path that did not exist before this stage: a person says yes, and exactly one field
+    /// The approval path: a person says yes, and exactly one field
     /// value reaches the agent.
     /// </summary>
-    /// <summary>request_save says only whether the person saved a value: the agent is told where, and never given it (F.79).</summary>
+    /// <summary>request_save says only whether the person saved a value: the agent is told where, and never given it.</summary>
     [Fact]
     public async Task A_save_says_where_it_was_saved_and_a_refusal_that_it_was_not()
     {

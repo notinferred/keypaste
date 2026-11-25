@@ -1,4 +1,5 @@
 using Keypaste.App.Session;
+using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Agents;
@@ -6,7 +7,9 @@ using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Settings;
+using Keypaste.Core.Sharing;
 using Keypaste.Core.Tests;
+using Keypaste.Core.Tokens;
 using Xunit;
 
 namespace Keypaste.App.Tests.Session;
@@ -18,7 +21,6 @@ namespace Keypaste.App.Tests.Session;
 public sealed class OpenVaultsTests : IDisposable
 {
     private static readonly TimeSpan _connect = TimeSpan.FromSeconds(10);
-    private static readonly TimeSpan _absent = TimeSpan.FromMilliseconds(300);
 
     private readonly TempVault _fixture = new();
     private readonly ManualClock _clock = new(AppClock.Start);
@@ -244,7 +246,7 @@ public sealed class OpenVaultsTests : IDisposable
         await personalPrompt.Shown.WaitAsync(_connect, Token);
 
         var second = acme.Client.RequestAsync(Request(AcmePath, acme.Session), Token).AsTask();
-        await Task.Delay(_absent, Token);
+        Assert.True(SpinWait.SpinUntil(() => _vaults.Turns.Waiting == 1, _connect), "the second vault's request never waited its turn");
         Assert.False(acmePrompt.Shown.IsCompleted, "the second vault's prompt showed beside the first");
 
         personalPrompt.Answer(ApprovalAnswer.ApprovedOnce);
@@ -421,6 +423,25 @@ public sealed class OpenVaultsTests : IDisposable
         Assert.Equal(ItemTemplate.Login, items.NewItem?.Template);
     }
 
+    /// <summary>An edit of one vault counts its places again, and a vault locked or unlocked since its count is counted with it.</summary>
+    [Fact]
+    public void An_edit_counts_its_vaults_places_and_a_vault_locked_or_unlocked_since_its_count()
+    {
+        UnlockBoth();
+        using var shell = new ShellViewModel(_personal.Session, _fixture.Home, authority: null, clock: _clock) { Vaults = _vaults };
+
+        Assert.True(_acme.Session.Write(vault => { vault.AddEntry(new VaultEntry { Title = "github", Username = "maya@acme.dev", Password = "acme-gh-9Qe2" }); return true; }, added => added).Outcome == WriteOutcome.Saved);
+        Assert.Equal(("1", "2"), (AllCountOf(shell, "test"), AllCountOf(shell, "acme")));
+
+        _vaults.LockAlone(_acme);
+        Assert.True(_personal.Session.Write(vault => { vault.AddEntry(new VaultEntry { Title = "notes", Password = "test-notes-7Hn3" }); return true; }, added => added).Outcome == WriteOutcome.Saved);
+        Assert.Equal("2", AccountCountOf(shell));
+
+        Unlock(_acme.Session, AcmePath);
+        Assert.True(_personal.Session.Write(vault => { vault.AddEntry(new VaultEntry { Title = "keys", Password = "test-keys-4Rd8" }); return true; }, added => added).Outcome == WriteOutcome.Saved);
+        Assert.Equal(("5", "3", "2"), (AccountCountOf(shell), AllCountOf(shell, "test"), AllCountOf(shell, "acme")));
+    }
+
     [Fact]
     public void All_Accounts_lists_and_searches_every_unlocked_vault_and_acts_on_each_items_own_vault()
     {
@@ -509,6 +530,88 @@ public sealed class OpenVaultsTests : IDisposable
         Assert.Equal(string.Empty, acmeOnly.VaultHeading);
     }
 
+    /// <summary>A copy of a vault holds its items' UUIDs, so an item's Share reads the vault it is listed under, and Share links and Scoped tokens act on Settings' vault.</summary>
+    [Fact]
+    public async Task Share_reads_the_items_own_vault_and_share_links_and_tokens_follow_the_vault_Settings_chose()
+    {
+        var example = new EntryName(string.Empty, "example");
+        string uuid;
+        using (var personal = ClaimedVault.Open(_fixture.Path_, TempVault.Password))
+        {
+            uuid = personal.Find(example)!.Uuid!;
+        }
+
+        ForeignEdit.InFile(AcmePath, TempVault.Password, database => database.RootGroup.GetEntries(true)
+            .Single(entry => entry.Strings.ReadSafe(KeePassLib.PwDefs.TitleField) == "example")
+            .SetUuid(new KeePassLib.PwUuid(Convert.FromHexString(uuid)), bAlsoChangeHistoryUuids: true));
+        UnlockBoth();
+        using var server = new FakeShareServer { Now = _clock.GetUtcNow() };
+        var clipboard = new FakeClipboard();
+        using var shell = new ShellViewModel(_personal.Session, _fixture.Home, authority: null, clipboard: clipboard, clock: _clock) { Vaults = _vaults, ShareTransport = server };
+
+        shell.SelectedSidebarRow = shell.SidebarRows.OfType<PlaceRow>().Single(row => row.Vault?.Title == "acme" && row.Place == ItemPlace.All);
+        var items = Assert.IsType<EntriesViewModel>(shell.Content);
+        items.Selected = items.Rows.Single(row => row.Title == "example");
+        Assert.Equal(uuid, items.Detail!.Name.Uuid, ignoreCase: true);
+        shell.ShareCommand.Press(items.Detail!.Name);
+        await shell.Share!.CreateCommand.PressAsync();
+
+        Assert.False(shell.HasShare, shell.Share?.Error);
+        Assert.True(ShareLink.TryParse(clipboard.Content!, out var id, out var key));
+        Assert.True(ShareCrypto.TryOpen(server.Shares[id].Envelope, key, ReadOnlySpan<char>.Empty, out var payload, out var error), error);
+        Assert.Equal("acme-secret-5Rt8Lw2", Assert.Single(payload.Fields).Value);
+        Assert.Single(new ShareStore(_acme.Session.Unlocked!).List());
+        Assert.Empty(new ShareStore(_personal.Session.Unlocked!).List());
+
+        shell.OpenSettings(SettingsSectionChoice.ShareLinks);
+        var acmeLinks = Assert.IsType<SharingViewModel>(shell.Content);
+        await acmeLinks.RefreshCommand.PressAsync();
+        Assert.Single(acmeLinks.Rows);
+
+        shell.Current = Navigation.Destinations.Of(Navigation.DestinationKind.Settings);
+        var settings = Assert.IsType<SettingsViewModel>(shell.Content);
+        Assert.Equal("acme", settings.ShownVault?.Title);
+        settings.ShownVault = settings.VaultChoices.Single(choice => choice.Title == "test");
+        shell.OpenSettings(SettingsSectionChoice.ShareLinks);
+        var personalLinks = Assert.IsType<SharingViewModel>(shell.Content);
+        await personalLinks.RefreshCommand.PressAsync();
+        Assert.Empty(personalLinks.Rows);
+
+        shell.OpenSettings(SettingsSectionChoice.ScopedTokens);
+        var (made, _, message) = Assert.IsType<ScopedTokensViewModel>(shell.Content).Create("ci", "read:acme-api/staging/*", TimeSpan.FromDays(30), false);
+        Assert.True(made, message);
+        Assert.Single(new TokenStore(_personal.Session.Unlocked!).List());
+        Assert.Empty(new TokenStore(_acme.Session.Unlocked!).List());
+
+        // The share dialog and Share links go with their vault's lock, though the window's own vault stays open.
+        shell.SelectedSidebarRow = shell.SidebarRows.OfType<PlaceRow>().Single(row => row.Vault?.Title == "acme" && row.Place == ItemPlace.All);
+        items = Assert.IsType<EntriesViewModel>(shell.Content);
+        items.Selected = items.Rows.Single(row => row.Title == "example");
+        shell.ShareCommand.Press(items.Detail!.Name);
+        Assert.True(shell.HasShare);
+
+        _vaults.LockAlone(_acme);
+        _clock.Advance(TimeSpan.FromSeconds(1));
+        Assert.False(shell.HasShare);
+
+        Unlock(_acme.Session, AcmePath);
+        _clock.Advance(TimeSpan.FromSeconds(1));
+        shell.Current = Navigation.Destinations.Of(Navigation.DestinationKind.Settings);
+        settings = Assert.IsType<SettingsViewModel>(shell.Content);
+        settings.ShownVault = settings.VaultChoices.Single(choice => choice.Title == "acme");
+        shell.OpenSettings(SettingsSectionChoice.ShareLinks);
+        acmeLinks = Assert.IsType<SharingViewModel>(shell.Content);
+        await acmeLinks.RefreshCommand.PressAsync();
+        Assert.Single(acmeLinks.Rows);
+
+        _vaults.LockAlone(_acme);
+        _clock.Advance(TimeSpan.FromSeconds(1));
+        var linksAfterLock = Assert.IsType<SharingViewModel>(shell.Content);
+        Assert.NotSame(acmeLinks, linksAfterLock);
+        await linksAfterLock.RefreshCommand.PressAsync();
+        Assert.Empty(linksAfterLock.Rows);
+    }
+
     [Fact]
     public async Task One_pairing_made_through_one_vault_serves_the_other_after_that_one_locks()
     {
@@ -552,6 +655,12 @@ public sealed class OpenVaultsTests : IDisposable
         Unlock(_personal.Session, _fixture.Path_);
         Unlock(_acme.Session, AcmePath);
     }
+
+    private static string AllCountOf(ShellViewModel shell, string vault) =>
+        shell.SidebarRows.OfType<PlaceRow>().Single(row => row.Vault?.Title == vault && row.Place == ItemPlace.All).Count;
+
+    private static string AccountCountOf(ShellViewModel shell) =>
+        shell.SidebarRows.OfType<PlaceRow>().Single(row => row is { IsTop: true, Place: ItemPlace.All }).Count;
 
     private static void Unlock(AppVaultSession session, string path)
     {

@@ -13,7 +13,7 @@ namespace Keypaste.App;
 /// <remarks>
 /// Handled at the window, on the tunnelling pass, so a focused list or text field cannot eat them first; a text
 /// field's own Copy, Paste and Undo are left to it. Exact modifiers matter: Windows reports AltGr as Ctrl+Alt, so a
-/// chord with an extra modifier is a character being typed (Q.1). <c>Ctrl/Cmd+L</c> is the honest counterweight to a
+/// chord with an extra modifier is a character being typed. <c>Ctrl/Cmd+L</c> is the honest counterweight to a
 /// five-minute idle timeout: a default that short is only defensible when locking now is one keystroke.
 /// </remarks>
 internal sealed class Shortcuts : IDisposable

@@ -15,7 +15,7 @@ namespace Keypaste.Consistency.Tests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// V.3b's claim is not that <c>RestoreRecycled</c> works — <c>VaultRecycleBinTests</c> establishes
+/// The claim here is not that <c>RestoreRecycled</c> works — <c>VaultRecycleBinTests</c> establishes
 /// that — but that a person can delete something by mistake in the app and get it back, and that
 /// what they get back is the credential every other keypaste surface then uses. Only a test holding
 /// both front ends can ask that: the deletion and the restore are GUI actions, and

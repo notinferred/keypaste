@@ -8,8 +8,11 @@ public interface ILoginItem
     /// <summary>Gets whether the entry is there and starts this copy of the app.</summary>
     bool IsEnabled { get; }
 
+    /// <summary>Gets whether this copy runs from a place that is gone once it quits or its disk image is ejected, so no entry is written for it.</summary>
+    bool RunsFromTemporaryLocation => false;
+
     /// <summary>Writes the entry.</summary>
-    /// <returns><see langword="false"/> when it could not be written.</returns>
+    /// <returns><see langword="false"/> when it could not be written, or this copy runs from the disk image or from a temporary copy macOS made.</returns>
     bool Enable();
 
     /// <summary>Removes the entry.</summary>

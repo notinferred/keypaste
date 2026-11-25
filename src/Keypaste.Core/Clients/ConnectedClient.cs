@@ -20,7 +20,7 @@ public sealed record ConnectedClient(
     /// <summary>The folder it said it runs in, or null; display only (T-3).</summary>
     public string? Folder { get; init; }
 
-    /// <summary>The globs it said it answers with when it attached, or empty when it said none (N.5).</summary>
+    /// <summary>The globs it said it answers with when it attached, or empty when it said none.</summary>
     public IReadOnlyList<string> Exposure { get; init; } = [];
 
     /// <summary>How a screen and a narration name a client: its label, else its name, sanitized, else <c>an unnamed agent</c>.</summary>

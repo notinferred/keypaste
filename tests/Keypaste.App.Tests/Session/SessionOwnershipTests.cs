@@ -14,7 +14,7 @@ namespace Keypaste.App.Tests.Session;
 
 /// <summary>
 /// The app owns the vault it unlocks: a second owner is refused by name before the password is
-/// tried, and the unlocked vault is served to <c>keypaste mcp</c> on its endpoint (U.1).
+/// tried, and the unlocked vault is served to <c>keypaste mcp</c> on its endpoint.
 /// </summary>
 public sealed class SessionOwnershipTests
 {
@@ -161,7 +161,7 @@ public sealed class SessionOwnershipTests
     /// <summary>
     /// While the log will not open, Agents and the sidebar say every request is refused, read from the
     /// last refusal, and the sidebar's Agents dot shows danger rather than ok: an unlock alone creates no
-    /// log and says nothing, and a mended log clears it at the next request (G.9, D-0494).
+    /// log and says nothing, and a mended log clears it at the next request.
     /// </summary>
     [Fact]
     public async Task Agents_says_when_the_log_could_not_be_opened_and_an_unlock_alone_opens_none()
@@ -218,7 +218,7 @@ public sealed class SessionOwnershipTests
 
     /// <summary>
     /// The pop-up is once per failure: agents retrying, a timed-out toast and a lock and unlock with the
-    /// log still broken raise nothing further (F.86).
+    /// log still broken raise nothing further.
     /// </summary>
     [Fact]
     public async Task A_log_that_will_not_open_pops_up_once_however_often_agents_retry_or_the_vault_relocks()
@@ -269,7 +269,7 @@ public sealed class SessionOwnershipTests
 
     /// <summary>
     /// A log that opened and later fails again is a new failure. An open log stays open until the lock,
-    /// so that is the only way one can come back (F.86).
+    /// so that is the only way one can come back.
     /// </summary>
     [Fact]
     public async Task A_log_that_opened_and_fails_again_pops_up_again()
@@ -313,7 +313,7 @@ public sealed class SessionOwnershipTests
 
     /// <summary>
     /// A log that opened and later cannot be written refuses each release and tells the person once, with its own
-    /// reason, until a line is written (F.102).
+    /// reason, until a line is written.
     /// </summary>
     [Fact]
     public async Task A_log_that_stops_being_written_pops_up_once_and_stays_on_Agents_until_a_write_succeeds()
@@ -370,7 +370,7 @@ public sealed class SessionOwnershipTests
         Assert.Equal((true, false), (dot.DotLive, dot.DotDanger));
     }
 
-    /// <summary>A write that succeeded ends the failure, so the next failure is told again (F.102).</summary>
+    /// <summary>A write that succeeded ends the failure, so the next failure is told again.</summary>
     [Fact]
     public async Task A_log_that_fails_to_write_again_after_a_write_succeeded_pops_up_again()
     {
@@ -406,7 +406,7 @@ public sealed class SessionOwnershipTests
         }
     }
 
-    /// <summary>A lock and unlock while the log still cannot be written is the same failure, told once (F.102).</summary>
+    /// <summary>A lock and unlock while the log still cannot be written is the same failure, told once.</summary>
     [Fact]
     public async Task A_log_that_still_cannot_be_written_after_a_relock_does_not_pop_up_again()
     {

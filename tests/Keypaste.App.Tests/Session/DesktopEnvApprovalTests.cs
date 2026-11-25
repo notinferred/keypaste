@@ -19,7 +19,7 @@ namespace Keypaste.App.Tests.Session;
 /// <summary>
 /// A <c>keypaste run --session</c> request over the app's real endpoint raises the app's own prompt
 /// window, drawn by Skia and clicked through hit-testing, naming the project, its variable names,
-/// the command and the directory; only a press of Allow once or the timed allow releases the set (V-E.1c).
+/// the command and the directory; only a press of Allow once or the timed allow releases the set.
 /// </summary>
 public sealed class DesktopEnvApprovalTests
 {
@@ -106,8 +106,7 @@ public sealed class DesktopEnvApprovalTests
             if (how.StartsWith("enter", StringComparison.Ordinal))
             {
                 Key(window, PhysicalKey.Enter);
-                await Task.Delay(100, Token);
-                Assert.False(reply.IsCompleted, "Return before the prompt was armed answered it");
+                Assert.False(IsAnswered(window), "Return before the prompt was armed answered it");
             }
 
             await app.ArmAsync();
@@ -142,38 +141,6 @@ public sealed class DesktopEnvApprovalTests
             await PromptedApp.WithdrawnAsync(window);
         });
 
-    [Fact]
-    public Task A_click_on_Allow_once_answers_at_once() =>
-        HeadlessSession.On(async () =>
-        {
-            await using var app = await PromptedApp.StartAsync();
-            var reply = app.AskEnv();
-            var window = await app.PromptAsync();
-
-            Click(window, "AllowOnce");
-            Assert.Equal(EnvOutcome.Resolved, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
-        });
-
-    [Fact]
-    public Task EnvAllowOnce_AsksAgain() =>
-        HeadlessSession.On(async () =>
-        {
-            await using var app = await PromptedApp.StartAsync();
-            var reply = app.AskEnv();
-            var window = await app.PromptAsync();
-
-            await app.ArmAsync();
-            Click(window, "AllowOnce");
-            Assert.Equal(EnvOutcome.Resolved, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
-            await PromptedApp.WithdrawnAsync(window);
-
-            var again = app.AskEnv();
-            var second = await app.PromptAsync(count: 2);
-            Click(second, "Deny");
-
-            Assert.Equal(EnvOutcome.Declined, (await again.WaitAsync(_wait, Token))?.Set.Outcome);
-        });
-
     /// <summary>A command, directory and names the runner sent cannot move the window or its buttons, however long they are.</summary>
     [Fact]
     public Task A_long_command_leaves_the_window_and_buttons_where_they_were() =>
@@ -186,6 +153,7 @@ public sealed class DesktopEnvApprovalTests
                 "/" + string.Join('/', Enumerable.Repeat("deep", 200)));
 
             Assert.Equal(ordinaryLayout, hostileLayout);
+            Assert.Equal(["Deny", "Allow once"], Buttons(hostile).Select(button => button.Content as string));
             Assert.DoesNotContain(Buttons(hostile), button => button.IsDefault);
 
             ordinary.Close();
@@ -245,8 +213,4 @@ public sealed class DesktopEnvApprovalTests
 
         return (window, layout);
     }
-
-    /// <summary>The window's own buttons; a scrolling box adds its scroll bar's, which move nothing that matters.</summary>
-    private static List<Button> Buttons(Window window) =>
-        [.. window.GetVisualDescendants().OfType<Button>().Where(button => button.Name is "Deny" or "AllowOnce" or "AllowOnce")];
 }

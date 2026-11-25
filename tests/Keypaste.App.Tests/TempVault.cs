@@ -4,9 +4,7 @@ using Keypaste.Core.Tests;
 
 namespace Keypaste.App.Tests;
 
-/// <summary>
-/// A real KDBX file in a temporary directory, deleted when the test finishes.
-/// </summary>
+/// <summary>A real KDBX file in a temporary directory, deleted when the test finishes.</summary>
 /// <remarks>
 /// A real vault rather than a fake, because what these tests assert is that Argon2 either accepted
 /// a password or did not, and a fake that returns <c>true</c> would prove nothing about the one
@@ -16,7 +14,7 @@ internal sealed class TempVault : IDisposable
 {
     internal const string Password = "correct-horse-battery-staple";
 
-    /// <summary>The password of the vault's one item, strong and used once, so Settings › Recommendations has nothing to say about it (V.9).</summary>
+    /// <summary>The password of the vault's one item, strong and used once, so Settings › Recommendations has nothing to say about it.</summary>
     internal const string ExamplePassword = "entry-secret-7Kq2Vx9mZ4";
 
     private readonly string _directory;

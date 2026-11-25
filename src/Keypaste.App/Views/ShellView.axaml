@@ -125,17 +125,25 @@
       <Setter Property="Background" Value="{DynamicResource KpBgSidebarVibrant}" />
     </Style>
 
-    <!-- The New button at the sidebar's top: the card's surface, a default line and a chosen segment's shadow, as Outlook draws it. -->
+    <!-- The New button at the sidebar's top, the sidebar's width: the search field's height, corner and fill, so the two read as one family. -->
     <Style Selector="Button#SidebarNew">
-      <Setter Property="Height" Value="34" />
-      <Setter Property="MinHeight" Value="34" />
-      <Setter Property="Padding" Value="12,0" />
-      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Height" Value="28" />
+      <Setter Property="MinHeight" Value="28" />
+      <Setter Property="Padding" Value="8,0" />
+      <Setter Property="CornerRadius" Value="{DynamicResource KpRadiusField}" />
+      <Setter Property="BorderThickness" Value="1" />
       <Setter Property="HorizontalAlignment" Value="Stretch" />
-      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <!-- On the button, not its presenter: a name selector has no trigger, so the template's own binding would outrank it there. -->
+      <Setter Property="Background" Value="{DynamicResource KpBgSearch}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource KpBorderDefault}" />
+      <Setter Property="Foreground" Value="{DynamicResource KpTextPrimary}" />
     </Style>
-    <Style Selector="Button#SidebarNew /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="BoxShadow" Value="0 1 1.5 0 #0F000000" />
+    <Style Selector="Button#SidebarNew:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button#SidebarNew:flyout-open /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource KpBgActive}" />
+    </Style>
+    <Style Selector="Button#SidebarNew:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource KpBgActiveHover}" />
     </Style>
 
     <!-- A vault's rows sit under its heading only while the account draws one, with a second vault. -->
@@ -163,11 +171,12 @@
 
   <Panel>
 
-    <Grid RowDefinitions="52,*">
+    <Grid RowDefinitions="Auto,*">
 
       <!-- The window's title bar, draggable everywhere but, at its end, the vault's state while it needs saying. -->
       <Border Grid.Row="0"
               Name="TitleBar"
+              Height="{x:Static views:WindowChrome.TitleBarHeight}"
               WindowDecorationProperties.ElementRole="TitleBar">
         <Grid Name="TitleColumns" ColumnDefinitions="80,*,Auto">
 
@@ -291,15 +300,14 @@
 
             <Button Name="SidebarNew"
                     DockPanel.Dock="Top"
-                    Classes="ghost"
-                    HorizontalAlignment="Left"
                     Margin="0,2,0,10"
                     ToolTip.Tip="{Binding NewItemHeading}"
                     AutomationProperties.Name="{x:Static res:Strings.New}">
-              <StackPanel Orientation="Horizontal" Spacing="8">
+              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
                 <ctl:KpIcon Icon="square-pen" Size="16" />
-                <TextBlock Text="{x:Static res:Strings.New}" VerticalAlignment="Center" />
-              </StackPanel>
+                <TextBlock Grid.Column="1" Text="{x:Static res:Strings.New}" VerticalAlignment="Center" />
+                <ctl:KpIcon Grid.Column="2" Icon="chevron-down" Size="14" Foreground="{DynamicResource KpTextMuted}" />
+              </Grid>
               <Button.Flyout>
                 <ctl:ButtonMenu Placement="BottomEdgeAlignedLeft" views:NewItemMenu.OffersTemplates="True" />
               </Button.Flyout>

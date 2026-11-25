@@ -5,7 +5,7 @@ using Xunit;
 namespace Keypaste.Processes.Tests;
 
 /// <summary>
-/// The desktop app's crash reports across real processes (4.11c): tests/Keypaste.AppDriver runs keypaste-app's own start on a headless
+/// The desktop app's crash reports across real processes: tests/Keypaste.AppDriver runs keypaste-app's own start on a headless
 /// display, crash reports composed as that start composes them, and stands in on loopback for api.keypaste.com's /v1/crash.
 /// </summary>
 /// <remarks>The first-launch screen and what a UI-thread exception does inside the app are App.Tests' <c>CrashJourneyTests</c>.</remarks>

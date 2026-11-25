@@ -426,9 +426,24 @@ public sealed class TerminalApprovalChannelTests
         Assert.Contains("[d] deny  [o] once  [a] always  ", Assert.Single(rig.Prompt.PromptsSeen), StringComparison.Ordinal);
         Assert.DoesNotContain("block", rig.Prompt.PromptsSeen[0], StringComparison.Ordinal);
         Assert.Contains("  From now on keypaste gives claude-code this item's password without asking you.", rig.Stderr.ToString(), StringComparison.Ordinal);
-        Assert.Contains("  Remove it on the agent's page in the keypaste app to be asked again.", rig.Stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains("  To be asked again, forget it with `keypaste clients claude-code --forget <key>`, the key that `keypaste clients claude-code` lists,", rig.Stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains("  or remove it on the agent's page in the keypaste app.", rig.Stderr.ToString(), StringComparison.Ordinal);
         Assert.Contains("keypaste: allowed, and always from now on.", rig.Stderr.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain("[y]", rig.Stderr.ToString(), StringComparison.Ordinal);
+    }
+
+    /// <summary>The undo hint names the agent so the command it shows runs as printed, or leaves a placeholder where no quoting is safe in every shell.</summary>
+    [Theory]
+    [InlineData("claude code", "`keypaste clients \"claude code\" --forget <key>`")]
+    [InlineData("deploy$bot", "`keypaste clients <agent> --forget <key>`")]
+    [InlineData("-x", "`keypaste clients <agent> --forget <key>`")]
+    public async Task The_undo_hint_quotes_an_agent_label_or_leaves_a_placeholder(string label, string command)
+    {
+        var rig = Build("a");
+        var prompt = ApprovalPrompt.For("Claude Code", new EntryName("env/dev", "STRIPE_KEY"), "password", "deploy billing", label) with { OffersAlways = true };
+
+        Assert.Equal(ApprovalAnswer.AlwaysAllowed, await rig.Channel.AskAsync(prompt, Token));
+        Assert.Contains(command, rig.Stderr.ToString(), StringComparison.Ordinal);
     }
 
     /// <summary>Blocking is set on the agent's page in the app: <c>b</c> at a prompt is a refusal like any other key.</summary>
@@ -457,7 +472,7 @@ public sealed class TerminalApprovalChannelTests
     private static SavePrompt SavePromptFor(bool replaces = false) =>
         SavePrompt.For("Claude Code", "claude-code", "work/stripe", "STRIPE_KEY", "the new key") with { Replaces = replaces };
 
-    /// <summary>A value typed masked, or generated, is saved only with y; the value is never printed (F.79).</summary>
+    /// <summary>A value typed masked, or generated, is saved only with y; the value is never printed.</summary>
     [Fact]
     public async Task A_save_takes_a_typed_or_generated_value_and_y_and_never_prints_it()
     {

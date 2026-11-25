@@ -1,4 +1,4 @@
-# 4.7b, R.1a: drives an installed keypaste desktop app from outside its process through UI Automation.
+# Drives an installed keypaste desktop app from outside its process through UI Automation.
 # One verb per call, as scripts/lib/desktop-drive.sh defines them; prints what it saw and exits 1 when the verb
 # could not be done, 2 when this driver does not implement it. DRIVE_WINDOW names the app's window to act in, and
 # DRIVE_TREE_DIR, when set, receives the window's automation tree each time a locator finds nothing.
@@ -205,7 +205,6 @@ function Chord([string]$chord) {
 }
 
 function Click($element, [string]$locator, [uint32]$down, [uint32]$up) {
-  Foreground
   $r = $element.Current.BoundingRectangle
   if ($r.IsEmpty -or $r.Width -le 0 -or $r.Height -le 0 -or $element.Current.IsOffscreen) { Fail "'$locator' is not on screen: $r" }
   $x = [int]($r.X + $r.Width / 2)
@@ -385,12 +384,20 @@ switch ($Action) {
   'click' {
     $element = Until 30 { Named $First $Any }
     if (-not $element) { Missing "nothing named '$First' to click" }
+    Foreground
     Write-Output "clicked '$First' at $(Click $element $First 0x2 0x4)"
   }
   'right-click' {
     $element = Until 30 { Named $First $Any }
     if (-not $element) { Missing "nothing named '$First' to right-click" }
+    Foreground
     Write-Output "right-clicked '$First' at $(Click $element $First 0x8 0x10)"
+  }
+  'raw-click' {
+    $element = Until 30 { Named $First $Any }
+    if (-not $element) { Missing "nothing named '$First' to click" }
+    # Not brought forward first: as with a person's click, only the click itself may bring its window forward.
+    Write-Output "clicked '$First' at $(Click $element $First 0x2 0x4) without bringing its window forward first"
   }
   'focus' {
     $element = Until 30 { Named $First $Any }

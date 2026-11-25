@@ -10,7 +10,7 @@ namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
 /// The first run offers the databases KeePassXC last opened, and the lock screen offers the YubiKey
-/// beside the key file, chosen already where the vault's recent entry records a slot (N.2).
+/// beside the key file, chosen already where the vault's recent entry records a slot.
 /// </summary>
 public sealed class FirstRunTests : IDisposable
 {

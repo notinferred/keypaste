@@ -23,7 +23,7 @@ namespace Keypaste.App;
 /// <para>
 /// <b>A pointer move is activity only when the pointer actually moved.</b> A window restored or
 /// shown under a resting cursor is sent a move at that unchanged position, which on Windows used to
-/// postpone the idle lock with nobody there (F.13). So a move counts only against a screen position
+/// postpone the idle lock with nobody there. So a move counts only against a screen position
 /// this window already saw, and leaving <see cref="WindowState.Minimized"/> forgets that position.
 /// </para>
 /// <para>
@@ -44,7 +44,6 @@ internal sealed class ActivityWatch : IDisposable
     private PixelPoint? _lastPointer;
     private bool _disposed;
 
-    /// <summary>Watches a window.</summary>
     /// <param name="window">The window a person uses.</param>
     /// <param name="session">The session activity keeps open.</param>
     /// <param name="clock">The clock the pointer throttle measures against.</param>

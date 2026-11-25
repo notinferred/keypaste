@@ -73,7 +73,7 @@ public sealed class HardwareKeyVaultHeldByTheAppTests : IDisposable
             Assert.True(_device.Challenges.Count > asked, "the holder saved the edit without asking the key");
         }
 
-        Assert.DoesNotContain("Master password: ", _harness.Prompt.PromptsSeen);
+        Assert.DoesNotContain(CliHarness.MasterPasswordPrompt, _harness.Prompt.PromptsSeen);
         Assert.Contains("holds this vault; it will ask you to allow this change", _harness.Err, StringComparison.Ordinal);
         Assert.DoesNotContain(VaultSession.HardwareKeyRefusal, _harness.Err, StringComparison.Ordinal);
 

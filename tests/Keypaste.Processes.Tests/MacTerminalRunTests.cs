@@ -5,7 +5,7 @@ using Xunit;
 namespace Keypaste.Processes.Tests;
 
 /// <summary>
-/// On macOS the app's own Run opens Terminal (E.1d): a keypaste.app laid out as a release lays it out carries the real launcher and a
+/// On macOS the app's own Run opens Terminal: a keypaste.app laid out as a release lays it out carries the real launcher and a
 /// keypaste that starts the built CLI, the held app presses Run in a terminal and Start, real Terminal runs the launcher, and the window's
 /// <c>keypaste run --session</c> presents the launch pass to the app, which asks nothing more.
 /// </summary>

@@ -30,53 +30,74 @@ public sealed class SecretHygieneTests
     /// entry back for confirmation, or logs the record it just wrote.
     /// </summary>
     [Theory]
-    [InlineData("ls")]
-    [InlineData("ls", "--flat")]
-    [InlineData("get", "secrets/target")]
-    [InlineData("rm", "secrets/target", "--yes")]
-    [InlineData("env", "ls")]
-    [InlineData("env", "ls", "hygiene")]
-    [InlineData("env", "rm", "hygiene", "API_KEY", "--yes")]
-    [InlineData("env", "ls", "--json")]
-    [InlineData("env", "ls", "hygiene", "--json")]
-    [InlineData("env", "ls", "hygiene", "--profiles")]
-    [InlineData("env", "export", "hygiene")]
-    [InlineData("env", "diff", "hygiene")]
-    [InlineData("ls", "--json")]
-    [InlineData("env", "tag", "hygiene", "secrets/target", "-p", "prod", "--yes")]
-    [InlineData("env", "untag", "hygiene", "secrets/target", "--yes")]
-    [InlineData("search", "target")]
-    [InlineData("search", "target", "--json")]
-    [InlineData("search", "example.invalid")]
-    [InlineData("show", "secrets/target")]
-    [InlineData("show", "secrets/target", "--json")]
-    [InlineData("field", "ls", "secrets/target")]
-    [InlineData("field", "ls", "secrets/target", "--json")]
-    [InlineData("field", "rm", "secrets/target", "Region")]
-    [InlineData("attachment", "ls", "secrets/target")]
-    [InlineData("attachment", "ls", "secrets/target", "--json")]
-    [InlineData("get", "secrets/target", "--field", "API Secret")]
-    [InlineData("set", "secrets/target", "--field", "API Secret")]
-    [InlineData("set", "secrets/target")]
-    [InlineData("set", "secrets/target", "--generate")]
-    [InlineData("set", "secrets/new", "--generate", "--words", "4")]
-    [InlineData("share", "ls", "--offline")]
-    [InlineData("share", "ls", "--offline", "--json")]
-    [InlineData("rotate", "secrets/target")]
-    [InlineData("rotate", "secrets/target", "--words", "6")]
-    [InlineData("rotate", "secrets/absent")]
-    [InlineData("clients")]
-    [InlineData("clients", "--json")]
-    [InlineData("doctor")]
-    [InlineData("doctor", "--json")]
-    public void NoVerb_LeaksAFieldValue_ToStdoutOrStderr(params string[] verb)
+    [InlineData(CliApp.ExitSuccess, "ls")]
+    [InlineData(CliApp.ExitSuccess, "ls", "--flat")]
+    [InlineData(CliApp.ExitSuccess, "get", "secrets/target")]
+    [InlineData(CliApp.ExitSuccess, "rm", "secrets/target", "--yes")]
+    [InlineData(CliApp.ExitSuccess, "env", "ls")]
+    [InlineData(CliApp.ExitSuccess, "env", "ls", "hygiene")]
+    [InlineData(CliApp.ExitSuccess, "env", "rm", "hygiene", "API_KEY", "--yes")]
+    [InlineData(CliApp.ExitSuccess, "env", "ls", "--json")]
+    [InlineData(CliApp.ExitSuccess, "env", "ls", "hygiene", "--json")]
+    [InlineData(CliApp.ExitSuccess, "env", "ls", "hygiene", "--profiles")]
+    [InlineData(CliApp.ExitSuccess, "env", "export", "hygiene")]
+    [InlineData(CliApp.ExitSuccess, "env", "diff", "hygiene")]
+    [InlineData(CliApp.ExitSuccess, "ls", "--json")]
+    [InlineData(CliApp.ExitSuccess, "env", "tag", "hygiene", "secrets/target", "-p", "prod", "--yes")]
+    [InlineData(CliApp.ExitSuccess, "env", "untag", "hygiene", "secrets/target", "--yes")]
+    [InlineData(CliApp.ExitSuccess, "search", "target")]
+    [InlineData(CliApp.ExitSuccess, "search", "target", "--json")]
+    [InlineData(CliApp.ExitSuccess, "search", "example.invalid")]
+    [InlineData(CliApp.ExitSuccess, "show", "secrets/target")]
+    [InlineData(CliApp.ExitSuccess, "show", "secrets/target", "--json")]
+    [InlineData(CliApp.ExitSuccess, "field", "ls", "secrets/target")]
+    [InlineData(CliApp.ExitSuccess, "field", "ls", "secrets/target", "--json")]
+    [InlineData(CliApp.ExitSuccess, "field", "rm", "secrets/target", "Region")]
+    [InlineData(CliApp.ExitSuccess, "attachment", "ls", "secrets/target")]
+    [InlineData(CliApp.ExitSuccess, "attachment", "ls", "secrets/target", "--json")]
+    [InlineData(CliApp.ExitSuccess, "get", "secrets/target", "--field", "API Secret")]
+    [InlineData(CliApp.ExitSuccess, "set", "secrets/target", "--generate")]
+    [InlineData(CliApp.ExitSuccess, "set", "secrets/new", "--generate", "--words", "6")]
+    [InlineData(CliApp.ExitSuccess, "share", "ls", "--offline")]
+    [InlineData(CliApp.ExitSuccess, "share", "ls", "--offline", "--json")]
+    [InlineData(CliApp.ExitSuccess, "rotate", "secrets/target")]
+    [InlineData(CliApp.ExitSuccess, "rotate", "secrets/target", "--words", "6")]
+    [InlineData(CliApp.ExitNotFound, "rotate", "secrets/absent")]
+    [InlineData(CliApp.ExitSuccess, "clients")]
+    [InlineData(CliApp.ExitSuccess, "clients", "--json")]
+    [InlineData(CliApp.ExitNeedsFixing, "doctor")]
+    [InlineData(CliApp.ExitNeedsFixing, "doctor", "--json")]
+    public void NoVerb_LeaksAFieldValue_ToStdoutOrStderr(int exit, params string[] verb)
     {
         using var harness = new CliHarness();
         Seed(harness);
 
         harness.Prompt.Enqueue(Master);
         var args = verb.Concat(["--vault", harness.VaultPath]).ToArray();
-        harness.Run(args);
+        harness.AssertExit(exit, harness.Run(args));
+
+        foreach (var sentinel in _everySentinel)
+        {
+            Assert.DoesNotContain(sentinel, harness.Out, StringComparison.Ordinal);
+            Assert.DoesNotContain(sentinel, harness.Err, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    /// <c>set</c> is swept with a value typed at its prompt, so its confirmation is the line under test: it names
+    /// the item or the field it wrote and never the value it was handed.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Set_NeverEchoesTheValueItWasTyped_ForThePasswordOrAField(bool field)
+    {
+        using var harness = new CliHarness();
+        Seed(harness);
+
+        harness.Prompt.Enqueue(Master, field ? SentinelField : SentinelPassword);
+        string[] shape = field ? ["--field", "API Secret"] : [];
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run(["set", "secrets/target", .. shape, "--vault", harness.VaultPath]));
 
         foreach (var sentinel in _everySentinel)
         {
@@ -157,7 +178,9 @@ public sealed class SecretHygieneTests
         File.WriteAllText(path, body);
 
         harness.Prompt.Enqueue(Master);
-        harness.Run("env", "pull", "hygiene", path, "--yes", "--keep", "--vault", harness.VaultPath);
+        harness.AssertExit(
+            wellFormed ? CliApp.ExitSuccess : CliApp.ExitUsageError,
+            harness.Run("env", "pull", "hygiene", path, "--yes", "--keep", "--vault", harness.VaultPath));
 
         foreach (var sentinel in _everySentinel)
         {
@@ -264,7 +287,7 @@ public sealed class SecretHygieneTests
         Seed(harness);
 
         harness.Prompt.Enqueue(Master);
-        harness.Run("ls", "--vault", harness.VaultPath);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("ls", "--vault", harness.VaultPath));
 
         Assert.DoesNotContain(Master, harness.Out, StringComparison.Ordinal);
         Assert.DoesNotContain(Master, harness.Err, StringComparison.Ordinal);
@@ -398,20 +421,20 @@ public sealed class SecretHygieneTests
     {
         harness.Prompt.Interactive = false;
         harness.Prompt.Enqueue(Master, Master);
-        harness.Run("init", harness.VaultPath);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("init", harness.VaultPath));
 
         harness.Prompt.Enqueue(Master, SentinelPassword);
-        harness.Run(
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run(
             "add", "secrets/target",
             "--vault", harness.VaultPath,
             "--username", SentinelUsername,
             "--url", SentinelUrl,
-            "--notes", SentinelNotes);
+            "--notes", SentinelNotes));
 
         // An env variable whose value is the same sentinel, so `env ls` and `env rm` are swept
         // against a real secret rather than an empty project.
         harness.Prompt.Enqueue(Master, SentinelPassword);
-        harness.Run("env", "set", "hygiene", "API_KEY", "--vault", harness.VaultPath);
+        harness.AssertExit(CliApp.ExitSuccess, harness.Run("env", "set", "hygiene", "API_KEY", "--vault", harness.VaultPath));
 
         // Custom fields, one protected and one plain, so the sweep covers what `field ls` names.
         harness.Prompt.Enqueue(Master, SentinelField);
@@ -554,10 +577,16 @@ public sealed class SecretHygieneTests
         harness.Prompt.Enqueue(Master, Master);
         Assert.Equal(CliApp.ExitSuccess, harness.Run("init", target));
 
-        foreach (var shape in new[] { new[] { "--dry-run" }, [], ["--into", ".keypaste"] })
+        // The last shape is refused, since keypaste's own group takes no import, so its refusal is swept too.
+        foreach (var (shape, exit) in new (string[] Shape, int Exit)[]
+        {
+            (["--dry-run"], CliApp.ExitSuccess),
+            ([], CliApp.ExitSuccess),
+            (["--into", ".keypaste"], CliApp.ExitUsageError),
+        })
         {
             harness.Prompt.Enqueue(Master, Master);
-            harness.Run(["import", harness.VaultPath, "--vault", target, .. shape]);
+            harness.AssertExit(exit, harness.Run(["import", harness.VaultPath, "--vault", target, .. shape]));
         }
 
         Assert.Contains("copied into vault", harness.Err, StringComparison.Ordinal);

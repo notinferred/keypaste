@@ -1,6 +1,4 @@
-using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
-using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Tests;
@@ -16,7 +14,7 @@ namespace Keypaste.App.Tests.ViewModels;
 /// <para>
 /// <b>Every row here is made by deleting something through a screen.</b> Seeding the bin directly
 /// would test a reader against a fixture, and the deletion that produces the row is half of what
-/// V.3b claims. So the entry deletions run through <see cref="EntriesViewModel"/> and the variable
+/// is under test. So the entry deletions run through <see cref="EntriesViewModel"/> and the variable
 /// deletion through <see cref="EnvProjectViewModel"/>, exactly as a person reaches them.
 /// </para>
 /// <para>
@@ -82,12 +80,13 @@ public sealed class TrashTests : IDisposable
     [Fact]
     public void An_untouched_vault_has_an_empty_trash()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, envSets: true);
+        using var trash = new TrashViewModel(context.Session);
 
-        Assert.True(context.Trash.IsEmpty);
-        Assert.Empty(context.Trash.Rows);
-        Assert.Equal(TrashViewModel.RecycledNote, context.Trash.Note);
-        Assert.DoesNotContain("format 4.1", context.Trash.Note, StringComparison.Ordinal);
+        Assert.True(trash.IsEmpty);
+        Assert.Empty(trash.Rows);
+        Assert.Equal(TrashViewModel.RecycledNote, trash.Note);
+        Assert.DoesNotContain("format 4.1", trash.Note, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -97,11 +96,11 @@ public sealed class TrashTests : IDisposable
     [Fact]
     public void A_deletion_made_in_the_app_appears_in_the_trash()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, envSets: true);
 
         Delete(context, "servers/production");
 
-        var trash = context.NewTrash();
+        using var trash = new TrashViewModel(context.Session);
         var row = Assert.Single(trash.Rows);
 
         Assert.Equal("production", row.DisplayTitle, StringComparer.Ordinal);
@@ -113,11 +112,11 @@ public sealed class TrashTests : IDisposable
     [Fact]
     public void A_deleted_password_is_restored_and_the_file_holds_it_again()
     {
-        using (var context = new Context(_vaultPath))
+        using (var context = new UnlockedScreens(_vaultPath, _master, envSets: true))
         {
             Delete(context, "servers/production");
 
-            var trash = context.NewTrash();
+            using var trash = new TrashViewModel(context.Session);
             trash.Selected = Assert.Single(trash.Rows);
             trash.RestoreCommand.Press();
 
@@ -132,8 +131,7 @@ public sealed class TrashTests : IDisposable
         Assert.NotNull(entry);
         Assert.Equal("v1", entry.Password, StringComparer.Ordinal);
 
-        // The history came back with it, which is what distinguishes a recycled entry from a
-        // re-created one.
+        // The history came back with it, which tells a recycled entry from a re-created one.
         var revisions = reopened.ReadHistory(new EntryName("servers", "production"));
         Assert.NotNull(revisions);
         Assert.Equal("v0", Assert.Single(revisions).Fields.Password, StringComparer.Ordinal);
@@ -146,13 +144,13 @@ public sealed class TrashTests : IDisposable
     [Fact]
     public void A_deleted_groups_items_are_listed_and_one_restores_to_its_path()
     {
-        using (var context = new Context(_vaultPath))
+        using (var context = new UnlockedScreens(_vaultPath, _master, envSets: true))
         {
             var write = context.Session.Write(vault => vault.DeleteGroup("servers"), outcome => outcome == GroupOutcome.Recycled);
 
             Assert.Equal(WriteOutcome.Saved, write.Outcome);
 
-            var trash = context.NewTrash();
+            using var trash = new TrashViewModel(context.Session);
             var row = Assert.Single(trash.Rows);
             Assert.Equal("production", row.DisplayTitle, StringComparer.Ordinal);
             Assert.Equal("servers", row.Where, StringComparer.Ordinal);
@@ -178,12 +176,12 @@ public sealed class TrashTests : IDisposable
     [Fact]
     public void Duplicate_names_restore_the_selected_identity()
     {
-        using (var context = new Context(_vaultPath))
+        using (var context = new UnlockedScreens(_vaultPath, _master, envSets: true))
         {
             Delete(context, "env/billing/.env");
             Delete(context, "env/dev/.env");
 
-            var trash = context.NewTrash();
+            using var trash = new TrashViewModel(context.Session);
             Assert.Equal(2, trash.Rows.Count);
 
             trash.Selected = trash.Rows.Single(row => row.Where == "env/dev");
@@ -206,11 +204,11 @@ public sealed class TrashTests : IDisposable
     [Fact]
     public void Permanent_deletion_needs_its_own_confirmation()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, envSets: true);
 
         Delete(context, "servers/production");
 
-        var trash = context.NewTrash();
+        using var trash = new TrashViewModel(context.Session);
         trash.Selected = Assert.Single(trash.Rows);
 
         // Asking is not doing: the file is untouched until the second act.
@@ -242,11 +240,11 @@ public sealed class TrashTests : IDisposable
     [Fact]
     public void Selecting_a_row_announces_the_lines_and_buttons_that_read_it()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, envSets: true);
 
         Delete(context, "servers/production");
 
-        var trash = context.NewTrash();
+        using var trash = new TrashViewModel(context.Session);
         var raised = Record(trash);
         var asked = new List<string>();
         trash.RestoreCommand.CanExecuteChanged += (_, _) => asked.Add("restore");
@@ -263,11 +261,11 @@ public sealed class TrashTests : IDisposable
     [Fact]
     public void Arming_the_permanent_deletion_announces_which_buttons_can_be_pressed()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, envSets: true);
 
         Delete(context, "servers/production");
 
-        var trash = context.NewTrash();
+        using var trash = new TrashViewModel(context.Session);
         trash.Selected = Assert.Single(trash.Rows);
         var asked = new List<string>();
         trash.RestoreCommand.CanExecuteChanged += (_, _) => asked.Add("restore");
@@ -285,9 +283,9 @@ public sealed class TrashTests : IDisposable
     [Fact]
     public void Reading_the_bin_again_restates_its_notes()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, envSets: true);
 
-        var trash = context.Trash;
+        using var trash = new TrashViewModel(context.Session);
         var raised = Record(trash);
 
         trash.Load();
@@ -299,11 +297,11 @@ public sealed class TrashTests : IDisposable
     [Fact]
     public void An_outcome_announces_that_there_is_one()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, envSets: true);
 
         Delete(context, "servers/production");
 
-        var trash = context.NewTrash();
+        using var trash = new TrashViewModel(context.Session);
         trash.Selected = Assert.Single(trash.Rows);
         var raised = Record(trash);
 
@@ -316,11 +314,11 @@ public sealed class TrashTests : IDisposable
     [Fact]
     public void A_refusal_announces_that_there_is_one()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, envSets: true);
 
         Delete(context, "servers/production");
 
-        var trash = context.NewTrash();
+        using var trash = new TrashViewModel(context.Session);
         trash.Selected = Assert.Single(trash.Rows);
         context.Session.Lock(VaultLockReason.Manual);
         var raised = Record(trash);
@@ -337,12 +335,12 @@ public sealed class TrashTests : IDisposable
     {
         string restoredUuid;
 
-        using (var context = new Context(_vaultPath))
+        using (var context = new UnlockedScreens(_vaultPath, _master, envSets: true))
         {
             Delete(context, "servers/production");
             Add(context, "servers/production");
 
-            var trash = context.NewTrash();
+            using var trash = new TrashViewModel(context.Session);
             trash.Selected = Assert.Single(trash.Rows);
             restoredUuid = trash.Selected.Id.UuidHex;
             trash.RestoreCommand.Press();
@@ -367,11 +365,11 @@ public sealed class TrashTests : IDisposable
     [Fact]
     public void Emptying_erases_nothing_when_the_trash_changed_after_it_asked()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, envSets: true);
 
         Delete(context, "servers/production");
 
-        var trash = context.NewTrash();
+        using var trash = new TrashViewModel(context.Session);
         trash.EmptyCommand.Press();
 
         var vault = context.Session.Unlocked!;
@@ -399,12 +397,12 @@ public sealed class TrashTests : IDisposable
     [Fact]
     public void Emptying_the_trash_needs_its_own_confirmation_naming_how_many_go()
     {
-        using (var context = new Context(_vaultPath))
+        using (var context = new UnlockedScreens(_vaultPath, _master, envSets: true))
         {
             Delete(context, "servers/production");
             Delete(context, "env/billing/.env");
 
-            var trash = context.NewTrash();
+            using var trash = new TrashViewModel(context.Session);
             Assert.Equal(2, trash.Rows.Count);
             Assert.True(trash.EmptyCommand.CanExecute(null));
             trash.Selected = trash.Rows[0];
@@ -448,14 +446,17 @@ public sealed class TrashTests : IDisposable
     [Fact]
     public void Empty_trash_is_disabled_while_the_trash_is_empty()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, envSets: true);
 
-        Assert.True(context.Trash.IsEmpty);
-        Assert.False(context.Trash.EmptyCommand.CanExecute(null));
-        Assert.Equal(string.Empty, context.Trash.EmptyPrompt, StringComparer.Ordinal);
+        using (var before = new TrashViewModel(context.Session))
+        {
+            Assert.True(before.IsEmpty);
+            Assert.False(before.EmptyCommand.CanExecute(null));
+            Assert.Equal(string.Empty, before.EmptyPrompt, StringComparer.Ordinal);
+        }
 
         Delete(context, "servers/production");
-        var trash = context.NewTrash();
+        using var trash = new TrashViewModel(context.Session);
         Assert.True(trash.EmptyCommand.CanExecute(null));
         Assert.Equal(
             "Delete the one item in the Trash and its history for good? This cannot be undone.",
@@ -473,11 +474,11 @@ public sealed class TrashTests : IDisposable
     [Fact]
     public void Reading_the_bin_announces_whether_it_can_be_emptied()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, envSets: true);
 
         Delete(context, "servers/production");
 
-        var trash = context.NewTrash();
+        using var trash = new TrashViewModel(context.Session);
         trash.Selected = Assert.Single(trash.Rows);
         var asked = 0;
         trash.EmptyCommand.CanExecuteChanged += (_, _) => asked++;
@@ -492,15 +493,14 @@ public sealed class TrashTests : IDisposable
     [Fact]
     public void A_row_whose_entry_has_gone_is_reported_rather_than_acted_on()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, envSets: true);
 
         Delete(context, "servers/production");
 
-        var trash = context.NewTrash();
+        using var trash = new TrashViewModel(context.Session);
         trash.Selected = Assert.Single(trash.Rows);
 
-        // Erased by something else holding the same vault — here, the session the screen is not
-        // looking at.
+        // Erased by another holder of the same vault: the session the screen is not looking at.
         var vault = context.Session.Unlocked!;
         Assert.True(vault.PurgeRecycled(trash.Selected!.Id));
         vault.Save();
@@ -523,11 +523,11 @@ public sealed class TrashTests : IDisposable
             vault.Save();
         }
 
-        using var context = new Context(path);
+        using var context = new UnlockedScreens(path, _master, envSets: true);
 
         Delete(context, "github");
 
-        var trash = context.NewTrash();
+        using var trash = new TrashViewModel(context.Session);
 
         Assert.False(trash.RecyclesDeletedEntries);
         Assert.Equal(TrashViewModel.NoBinNote, trash.Note);
@@ -538,11 +538,11 @@ public sealed class TrashTests : IDisposable
     [Fact]
     public void Locking_clears_the_list_the_selection_and_the_outcome()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, envSets: true);
 
         Delete(context, "servers/production");
 
-        var trash = context.NewTrash();
+        using var trash = new TrashViewModel(context.Session);
         trash.Selected = Assert.Single(trash.Rows);
         trash.PurgeCommand.Press();
 
@@ -564,7 +564,7 @@ public sealed class TrashTests : IDisposable
     [Fact]
     public void A_delete_that_raises_the_format_says_only_where_the_item_went()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, envSets: true);
 
         Assert.True(KdbxHeader.IsOlderThan41(_vaultPath));
         Delete(context, "servers/production");
@@ -576,7 +576,7 @@ public sealed class TrashTests : IDisposable
     [Fact]
     public void The_entry_screen_states_the_outcome_and_can_undo_it()
     {
-        using (var context = new Context(_vaultPath))
+        using (var context = new UnlockedScreens(_vaultPath, _master, envSets: true))
         {
             Delete(context, "servers/production");
 
@@ -590,7 +590,9 @@ public sealed class TrashTests : IDisposable
             Assert.Null(context.Entries.Notice);
             Assert.Null(context.Entries.Error);
             Assert.Contains(context.Entries.Rows, row => row.Path == "servers/production");
-            Assert.Empty(context.NewTrash().Rows);
+
+            using var trash = new TrashViewModel(context.Session);
+            Assert.Empty(trash.Rows);
         }
 
         using var reopened = ClaimedVault.Open(_vaultPath, _master);
@@ -613,7 +615,7 @@ public sealed class TrashTests : IDisposable
             vault.Save();
         }
 
-        using var context = new Context(path);
+        using var context = new UnlockedScreens(path, _master, envSets: true);
 
         Delete(context, "github");
 
@@ -625,7 +627,7 @@ public sealed class TrashTests : IDisposable
     [Fact]
     public void Opening_a_form_keeps_the_undo_and_the_next_write_ends_it()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, envSets: true);
 
         Delete(context, "servers/production");
         Assert.True(context.Entries.CanUndo);
@@ -649,14 +651,14 @@ public sealed class TrashTests : IDisposable
     [Fact]
     public void Restore_puts_every_selected_row_back_in_one_save_a_taken_name_included()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, envSets: true);
 
         Add(context, "servers/staging");
         Delete(context, "servers/production");
         Delete(context, "servers/staging");
         Add(context, "servers/staging");
 
-        var trash = context.Trash;
+        using var trash = new TrashViewModel(context.Session);
         trash.Load();
         Assert.Equal(2, trash.Rows.Count);
         trash.SelectedRows.AddRange(trash.Rows);
@@ -680,14 +682,15 @@ public sealed class TrashTests : IDisposable
     [Fact]
     public void A_key_removed_on_the_env_card_puts_nothing_in_the_trash()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, envSets: true);
 
         RemoveVariable(context, "billing", "STRIPE_KEY");
 
-        Assert.Empty(context.NewTrash().Rows);
+        using var trash = new TrashViewModel(context.Session);
+        Assert.Empty(trash.Rows);
     }
 
-    private static void Delete(Context context, string path)
+    private static void Delete(UnlockedScreens context, string path)
     {
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Path == path);
         context.Entries.DeleteCommand.Press();
@@ -699,7 +702,7 @@ public sealed class TrashTests : IDisposable
     }
 
     // A group's item, as KeePassXC adds one: the app adds items only at a vault's top level.
-    private static void Add(Context context, string path)
+    private static void Add(UnlockedScreens context, string path)
     {
         var slash = path.LastIndexOf('/');
         var entry = new VaultEntry { GroupPath = path[..slash], Title = path[(slash + 1)..], Password = "added" };
@@ -707,11 +710,11 @@ public sealed class TrashTests : IDisposable
         Assert.Equal(WriteOutcome.Saved, context.Session.Write(vault => { vault.AddEntry(entry); return true; }, _ => true).Outcome);
     }
 
-    private static void RemoveVariable(Context context, string project, string key)
+    private static void RemoveVariable(UnlockedScreens context, string project, string key)
     {
-        context.Env.OpenCommand.Press(project);
+        context.EnvSets.OpenCommand.Press(project);
 
-        var open = context.Env.OpenProject!;
+        var open = context.EnvSets.OpenProject!;
         open.Variables.Single(row => row.Key == key).RemoveCommand.Press();
         open.ConfirmRemoveCommand.Press();
     }
@@ -725,52 +728,4 @@ public sealed class TrashTests : IDisposable
 
     private static string Digest(string path) =>
         Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
-
-    /// <summary>An unlocked session and the three screens that reach the bin.</summary>
-    private sealed class Context : IDisposable
-    {
-        private TrashViewModel? _trash;
-
-        internal Context(string vaultPath)
-        {
-            Session = new AppVaultSession(new ManualClock(AppClock.Start));
-
-            using (var master = TempVault.Secret(_master))
-            {
-                Assert.Equal(UnlockOutcome.Opened, Session.TryUnlock(vaultPath, master.Value));
-            }
-
-            Countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock(AppClock.Start));
-            Entries = new EntriesViewModel(Session, Countdown);
-            Env = new EnvSetsViewModel(Session, Countdown);
-        }
-
-        internal AppVaultSession Session { get; }
-
-        internal ClipboardCountdown Countdown { get; }
-
-        internal EntriesViewModel Entries { get; }
-
-        internal EnvSetsViewModel Env { get; }
-
-        /// <summary>The Trash screen as a navigation builds it: read fresh, never cached.</summary>
-        internal TrashViewModel Trash => _trash ??= new TrashViewModel(Session);
-
-        /// <summary>Navigates to Trash again, which is what a person does after deleting.</summary>
-        internal TrashViewModel NewTrash()
-        {
-            _trash?.Dispose();
-            _trash = new TrashViewModel(Session);
-            return _trash;
-        }
-
-        public void Dispose()
-        {
-            _trash?.Dispose();
-            Env.Dispose();
-            Entries.Dispose();
-            Countdown.Dispose();
-            Session.Dispose();
-        }
-    }
 }

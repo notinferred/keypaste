@@ -12,14 +12,13 @@ using Xunit;
 namespace Keypaste.App.Tests;
 
 /// <summary>
-/// What the desktop app puts on screen, now that it puts vault contents on screen.
+/// What the desktop app puts on screen from inside the vault.
 /// </summary>
 /// <remarks>
 /// <para>
-/// In 4.1 this file held one blanket claim — no destination surfaces anything from inside the vault
-/// — and said in as many words that the day 4.2 put an entry list on screen it would fail, and
-/// whoever wrote that list would have to decide what belongs there. This is that decision, written
-/// down as assertions.
+/// A blanket claim that no destination surfaces anything from inside the vault cannot hold once
+/// the app lists entries, so what belongs on screen has to be decided. This is that decision,
+/// written down as assertions.
 /// </para>
 /// <para>
 /// <b>The blanket claim was not given an allow-set, and that is the point.</b> Moving four of five
@@ -34,23 +33,14 @@ namespace Keypaste.App.Tests;
 /// <para>
 /// <b>What may appear where.</b> A list row carries a title, a kind, a group, its agent use, a
 /// username and a URL, as KeePassXC's table does, and never a password, a note or a custom field's
-/// value (D-0488). The detail pane widens to the notes for the one entry a person selected —
+/// value. The detail pane widens to the notes for the one entry a person selected —
 /// <c>keypaste get</c>'s scope minus the password. A password appears nowhere, in any state,
 /// including after Copy.
 /// </para>
 /// </remarks>
 public sealed class SecretHygieneTests
 {
-    /// <summary>
-    /// The strings that must never reach a screen.
-    /// </summary>
-    /// <remarks>
-    /// <c>internal</c> rather than <c>private</c> for the reason <see cref="Core.Audit.AuditText"/>
-    /// gives and <c>Keypaste.Mcp.Tests</c>' own sentinels follow: <c>.editorconfig</c> applies
-    /// <c>_camelCase</c> to every private field, constants included, so this repository has no
-    /// <c>private const</c> anywhere. Worth knowing that only <c>dotnet format</c> enforces it —
-    /// <c>dotnet build</c> does not, so a local build can be green while CI is not.
-    /// </remarks>
+    /// <summary>The strings that must never reach a screen.</summary>
     internal const string Master = "correct horse battery staple";
 
     internal const string SentinelPassword = "SENTINEL-PASSWORD-a17f3c";
@@ -85,7 +75,7 @@ public sealed class SecretHygieneTests
 
     internal const string SentinelUnselectedTitle = "SENTINEL-OTHER-TITLE-30bd19";
 
-    /// <summary>A key left in the unselected entry's notes, which Settings › Recommendations names (C.2).</summary>
+    /// <summary>A key left in the unselected entry's notes, which Settings › Recommendations names.</summary>
     internal const string SentinelNoteKey = "SENTINEL_NOTE_KEY";
 
     /// <summary>That key's value, which the recommendation never holds.</summary>
@@ -99,7 +89,7 @@ public sealed class SecretHygieneTests
     /// </summary>
     /// <remarks>
     /// The entry pane can show this one, while somebody holds it, and nothing else about the entry
-    /// changes when it does (V.2b, D-0231). Having it in the fixture means every sweep in this file
+    /// changes when it does. Having it in the fixture means every sweep in this file
     /// now runs against an entry that has a history, so a pane that read one eagerly and kept it
     /// fails here rather than in the one test that thought to look.
     /// </remarks>
@@ -124,7 +114,7 @@ public sealed class SecretHygieneTests
     /// <summary>A protected custom field's value on the selected entry.</summary>
     internal const string SentinelFieldValue = "SENTINEL-FIELD-VALUE-8f14c2";
 
-    /// <summary>A plain custom field's value on the selected entry, masked like a protected one (V.7b).</summary>
+    /// <summary>A plain custom field's value on the selected entry, masked like a protected one.</summary>
     internal const string SentinelPlainFieldValue = "SENTINEL-PLAIN-FIELD-VALUE-d3a6e9";
 
     private static readonly string[] _everySentinel =
@@ -171,7 +161,7 @@ public sealed class SecretHygieneTests
     /// No destination surfaces a password, on any screen, in any state.
     /// </summary>
     /// <remarks>
-    /// What survives of 4.1's blanket claim, narrowed to the strings that never have a reason to be
+    /// The part of the no-surface rule with no exception, narrowed to the strings that never have a reason to be
     /// anywhere. Every destination is still walked, and every property is still reflected over, so a
     /// screen added in six months is covered without anybody remembering this file exists.
     /// </remarks>
@@ -198,7 +188,7 @@ public sealed class SecretHygieneTests
 
     /// <summary>
     /// Settings › Recommendations names the keys left in notes and holds none of their values,
-    /// before and after a lock (C.2).
+    /// before and after a lock.
     /// </summary>
     [Fact]
     public async Task The_recommendations_list_holds_keys_and_no_value()
@@ -226,7 +216,7 @@ public sealed class SecretHygieneTests
 
     /// <summary>
     /// The list holds names, usernames and URLs, and no password, note or custom field value — including
-    /// for an entry nobody selected (D-0488).
+    /// for an entry nobody selected.
     /// </summary>
     [Fact]
     public void The_entry_list_holds_names_usernames_and_urls_and_no_secret()
@@ -239,7 +229,7 @@ public sealed class SecretHygieneTests
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
 
         // First, that the list actually listed something. Without this the sweep below passes for a
-        // screen that renders nothing at all, which is the shape 4.1 already had.
+        // screen that renders nothing at all.
         //
         // Four rows, not two: a project's variables are fields of its home entry env/<project>/.env,
         // an ordinary entry `keypaste ls` lists too.
@@ -283,7 +273,7 @@ public sealed class SecretHygieneTests
     /// A search that matched a username shows it on the row, and its result holds no secret.
     /// </summary>
     /// <remarks>
-    /// The test above is about an unfiltered list. This one is about the case V.5b added, where a
+    /// The test above is about an unfiltered list. This one is about a filtered list, where a
     /// row is in the list <em>because of</em> a field: the comparison happens in <c>Vault.Search</c>,
     /// which never reads a password, a note or a custom field, so a filtered list holds no more than
     /// an unfiltered one does.
@@ -348,7 +338,7 @@ public sealed class SecretHygieneTests
     /// <see cref="RecycledEntry"/> says in prose that it carries no secret. This is what holds it:
     /// the same walk every other surface here gets, so adding a <c>Password</c> to that record
     /// fails a test rather than passing a review. A trash view keeps its whole list for as long as
-    /// it is open, which is exactly the shape 4.1's blanket claim was written against.
+    /// it is open, so every row it holds is swept.
     /// </remarks>
     [Fact]
     public void A_trash_row_holds_the_name_and_where_it_came_from_and_no_field_value()
@@ -436,7 +426,7 @@ public sealed class SecretHygieneTests
     /// legitimately reaches a screen here, so what has to hold instead is narrower: a row carries
     /// how long the password was and when it was current, the view model records which revision is
     /// revealed rather than what it holds, and the characters go from the open vault straight to
-    /// the control that draws them (D-0231).
+    /// the control that draws them.
     /// </para>
     /// <para>
     /// The list is opened deliberately, because the pane reads no history until it is asked.
@@ -481,7 +471,7 @@ public sealed class SecretHygieneTests
     }
 
     /// <summary>
-    /// The entry pane hands its current password only to a hold, and keeps none of it (D-0300).
+    /// The entry pane hands its current password only to a hold, and keeps none of it.
     /// </summary>
     /// <remarks>
     /// The third surface that draws a value on purpose, after env values and revisions. The pane
@@ -660,9 +650,8 @@ public sealed class SecretHygieneTests
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The invariant that replaces 4.1's blanket claim, and the first stage in which it can be
-    /// broken. <c>ShellViewModel</c>'s own rule is that everything it built is disposed on lock, and
-    /// 4.1 asserted that against an empty room.
+    /// The one invariant that is total. <c>ShellViewModel</c>'s own rule is that everything it built
+    /// is disposed on lock, which only a screen holding vault contents can break.
     /// </para>
     /// <para>
     /// <b>Two details decide whether this is worth anything.</b> The sweep holds a direct reference

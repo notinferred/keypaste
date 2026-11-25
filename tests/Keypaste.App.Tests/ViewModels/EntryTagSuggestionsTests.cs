@@ -11,7 +11,7 @@ namespace Keypaste.App.Tests.ViewModels;
 /// <summary>
 /// The item pane's tag box offers every environment the vault's items are tagged into, as its project tag, less the
 /// item's own; a tag that puts no item in a project, an item in the recycle bin and a malformed project tag offer
-/// nothing, and choosing a suggestion only fills the box, so Add tag still asks first (D-0415).
+/// nothing, and choosing a suggestion only fills the box, so Add tag still asks first.
 /// </summary>
 public sealed class EntryTagSuggestionsTests : IDisposable
 {

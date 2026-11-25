@@ -8,11 +8,11 @@ namespace Keypaste.Core.Ownership;
 
 /// <summary>
 /// Puts an agent's request to save a value to the person, who enters the value, and saves it at the place the agent named
-/// in the owner's own unlocked vault, under the owner's claim (F.79). The agent learns only whether it was saved.
+/// in the owner's own unlocked vault, under the owner's claim. The agent learns only whether it was saved.
 /// </summary>
 /// <remarks>
 /// The place is checked before anyone is asked, and only where the agent's bridge can see it, and checked again before it is
-/// written, so a vault that changed meanwhile saves nothing. A refused or unanswered request holds the same place back for a
+/// written, so a vault that changed meanwhile saves nothing. A refused request holds the same place back for a
 /// minute (THREATS.md T-11); a value is written only while the unlock it was asked under is live, its line is written before the
 /// vault is saved, and one whose line or save fails is taken back out of the open vault.
 /// </remarks>

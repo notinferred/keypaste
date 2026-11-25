@@ -130,9 +130,7 @@ public sealed class ClipboardCountdownTests
         Assert.Equal(1, clipboard.ClearCount);
     }
 
-    /// <summary>
-    /// A clock moved backwards does not buy the secret more time on the clipboard.
-    /// </summary>
+    /// <summary>A clock moved backwards does not buy the secret more time on the clipboard.</summary>
     [Fact]
     public async Task A_backwards_clock_correction_does_not_extend_the_window()
     {
@@ -288,7 +286,7 @@ public sealed class ClipboardCountdownTests
     /// </summary>
     /// <remarks>
     /// KeePassXC keeps the copied secret in a plain string for the whole timeout window purely to
-    /// power the same equality guard (O-0008). A hash answers the only question being asked, and
+    /// power the same equality guard. A hash answers the only question being asked, and
     /// this reflects over every field to prove the obvious implementation was not the one taken.
     /// </remarks>
     [Fact]

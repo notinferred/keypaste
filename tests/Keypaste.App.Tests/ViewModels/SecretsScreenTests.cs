@@ -1,6 +1,3 @@
-using Keypaste.App.Clipboard;
-using Keypaste.App.Session;
-using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Tests;
@@ -11,7 +8,7 @@ namespace Keypaste.App.Tests.ViewModels;
 /// <summary>
 /// What the Secrets screen says about an entry beyond its name: its kind, where it lives and its
 /// reference. Each is read from which fields are filled in or from the entry's path, never from a
-/// value; an entry under <c>env/</c> is an ordinary entry (D-0416).
+/// value; an entry under <c>env/</c> is an ordinary entry.
 /// </summary>
 public sealed class SecretsScreenTests : IDisposable
 {
@@ -54,7 +51,7 @@ public sealed class SecretsScreenTests : IDisposable
     [InlineData("env/acme-api/prod", "DATABASE_URL", "Password")]
     public void A_row_says_its_kind_and_not_its_group(string group, string title, string kind)
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
 
         var row = context.Entries.Rows.Single(row => row.GroupPath == group && row.Title == title);
 
@@ -65,7 +62,7 @@ public sealed class SecretsScreenTests : IDisposable
     [Fact]
     public void An_untagged_entry_under_env_is_a_password_named_by_its_entry_reference()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
 
         context.Entries.Selected = context.Entries.Rows.Single(row => row.GroupPath == "env/acme-api");
         var detail = context.Entries.Detail!;
@@ -78,7 +75,7 @@ public sealed class SecretsScreenTests : IDisposable
     [Fact]
     public void A_login_shows_where_it_lives_and_what_rotating_it_changes()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
 
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "github");
         var detail = context.Entries.Detail!;
@@ -92,7 +89,7 @@ public sealed class SecretsScreenTests : IDisposable
     [Fact]
     public void An_empty_list_says_why()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         Assert.False(context.Entries.ShowsListEmpty);
 
         context.Entries.Search = "nothing-is-called-this";
@@ -105,7 +102,7 @@ public sealed class SecretsScreenTests : IDisposable
     [Fact]
     public void An_entry_under_env_is_rotated_as_a_password()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
 
         context.Entries.Selected = context.Entries.Rows.Single(row => row.GroupPath == "env/acme-api/prod");
         var detail = context.Entries.Detail!;
@@ -117,7 +114,7 @@ public sealed class SecretsScreenTests : IDisposable
     [Fact]
     public void A_new_login_is_made_whole_in_one_step_at_the_top_level()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
 
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "github");
         var form = NewItemForm.Open(context.Entries, "gitlab");
@@ -137,44 +134,12 @@ public sealed class SecretsScreenTests : IDisposable
     [Fact]
     public async Task Copying_the_reference_puts_the_reference_and_never_the_value_on_the_clipboard()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
 
         context.Entries.Selected = context.Entries.Rows.Single(row => row.GroupPath == "env/acme-api");
         await context.Entries.Detail!.CopyReferenceCommand.PressAsync();
 
         Assert.Equal("kp:///env/acme-api/DATABASE_URL", context.Clipboard.Content);
         Assert.False(context.Clipboard.ContentWasSetAsASecret);
-    }
-
-    private sealed class Context : IDisposable
-    {
-        internal Context(string vaultPath)
-        {
-            Session = new AppVaultSession(new ManualClock(AppClock.Start));
-
-            using (var master = TempVault.Secret(_master))
-            {
-                Assert.Equal(UnlockOutcome.Opened, Session.TryUnlock(vaultPath, master.Value));
-            }
-
-            Clipboard = new FakeClipboard();
-            Countdown = new ClipboardCountdown(Clipboard, new ManualClock(AppClock.Start));
-            Entries = new EntriesViewModel(Session, Countdown);
-        }
-
-        internal AppVaultSession Session { get; }
-
-        internal ClipboardCountdown Countdown { get; }
-
-        internal EntriesViewModel Entries { get; }
-
-        internal FakeClipboard Clipboard { get; }
-
-        public void Dispose()
-        {
-            Entries.Dispose();
-            Countdown.Dispose();
-            Session.Dispose();
-        }
     }
 }

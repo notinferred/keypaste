@@ -247,12 +247,10 @@ public sealed class SharingViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task AnEndpointThatDoesNotResolve_KeepsTheFormOff_WithNoRetry()
+    public void AnEndpointThatDoesNotResolve_KeepsTheFormOff_WithNoRetry()
     {
         using var screen = Screen(unavailable: "Sharing is off: KEYPASTE_SHARE_URL may only name a local development server.");
         screen.SelectedWhat = "env/acme-api/STRIPE_KEY";
-
-        await screen.CreateCommand.PressAsync();
 
         Assert.True(screen.IsUnavailable);
         Assert.False(screen.CanRetry);

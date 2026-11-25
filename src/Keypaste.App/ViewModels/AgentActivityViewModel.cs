@@ -29,8 +29,8 @@ namespace Keypaste.App.ViewModels;
 /// One Connect sheet is open at a time, and while its plan or check runs it stays open.
 /// </para>
 /// <para>
-/// It re-reads the authority every second so the lifetimes count down, and re-reads the audit file, which says
-/// when each agent last asked, only when its length or write time has moved. The log itself is Agents › Activity.
+/// It re-reads the authority every second so the lifetimes count down, and reads what was appended to the audit file,
+/// which says when each agent last asked, only when its length or write time has moved. The log itself is Agents › Activity.
 /// </para>
 /// </remarks>
 internal sealed partial class AgentActivityViewModel : ObservableObject, IDisposable, IHoldsDraft
@@ -47,7 +47,8 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
     private readonly Dictionary<string, AgentRow> _byKey = new(StringComparer.Ordinal);
     private readonly HashSet<string> _opened = new(StringComparer.Ordinal);
     private bool _choosing;
-    private IReadOnlyList<AuditEntry> _auditEntries = [];
+    private readonly List<AuditEntry> _auditEntries = [];
+    private AuditPosition _auditPosition = AuditPosition.Start;
     private (long Length, DateTime Written)? _auditRead;
     private readonly ObservableCollection<AgentRow> _rows = [];
     private IReadOnlyList<McpToolFinding> _findings = [];
@@ -486,17 +487,17 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         var file = new FileInfo(_auditPath);
         (long, DateTime)? stamp = file.Exists ? (file.Length, file.LastWriteTimeUtc) : null;
 
+        var now = _clock.GetUtcNow();
+
         if (force || stamp != _auditRead)
         {
             _auditRead = stamp;
-            _auditEntries = stamp is not null && AuditReader.TryRead(_auditPath, out var entries, out _, out _) ? entries : [];
+            ReadAudit(restart: force, now);
         }
 
         var read = CurrentRules(out var problem, out var detail);
         ClientsProblem = problem;
         ClientsProblemDetail = detail;
-
-        var now = _clock.GetUtcNow();
 
         // A row whose settings are open is built from its name, so it stays listed, and current, until they close.
         var open = _byKey.Values.Where(row => row.IsOpen).Select(row => row.Label).OfType<string>();
@@ -566,6 +567,36 @@ internal sealed partial class AgentActivityViewModel : ObservableObject, IDispos
         }
 
         return read;
+    }
+
+    /// <summary>
+    /// Reads the audit lines appended since the last read, as <see cref="EntryActivitySource"/> does, keeping only those
+    /// inside <see cref="McpClientCards.SeenWindow"/>, the only ones the cards count, so a busy log is never read whole again.
+    /// </summary>
+    private void ReadAudit(bool restart, DateTimeOffset now)
+    {
+        if (restart)
+        {
+            _auditPosition = AuditPosition.Start;
+            _auditEntries.Clear();
+        }
+
+        if (!AuditReader.TryReadFrom(_auditPath, _auditPosition, out var appended, out var next, out _, out _))
+        {
+            _auditPosition = AuditPosition.Start;
+            _auditEntries.Clear();
+            return;
+        }
+
+        // A replaced or removed file is read from its start again, which numbers its lines from one again.
+        if (next.Line < _auditPosition.Line || (appended.Count > 0 && appended[0].Line <= _auditPosition.Line))
+        {
+            _auditEntries.Clear();
+        }
+
+        _auditPosition = next;
+        _auditEntries.AddRange(appended);
+        _auditEntries.RemoveAll(entry => entry.At is not { } at || now - at > McpClientCards.SeenWindow);
     }
 
     /// <summary>Whether a tool's entry starts something other than what Connect writes: another program, or not under the tool's own name.</summary>

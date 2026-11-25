@@ -81,7 +81,7 @@ public sealed class LogRowTests
         Assert.True(row.Denied);
     }
 
-    /// <summary>A merge the app saved reads as the app merging another program's save, naming what it merged, and is no agent's request (D-0619).</summary>
+    /// <summary>A merge the app saved reads as the app merging another program's save, naming what it merged, and is no agent's request.</summary>
     [Fact]
     public void A_merge_reads_as_the_app_merging_another_programs_save()
     {

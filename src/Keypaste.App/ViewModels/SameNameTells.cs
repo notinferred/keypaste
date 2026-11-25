@@ -20,9 +20,12 @@ internal sealed class SameNameTells
 
         foreach (var named in entries.GroupBy(EntryName.Of).Where(named => named.Count() > 1))
         {
+            var usernames = CountsOf(named, item => item.Username);
+            var urls = CountsOf(named, item => item.Url);
+
             foreach (var entry in named)
             {
-                var tell = OnlyThisOne(named, entry, item => item.Username) ?? OnlyThisOne(named, entry, item => item.Url) ?? string.Empty;
+                var tell = OnlyThisOne(usernames, entry.Username) ?? OnlyThisOne(urls, entry.Url) ?? string.Empty;
                 tells._tells[(entry.Uuid!, named.Key)] = DisplayTextSanitizer.Sanitize(tell, DisplayTextSanitizer.MaximumLength).Text;
             }
         }
@@ -49,6 +52,18 @@ internal sealed class SameNameTells
     internal static string WithTell(string path, string? tell) =>
         string.IsNullOrEmpty(tell) ? path : $"{path} ({tell})";
 
-    private static string? OnlyThisOne(IEnumerable<VaultEntry> named, VaultEntry entry, Func<VaultEntry, string> value) =>
-        value(entry).Length > 0 && named.Count(other => value(other) == value(entry)) == 1 ? value(entry) : null;
+    private static Dictionary<string, int> CountsOf(IEnumerable<VaultEntry> named, Func<VaultEntry, string> value)
+    {
+        Dictionary<string, int> counts = new(StringComparer.Ordinal);
+
+        foreach (var held in named.Select(value))
+        {
+            counts[held] = counts.GetValueOrDefault(held) + 1;
+        }
+
+        return counts;
+    }
+
+    private static string? OnlyThisOne(Dictionary<string, int> counts, string value) =>
+        value.Length > 0 && counts[value] == 1 ? value : null;
 }

@@ -53,7 +53,6 @@ on:
       - 'tests/Keypaste.Core.Tests/ForeignXml.cs'
       - 'tests/Keypaste.Core.Tests/Kdbx31.cs'
       - 'tests/Keypaste.Core.Tests/UnflushableFolder.cs'
-      - 'tests/Keypaste.Core.Tests/TestZones.cs'
       - 'tests/Keypaste.Core.Tests/ClaimedVault.cs'
       - 'scripts/verify.sh'
       - 'keypaste.app.slnx'
@@ -109,7 +108,7 @@ env:
 jobs:
   # main's push runs every job on Linux and Windows and every other run adds macOS; a dispatch or a tag's own run counts
   # toward a release.
-  # Only NuGet restores are cached, by every lock file's hash with no fallback key; package restores fresh (B.5).
+  # Only NuGet restores are cached, by every lock file's hash with no fallback key; package restores fresh.
   targets:
     runs-on: ubuntu-24.04
     timeout-minutes: 2
@@ -186,7 +185,7 @@ jobs:
         run: bash scripts/verify.sh desktop-gates
 
   # What the platform clipboard offers after the app copies a secret, after its clear and after a
-  # plain copy: the nspasteboard.org types on macOS, Klipper's hint on X11 (N.12). The readings go to
+  # plain copy: the nspasteboard.org types on macOS, Klipper's hint on X11. The readings go to
   # the log, since nothing in this workflow uploads before the installer is signed.
   clipboard-markers:
     name: clipboard markers (ubuntu-24.04)
@@ -227,7 +226,7 @@ jobs:
         shell: bash
         run: bash scripts/verify-clipboard-markers.sh "$PWD/artifacts/bin/Keypaste.MinimizeObserver/release/Keypaste.MinimizeObserver" clipboard-markers
 
-  # keypaste's browser extension (8.1f): its two builds, its own tests, and each build loaded in a real browser and paired with
+  # keypaste's browser extension: its two builds, its own tests, and each build loaded in a real browser and paired with
   # a held vault. The zips' bytes depend on Node's zlib, so Node is pinned exactly.
   extension:
     name: extension (ubuntu-24.04)
@@ -399,7 +398,7 @@ jobs:
         if: runner.os == 'Linux'
         run: bash scripts/apt-install.sh --no-install-recommends clang zlib1g-dev
 
-      # A client connected from the app starts this copy, so the package carries it (2.6a).
+      # A client connected from the app starts this copy, so the package carries it.
       - name: Add the NativeAOT bridge to the payload
         shell: bash
         run: |
@@ -658,7 +657,7 @@ jobs:
           bundle="$(scripts/build-macos-app.sh artifacts/stage "$VERSION" "$REPORTED" artifacts/bundle)"
           echo "zip=$bundle" >> "$GITHUB_OUTPUT"
 
-      # Every build's bundle, as install-desktop checks only a dispatched candidate's installed copy (G.5).
+      # Every build's bundle, as install-desktop checks only a dispatched candidate's installed copy.
       - name: Check a new terminal runs the bundle's keypaste through its link
         if: matrix.dmg
         shell: bash
@@ -685,7 +684,7 @@ jobs:
           printf '%s  %s\n' "$hash" "$name" > "artifacts/dist/$name.sha256"
           (cd artifacts/dist && shasum -a 256 -c "$name.sha256")
 
-      # Attested now so a desktop download published by 4.7c can be checked like the CLI's (3.8).
+      # Attested so a published desktop download can be checked like the CLI's.
       - name: Attest the desktop archive
         if: github.ref_type == 'tag' && steps.rehearsal.outputs.trusted == ''
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2

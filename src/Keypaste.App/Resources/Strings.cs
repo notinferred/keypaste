@@ -479,6 +479,7 @@ public static class Strings
     public static string OptionalTheSetupKeyOrOtpauthLink => Manager.GetString("OptionalTheSetupKeyOrOtpauthLink", CultureInfo.CurrentUICulture)!;
     public static string OrSetItUpByHand => Manager.GetString("OrSetItUpByHand", CultureInfo.CurrentUICulture)!;
     public static string OtherAITool => Manager.GetString("OtherAITool", CultureInfo.CurrentUICulture)!;
+    public static string OtherPlace => Manager.GetString("OtherPlace", CultureInfo.CurrentUICulture)!;
     public static string PairInTheExtension => Manager.GetString("PairInTheExtension", CultureInfo.CurrentUICulture)!;
     public static string PairedBrowsers => Manager.GetString("PairedBrowsers", CultureInfo.CurrentUICulture)!;
     public static string Passphrase => Manager.GetString("Passphrase", CultureInfo.CurrentUICulture)!;

@@ -76,6 +76,9 @@ public sealed class ProjectTagChangeTests : IDisposable
         Assert.Null(shouted.Environment);
         Assert.StartsWith("env:billing:Prod puts services/Stripe in no project: ", described[0], StringComparison.Ordinal);
         Assert.Equal("While the item carries it, every agent request for the item is asked live.", described[1]);
+        Assert.Equal(
+            "It stops making agent requests for the item ask live, unless another tag still does.",
+            Preview(["env:billing:Prod"], adding: false)!.Describe()[1]);
         Assert.Equal("It changes no stage.", Preview(["Env:billing"], adding: true)!.Describe()[1]);
     }
 

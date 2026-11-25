@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# keypaste setup and doctor against the real AI tools (G.2, G.3), as install-real-tools.sh puts them on a
+# keypaste setup and doctor against the real AI tools, as install-real-tools.sh puts them on a
 # runner at their pinned versions: Claude Code, Codex, Gemini CLI, Devin, VS Code and Cursor on every runner, and
 # Claude Desktop on macOS and Windows. It writes those tools' own configuration in the runner account's home, so it
 # refuses to run anywhere but GitHub Actions. keypaste runs with a KEYPASTE_HOME of its own and a vault chosen
@@ -23,7 +23,7 @@
 # fix, and changes no tool's configuration, the pinned audit log or the default home's.
 # VS Code, Claude Desktop and, on Windows, Cursor are checked at the file level only. On Linux and macOS, codex
 # sandbox runs a shell from the project folder as docs/safe-agents.md sets Codex: its write inside that folder lands,
-# its appends to ~/.keypaste/agents.toml and to Codex's config.toml are refused and change neither (L.3).
+# its appends to a vault's agent rules in ~/.keypaste/agents/ and to Codex's config.toml are refused and change neither.
 # setup --remove --dry-run then finds every registration, so each of keypaste's readers reads the file its tool wrote
 # on this runner, and on Windows starts Codex and Gemini CLI through node.exe, never cmd.exe. The backups equal the
 # seeds. A second connect changes no entry and no backup. Removing leaves no tool listing keypaste and gives each
@@ -360,14 +360,20 @@ MSYS2_ARG_CONV_EXCL='*' "$TIMEOUT" 120 code --user-data-dir "$(native "$WORK/vsc
   || die "VS Code writes $(json "$WORK/vscode/User/mcp.json" | jq -c '.servers.keypaste'), not keypaste's $(json "$VSCODE_FILE" | jq -c '.servers.keypaste')"
 
 # ------------------------------------------------------------------ an agent's command under Codex's sandbox
-# Codex's Windows sandbox needs a setup this runner has not had, so it is not driven here (L.3).
+# Codex's Windows sandbox needs a setup this runner has not had, so it is not driven here.
 if [ "$platform" != windows ]; then
   step "Codex's sandbox, set as docs/safe-agents.md sets it, refuses writes to keypaste's home and Codex's configuration"
   KEYPASTE_DIR="$H/.keypaste"
+  AGENTS_DIR="$KEYPASTE_DIR/agents"
   MADE_KEYPASTE_DIR=false
   if [ ! -d "$KEYPASTE_DIR" ]; then
     mkdir "$KEYPASTE_DIR"
     MADE_KEYPASTE_DIR=true
+  fi
+  MADE_AGENTS_DIR=false
+  if [ ! -d "$AGENTS_DIR" ]; then
+    mkdir "$AGENTS_DIR"
+    MADE_AGENTS_DIR=true
   fi
   # Appends a line to a file from a shell Codex sandboxes as it would the agent's, from the project folder.
   sandboxed_append() {
@@ -377,7 +383,7 @@ if [ "$platform" != windows ]; then
   sandboxed_append "$WORK/project/sandbox-probe" > "$OUT" 2>&1 \
     || die "Codex's sandbox refused a write inside its workspace, so it did not run as configured: $(cat "$OUT")"
   [ -s "$WORK/project/sandbox-probe" ] || die "Codex's sandbox reported a write inside its workspace that did not land"
-  for target in "$KEYPASTE_DIR/agents.toml" "$CODEX_FILE"; do
+  for target in "$AGENTS_DIR/vault.toml" "$CODEX_FILE"; do
     before="$(contents "$target")"
     if sandboxed_append "$target" > "$OUT" 2>&1; then die "Codex's sandbox let a command write $target"; fi
     grep -Eiq 'not permitted|read-only file system|permission denied' "$OUT" \
@@ -385,6 +391,7 @@ if [ "$platform" != windows ]; then
     [ "$(contents "$target")" = "$before" ] || die "Codex's sandbox let a command change $target"
     echo "refused: $target"
   done
+  if [ "$MADE_AGENTS_DIR" = true ]; then rmdir "$AGENTS_DIR"; fi
   if [ "$MADE_KEYPASTE_DIR" = true ]; then rmdir "$KEYPASTE_DIR"; fi
 fi
 

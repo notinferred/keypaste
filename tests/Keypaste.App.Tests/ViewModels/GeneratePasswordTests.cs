@@ -13,7 +13,7 @@ using Xunit;
 namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
-/// A password generated where it goes, or on its own (V.12): into the field it is for, a filled one written only by its
+/// A password generated where it goes, or on its own: into the field it is for, a filled one written only by its
 /// form's Save with the old value kept in history, and from Generate password… copied through the clearing clipboard,
 /// made a new item's password or added to the chosen item as a field, with nothing generated in the automation tree.
 /// </summary>
@@ -65,7 +65,7 @@ public sealed class GeneratePasswordTests : IDisposable
     [Fact]
     public void Generate_on_the_saved_password_opens_Edit_with_the_generator_and_Save_keeps_the_old_in_history()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
         var before = context.Vault.Find(_checking)!.Password;
         var revisions = context.Vault.ReadHistory(_checking)!.Count;
@@ -92,7 +92,7 @@ public sealed class GeneratePasswordTests : IDisposable
     [Fact]
     public void Cancel_on_the_saved_passwords_generator_leaves_nothing_for_Save_to_write()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
         var before = context.Vault.Find(_checking)!.Password;
 
@@ -111,7 +111,7 @@ public sealed class GeneratePasswordTests : IDisposable
     [Fact]
     public void Applying_the_new_passwords_choices_leaves_a_value_generated_in_another_field_as_it_was()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
         detail.BeginAddFieldCommand.Execute(null);
         detail.OpenFieldGeneratorCommand.Execute(detail.NewFieldValue);
@@ -133,7 +133,7 @@ public sealed class GeneratePasswordTests : IDisposable
     [Fact]
     public void Generate_on_a_protected_field_opens_its_replace_form_with_the_generator_and_writes_on_Replace()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
         var pin = detail.Fields.Single(field => field.Name == "PIN");
 
@@ -162,7 +162,7 @@ public sealed class GeneratePasswordTests : IDisposable
     [Fact]
     public void A_generated_field_follows_the_length_chosen()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
         var pin = detail.Fields.Single(field => field.Name == "PIN");
 
@@ -177,7 +177,7 @@ public sealed class GeneratePasswordTests : IDisposable
     [Fact]
     public void Choices_the_generator_refuses_empty_a_generated_field_and_its_form_writes_nothing_until_they_change()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
         var pin = detail.Fields.Single(field => field.Name == "PIN");
 
@@ -207,7 +207,7 @@ public sealed class GeneratePasswordTests : IDisposable
     [Fact]
     public void Choices_the_generator_refuses_keep_Save_from_writing_the_password_generated_before_them()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
         var before = context.Vault.Find(_checking)!.Password;
 
@@ -228,7 +228,7 @@ public sealed class GeneratePasswordTests : IDisposable
     [Fact]
     public void A_field_forms_generator_fills_only_its_field_and_only_on_Apply()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
         detail.BeginAddFieldCommand.Execute(null);
 
@@ -261,7 +261,7 @@ public sealed class GeneratePasswordTests : IDisposable
     [Fact]
     public void Edits_generator_puts_its_value_in_the_new_password_on_Apply_and_closes_with_the_edit()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
         detail.EditCommand.Execute(null);
 
@@ -285,7 +285,7 @@ public sealed class GeneratePasswordTests : IDisposable
     [Fact]
     public void Edits_username_box_suggests_the_vaults_usernames_once_something_is_typed()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         context.Vault.AddEntry(new VaultEntry { Title = "mail", Username = "dan@example.com", Password = "dan-secret-password" });
         var detail = context.Open(_checking);
 
@@ -376,42 +376,5 @@ public sealed class GeneratePasswordTests : IDisposable
         using var master = TempVault.Secret(TempVault.Password);
         Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(vault.Path_, master.Value));
         return session;
-    }
-
-    private sealed class Context : IDisposable
-    {
-        internal Context(string vaultPath)
-        {
-            Session = new AppVaultSession(new ManualClock(AppClock.Start));
-
-            using (var master = TempVault.Secret(_master))
-            {
-                Assert.Equal(UnlockOutcome.Opened, Session.TryUnlock(vaultPath, master.Value));
-            }
-
-            Countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock(AppClock.Start));
-            Entries = new EntriesViewModel(Session, Countdown);
-        }
-
-        internal AppVaultSession Session { get; }
-
-        internal Vault Vault => Session.Unlocked!;
-
-        internal ClipboardCountdown Countdown { get; }
-
-        internal EntriesViewModel Entries { get; }
-
-        internal EntryDetailViewModel Open(EntryName name)
-        {
-            Entries.Selected = Entries.Rows.Single(row => row.Title == name.Title && row.GroupPath == name.GroupPath);
-            return Entries.Detail!;
-        }
-
-        public void Dispose()
-        {
-            Entries.Dispose();
-            Countdown.Dispose();
-            Session.Dispose();
-        }
     }
 }

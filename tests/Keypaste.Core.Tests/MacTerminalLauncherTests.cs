@@ -10,7 +10,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// The launcher Terminal runs claims one request, deletes it, and starts the bundle's own <c>keypaste run --session</c>
-/// with exactly that request, evaluating none of it; a request it cannot use starts nothing (E.1d).
+/// with exactly that request, evaluating none of it; a request it cannot use starts nothing.
 /// </summary>
 /// <remarks>
 /// The launcher reads the real per-user folder, as Terminal's window does, so these share one collection that runs alone.

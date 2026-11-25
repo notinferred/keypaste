@@ -78,7 +78,7 @@ public sealed partial class BrowserPairingTests
         window.FindControl<TextBox>("NameBox")!.Text = "work laptop";
         app.Clock.Advance(PromptViewModel.ArmingDelay);
         await PromptedApp.UntilAsync(() => Text(window, "NameProblemText") == "Another pairing has this name.");
-        await Task.Delay(200, Token);
+        await PromptedApp.UntilAsync(() => IsArmed(window));
         Assert.False(window.FindControl<Button>("Allow")!.IsEffectivelyEnabled);
 
         Click(window, "Deny");

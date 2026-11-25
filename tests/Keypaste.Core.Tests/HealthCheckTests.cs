@@ -342,7 +342,7 @@ public sealed class HealthCheckTests : IDisposable
         Assert.Equal(HealthStatus.Fix, app.Status);
         Assert.StartsWith("line 1: ", app.Says, StringComparison.Ordinal);
         Assert.Equal(KeypasteHome.SettingsPath(home), app.Where);
-        Assert.Equal("fix line 1, or delete it and run `keypaste use <path>`; deleting also resets the app's preferences", app.Fix);
+        Assert.Equal("fix line 1, or delete it and run `keypaste use <path>`; deleting also resets the app's preferences, and how long the agent log is kept goes back to one year", app.Fix);
 
         var shared = Of("agents.toml");
         Assert.Equal(HealthStatus.Fix, shared.Status);

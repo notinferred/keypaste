@@ -18,7 +18,8 @@ namespace Keypaste.Mcp.Tests;
 /// test driving the tool against an in-process source would have encoded nothing and proved nothing.
 /// </para>
 /// <para>
-/// Before F.3c an over-size reply threw inside the listener's write, took the connection down with
+/// Before a listing reply was bounded by what one frame carries, an over-size reply threw
+/// inside the listener's write, took the connection down with
 /// its grants, was retried once onto a fresh connection with the same result, and reached the agent
 /// as "something went wrong while asking a person". Every assertion below distinguishes that from a
 /// bounded reply that says what it left out.
@@ -63,23 +64,9 @@ public sealed class ListingSizeTests
         return (approver, harness, await harness.StartAsync("--expose", "env/**"));
     }
 
-    /// <summary>A vault too big for one reply is listed, and the agent is told it is not the whole list.</summary>
-    [Fact]
-    public async Task AVaultTooBigForOneReply_TellsTheAgentTheListIsIncomplete()
-    {
-        var (approver, harness, client) = await ConnectedAsync(Crowd(1000));
-        await using var _ = approver;
-        await using var __ = harness;
-
-        var call = await ListingCall.ReadAsync(client, harness, Token);
-
-        Assert.False(call.Result.IsError, call.Report());
-        Assert.True(call.Structured.GetProperty("truncated").GetBoolean());
-        Assert.Contains(ToolText.ListingIncomplete, call.Text, StringComparison.Ordinal);
-    }
-
     /// <summary>
-    /// And it is a listing, not an empty one. Without this, refusing everything would pass above.
+    /// A vault too big for one reply is listed with the names that fit, not as an empty listing, and the agent is told it
+    /// is not the whole list.
     /// </summary>
     [Fact]
     public async Task AVaultTooBigForOneReply_StillListsTheNamesThatFit()
@@ -90,8 +77,11 @@ public sealed class ListingSizeTests
 
         var call = await ListingCall.ReadAsync(client, harness, Token);
 
+        Assert.False(call.Result.IsError, call.Report());
         Assert.True(call.Structured.GetProperty("count").GetInt32() > 0, call.Report());
         Assert.Contains("SERVICE_ACCOUNT_ACCESS_TOKEN_AB_0000", call.Text, StringComparison.Ordinal);
+        Assert.True(call.Structured.GetProperty("truncated").GetBoolean());
+        Assert.Contains(ToolText.ListingIncomplete, call.Text, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -113,11 +103,8 @@ public sealed class ListingSizeTests
         var text = call.Text;
         var header = text.Split('\n')[0];
 
-        // F.9: this is the assertion that reproduces. Under an injected pool floor of one worker
-        // thread it fails here with the no-approver refusal against a listener that stayed bound,
-        // and the sub-string failure alone says nothing about why. Reported on the failing path so
-        // the pool reading arrives with it rather than being thrown away by the assertion that
-        // tripped over it - the same mistake ListingCall itself was built to stop.
+        // Reported on the failing path, because a bare sub-string failure says nothing about which
+        // refusal came back.
         if (!header.Contains("not all of them", StringComparison.Ordinal))
         {
             Assert.Fail($"the header did not say the listing was cut off.{Environment.NewLine}{call.Report()}");
@@ -203,11 +190,11 @@ public sealed class ListingSizeTests
     /// A listing that came back without structured content says which refusal it was.
     /// </summary>
     /// <remarks>
-    /// F.8. This is the shape the failure on <c>windows-2025</c> had — an error result where a
+    /// This is the shape a failure once seen on <c>windows-2025</c> had — an error result where a
     /// bounded listing was due — reached here on purpose by pointing the bridge at a pipe nobody
     /// answers. What is asserted is not that the reply was wrong but that the assertion tripping
-    /// over it names the path: eight refusals reach this shape, the audit method alone cannot
-    /// separate three of them, and the one sighting discarded the sentence that could.
+    /// over it names the path: eight refusals reach this shape, and the audit method alone cannot
+    /// separate three of them.
     /// </remarks>
     [Fact]
     public async Task AListingThatCameBackWithoutStructuredContent_SaysWhatCameBackInstead()

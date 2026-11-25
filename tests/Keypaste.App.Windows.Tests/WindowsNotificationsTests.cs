@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Keypaste.App.Windows.Tests;
 
-/// <summary>Toasts from the app's Windows build (Q.14). A hosted runner has no person to see one, so these read what Windows is told and how it answers.</summary>
+/// <summary>Toasts from the app's Windows build. A hosted runner has no person to see one, so these read what Windows is told and how it answers.</summary>
 public sealed class WindowsNotificationsTests
 {
     [Fact]

@@ -115,7 +115,7 @@ public sealed class AgentRulesFile(string path, string homeIdPath)
         StringLength = Approval.CredentialRequestRules.MaximumEntryLength + 128,
     };
 
-    /// <summary>The file.</summary>
+    /// <summary>The file the rules are read from and written to.</summary>
     public string Path { get; } = path ?? throw new ArgumentNullException(nameof(path));
 
     /// <summary>This home's identity, which every vault's rules in the home share.</summary>

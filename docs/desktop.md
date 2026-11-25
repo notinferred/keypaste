@@ -46,7 +46,7 @@ Drag a `.kdbx` onto the window, choose Open a vault…, or pick it from the rece
 
 - **Key file.** Choose it with Key file… under Unlock.
 - **YubiKey.** Choose YubiKey… (slot 2 by default), programmed for HMAC-SHA1 challenge-response, and touch the key when asked. Every save asks again. The CLI reaches such a vault only through the app while the app holds it. No physical YubiKey has been tested.
-- **Windows Hello and Touch ID.** After an idle lock or a lock you made, Unlock with Windows Hello, or Unlock with Touch ID on a Mac, reopens the vault. Quitting, `keypaste lock`, a changed password or key file, and on a Mac an added or removed fingerprint need the master password. Pressing the notification that an agent asked for a locked vault asks Windows Hello or Touch ID at once where they can reopen it.
+- **Windows Hello and Touch ID.** After an idle lock or a lock you made, Unlock with Windows Hello, or Unlock with Touch ID on a Mac, reopens the vault. Quitting, `keypaste lock`, a changed password or key file, and on a Mac an added or removed fingerprint need the master password. Pressing the notification that an agent asked for a locked vault asks Windows Hello or Touch ID at once where they can reopen it, unless another vault is unlocked.
 
 One vault has one approver at a time: while `keypaste approve` holds it in a terminal, the app cannot, and the other way round.
 
@@ -54,14 +54,22 @@ One vault has one approver at a time: while `keypaste approve` holds it in a ter
 
 Add vault…, at the foot of the sidebar or in the File menu, opens or creates another vault. Each vault has its own connection and settings for agents.
 
-Search covers every unlocked vault. Settings, Agents and Security act on the vault you pick at their top. A vault's heading menu locks or closes just that vault; Lock locks them all.
+Search covers every unlocked vault. Settings, Agents and Security act on the vault you pick at their top, and so do Settings' Share links and Scoped tokens. An item's Share… shares from the item's own vault, and closes if that vault locks. A vault's heading menu locks or closes just that vault; Lock locks them all.
+
+When an agent asks for a locked vault, keypaste shows one notice. You see another after a vault opens, or after every vault locks again once that notice is gone. With another vault unlocked, Open keypaste on the notice only brings the window forward; unlock the asked vault from its own unlock form.
+
+### Use keypaste in a terminal
+
+A project's copied run command and the other `keypaste` commands in this guide need `keypaste` on the terminal's `PATH`. The MSI puts it there on Windows. On macOS and Linux, Settings › keypaste in a terminal links it: on macOS as `/usr/local/bin/keypaste`, after an administrator password, and on Linux as `~/.local/bin/keypaste`.
+
+On a Mac, move keypaste.app to Applications and open it from there before you link the command or turn on Open at login. A copy run from the mounted disk image, or from the temporary copy macOS makes of a downloaded app, can't be linked or opened at login, because it is gone once you eject or quit it.
 
 <a id="what-the-screens-show"></a>
 <a id="layout"></a>
 
 ## Find and use items
 
-The rail at the left holds Items, Agents, Security and Settings. On Items, the sidebar lists New, Favorites, the vault's places and Trash.
+The rail at the left holds Items, Agents, Security and Settings. On Items, the sidebar lists New, Favorites, the vault's places and Trash. Other lists the identities, SSH keys and Wi-Fi networks no other place holds, and the list shows how many items it holds beside its title, with the search under it.
 
 A vault is one flat list of items, organized by tags. The app shows no groups, and leaves the groups a file already holds untouched for KeePassXC.
 
@@ -131,7 +139,7 @@ Environments lists the vault's projects. Pick a stage, such as `dev` or `prod`, 
 
 ### Run a command with a project's variables
 
-Run with keypaste shows the stage's command, such as `keypaste run --session -p dev <project> -- npm start`, to copy. `--session` asks the app instead of opening the vault, so you type no password in the terminal. Add `--vault <this vault>` where the terminal would find another vault. The app asks before releasing the variables.
+Run with keypaste shows the stage's command, such as `keypaste run --session --vault '<this vault's path>' -p dev <project> -- npm start`, to copy. `--session` asks the app instead of opening the vault, so you type no password in the terminal. `--vault` names this vault, so the run asks it even when another vault is open. When the vault's file path or the project's name holds characters a terminal could run or change, the app shows no command and says why. The app asks before releasing the variables.
 
 Run… opens a terminal running the command in a directory you save.
 
@@ -153,7 +161,7 @@ A click on an allow works once the prompt has focus; Return and Space wait a sec
 
 Agents lists the AI tools on this computer and the agents that asked this vault recently.
 
-- **Connect an AI tool.** Add an agent offers a setup prompt to copy, an app to connect, or MCP to add by hand. Connect shows the command it will register and runs it only when you press it ([MCP setup](mcp-setup.md)).
+- **Connect an AI tool.** In Agents, the + (Connect an AI tool…) opens the Connect sheet: a setup prompt to paste into an AI tool, the server entry to add by hand, and the tools found on this computer. Connect… shows what Add it for me changes, and nothing is written until you press it ([MCP setup](mcp-setup.md)).
 - **Choose what an agent gets.** An agent's page sets what it gets of each kind of value and whether it may run commands. Settings › Agents sets the defaults. Agent settings are kept on this computer, not in the vault ([agent settings](policy.md)).
 - **See what happened.** Agents › Activity shows the audit log, newest first; a record the hash chain does not vouch for says Edited. `keypaste log` reads the log at any time.
 

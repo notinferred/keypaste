@@ -67,9 +67,8 @@ public sealed class ApprovalGateTests
 
     /// <summary>
     /// The window is open before the person is asked, so a whole window spent putting the prompt up
-    /// closes it. Opened afterwards, it began again once the prompt was showing, and a test that
-    /// moved its clock as soon as the person was asked could never see it close (app run
-    /// 36084643134).
+    /// closes it. Opened afterwards, it would begin again once the prompt was showing, and a test
+    /// that moved its clock as soon as the person was asked could never see it close.
     /// </summary>
     [Fact]
     public async Task TheWindowIsOpenBeforeThePersonIsAsked()
@@ -397,6 +396,45 @@ public sealed class ApprovalGateTests
         channel.Release();
 
         Assert.Equal(ApprovalAnswer.TimedOut, await asking);
+    }
+
+    /// <summary>
+    /// A machine that sleeps stops the window's timer on a platform whose monotonic clock stops too, so the prompt is still
+    /// up on waking; a yes then is as late as one after the timer fired.
+    /// </summary>
+    [Fact]
+    public async Task ApprovedOnce_AfterASleepLongerThanTheWindow_IsTimedOut()
+    {
+        var channel = new ScriptedChannel(ApprovalAnswer.ApprovedOnce) { Park = true };
+        var (gate, clock) = Build(channel);
+        using var owned = gate;
+
+        var asking = owned.AskAsync("k", Prompt(), TestContext.Current.CancellationToken).AsTask();
+        await channel.Entered.WaitAsync(TestContext.Current.CancellationToken);
+
+        clock.AdvanceWallOnly(TimeSpan.FromMinutes(20));
+        channel.Release();
+
+        Assert.Equal(ApprovalAnswer.TimedOut, await asking);
+    }
+
+    /// <summary>A no given on waking is still the person's no, so it keeps its cooldown rather than becoming a timeout.</summary>
+    [Fact]
+    public async Task ADenial_AfterASleepLongerThanTheWindow_StaysADenialAndHoldsTheSameRequestBack()
+    {
+        var channel = new ScriptedChannel(ApprovalAnswer.Denied) { Park = true };
+        var (gate, clock) = Build(channel);
+        using var owned = gate;
+
+        var asking = owned.AskAsync("same", Prompt(), TestContext.Current.CancellationToken).AsTask();
+        await channel.Entered.WaitAsync(TestContext.Current.CancellationToken);
+
+        clock.AdvanceWallOnly(TimeSpan.FromMinutes(20));
+        channel.Release();
+
+        Assert.Equal(ApprovalAnswer.Denied, await asking);
+        Assert.Equal(ApprovalAnswer.Cooldown, await owned.AskAsync("same", Prompt(), TestContext.Current.CancellationToken));
+        Assert.Equal(1, channel.Asked);
     }
 
     [Fact]

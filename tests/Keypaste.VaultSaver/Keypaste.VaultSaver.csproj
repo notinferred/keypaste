@@ -5,8 +5,8 @@
     <RootNamespace>Keypaste.VaultSaver</RootNamespace>
 
     <!-- Not a test project: it holds no tests. It lives under tests/ because nothing shipped
-         references it, and it exists only so V-F.6 can save from a process whose TMP was set
-         before the process started. -->
+         references it, and it exists so Core's save tests can save from a process whose TMP was set
+         before the process started, or kill one partway through a save. -->
     <IsTestProject>false</IsTestProject>
   </PropertyGroup>
 

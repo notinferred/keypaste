@@ -29,8 +29,8 @@ public sealed class ConsoleMarksTests
     }
 
     /// <summary>
-    /// A Windows console code page substitutes a look-alike rather than throwing, as code page 437
-    /// did in the acceptance transcript: the mark it cannot carry falls back, the one it can stays.
+    /// A Windows console code page such as 437 substitutes a look-alike rather than throwing: the mark it
+    /// cannot carry falls back, the one it can stays.
     /// </summary>
     [Fact]
     public void ABestFitCodePage_FallsBackOnlyWhereItSubstitutes()

@@ -220,7 +220,7 @@
           </Border>
         </StackPanel>
 
-        <!-- The export is plaintext on disk, and keypaste leaves it there (D-0592). -->
+        <!-- The export is plaintext on disk, and keypaste leaves it there. -->
         <Border Classes="card" Padding="16" IsVisible="{Binding IsImported}">
           <Grid ColumnDefinitions="Auto,*">
             <ctl:KpIcon Grid.Column="0" Icon="trash-2" Size="16" Margin="0,2,8,0" VerticalAlignment="Top"

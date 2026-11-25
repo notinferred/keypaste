@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -19,6 +21,9 @@ public sealed class RelayTests
     private const string _pairing = "keypaste on this computer";
 
     private static readonly TimeSpan _wait = TimeSpan.FromSeconds(10);
+
+    // The extension's messageTimeout for status checks, after which it says keypaste can't be reached.
+    private static readonly TimeSpan _extensionStatusTimer = TimeSpan.FromMilliseconds(500);
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -275,7 +280,7 @@ public sealed class RelayTests
         using var app = LockedAppEndpoint.Listen(rig.LockedAppName, () => heard.Release(), _ => { });
 
         var quiet = await rig.Browser.RequestAsync("get-databasehash", null, Token);
-        Assert.False(await heard.WaitAsync(TimeSpan.FromMilliseconds(500), Token), "the relay knocked when the extension had not asked to unlock");
+        Assert.True(await KnocksHeardAsync(rig.LockedAppName, heard) == 0, "the relay knocked when the extension had not asked to unlock");
 
         var asking = await rig.Browser.RequestAsync("get-databasehash", null, ExtensionClient.NewNonce(), triggerUnlock: true, Token);
 
@@ -283,7 +288,7 @@ public sealed class RelayTests
         Assert.Equal("1", asking.ErrorCode);
         Assert.Equal("Database not opened", (string?)asking.Reply["error"]);
         Assert.True(await heard.WaitAsync(_wait, Token), "the locked app was not told");
-        Assert.False(await heard.WaitAsync(TimeSpan.FromMilliseconds(500), Token), "the locked app was told twice");
+        Assert.True(await KnocksHeardAsync(rig.LockedAppName, heard) == 0, "the locked app was told twice");
     }
 
     /// <summary>
@@ -345,7 +350,45 @@ public sealed class RelayTests
         Assert.Single(rig.Owner.Heard);
         Assert.Single(rig.Others["Acme"].Heard);
         Assert.True(await heard.WaitAsync(_wait, Token), "the locked app was not told");
-        Assert.False(await heard.WaitAsync(TimeSpan.FromMilliseconds(500), Token), "the locked app was told twice");
+        Assert.True(await KnocksHeardAsync(rig.LockedAppName, heard) == 0, "the locked app was told twice");
+    }
+
+    /// <summary>
+    /// A locked or closed app has no owner listening on any vault's pipe, and a status check answered after the extension's
+    /// timer would be shown as keypaste unreachable rather than locked.
+    /// </summary>
+    [Fact]
+    public async Task With_no_owner_listening_on_any_vault_each_status_check_is_answered_as_not_open_before_the_extension_gives_up()
+    {
+        await using var rig = await RelayRig.KeyedAsync(owner: false, "Acme");
+        await rig.Others["Acme"].StopAsync();
+
+        var (hash, hashWaited) = await TimedAsync(rig, "get-databasehash", null);
+        var (check, checkWaited) = await TimedAsync(rig, "test-associate", Pairing(Key()));
+
+        Assert.Equal("1", hash.ErrorCode);
+        Assert.Equal("1", check.ErrorCode);
+        Assert.True(hashWaited < _extensionStatusTimer, $"get-databasehash waited {(int)hashWaited.TotalMilliseconds} ms on the owners' pipes, past the extension's timer");
+        Assert.True(checkWaited < _extensionStatusTimer, $"test-associate waited {(int)checkWaited.TotalMilliseconds} ms on the owners' pipes, past the extension's timer");
+    }
+
+    [Fact]
+    public async Task With_the_first_two_vaults_owners_not_listening_a_status_check_is_answered_by_the_third_vaults_owner_before_the_extension_gives_up()
+    {
+        // Waiting on each of two silent pipes as long as a request does would take twice the extension's timer, well past timing noise.
+        await using var rig = await RelayRig.KeyedAsync(owner: false, "Beta", "Acme");
+        await rig.Others["Beta"].StopAsync();
+        var hash = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
+        rig.Others["Acme"].Session = "session-acme";
+        rig.Others["Acme"].DatabaseHash = hash;
+
+        var (told, waited) = await TimedAsync(rig, "get-databasehash", null);
+
+        Assert.Equal(hash, (string?)told.Message!["hash"]);
+        Assert.True(waited < _extensionStatusTimer, $"get-databasehash waited {(int)waited.TotalMilliseconds} ms on the owners' pipes, past the extension's timer");
+        Assert.Equal(
+            new AttachRequest(rig.Options.Vaults[2].Path) { Browser = BrowserIdentity.ChromeWebStore.Caller },
+            Assert.IsType<AttachRequest>(Assert.Single(rig.Others["Acme"].Heard)));
     }
 
     [Fact]
@@ -620,6 +663,73 @@ public sealed class RelayTests
     }
 
     private static JsonObject Pairing(string key) => new() { ["id"] = _pairing, ["key"] = key };
+
+    /// <summary>
+    /// The answer to <paramref name="action"/>, and how much longer the relay took over it than over a request it answers
+    /// without trying any owner's pipe, so what a loaded machine adds to every request is not counted as waiting on the pipes.
+    /// </summary>
+    private static async Task<(Answer Answer, TimeSpan Waited)> TimedAsync(RelayRig rig, string action, JsonObject? fields)
+    {
+        // A check naming no pairing is refused before any pipe is tried; the faster of two leaves out a pause in either.
+        var unwaited = TimeSpan.MaxValue;
+
+        for (var run = 0; run < 2; run++)
+        {
+            var started = Stopwatch.GetTimestamp();
+            var refused = await rig.Browser.RequestAsync("test-associate", null, Token);
+            var took = Stopwatch.GetElapsedTime(started);
+
+            Assert.Equal("8", refused.ErrorCode);
+            unwaited = took < unwaited ? took : unwaited;
+        }
+
+        var asked = Stopwatch.GetTimestamp();
+        var answer = await rig.Browser.RequestAsync(action, fields, Token);
+
+        return (answer, Stopwatch.GetElapsedTime(asked) - unwaited);
+    }
+
+    /// <summary>How many knocks besides two of the test's own the app on <paramref name="endpoint"/> has heard, taking each from <paramref name="heard"/> so none is counted twice.</summary>
+    /// <remarks>
+    /// The app hears a knock before it hangs up on it, so the test's own are always counted. The app answers knocks in the
+    /// order its pipe instances were made, and a knock made after one of the test's has been answered waits on a later
+    /// instance than any knock before it, so every earlier knock is counted.
+    /// </remarks>
+    private static async Task<int> KnocksHeardAsync(string endpoint, SemaphoreSlim heard)
+    {
+        await KnockAsync(endpoint);
+        await KnockAsync(endpoint);
+        var knocks = 0;
+
+        while (await heard.WaitAsync(0, Token))
+        {
+            knocks++;
+        }
+
+        // Without the two knocks the test made itself.
+        return knocks - 2;
+    }
+
+    /// <summary>Knocks on <paramref name="endpoint"/> and waits for the app to hang up.</summary>
+    private static async Task KnockAsync(string endpoint)
+    {
+        await using (var pipe = new NamedPipeClientStream(".", endpoint, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly))
+        {
+            await pipe.ConnectAsync(_wait, Token);
+            var discarded = new byte[1];
+
+            try
+            {
+                while (await pipe.ReadAsync(discarded, Token) > 0)
+                {
+                }
+            }
+            catch (IOException)
+            {
+                // A broken pipe is the app hanging up too.
+            }
+        }
+    }
 
     private static JsonObject Request(string action, string message, string nonce) =>
         new() { ["action"] = action, ["message"] = message, ["nonce"] = nonce, ["clientID"] = ExtensionClient.NewNonce() };

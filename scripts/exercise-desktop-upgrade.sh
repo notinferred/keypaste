@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
-# 4.7d: installs one internal desktop candidate, fills a real ~/.keypaste and vault with it, then upgrades,
+# Installs one internal desktop candidate, fills a real ~/.keypaste and vault with it, then upgrades,
 # interrupts an upgrade, refuses a downgrade and uninstalls, checking after every transition that the user's
 # data is byte-identical and still readable.
 #
 # The candidates are three unpublished builds of one commit at distinct numeric versions, because an MSI
 # ProductVersion is numeric and two candidates of one version cannot be ordered. The CLI/MCP
-# that makes the data is the published release, kept apart from the packages, so no upgrade can change it
-#.
+# that makes the data is the published release, kept apart from the packages, so no upgrade can change it.
 #
-# After each transition a new terminal must run the keypaste the installed app carries (G.5). On Windows the
+# After each transition a new terminal must run the keypaste the installed app carries. On Windows the
 # MSI appends its folder to the user Path, keeps one entry through an upgrade and removes only that entry on
 # uninstall, which an entry of the user's own, added first, shows. Open at login's Run value, written after the
 # first install as the app's Settings writes it, must come through the upgrade unchanged and be gone after the
@@ -597,7 +596,7 @@ upgrade_code() {
   printf '{%s}' "$(printf '%s' "$code" | tr '[:lower:]' '[:upper:]')"
 }
 
-# An MSI verbose log is UTF-16; grep reads it to the end, as a grep -q stopping at the match kills tr and pipefail then reads no match (F.43).
+# An MSI verbose log is UTF-16; grep reads it to the end, as a grep -q stopping at the match kills tr and pipefail then reads no match.
 msi_log_says() { # msi_log_says <log> <extended-regexp>
   [ -f "$1" ] && tr -d '\0' < "$1" | grep -iE "$2" > /dev/null
 }
@@ -1278,7 +1277,7 @@ selftest() {
   expect macos-uninstall-left-the-app uninstall contradiction
 
   utf16() { local s="$1" i; for ((i = 0; i < ${#s}; i++)); do printf '%s\0' "${s:i:1}"; done; }
-  # Two megabytes after the line read for, so a reader that stops at the match leaves its producer writing (F.43).
+  # Two megabytes after the line read for, so a reader that stops at the match leaves its producer writing.
   utf16 $'MSI (s) (D0:2C) [15:21:46:444]: Note: 1: 2205 2:  3: Error\n' > "$work/filler"
   for _ in $(seq 1 14); do cat "$work/filler" "$work/filler" > "$work/t" && mv "$work/t" "$work/filler"; done
   expect_log() { # expect_log <name> <line> <extended-regexp> <yes|no>

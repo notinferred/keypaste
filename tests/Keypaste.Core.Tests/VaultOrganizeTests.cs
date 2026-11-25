@@ -75,7 +75,7 @@ public sealed class VaultOrganizeTests : IDisposable
 
     /// <summary>
     /// A rename changes identity, not a value, so it takes no history slot. KeePass evicts the
-    /// oldest revision when the list fills, and V.3a exists because keypaste once lost history:
+    /// oldest revision when the list fills, and keypaste once lost history that way:
     /// two renames must not be able to push out the oldest password an entry ever held.
     /// </summary>
     [Fact]
@@ -121,8 +121,8 @@ public sealed class VaultOrganizeTests : IDisposable
     }
 
     /// <summary>
-    /// A group is a thing a person made. Emptying it is not a reason to delete it, and V.5a has no
-    /// group deletion to do it with.
+    /// A group is a thing a person made. Emptying it is not a reason to delete it; deleting a group
+    /// is its own deliberate step.
     /// </summary>
     [Fact]
     public void MoveEntry_LeavesTheGroupItCameFrom_Empty()
@@ -547,7 +547,7 @@ public sealed class VaultOrganizeTests : IDisposable
     }
 
     /// <summary>
-    /// Task V.5a: fresh resolution uses the resulting path. The exposure matcher is the
+    /// After a move, fresh resolution uses the resulting path. The exposure matcher is the
     /// seam that actually decides what a bridge may name, so the claim is asserted there rather
     /// than inferred from the entry list.
     /// </summary>

@@ -77,10 +77,17 @@ internal static class LogCommand
             return CliApp.ExitSuccess;
         }
 
-        if (!AuditReader.TryRead(path, out var entries, out var unreadable, out var readError))
+        // One read serves the rows and the chain check, so a compaction between two reads cannot put a mark on the wrong row.
+        if (!AuditReader.TryReadBytes(path, out var bytes, out var readError))
         {
-            context.Stderr.WriteLine($"keypaste log: {path} could not be read: {readError}");
-            return CliApp.ExitInternalError;
+            return CouldNotRead(readError);
+        }
+
+        using var log = new MemoryStream(bytes, writable: false);
+
+        if (!AuditReader.TryRead(log, out var entries, out var unreadable, out readError))
+        {
+            return CouldNotRead(readError);
         }
 
         var shown = new List<AuditEntry>(entries.Count);
@@ -92,7 +99,8 @@ internal static class LogCommand
             }
         }
 
-        var report = AuditChainVerifier.Verify(path);
+        log.Position = 0;
+        var report = AuditChainVerifier.Verify(log, path);
 
         // A table drawn from a file nothing checked must not be handed over as though something
         // had. This is the same reasoning as `verify` refusing to call a missing file intact.
@@ -118,6 +126,12 @@ internal static class LogCommand
         return report.Verdict == AuditChainVerdict.Broken
             ? CliApp.ExitTamperDetected
             : CliApp.ExitSuccess;
+
+        int CouldNotRead(string error)
+        {
+            context.Stderr.WriteLine($"keypaste log: {path} could not be read: {error}");
+            return CliApp.ExitInternalError;
+        }
     }
 
     private static void Render(

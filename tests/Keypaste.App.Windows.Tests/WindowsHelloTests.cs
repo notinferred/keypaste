@@ -13,7 +13,7 @@ namespace Keypaste.App.Windows.Tests;
 /// </summary>
 /// <remarks>
 /// A machine with Windows Hello set up needs a person: making the key, the prompt's focus, cancelling, the PIN and a
-/// YubiKey vault resumed are checked by hand (BACKLOG's Windows Hello check, H-0025).
+/// YubiKey vault resumed are checked by hand.
 /// </remarks>
 public sealed class WindowsHelloTests : IDisposable
 {

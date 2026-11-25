@@ -8,7 +8,7 @@ namespace Keypaste.Cli.Tests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// V-V.6 asks that it print <em>only</em> the passphrase on stdout, which is stricter than
+/// It must print <em>only</em> the passphrase on stdout, which is stricter than
 /// printing the passphrase: a provenance line, a prompt or a trailing note on the same stream
 /// would all satisfy the loose reading and break
 /// <c>keypaste generate --words 6 &gt; passphrase.txt</c>. So the assertion is on the whole of
@@ -44,8 +44,8 @@ public sealed class GenerateCommandTests
     /// What the passphrase is made of is on stderr, where a redirect does not take it.
     /// </summary>
     /// <remarks>
-    /// This is V.6's "stated where a person choosing a count can read them": the list, its size
-    /// and the entropy the chosen count buys. It must not restate the value, or the split-stream
+    /// The list, its size and the entropy the chosen count buys are stated where a person choosing a
+    /// count can read them. Stderr must not restate the value, or the split-stream
     /// discipline above buys nothing.
     /// </remarks>
     [Fact]

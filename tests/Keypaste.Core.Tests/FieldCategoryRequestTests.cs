@@ -8,7 +8,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// F.78a's acceptance on the request path: a real vault, the owner's own authority and log, and only the person faked.
+/// Field categories on the request path: a real vault, the owner's own authority and log, and only the person faked.
 /// Each value is decided by its field's category under this computer's rules, every agent alike, and each decision is
 /// recorded as it was made.
 /// </summary>
@@ -452,7 +452,7 @@ public sealed class FieldCategoryRequestTests : IDisposable
     }
 
     /// <summary>
-    /// A card's or an identity's tag makes only its item's protected fields theirs (F.78c): its plain fields, and a hand-made
+    /// A card's or an identity's tag makes only its item's protected fields theirs: its plain fields, and a hand-made
     /// card nobody tagged, stay custom fields, so an unrecognised card releases nothing more.
     /// </summary>
     [Fact]

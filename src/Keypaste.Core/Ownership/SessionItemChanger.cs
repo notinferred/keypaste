@@ -14,7 +14,7 @@ namespace Keypaste.Core.Ownership;
 /// <remarks>
 /// Ordered as <see cref="SessionSaver"/> is: the item is resolved and checked before anyone is asked, only where the agent's
 /// bridge reaches it whole, and checked again before it is written, so a vault that changed meanwhile changes nothing. An asked
-/// change is Allow once only, and a refused or unanswered one holds the same item back for a minute (T-11); the tag puts nothing
+/// change is Allow once only, and a refused one holds the same item back for a minute (T-11); the tag puts nothing
 /// to the person, so it neither waits for a hold nor starts one. A change is written only while the unlock it was asked under is
 /// live, its line is written before the vault is saved, and one whose line or save fails is taken back out of the open vault.
 /// </remarks>

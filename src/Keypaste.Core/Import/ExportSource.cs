@@ -29,6 +29,7 @@ public sealed class ExportSource : IDisposable
     internal static readonly string AttachmentTooLarge = $"it is larger than {EntryAttachment.MaximumSize / (1024 * 1024)} MiB, the most keypaste attaches";
 
     private readonly ExportContents _contents;
+    private ItemLanding[]? _landings;
     private bool _disposed;
 
     internal ExportSource(string fileName, string format, ExportContents contents)
@@ -65,6 +66,8 @@ public sealed class ExportSource : IDisposable
         var intoGroup = into ?? ImportSource.DefaultInto(FileName, groupPaths.ToHashSet(StringComparer.Ordinal));
         var held = target.Search(string.Empty, includeReserved: true).Select(match => Joined(match.Name.GroupPath, match.Name.Title)).ToHashSet(StringComparer.Ordinal);
         var landed = new HashSet<string>(StringComparer.Ordinal);
+        var nextSuffixes = new Dictionary<string, int>(StringComparer.Ordinal);
+        var landings = _landings ??= [.. Items.Select(Landing)];
         var groups = new SortedSet<string>(StringComparer.Ordinal);
         var projects = new SortedSet<string>(StringComparer.Ordinal);
         List<ExportRow> rows = [];
@@ -72,11 +75,11 @@ public sealed class ExportSource : IDisposable
 
         for (var index = 0; index < Items.Count; index++)
         {
-            var item = Items[index];
-            var label = string.Join("/", item.Folder.Append(item.Title));
-            List<string> notes = [];
-            var group = Group(intoGroup, item.Folder, notes);
-            var title = Landable(item.Title, "item title", notes);
+            var landing = landings[index];
+            var label = landing.Label;
+            List<string> notes = [.. landing.Notes];
+            var group = landing.Folder.Length == 0 ? intoGroup : Joined(intoGroup, landing.Folder);
+            var title = landing.Title;
             var path = Joined(group, title);
             var collision = held.Contains(path) ? ExportCollision.VaultItem
                 : landed.Contains(path) ? ExportCollision.ExportItem
@@ -93,16 +96,15 @@ public sealed class ExportSource : IDisposable
                     continue;
                 }
 
-                title = Free(group, title, held, landed);
+                title = Free(group, title, held, landed, nextSuffixes);
             }
 
             landed.Add(Joined(group, title));
             groups.Add(group);
             rows.Add(new ExportRow(index, label, new EntryName(group, title), collision, decision, notes.Count == 0 ? null : string.Join("; ", notes)));
 
-            var parts = Parts(item);
-            losses.AddRange(parts.Losses.Select(loss => new ExportLoss(index, label, loss.Part, loss.Reason)));
-            projects.UnionWith(parts.Tags.Select(ProjectTag.Read).Where(tag => tag.Kind == ProjectTagKind.Member).Select(tag => tag.Project).OfType<string>());
+            losses.AddRange(landing.Losses.Select(loss => new ExportLoss(index, label, loss.Part, loss.Reason)));
+            projects.UnionWith(landing.Projects);
         }
 
         var refusal = ImportSource.RefuseDestination(intoGroup, groupCounts)
@@ -212,6 +214,23 @@ public sealed class ExportSource : IDisposable
             item.Modified);
     }
 
+    /// <summary>What of an item's landing does not depend on the group it lands under; it keeps no field value, so no further copy of a secret outlives the plan.</summary>
+    private static ItemLanding Landing(ExportItem item)
+    {
+        List<string> notes = [];
+        var folder = Folder(item.Folder, notes);
+        var title = Landable(item.Title, "item title", notes);
+        var parts = Parts(item);
+
+        return new ItemLanding(
+            string.Join("/", item.Folder.Append(item.Title)),
+            folder,
+            title,
+            notes,
+            parts.Losses,
+            [.. parts.Tags.Select(ProjectTag.Read).Where(tag => tag.Kind == ProjectTagKind.Member).Select(tag => tag.Project).OfType<string>()]);
+    }
+
     /// <summary>What of an item lands beyond its standard fields, and what does not, with why.</summary>
     private static ItemParts Parts(ExportItem item)
     {
@@ -319,10 +338,10 @@ public sealed class ExportSource : IDisposable
 
     private static string Named(string kind, string name) => name.Length == 0 ? $"a {kind} with no name" : $"{kind} {name}";
 
-    /// <summary>The group an item lands in: its folders below <paramref name="into"/>, each made a group name keypaste writes.</summary>
-    private static string Group(string into, IReadOnlyList<string> folder, List<string> notes)
+    /// <summary>The path an item lands at below the group everything lands under: its folders, each made a group name keypaste writes; empty for none.</summary>
+    private static string Folder(IReadOnlyList<string> folder, List<string> notes)
     {
-        var path = into;
+        var path = string.Empty;
 
         foreach (var segment in folder)
         {
@@ -355,15 +374,23 @@ public sealed class ExportSource : IDisposable
     }
 
     /// <summary>The first of <c>title (2)</c>, <c>title (3)</c> … that neither the vault nor this import holds in the group.</summary>
-    private static string Free(string group, string title, HashSet<string> held, HashSet<string> landed)
+    /// <param name="group">The group the item lands in.</param>
+    /// <param name="title">The title the item asks for.</param>
+    /// <param name="held">The joined group and titles the vault already holds.</param>
+    /// <param name="landed">The joined group and titles this import has already placed.</param>
+    /// <param name="nextSuffixes">Where to resume for each joined group and title within one plan; what is taken only grows there, so no earlier suffix frees up.</param>
+    private static string Free(string group, string title, HashSet<string> held, HashSet<string> landed, Dictionary<string, int> nextSuffixes)
     {
-        for (var suffix = 2; ; suffix++)
+        var key = Joined(group, title);
+
+        for (var suffix = nextSuffixes.GetValueOrDefault(key, 2); ; suffix++)
         {
             var candidate = Invariant($"{title} ({suffix})");
             var path = Joined(group, candidate);
 
             if (!held.Contains(path) && !landed.Contains(path))
             {
+                nextSuffixes[key] = suffix + 1;
                 return candidate;
             }
         }
@@ -371,6 +398,15 @@ public sealed class ExportSource : IDisposable
 
     /// <summary>A name joined to the group it is in, as a path addresses it, so a title holding <c>/</c> collides with what its path names.</summary>
     private static string Joined(string group, string name) => group.Length == 0 ? name : group + "/" + name;
+
+    /// <summary>An item's label, its folders and title as they land, the notes those names earned, what of it does not land, and the projects its tags make it a member of.</summary>
+    private sealed record ItemLanding(
+        string Label,
+        string Folder,
+        string Title,
+        IReadOnlyList<string> Notes,
+        IReadOnlyList<(string Part, string Reason)> Losses,
+        IReadOnlyList<string> Projects);
 
     private sealed record ItemParts(
         IReadOnlyList<FieldWrite> Fields,

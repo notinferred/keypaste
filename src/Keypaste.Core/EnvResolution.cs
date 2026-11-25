@@ -292,9 +292,24 @@ public static class EnvResolution
     /// <param name="now">What expiry is judged against.</param>
     /// <returns>The set, or why it cannot be released.</returns>
     /// <remarks>A key subset is taken before any entry is judged, so an unusable key nobody asked for refuses nothing.</remarks>
-    internal static EnvResolved Resolve(EnvSnapshot snapshot, string project, string profile, IReadOnlyList<string>? keys, DateTimeOffset now)
+    internal static EnvResolved Resolve(EnvSnapshot snapshot, string project, string profile, IReadOnlyList<string>? keys, DateTimeOffset now) =>
+        Resolve(snapshot, project, profile, keys, now, out _);
+
+    /// <summary><see cref="Resolve(EnvSnapshot, string, string, IReadOnlyList{string}?, DateTimeOffset)"/>, handing back the members it judged.</summary>
+    /// <param name="snapshot">The vault's entries, tags and group paths, read together.</param>
+    /// <param name="project">The project name.</param>
+    /// <param name="profile">The profile name.</param>
+    /// <param name="keys">The keys to release, in the order they come out, or null for the whole set.</param>
+    /// <param name="now">What expiry is judged against.</param>
+    /// <param name="filled">
+    /// Each member of the profile, or of the key subset, in the vault's order, its value filled in where its
+    /// placeholders could be and as stored where they could not; a key two entries hold is there twice.
+    /// </param>
+    /// <returns>The set, or why it cannot be released.</returns>
+    internal static EnvResolved Resolve(EnvSnapshot snapshot, string project, string profile, IReadOnlyList<string>? keys, DateTimeOffset now, out IReadOnlyList<EnvMember> filled)
     {
         var members = Members(snapshot, project, profile, out var exists);
+        filled = members;
 
         if (!exists)
         {
@@ -307,6 +322,7 @@ public static class EnvResolution
         if (keys is not null)
         {
             members = [.. members.Where(member => keys.Contains(member.Key, StringComparer.Ordinal))];
+            filled = members;
 
             foreach (var missing in keys.Where(key => !members.Any(member => string.Equals(member.Key, key, StringComparison.Ordinal))))
             {
@@ -345,7 +361,8 @@ public static class EnvResolution
 
         if (keys is null)
         {
-            members.Sort(static (a, b) => string.CompareOrdinal(a.Key, b.Key));
+            // A sorted copy, so the members handed back keep the vault's order.
+            members = [.. members.OrderBy(member => member.Key, StringComparer.Ordinal)];
         }
         else
         {
@@ -425,9 +442,6 @@ public static class EnvResolution
         refused = problems;
         return Listing(filled, outcome);
     }
-
-    /// <summary>A member's value as it leaves keypaste, or null when it holds a placeholder keypaste cannot fill in.</summary>
-    internal static string? Filled(EnvMember member) => Fill(member).Value;
 
     /// <summary>Every variable one environment holds, unjudged, and whether the environment exists at all.</summary>
     /// <param name="snapshot">The vault's entries, tags and group paths.</param>

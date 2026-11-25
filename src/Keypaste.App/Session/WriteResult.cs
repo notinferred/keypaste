@@ -29,7 +29,7 @@ internal sealed record WriteResult<T>(WriteOutcome Outcome, T? Value = default, 
 {
     /// <summary>
     /// Whether another program's save, which refused this edit's save, has since been merged with the open vault without the
-    /// edit, so the vault matches its file again and the edit can simply be made again (D-0542).
+    /// edit, so the vault matches its file again and the edit can simply be made again.
     /// </summary>
     internal bool Merged { get; init; }
 

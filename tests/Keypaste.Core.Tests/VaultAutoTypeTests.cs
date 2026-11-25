@@ -7,7 +7,7 @@ namespace Keypaste.Core.Tests;
 /// keypaste reads an item's and its groups' Auto-Type settings from a KDBX file as KeePassXC 2.8 reads them, with its
 /// inheritance and defaults, chooses the sequence for a window's title as KeePassXC matches its associations, fills
 /// each field as a placeholder fills a value, never offers a recycled item or one of its own records, and keeps every setting
-/// through its own edits and saves (P.4a1).
+/// through its own edits and saves.
 /// </summary>
 public sealed class VaultAutoTypeTests : IDisposable
 {

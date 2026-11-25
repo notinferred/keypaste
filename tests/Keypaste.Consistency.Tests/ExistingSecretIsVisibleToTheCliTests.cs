@@ -16,7 +16,7 @@ namespace Keypaste.Consistency.Tests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// 4.9's claim is not that a value reached the file — <c>Vault.Open</c> would show that — but that
+/// The claim here is not that a value reached the file — <c>Vault.Open</c> would show that — but that
 /// it reached it <b>unchanged</b>, and that is only provable against something that did not put it
 /// there. The CLI is asked, the way <see cref="GuiEditIsVisibleToTheCliTests"/> asks it.
 /// </para>

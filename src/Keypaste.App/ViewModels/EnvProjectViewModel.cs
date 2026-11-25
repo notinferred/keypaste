@@ -82,7 +82,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         GenerateIntoCommand = new RelayCommand<SecretField>(GenerateInto);
         OpenGeneratorCommand = new RelayCommand<SecretField>(OpenGeneratorFor);
 
-        // A generated value is in its field, where it can be seen and replaced, and follows the choices (V.12).
+        // A generated value is in its field, where it can be seen and replaced, and follows the choices.
         NewValue.GeneratedValueReplaced += (_, _) => SetProperty(ref _generateValue, false, nameof(GenerateValue));
         // While the panel is open, its Apply is what changes these choices, and the value it hands over is the one shown.
         Generator.PropertyChanged += (_, _) =>
@@ -191,18 +191,24 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
     /// <summary>What the card says under its name.</summary>
     internal string Summary => Count == 1 ? "1 variable" : $"{Count} variables";
 
-    /// <summary>The command that injects the selected profile, for the copy helper and the card, or null when the project's name gets none.</summary>
+    /// <summary>The command that injects the selected profile, for the copy helper and the card, or null when the vault's path or the project's name gets none.</summary>
     /// <remarks>
-    /// It names the project as well as the profile, so it runs from any directory and not only the
-    /// one <c>projects.json</c> maps; the command is the mapped one, or <c>npm start</c> to edit.
+    /// It names the vault, the project and the profile, so it runs from any directory and not only the one
+    /// <c>projects.json</c> maps, and asks this vault's session even when another vault is the chosen one; the command
+    /// is the mapped one, or <c>npm start</c> to edit.
     /// </remarks>
-    internal string? RunCommand => CopiedRunCommand.For(Name, SelectedProfile, Launch.Mapping?.Command ?? "npm start");
+    internal string? RunCommand => _session.VaultPath is { } vault
+        ? CopiedRunCommand.For(vault, Name, SelectedProfile, Launch.Mapping?.Command ?? "npm start")
+        : null;
 
-    /// <summary>Whether the card offers <see cref="RunCommand"/>, which a name a terminal could run never gets.</summary>
-    internal bool HasRunCommand => CopiedRunCommand.IsCopyable(Name, OperatingSystem.IsWindows());
+    /// <summary>Whether the card offers <see cref="RunCommand"/>, which a vault path or a name a terminal could run never gets.</summary>
+    internal bool HasRunCommand => RunCommand is not null;
 
     /// <summary>What the card says in place of <see cref="RunCommand"/> when it offers none, or empty.</summary>
-    internal string RunCommandNote => HasRunCommand ? string.Empty : CopiedRunCommand.NoCommandNote;
+    internal string RunCommandNote =>
+        HasRunCommand ? string.Empty
+        : CopiedRunCommand.IsCopyable(Name, OperatingSystem.IsWindows()) ? CopiedRunCommand.NoCommandForVaultNote
+        : CopiedRunCommand.NoCommandNote;
 
     /// <summary>The project's profiles: <c>dev</c> first, protected ones last.</summary>
     [ObservableProperty]
@@ -397,7 +403,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
     /// <summary>Whether to generate the new variable value rather than take one already in hand.</summary>
     /// <remarks>
-    /// On by default, so adding a variable behaves exactly as it did before 4.9. Turning it off
+    /// On by default, so a new variable gets a generated value. Turning it off
     /// shows <see cref="NewValue"/>, which is how somebody stores a key a provider gave them.
     /// </remarks>
     internal bool GenerateValue
@@ -856,6 +862,14 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         var selected = Variables.ToDictionary(row => row.Key, StringComparer.Ordinal);
         var keys = (Matrix?.Rows.Select(row => row.Key) ?? []).Union(selected.Keys, StringComparer.Ordinal).Order(StringComparer.Ordinal);
 
+        // The first row of a key wins, as EnvMatrix.Row finds it.
+        var matrixRows = new Dictionary<string, EnvMatrixRow>(StringComparer.Ordinal);
+
+        foreach (var matrixRow in Matrix?.Rows ?? [])
+        {
+            matrixRows.TryAdd(matrixRow.Key, matrixRow);
+        }
+
         List<EnvKeyRow> rows = [.. keys.Select(key => new EnvKeyRow(key, [.. profiles.Select(profile => Cell(key, profile.Name))], SelectedProfile))];
         var common = rows
             .Select(row => row.Selected)
@@ -882,7 +896,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
         EnvProfileCell Cell(string key, string profile)
         {
-            var known = Matrix?.Row(key)?.Cells.FirstOrDefault(cell => string.Equals(cell.Profile, profile, StringComparison.Ordinal));
+            var known = matrixRows.GetValueOrDefault(key)?.Cells.FirstOrDefault(cell => string.Equals(cell.Profile, profile, StringComparison.Ordinal));
             var isSelected = string.Equals(profile, SelectedProfile, StringComparison.Ordinal);
             var variable = isSelected ? selected.GetValueOrDefault(key) : null;
             var state = known?.State ?? (variable is null ? EnvCellState.Missing : EnvCellState.Set);

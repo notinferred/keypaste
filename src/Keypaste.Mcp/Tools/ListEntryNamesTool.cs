@@ -89,8 +89,8 @@ internal sealed class ListEntryNamesTool(
             }
 
             // The exposure is applied twice on purpose: two things enforcing one rule that cannot
-            // disagree (THREATS.md T-4). A second *cap* is deliberately absent — that was two things
-            // authoring one claim, and this side's was wrong in both directions.
+            // disagree (THREATS.md T-4). Whether the listing is complete is the owner's claim alone,
+            // so no cap is applied here.
             var exposed = new List<ListedEntry>();
             foreach (var entry in listing.Names)
             {

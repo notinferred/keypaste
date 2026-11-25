@@ -9,7 +9,7 @@ namespace Keypaste.App.ViewModels;
 /// <summary>
 /// The export import dialog: another password manager's export, read, previewed against the open vault with where each
 /// item lands and everything that does not, copied in all or nothing, and then what was imported and that the file is
-/// to be deleted (D-0591, D-0592).
+/// to be deleted.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -20,7 +20,7 @@ namespace Keypaste.App.ViewModels;
 /// </para>
 /// <para>
 /// Nothing here names a value: rows carry the export's item names and where they land, and what does not land is named
-/// by its part and why (D-0565).
+/// by its part and why.
 /// </para>
 /// </remarks>
 internal sealed partial class ExportImportViewModel : ObservableObject, IDisposable
@@ -71,7 +71,6 @@ internal sealed partial class ExportImportViewModel : ObservableObject, IDisposa
     /// <summary>Raised once, when the dialog is done: cancelled, closed after an import or dropped by a lock.</summary>
     internal event EventHandler? Closed;
 
-    /// <summary>The export's file name.</summary>
     internal string FileName => Show(System.IO.Path.GetFileName(_path));
 
     /// <summary>Where the export is on disk, so the person can find it to delete it.</summary>
@@ -144,7 +143,7 @@ internal sealed partial class ExportImportViewModel : ObservableObject, IDisposa
         var held => string.Create(CultureInfo.InvariantCulture, $"{Items(Plan?.Rows.Count ?? 0)} to import, {held} duplicates"),
     };
 
-    /// <summary>Whether an item whose name the vault already has lands beside it, the default (D-0566).</summary>
+    /// <summary>Whether an item whose name the vault already has lands beside it, the default.</summary>
     internal bool KeepHeld
     {
         get => !SkipHeld;

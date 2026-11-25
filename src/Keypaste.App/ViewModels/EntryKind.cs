@@ -4,7 +4,7 @@ using Keypaste.Core.Agents;
 
 namespace Keypaste.App.ViewModels;
 
-/// <summary>What sort of thing an entry is, as the Secrets list and pane name it.</summary>
+/// <summary>What sort of thing an entry is, as the Items list and pane name it.</summary>
 internal enum EntryKind
 {
     /// <summary>A password with a username or a URL beside it.</summary>

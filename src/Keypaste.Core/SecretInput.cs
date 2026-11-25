@@ -43,8 +43,8 @@ public enum PasteOutcome
 /// removing an interior control character stores a value that differs from the one on the
 /// clipboard, and the person pasting has no way to see it — they would be told the secret was
 /// saved, and it would be the wrong secret. Refusing says so while there is still a form open to
-/// fix it. It is also what <c>MaskedInput</c> already does with typed input, where a control
-/// character is a keystroke rather than a password character.
+/// fix it. Typed input is different: <c>MaskedInput</c> drops a typed control character, because
+/// there it is a keystroke rather than a password character.
 /// </para>
 /// <para>
 /// <b>What is deliberately not refused:</b> a bidi override or a zero-width space. Those are display

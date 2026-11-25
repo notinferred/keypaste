@@ -466,16 +466,16 @@ public sealed class ApproverHandlerTests
         Assert.Equal("no vault is unlocked", reply.Reason);
     }
 
-    // ------------------------------------------------------- a release nobody could send (F.3d)
+    // ------------------------------------------------------- a release nobody could send
 
     /// <summary>
     /// A field too large for one frame is refused, and the refusal says the release was approved.
     /// </summary>
     /// <remarks>
     /// <c>notes</c> is releasable and a KDBX note has no length limit, so this is an ordinary entry
-    /// somebody pasted a certificate into. Before F.3d the reply was built and handed to the
-    /// encoder anyway; the write threw, the connection went down and took its grants with it, and
-    /// the agent was told the approver could not be asked — about a request a person had answered.
+    /// somebody pasted a certificate into. A reply built and handed to the encoder anyway would make
+    /// the write throw, take the connection down with its grants, and tell the agent the approver
+    /// could not be asked — about a request a person had answered.
     /// </remarks>
     [Fact]
     public async Task AReleaseTooBigToDeliver_IsRefusedAndSaysAPersonApprovedIt()

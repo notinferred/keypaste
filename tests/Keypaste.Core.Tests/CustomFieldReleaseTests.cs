@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>An env-named custom field leaves by name to an agent, a reference or a share; no other custom field does (C.5a).</summary>
+/// <summary>An env-named custom field leaves by name to an agent, a reference or a share; no other custom field does.</summary>
 public sealed class CustomFieldReleaseTests : IDisposable
 {
     private const string _master = "correct horse battery staple";

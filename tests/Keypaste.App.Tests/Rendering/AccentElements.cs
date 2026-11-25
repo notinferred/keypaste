@@ -32,7 +32,7 @@ namespace Keypaste.App.Tests.Rendering;
 /// as macOS does and are not counted.
 /// </para>
 /// <para>
-/// <b>Not counted</b> either, because the design system's Colour section gives them the accent as state rather than as a signal:
+/// <b>Not counted</b> either, because they take the accent as a state rather than as a signal:
 /// the keyboard's focus ring, a focused field's border and glow and the lock field's caret. The marks' dot is the brand's amber, never the accent.
 /// </para>
 /// </remarks>

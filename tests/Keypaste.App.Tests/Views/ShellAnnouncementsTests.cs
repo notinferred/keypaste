@@ -13,7 +13,7 @@ namespace Keypaste.App.Tests.Views;
 
 /// <summary>
 /// The idle warning as a screen reader is told it: its first line said once, as the warning comes, while the seconds
-/// it draws tick unannounced (F.68).
+/// it draws tick unannounced.
 /// </summary>
 public sealed class ShellAnnouncementsTests
 {

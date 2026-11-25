@@ -33,7 +33,6 @@ public sealed class WindowsClipboardWriterTests
 
         Assert.True(new WindowsClipboardWriter(win32).TrySet("sk_live_the_secret", out _));
 
-        // One open and one close, and every write strictly between them.
         Assert.Equal(1, win32.Calls.Count(c => c == "open"));
         Assert.Equal(1, win32.Calls.Count(c => c == "close"));
         Assert.Equal(0, win32.Calls.IndexOf("open"));

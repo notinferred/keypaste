@@ -4,7 +4,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// What another process may be answered from: an open vault only while it holds exactly what its
-/// file holds, and every change reporting the entries it touched before it is saved (U.3).
+/// file holds, and every change reporting the entries it touched before it is saved.
 /// </summary>
 public sealed class VaultSavedStateTests : IDisposable
 {
@@ -323,7 +323,7 @@ public sealed class VaultSavedStateTests : IDisposable
     /// <summary>
     /// A revision's password is filled in only while the revision at that position still holds it, judged under the
     /// lock its fields are read under, so an edit saved after the history was read fills in nothing from the wrong
-    /// revision's fields (P.3b1).
+    /// revision's fields.
     /// </summary>
     [Fact]
     public void A_password_the_revision_at_that_position_no_longer_holds_is_not_filled_in()

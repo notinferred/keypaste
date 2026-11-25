@@ -13,7 +13,7 @@ namespace Keypaste.Consistency.Tests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The claim 4.2 makes is that everything reads and writes through core, so the CLI and the GUI stay
+/// The claim here is that everything reads and writes through core, so the CLI and the GUI stay
 /// consistent. That is not provable by reopening the file with <c>Vault.Open</c>: core is the shared
 /// path, so a round trip through it proves persistence and assumes agreement. These tests ask the
 /// CLI instead, by running its verbs in-process the way <c>Keypaste.Cli.Tests</c> does.
@@ -43,7 +43,7 @@ public sealed class GuiEditIsVisibleToTheCliTests
     /// A generated password is exactly the value <c>keypaste get</c> returns.
     /// </summary>
     /// <remarks>
-    /// Worth its own test: the generator is the only thing in 4.2 that produces a value nothing else
+    /// Worth its own test: the generator is the only thing in the app's editing that produces a value nothing else
     /// has seen, so it cannot agree by accident with a constant both sides were given. The same
     /// argument <c>verify-keepassxc-writeback.sh</c> makes for having KeePassXC write the value.
     /// </remarks>
@@ -71,7 +71,7 @@ public sealed class GuiEditIsVisibleToTheCliTests
     /// A passphrase generated in the app is the value <c>keypaste get --reveal</c> returns.
     /// </summary>
     /// <remarks>
-    /// V-V.6's last clause, and the same argument as the test above: the generator is the only
+    /// The same argument as the generated-password test: the generator is the only
     /// thing here producing a value nothing else has seen, so the two front ends cannot agree by
     /// having been handed the same constant. The word count is read back by splitting on the
     /// separator, and each piece is checked against the list, so five words and a stray separator
@@ -332,7 +332,7 @@ public sealed class GuiEditIsVisibleToTheCliTests
 
     /// <summary>
     /// A custom field added in the entry pane is the value <c>keypaste get --field</c> returns, and a
-    /// tag it adds puts the entry in the project <c>keypaste env ls</c> lists (V.7b).
+    /// tag it adds puts the entry in the project <c>keypaste env ls</c> lists.
     /// </summary>
     [Fact]
     public void A_field_and_a_tag_added_in_the_gui_are_what_the_cli_reads()

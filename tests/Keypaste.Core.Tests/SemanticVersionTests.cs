@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>Release versions order by Semantic Versioning 2.0's precedence, so a newer copy knows it is newer (G.5).</summary>
+/// <summary>Release versions order by Semantic Versioning 2.0's precedence, so a newer copy knows it is newer.</summary>
 public sealed class SemanticVersionTests
 {
     [Fact]

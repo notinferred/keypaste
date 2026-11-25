@@ -250,8 +250,7 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
     public async Task A_check_that_fails_and_a_removed_pairing_each_leave_the_connection_bound_to_nothing()
     {
         var browsers = new FakeBrowsers();
-        SessionAuthority? authority = null;
-        await using var owner = Owner.Start(this, browsers: browsers, built: built => authority = built);
+        await using var owner = Owner.Start(this, browsers: browsers);
         await using var link = await owner.AttachAsync(BrowserIdentity.ChromeWebStore);
 
         await CheckAsync(link, "laptop");
@@ -261,7 +260,7 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
 
         browsers.CheckOutcome = BrowserOutcome.Done;
         await CheckAsync(link, "laptop");
-        authority!.Unbind("laptop");
+        owner.Authority.Unbind("laptop");
         var afterRemoval = await link.ReleaseAsync(new BrowserReleaseRequest("laptop", Key(), "https://github.com/", _item) { Vault = VaultPath, Session = "session-one" }, Token);
 
         Assert.Equal(BrowserOutcome.NotPaired, failed?.Outcome);
@@ -421,32 +420,29 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
     /// <summary>An owner of the test's vault on its own pipe, whose session the test changes.</summary>
     private sealed class Owner : IAsyncDisposable
     {
-        private readonly SessionAuthorityBrowserTests _test;
-        private readonly CancellationTokenSource _stop = new();
-        private readonly ApproverListener _listener;
-        private readonly Task _running;
-        private bool _disposed;
+        private readonly ServedOwner _served;
+        private readonly string _vault;
 
-        private Owner(SessionAuthorityBrowserTests test, Action? lockNow, IBrowserRequests? browsers, Action<SessionAuthority>? built)
+        private Owner(ServedOwner served, string vault)
         {
-            _test = test;
-            PipeName = "keypaste-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
-            var authority = new SessionAuthority(
-                VaultIdentity.Of(test._directory, test.VaultPath),
-                () => test._lifetime,
-                test._fixture.Handler,
-                audit: () => test._log.Log,
-                lockNow: lockNow,
-                browsers: browsers);
-            built?.Invoke(authority);
-            _listener = new ApproverListener(PipeName, authority);
-            _running = _listener.RunAsync(_stop.Token);
+            _served = served;
+            _vault = vault;
         }
 
-        internal string PipeName { get; }
+        internal string PipeName => _served.PipeName;
 
-        internal static Owner Start(SessionAuthorityBrowserTests test, Action? lockNow = null, IBrowserRequests? browsers = null, Action<SessionAuthority>? built = null) =>
-            new(test, lockNow, browsers, built);
+        internal SessionAuthority Authority => _served.Authority;
+
+        internal static Owner Start(SessionAuthorityBrowserTests test, Action? lockNow = null, IBrowserRequests? browsers = null) =>
+            new(
+                ServedOwner.Serve(new SessionAuthority(
+                    VaultIdentity.Of(test._directory, test.VaultPath),
+                    () => test._lifetime,
+                    test._fixture.Handler,
+                    audit: () => test._log.Log,
+                    lockNow: lockNow,
+                    browsers: browsers)),
+                test.VaultPath);
 
         internal async Task<BrowserLink> ConnectAsync()
         {
@@ -458,32 +454,11 @@ public sealed class SessionAuthorityBrowserTests : IDisposable
         internal async Task<BrowserLink> AttachAsync(BrowserIdentity browser)
         {
             var link = await ConnectAsync();
-            var attached = await link.AttachAsync(new AttachRequest(_test.VaultPath) { Browser = browser.Caller }, Token);
+            var attached = await link.AttachAsync(new AttachRequest(_vault) { Browser = browser.Caller }, Token);
             Assert.True(attached?.Attached, attached?.Reason);
             return link;
         }
 
-        public async ValueTask DisposeAsync()
-        {
-            if (_disposed)
-            {
-                return;
-            }
-
-            _disposed = true;
-            await _stop.CancelAsync();
-
-            try
-            {
-                await _running;
-            }
-            catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
-            {
-                // Tearing the listener down is how it stops.
-            }
-
-            _listener.Dispose();
-            _stop.Dispose();
-        }
+        public ValueTask DisposeAsync() => _served.DisposeAsync();
     }
 }

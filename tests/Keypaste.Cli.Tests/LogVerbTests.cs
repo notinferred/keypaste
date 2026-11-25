@@ -531,6 +531,28 @@ public sealed class LogVerbTests : IDisposable
         Assert.Equal(2, document.RootElement.GetArrayLength());
     }
 
+    /// <summary>Output longer than the chunk <c>--json</c> writes in is still one line holding one array, in file order.</summary>
+    [Fact]
+    public void Log_Json_LongerThanOneChunk_IsOneArrayInOrder()
+    {
+        const int count = 600;
+        static string Key(int index) => "env/dev/KEY_" + index.ToString("D4", System.Globalization.CultureInfo.InvariantCulture);
+
+        Write(
+            new DateTimeOffset(2026, 7, 26, 14, 0, 0, TimeSpan.Zero),
+            [.. Enumerable.Range(1, count).Select(index =>
+                Record("claude-code", Key(index), AuditDecision.Granted, AuditMethod.Prompt))]);
+
+        _cli.AssertExit(CliApp.ExitSuccess, _cli.Run("log", "--json"));
+
+        Assert.True(_cli.Out.Length > 64 * 1024, $"only {_cli.Out.Length} characters, too few to span a chunk");
+        Assert.Single(_cli.Out.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries));
+        using var document = System.Text.Json.JsonDocument.Parse(_cli.Out);
+        Assert.Equal(
+            Enumerable.Range(1, count).Select(Key),
+            document.RootElement.EnumerateArray().Select(record => record.GetProperty("entry").GetString()));
+    }
+
     [Fact]
     public void Log_Json_WithNoLogYet_IsAnEmptyArray()
     {

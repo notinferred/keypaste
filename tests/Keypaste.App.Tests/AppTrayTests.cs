@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Keypaste.App.Tests;
 
-/// <summary>The tray menu's Open, Lock and Quit, Lock offered only while a vault is open (G.4a), and a template image in the macOS menu bar.</summary>
+/// <summary>The tray menu's Open, Lock and Quit, Lock offered only while a vault is open, and a template image in the macOS menu bar.</summary>
 public sealed class AppTrayTests
 {
     [Fact]

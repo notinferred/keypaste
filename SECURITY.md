@@ -270,7 +270,7 @@ What keypaste holds to under the [laws](#security-laws), and what it can't preve
 [T-36]: THREATS.md#t-36--an-agents-settings-bind-only-the-bridge-that-names-them
 [T-37]: THREATS.md#t-37--a-yubikey-protects-a-copied-vault-not-an-unlocked-one-and-a-lost-key-locks-it
 [T-43]: THREATS.md#t-43--a-terminal-asks-the-owner-to-change-the-vault
-[T-44]: THREATS.md#t-44--windows-hello-stands-in-for-the-master-password-after-a-lock
+[T-44]: THREATS.md#t-44--quick-unlock-stands-in-for-the-master-password-after-a-lock
 [T-48]: THREATS.md#t-48--the-browser-relay-holds-released-passwords-in-plaintext-and-anything-can-start-it-or-ask-to-pair
 [T-49]: THREATS.md#t-49--another-program-answers-keypastes-host-name
 [T-50]: THREATS.md#t-50--a-pairing-is-a-bearer-key

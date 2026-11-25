@@ -6,7 +6,7 @@ using Keypaste.Core.HardwareKeys;
 namespace Keypaste.App.ViewModels;
 
 /// <summary>One backup, as the restore panel lists it.</summary>
-/// <remarks>The time comes from the backup's name, which is the only one a copy keeps (V.4a).</remarks>
+/// <remarks>The time comes from the backup's name, which is the only one a copy keeps.</remarks>
 internal sealed class BackupRow(VaultBackup backup, bool isDamaged)
 {
     internal VaultBackup Backup { get; } = backup;
@@ -257,7 +257,7 @@ internal sealed partial class RestoreBackupViewModel : ObservableObject, IDispos
 
         try
         {
-            // Argon2, as unlocking is, so off the UI thread for the same reason.
+            // Off the UI thread: Argon2 takes a good fraction of a second, as it does when unlocking.
             var keyfile = KeyfilePath;
             using var hardwareKey = _newHardwareKey?.Invoke();
             Validated = await Task.Run(() => VaultBackups.Inspect(_vaultPath, row.Backup, _password.Value, keyfile, hardwareKey))

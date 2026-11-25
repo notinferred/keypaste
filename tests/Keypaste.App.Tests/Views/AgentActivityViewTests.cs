@@ -62,7 +62,7 @@ public sealed class AgentActivityViewTests
         window.Close();
     });
 
-    /// <summary>The message is drawn while the app is serving agents, not only in the card shown when it is not, and goes when the log opens (F.86).</summary>
+    /// <summary>The message is drawn while the app is serving agents, not only in the card shown when it is not, and goes when the log opens.</summary>
     [Fact]
     public Task A_log_that_will_not_open_stays_on_Agents_until_it_opens() => HeadlessSession.On(async () =>
     {

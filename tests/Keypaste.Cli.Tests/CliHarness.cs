@@ -19,6 +19,9 @@ namespace Keypaste.Cli.Tests;
 /// </summary>
 internal sealed class CliHarness : IDisposable
 {
+    /// <summary>What a verb asks first when it opens a vault, written out here so the wording stays pinned.</summary>
+    internal const string MasterPasswordPrompt = "Master password: ";
+
     internal CliHarness()
     {
         Directory = System.IO.Directory.CreateTempSubdirectory("keypaste-cli-tests-").FullName;
@@ -130,8 +133,7 @@ internal sealed class CliHarness : IDisposable
     /// <summary>Asserts an exit code, quoting stderr when it does not match.</summary>
     /// <remarks>
     /// <c>Assert.Equal(0, exit)</c> reports "expected 0, actual 2" and nothing else, while the one
-    /// line explaining why sits unread in <see cref="Err"/>. That gap cost a CI investigation
-    /// once; it should not cost a second one.
+    /// line explaining why sits unread in <see cref="Err"/>.
     /// </remarks>
     internal void AssertExit(int expected, int actual) =>
         Check(expected == actual, $"expected exit {expected}, got {actual}");
@@ -191,7 +193,7 @@ internal sealed class FakeSecretPrompt : ISecretPrompt
     /// It fires from <see cref="ReadLine"/> as well as <see cref="ReadSecret"/>, because the
     /// confirmations are where a person is standing still: <c>env pull</c> asks whether to import
     /// and then whether to delete the file it read, and the seconds spent answering either one are
-    /// seconds in which that file can be edited (task F.1c). This is a prompt seam and not
+    /// seconds in which that file can be edited. This is a prompt seam and not
     /// a filesystem one — <c>File.Delete</c> is still the real thing, which is the half of the delete-source rule
     /// that matters.
     /// </para>
@@ -254,6 +256,9 @@ internal sealed class FakeClipboard : IClipboard
     /// <summary>Forced failure mode, for the headless and missing-tool paths.</summary>
     internal ClipboardStatus SetStatus { get; set; } = ClipboardStatus.Ok;
 
+    /// <summary>How many of the next read-backs fail, as a timed-out or busy platform read does.</summary>
+    internal int FailingReads { get; set; }
+
     public ClipboardStatus TrySet(string text, out string error)
     {
         error = SetStatus == ClipboardStatus.Ok ? string.Empty : "no clipboard tool found";
@@ -269,6 +274,14 @@ internal sealed class FakeClipboard : IClipboard
 
     public ClipboardStatus TryReadHash(out byte[] sha256, out string error)
     {
+        if (FailingReads > 0)
+        {
+            FailingReads--;
+            error = "the clipboard tool timed out";
+            sha256 = [];
+            return ClipboardStatus.Failed;
+        }
+
         error = string.Empty;
         sha256 = SHA256.HashData(Encoding.UTF8.GetBytes(Content ?? string.Empty));
         return ClipboardStatus.Ok;
@@ -296,15 +309,14 @@ internal sealed class FakeClearStrategy : IClipboardClearStrategy
     /// <summary>Runs during the simulated wait, so a test can change the clipboard underneath.</summary>
     internal Action? DuringWait { get; set; }
 
-    public void ClearAfter(IClipboard clipboard, byte[] expectedHash, TimeSpan delay, TextWriter status)
+    public void ClearAfter(IClipboard clipboard, byte[]? expectedHash, TimeSpan delay, TextWriter status)
     {
         RequestedDelay = delay;
         DuringWait?.Invoke();
 
-        // Mirrors BlockingClearStrategy's conditional-clear rule so the command-level tests
-        // observe the same behaviour without depending on a clock.
-        clipboard.TryReadHash(out var current, out _);
-        if (!CryptographicOperations.FixedTimeEquals(current, expectedHash))
+        // Decides by ClipboardClear.Should, as BlockingClearStrategy does, so command-level tests see its behaviour without a clock.
+        var read = clipboard.TryReadHash(out var current, out _);
+        if (!Core.Clipboard.ClipboardClear.Should(read == ClipboardStatus.Ok && expectedHash is not null, current, expectedHash ?? []))
         {
             status.WriteLine("Clipboard changed since the copy; leaving it alone.");
             return;
@@ -354,7 +366,6 @@ internal sealed class FakeClock : TimeProvider
     public override TimeZoneInfo LocalTimeZone => Zone;
 }
 
-/// <summary>An environment backed by a dictionary.</summary>
 internal sealed class FakeEnvironment(Dictionary<string, string> values) : IEnvironmentProbe
 {
     public string? Get(string name) => values.TryGetValue(name, out var value) ? value : null;

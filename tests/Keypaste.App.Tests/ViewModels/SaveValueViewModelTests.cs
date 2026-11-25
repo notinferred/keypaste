@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
 
-/// <summary>A save prompt saves nothing until a value is entered and a replace is confirmed; Cancel saves nothing (F.79).</summary>
+/// <summary>A save prompt saves nothing until a value is entered and a replace is confirmed; Cancel saves nothing.</summary>
 public sealed class SaveValueViewModelTests
 {
     private readonly FakeClipboard _clipboard = new();
@@ -28,7 +28,7 @@ public sealed class SaveValueViewModelTests
         }
 
         Assert.True(prompt.AllowOnceCommand.CanExecute(null));
-        prompt.AllowOnceCommand.Execute(null);
+        prompt.AllowOnceCommand.Press();
 
         Assert.Equal(ApprovalAnswer.ApprovedOnce, await prompt.Answer);
         Assert.Equal("sk_new", prompt.Composed());
@@ -38,7 +38,7 @@ public sealed class SaveValueViewModelTests
     public void A_replace_saves_only_once_the_person_confirms_it()
     {
         using var prompt = new SaveValueViewModel(Prompt(replaces: true), _clipboard, _clock) { IsInFront = true };
-        prompt.GenerateCommand.Execute(null);
+        prompt.GenerateCommand.Press();
 
         Assert.True(prompt.Value.HasValue);
         Assert.False(prompt.AllowOnceCommand.CanExecute(null));
@@ -55,7 +55,7 @@ public sealed class SaveValueViewModelTests
         using var prompt = new SaveValueViewModel(Prompt(replaces: false), _clipboard, _clock);
         prompt.Value.Type('x');
 
-        prompt.DenyCommand.Execute(null);
+        prompt.DenyCommand.Press();
 
         Assert.Equal(ApprovalAnswer.Denied, await prompt.Answer);
     }

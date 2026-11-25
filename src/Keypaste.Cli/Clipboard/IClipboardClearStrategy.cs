@@ -13,11 +13,14 @@ internal interface IClipboardClearStrategy
 {
     /// <summary>
     /// Clears the clipboard <paramref name="delay"/> after the secret was copied, provided it
-    /// still holds <paramref name="expectedHash"/>.
+    /// still holds <paramref name="expectedHash"/>, or unconditionally when there is none.
     /// </summary>
     /// <param name="clipboard">The clipboard to clear.</param>
-    /// <param name="expectedHash">SHA-256 of the clipboard taken immediately after the copy.</param>
+    /// <param name="expectedHash">
+    /// SHA-256 of the clipboard taken immediately after the copy, from <see cref="ClipboardBaseline.Take"/>;
+    /// <see langword="null"/> when that read failed.
+    /// </param>
     /// <param name="delay">How long to leave the secret in place.</param>
     /// <param name="status">Receives progress messages; in practice stderr.</param>
-    void ClearAfter(IClipboard clipboard, byte[] expectedHash, TimeSpan delay, TextWriter status);
+    void ClearAfter(IClipboard clipboard, byte[]? expectedHash, TimeSpan delay, TextWriter status);
 }

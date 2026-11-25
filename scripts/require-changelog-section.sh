@@ -7,7 +7,7 @@
 #
 # THE MATCH IS WHOLE-LINE, and that is the whole point of the file. `grep -qF "## 0.2.0"` is
 # satisfied by a `## 0.2.0-rc.1` heading, so a release could be cut against a candidate's notes -
-# found by R.0a's own gate, red first. `grep -qxF` refuses that and still finds the real heading.
+# found by this repository's own release gate, red first. `grep -qxF` refuses that and still finds the real heading.
 #
 # Usage:
 #   require-changelog-section.sh <version> [changelog]

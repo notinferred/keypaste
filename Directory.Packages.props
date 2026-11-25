@@ -39,7 +39,7 @@
     <PackageVersion Include="ModelContextProtocol.Core" Version="1.4.1" />
   </ItemGroup>
 
-  <!-- The desktop shell (Stage 4.1). This is the largest single change to this repository's
+  <!-- The desktop shell. This is the largest single part of this repository's
        supply chain — four direct packages and roughly twenty transitive ones, in the process that
        holds the unlocked vault — so SECURITY.md law 9 governs it.
 
@@ -60,12 +60,12 @@
     <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.1.5" />
     <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.1.5" />
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-    <!-- org.freedesktop.Notifications on the session bus (Q.14): the D-Bus client Avalonia.FreeDesktop already brings at this version,
+    <!-- org.freedesktop.Notifications on the session bus: the D-Bus client Avalonia.FreeDesktop already brings at this version,
          named so the app's own use of it is pinned. It speaks only to the local bus and carries only fixed words. -->
     <PackageVersion Include="Tmds.DBus.Protocol" Version="0.94.1" />
   </ItemGroup>
 
-  <!-- Hardware-key unlocking in the desktop app (P.1), under SECURITY.md law 9 because a YubiKey's response is key material.
+  <!-- Hardware-key unlocking in the desktop app, under SECURITY.md law 9 because a YubiKey's response is key material.
 
        Yubico's own .NET SDK (Apache-2.0) is the one maintained driver for YubiKey OTP HMAC-SHA1
        challenge-response over USB HID on Windows, macOS and Linux; the alternative is three

@@ -5,7 +5,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// F.80's acceptance at the gate: an agent's request that arrives while a prompt is open waits its turn and is prompted in
+/// At the gate, an agent's request that arrives while a prompt is open waits its turn and is prompted in
 /// order, leaves the queue once withdrawn, a lock emptying it, and no agent has more than its bound waiting.
 /// </summary>
 public sealed class WaitingTurnTests : IDisposable

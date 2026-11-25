@@ -2,7 +2,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>Today's Core opens, reads and saves the vaults each published release wrote (law 14, Y.2); ReleaseVaults/README.md says how each was made.</summary>
+/// <summary>Today's Core opens, reads and saves the vaults each published release wrote (SECURITY.md law 14); ReleaseVaults/README.md says how each was made.</summary>
 public sealed class ReleaseVaultFixtureTests : IDisposable
 {
     private const string _fixturePassword = "keypaste-fixture-password";

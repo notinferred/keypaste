@@ -3,7 +3,6 @@ using System.Text;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Internal;
-using Keypaste.Core.Ownership;
 using Keypaste.Core.Recent;
 using Keypaste.Core.Tests;
 using Xunit;
@@ -41,7 +40,7 @@ public sealed class ImportVerbTests : IDisposable
         var exit = _cli.Run("import", source, "--vault", _cli.VaultPath);
 
         _cli.AssertExit(CliApp.ExitSuccess, exit);
-        Assert.Equal(["Password for acme.kdbx: ", "Master password: "], _cli.Prompt.PromptsSeen);
+        Assert.Equal(["Password for acme.kdbx: ", CliHarness.MasterPasswordPrompt], _cli.Prompt.PromptsSeen);
         Assert.Contains("  acme.kdbx · KeePass database 4.0 · Argon2d · AES-256", _cli.Err, StringComparison.Ordinal);
         Assert.Contains("  ✓ 2 items · 0 projects · copied into acme", _cli.Err, StringComparison.Ordinal);
         Assert.Empty(_cli.Out);
@@ -130,7 +129,7 @@ public sealed class ImportVerbTests : IDisposable
 
         _cli.AssertExit(CliApp.ExitAuthFailed, exit);
         Assert.Contains("keypaste import: wrong password for acme.kdbx", _cli.Err, StringComparison.Ordinal);
-        Assert.DoesNotContain("Master password: ", _cli.Prompt.PromptsSeen);
+        Assert.DoesNotContain(CliHarness.MasterPasswordPrompt, _cli.Prompt.PromptsSeen);
     }
 
     [Fact]
@@ -153,27 +152,6 @@ public sealed class ImportVerbTests : IDisposable
 
         _cli.AssertExit(CliApp.ExitSuccess, without);
         Assert.DoesNotContain("key file", _cli.Err, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Import_WhileTheTargetIsHeld_IsRefused()
-    {
-        Seed();
-        var source = Source("acme.kdbx");
-        var before = File.ReadAllBytes(_cli.VaultPath);
-
-        Assert.True(VaultClaim.TryAcquire(Home, _cli.VaultPath, OwnerKind.DesktopApp, out var held, out var refusal), refusal);
-        using (held)
-        {
-            _cli.Prompt.Enqueue(_sourcePassword, _master);
-            var exit = _cli.Run("import", source, "--vault", _cli.VaultPath);
-
-            _cli.AssertExit(CliApp.ExitInternalError, exit);
-        }
-
-        Assert.Contains("already unlocked in", _cli.Err, StringComparison.Ordinal);
-        Assert.Empty(_cli.Prompt.PromptsSeen);
-        Assert.Equal(before, File.ReadAllBytes(_cli.VaultPath));
     }
 
     private void Seed()

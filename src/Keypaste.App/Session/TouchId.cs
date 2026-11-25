@@ -8,7 +8,7 @@ namespace Keypaste.App.Session;
 /// <summary>
 /// Touch ID through the data protection keychain, as KeePassXC's quick unlock reaches it on macOS: each copy's key is
 /// 32 random bytes in a keychain item that only a fingerprint enrolled when it was made releases, kept on this Mac
-/// alone and never synced (D-0681, D-0682).
+/// alone and never synced.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -18,7 +18,7 @@ namespace Keypaste.App.Session;
 /// </para>
 /// <para>
 /// <b>Making a key asks.</b> An item is stored without asking, so a new key is read back at once, which asks the person
-/// as Windows Hello asks on every keep (D-0683); a cancelled read deletes it again.
+/// as Windows Hello asks on every keep; a cancelled read deletes it again.
 /// </para>
 /// <para>
 /// <b>Each home has its own service.</b> The app deletes every key under its home's service when it starts, since a key

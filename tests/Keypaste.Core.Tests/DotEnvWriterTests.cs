@@ -113,7 +113,7 @@ public sealed class DotEnvWriterTests
         return body.TrimEnd('\n');
     }
 
-    // ---- P1: the round trip ------------------------------------------------------------
+    // ---- the round trip ----------------------------------------------------------------
 
     [Fact]
     public void EveryValueInTheCorpus_SurvivesTheRoundTrip()
@@ -144,7 +144,7 @@ public sealed class DotEnvWriterTests
         Assert.Equal(["ZEBRA", "APPLE", "MIDDLE"], document.Variables.Select(v => v.Key));
     }
 
-    // ---- P2: byte invariants -----------------------------------------------------------
+    // ---- byte invariants ---------------------------------------------------------------
 
     /// <summary>
     /// No byte order mark, ever. <see cref="Encoding.UTF8"/> emits one, so the obvious
@@ -190,7 +190,7 @@ public sealed class DotEnvWriterTests
     public void TheTextAndTheBytesAgree() =>
         Assert.Equal(Format(("A", "caf\u00e9")).Text, _strictUtf8.GetString(Format(("A", "caf\u00e9")).Utf8.Span));
 
-    // ---- P3: minimality ----------------------------------------------------------------
+    // ---- minimality --------------------------------------------------------------------
 
     /// <summary>
     /// Double quotes are used <b>only</b> for a value containing an apostrophe or a carriage
@@ -280,7 +280,7 @@ public sealed class DotEnvWriterTests
         Assert.Equal("V=\"it's a \\\"quote\\\" and a \\\\\"", Line("V", "it's a \"quote\" and a \\"));
     }
 
-    // ---- P4, P5: determinism and idempotence -------------------------------------------
+    // ---- determinism and idempotence ---------------------------------------------------
 
     /// <summary>
     /// Two exports of the same data are byte-identical. A timestamp in the header would break this,

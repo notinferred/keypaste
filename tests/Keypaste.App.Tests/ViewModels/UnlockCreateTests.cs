@@ -12,14 +12,14 @@ using Xunit;
 namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
-/// Making a vault from the desktop (4.8).
+/// Making a vault from the desktop.
 /// </summary>
 /// <remarks>
 /// <para>
 /// <see cref="UnlockViewModel"/> names no Avalonia type and the picker is behind
 /// <see cref="IVaultFilePicker"/>, so the whole create journey is assertable with no application and
-/// no window. The headless session is for the claims that are only true of a visual tree, which for
-/// 4.8 is the accessibility sweep in <c>MaskedInputAutomationTests</c>.
+/// no window. The headless session is for the claims that are only true of a visual tree, here the
+/// accessibility sweep in <c>MaskedInputAutomationTests</c>.
 /// </para>
 /// <para>
 /// <b>Every refusal asserts a directory snapshot, not just <c>File.Exists</c>.</b> "Nothing was
@@ -85,8 +85,7 @@ public sealed class UnlockCreateTests : IDisposable
 
         await model.StartCreateAsync();
 
-        // First that the picker was actually reached. Without this the assertions below would pass
-        // against code that wrote a vault before ever opening a dialog.
+        // The picker was reached, or the checks below pass for code that writes before any dialog.
         Assert.Equal(1, _picker.NewCalls);
 
         Assert.False(model.IsCreating);

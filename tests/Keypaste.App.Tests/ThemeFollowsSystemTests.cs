@@ -13,7 +13,7 @@ using Xunit;
 namespace Keypaste.App.Tests;
 
 /// <summary>
-/// V-N.7: with no <c>app.toml</c> the app paints in the system's light or dark setting, as it
+/// With no <c>app.toml</c> the app paints in the system's light or dark setting, as it
 /// changes, and a choice in Settings wins over either.
 /// </summary>
 /// <remarks>Read from the pixels of the app's own window, composed by the method launch runs.</remarks>

@@ -34,11 +34,7 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault, TimeProvid
     private readonly TimeProvider _clock = clock ?? TimeProvider.System;
 
     /// <inheritdoc/>
-    /// <remarks>
-    /// Any of the entry's own tags, read from the open vault; a request it answers is
-    /// released only after a read of the saved file, which refuses a tag not yet saved. It fails
-    /// closed: with no vault, no single such entry or no way to read its tags, the answer is yes.
-    /// </remarks>
+    /// <remarks>Null when no vault is unlocked, no single entry has that name, or the vault cannot be read.</remarks>
     public string? ItemId(EntryName name)
     {
         ArgumentNullException.ThrowIfNull(name);
@@ -69,6 +65,11 @@ public sealed class VaultCredentialSource(Func<Vault?> unlockedVault, TimeProvid
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Any of the entry's own tags, read from the open vault; a request it answers is
+    /// released only after a read of the saved file, which refuses a tag not yet saved. It fails
+    /// closed: with no vault, no single such entry or no way to read its tags, the answer is yes.
+    /// </remarks>
     public bool RequiresLiveApproval(EntryName name)
     {
         ArgumentNullException.ThrowIfNull(name);

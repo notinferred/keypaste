@@ -14,7 +14,7 @@ using Xunit;
 namespace Keypaste.App.Tests.Rendering;
 
 /// <summary>
-/// Each surface that reveals a secret, read from the frames Skia drew for it (4.6).
+/// Each surface that reveals a secret, read from the frames Skia drew for it.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -49,7 +49,7 @@ public sealed class DrawnRevealTests
 
         // The env cell sits in a panel with a tooltip, whose 400 ms show timer starts at the hover on the
         // wall clock: where frames drew slowly it opened before the press, the press closed it, and
-        // Avalonia's popup layer, which it never removes, was in the revealed surface alone (G.4b). The
+        // Avalonia's popup layer, which it never removes, was in the revealed surface alone. The
         // cell shows no tooltip here, so the surfaces differ only by what the reveal does.
         ToolTip.SetServiceEnabled(cell, false);
         ToolTip.SetServiceEnabled(toggle, false);

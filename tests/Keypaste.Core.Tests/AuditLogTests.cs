@@ -93,10 +93,9 @@ public sealed class AuditLogTests : IDisposable
     /// fallback.
     /// </summary>
     /// <remarks>
-    /// This is the tripwire for a specific, quiet bug. The wire switch used to fall back to
-    /// <c>vault-locked</c>, so a member added without a matching case — which is exactly what
-    /// happens when a stage adds a new way to say no — would have been recorded as a denial that
-    /// never occurred. A log that lies about which decisions were taken is worse than no log, and
+    /// This is the tripwire for a quiet bug: a wire switch that falls back to a default, such as
+    /// <c>vault-locked</c>, records a member added without a matching case — which is exactly what
+    /// happens when a new way to say no is added — as a denial that never occurred. A log that lies about which decisions were taken is worse than no log, and
     /// nothing else in the suite would have noticed.
     /// </remarks>
     [Fact]
@@ -260,7 +259,7 @@ public sealed class AuditLogTests : IDisposable
 
     /// <summary>
     /// The redaction rule for the one field an agent writes freely: an excerpt for the human, the
-    /// true length so truncation is visible, and a hash so 2.2 can prove the dialog showed the same
+    /// true length so truncation is visible, and a hash that can prove the dialog showed the same
     /// text that was recorded.
     /// </summary>
     [Fact]
@@ -374,7 +373,7 @@ public sealed class AuditLogTests : IDisposable
     }
 
     /// <summary>
-    /// Reopening appends, and — since 2.4 — the second record links to the first. That is where the
+    /// Reopening appends, and the second record links to the first. That is where the
     /// writer proves it learns what to link to from the <em>file</em>: a fresh
     /// <see cref="AuditLog"/> has no memory of what the last one wrote.
     /// </summary>
@@ -407,13 +406,13 @@ public sealed class AuditLogTests : IDisposable
 
     /// <summary>
     /// Claude Desktop and Claude Code each spawn their own server, so two processes really do share
-    /// one file. Interleaving them must not lose or tear a line — and, since 2.4, must produce one
+    /// one file. Interleaving them must not lose or tear a line, and must produce one
     /// unbroken chain rather than two interleaved ones.
     /// </summary>
     /// <remarks>
-    /// This is the test that holds up both halves of the 2.4 writer at once: the second file handle
-    /// that lets an append read the end of the file, and the positions being the file's rather than
-    /// each object's. Before 2.4 this file would have run 1, 1, 2, 2, 3, 3 — a number that looks
+    /// This is the test that holds up both halves of the chained writer at once: the second file
+    /// handle that lets an append read the end of the file, and the positions being the file's rather
+    /// than each object's. Positions kept per object would run 1, 1, 2, 2, 3, 3 here — a number that looks
     /// like a record index and is not one, in the file whose job is to be read back afterwards.
     /// </remarks>
     [Fact]
@@ -459,8 +458,8 @@ public sealed class AuditLogTests : IDisposable
     /// newer ones — which is truncation, and is already THREATS.md T-5's residual.
     /// </para>
     /// <para>
-    /// It used to refuse, and that was worse. One appended byte — a blank line out of an editor, an
-    /// <c>echo</c> — became a permanent denial of every credential request, which under assumption 1
+    /// Refusing would be worse. One appended byte — a blank line out of an editor, an
+    /// <c>echo</c> — would become a permanent denial of every credential request, which under assumption 1
     /// is a cheaper lever than the one the refusal was meant to close. The honest answer to a line
     /// keypaste did not write is to record around it and let the verifier report it.
     /// </para>
@@ -563,8 +562,8 @@ public sealed class AuditLogTests : IDisposable
     /// caller that sees false is required to deny the call it was about to answer.
     /// </summary>
     /// <remarks>
-    /// Never covered before 2.4, and worth covering now: the chain spends
-    /// <c>AuditChain.ChainOverheadBytes</c> of the same budget, so the cliff is closer than it was.
+    /// The chain spends <c>AuditChain.ChainOverheadBytes</c> of the same budget, so a record reaches
+    /// the limit sooner than its own fields suggest.
     /// <c>exposure</c> is the lever because it is the one field with no cap of its own.
     /// </remarks>
     [Fact]
@@ -660,6 +659,29 @@ public sealed class AuditLogTests : IDisposable
         Assert.True(AuditReader.TryRead(LogPath, out var entries, out var unreadable, out var failure), failure);
         Assert.Equal((5, 0), (entries.Count, unreadable));
         Assert.Equal(AuditChainVerdict.Intact, AuditChainVerifier.Verify(LogPath).Verdict);
+    }
+
+    /// <summary>A log already read into memory reads as its file does, so a caller can check the chain over the same bytes.</summary>
+    [Fact]
+    public void ALogReadFromItsBytes_ReadsAsItsFileDoes()
+    {
+        using (var log = Open())
+        {
+            Assert.True(log.TryAppend(Denial(), out var error), error);
+            Assert.True(log.TryAppend(Denial("get_entry"), out error), error);
+        }
+
+        File.AppendAllText(LogPath, "somebody wrote this by hand\n\n");
+
+        Assert.True(AuditReader.TryRead(LogPath, out var fromFile, out var unreadableInFile, out var failure), failure);
+        Assert.True(AuditReader.TryReadBytes(LogPath, out var read, out failure), failure);
+        using var bytes = new MemoryStream(read, writable: false);
+        Assert.True(AuditReader.TryRead(bytes, out var fromBytes, out var unreadableInBytes, out failure), failure);
+
+        Assert.Equal((2, 1), (fromFile.Count, unreadableInFile));
+        Assert.Equal(unreadableInFile, unreadableInBytes);
+        Assert.Equivalent(fromFile, fromBytes, strict: true);
+        Assert.True(bytes.CanRead);
     }
 
     /// <summary>When one of the lines cannot be written, none is, so a set is never recorded in part.</summary>
@@ -908,6 +930,20 @@ public sealed class AuditLogTests : IDisposable
         Assert.Equal(1, unreadable);
         Assert.Equal(3, after.Line);
         Assert.Equal(new FileInfo(LogPath).Length, after.Offset);
+    }
+
+    /// <summary>A line holding bytes that are not UTF-8 reads with them replaced, as the whole-file reader reads it, rather than as unreadable.</summary>
+    [Fact]
+    public void TryReadFrom_ReadsALineThatIsNotUtf8_AsTryReadDoes()
+    {
+        File.WriteAllBytes(LogPath, [.. "{\"ts\":\"2026-07-26T14:03:11.482Z\",\"tool\":\"list_entry_names\",\"client\":{\"name\":\"bad"u8, 0xFF, .. "name\"},\"decision\":\"denied\"}\n"u8]);
+
+        Assert.True(AuditReader.TryReadFrom(LogPath, AuditPosition.Start, out var appended, out _, out var unreadable, out _));
+        Assert.True(AuditReader.TryRead(LogPath, out var whole, out _, out var failure), failure);
+
+        Assert.Equal(0, unreadable);
+        Assert.Equal(Assert.Single(whole).Name, Assert.Single(appended).Name);
+        Assert.StartsWith("bad", appended[0].Name, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -25,7 +25,7 @@ internal sealed record OwnerRoute(string Verb, Func<CliContext, TerminalEdit?> R
 /// on a vault it opened itself, so a refusal reads as the verb's own.
 /// </para>
 /// <para>
-/// With nothing answering on the pipe, the verb is refused as a held vault always was.
+/// With nothing answering on the pipe, the verb refuses the held vault rather than editing it.
 /// </para>
 /// </remarks>
 internal static class OwnerEdit

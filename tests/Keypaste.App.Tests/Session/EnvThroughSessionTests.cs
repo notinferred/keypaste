@@ -10,7 +10,7 @@ namespace Keypaste.App.Tests.Session;
 
 /// <summary>
 /// An env set resolved through the app's session is read from the vault as saved and released only
-/// while the unlock that asked is live (E.1a, D-0313, D-0317).
+/// while the unlock that asked is live.
 /// </summary>
 /// <remarks>
 /// Each resolution goes through <see cref="AppVaultSession.Environments"/> and each edit through the

@@ -1,6 +1,3 @@
-using Keypaste.App.Clipboard;
-using Keypaste.App.Session;
-using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Agents;
@@ -36,7 +33,7 @@ public sealed class EntryFieldsTests : IDisposable
     [Fact]
     public void The_pane_lists_fields_by_name_and_kind_and_holds_no_value()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
 
         Assert.Equal(["PIN", "otp"], detail.Fields.Select(field => field.Name));
@@ -52,7 +49,7 @@ public sealed class EntryFieldsTests : IDisposable
     [Fact]
     public void A_card_from_its_template_reads_as_a_card_and_its_number_as_a_card_value()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var form = NewItemForm.Open(context.Entries, "Visa", ItemTemplate.Card);
         foreach (var c in _secret)
         {
@@ -87,7 +84,7 @@ public sealed class EntryFieldsTests : IDisposable
             }
             """);
 
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         using (var source = ExportImport.Open(export, ExportImport.Readers)!)
         {
             source.Commit(context.Session.Unlocked!, source.Plan(context.Session.Unlocked!, "imported"), vault => vault.Save());
@@ -110,7 +107,7 @@ public sealed class EntryFieldsTests : IDisposable
     [Fact]
     public void Adding_a_field_is_one_revision_and_protected_unless_switched_off()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
         var revisions = Revisions();
 
@@ -133,7 +130,7 @@ public sealed class EntryFieldsTests : IDisposable
     [InlineData("PIN")]
     public void A_name_the_pane_refuses_writes_nothing_and_says_why(string name)
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
         var before = File.ReadAllBytes(_vaultPath);
 
@@ -147,7 +144,7 @@ public sealed class EntryFieldsTests : IDisposable
     [Fact]
     public void Replacing_a_value_keeps_its_protection_and_switching_protection_keeps_its_value()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
         var revisions = Revisions();
 
@@ -172,7 +169,7 @@ public sealed class EntryFieldsTests : IDisposable
     [Fact]
     public void Removing_a_field_asks_first_and_is_one_revision()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
         var revisions = Revisions();
 
@@ -194,7 +191,7 @@ public sealed class EntryFieldsTests : IDisposable
     [Fact]
     public void Renaming_a_plain_field_is_one_revision_that_keeps_its_value_and_protection()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
         Add(detail, "Region", "eu", protect: false);
         var revisions = Revisions();
@@ -217,12 +214,12 @@ public sealed class EntryFieldsTests : IDisposable
 
     /// <summary>
     /// A field named as a project variable is renamed only after the pane has named the environments it
-    /// leaves and the references it breaks, never a value; cancelling writes nothing (D-0415's pattern).
+    /// leaves and the references it breaks, never a value; cancelling writes nothing.
     /// </summary>
     [Fact]
     public void Renaming_a_variable_names_what_it_breaks_first_and_cancelled_writes_nothing()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
         detail.DraftTag = "env:billing:staging";
         detail.AddTagCommand.Press();
@@ -262,7 +259,7 @@ public sealed class EntryFieldsTests : IDisposable
     [InlineData("otp")]
     public void A_refused_field_rename_writes_nothing_and_says_why(string name)
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
         var before = File.ReadAllBytes(_vaultPath);
 
@@ -279,7 +276,7 @@ public sealed class EntryFieldsTests : IDisposable
     [Fact]
     public void Tags_are_chips_a_project_tag_shows_its_environment_and_protection_and_each_change_is_a_revision()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
         var revisions = Revisions();
 
@@ -310,7 +307,7 @@ public sealed class EntryFieldsTests : IDisposable
     [Fact]
     public void A_project_tag_change_names_its_environment_and_fields_first_and_cancelled_writes_nothing()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
         var before = File.ReadAllBytes(_vaultPath);
 
@@ -351,7 +348,7 @@ public sealed class EntryFieldsTests : IDisposable
 
     /// <summary>
     /// The pane's project tag confirmation names each variable joining whose value holds a KeePass placeholder by keyword,
-    /// since it fills in from the item wherever the variable leaves (D-0465), and never the value.
+    /// since it fills in from the item wherever the variable leaves, and never the value.
     /// </summary>
     [Fact]
     public void A_project_tag_change_names_each_joining_variable_holding_a_placeholder()
@@ -362,7 +359,7 @@ public sealed class EntryFieldsTests : IDisposable
             vault.Save();
         }
 
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
 
         detail.DraftTag = "env:billing:staging";
@@ -382,7 +379,7 @@ public sealed class EntryFieldsTests : IDisposable
     [Fact]
     public void A_refused_tag_writes_nothing_and_says_why()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
         var before = File.ReadAllBytes(_vaultPath);
 
@@ -400,7 +397,7 @@ public sealed class EntryFieldsTests : IDisposable
     [Fact]
     public void A_change_over_a_file_something_else_saved_is_refused_and_says_so()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
 
         using (var elsewhere = ClaimedVault.Open(_vaultPath, _master))
@@ -419,7 +416,7 @@ public sealed class EntryFieldsTests : IDisposable
     [Fact]
     public void Opening_a_form_announces_the_lines_and_buttons_that_read_it()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
         var raised = new List<string>();
         detail.PropertyChanged += (_, e) => raised.Add(e.PropertyName ?? string.Empty);
@@ -441,7 +438,7 @@ public sealed class EntryFieldsTests : IDisposable
     [Fact]
     public async Task Copying_a_field_goes_through_the_countdown_under_its_name()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
 
         await detail.Fields.Single(field => field.Name == "PIN").CopyValueCommand.PressAsync();
@@ -453,7 +450,7 @@ public sealed class EntryFieldsTests : IDisposable
     [Fact]
     public void Letting_go_of_the_pane_empties_its_fields_tags_and_forms()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var detail = context.Open(_checking);
         detail.BeginAddFieldCommand.Press();
         detail.NewFieldValue.Type('x');
@@ -501,45 +498,5 @@ public sealed class EntryFieldsTests : IDisposable
     {
         using var vault = ClaimedVault.Open(_vaultPath, _master);
         return vault.Tags(_checking)!;
-    }
-
-    private sealed class Context : IDisposable
-    {
-        /// <param name="vaultPath">The vault to unlock.</param>
-        /// <param name="home">The keypaste home whose <c>clients.toml</c> it reads, or null for the process's.</param>
-        internal Context(string vaultPath, string? home = null)
-        {
-            Session = new AppVaultSession(new ManualClock(AppClock.Start), home: home);
-
-            using (var master = TempVault.Secret(_master))
-            {
-                Assert.Equal(UnlockOutcome.Opened, Session.TryUnlock(vaultPath, master.Value));
-            }
-
-            Clipboard = new FakeClipboard();
-            Countdown = new ClipboardCountdown(Clipboard, new ManualClock(AppClock.Start));
-            Entries = new EntriesViewModel(Session, Countdown);
-        }
-
-        internal AppVaultSession Session { get; }
-
-        internal ClipboardCountdown Countdown { get; }
-
-        internal EntriesViewModel Entries { get; }
-
-        internal FakeClipboard Clipboard { get; }
-
-        internal EntryDetailViewModel Open(EntryName name)
-        {
-            Entries.Selected = Entries.Rows.Single(row => row.Title == name.Title && row.GroupPath == name.GroupPath);
-            return Entries.Detail!;
-        }
-
-        public void Dispose()
-        {
-            Entries.Dispose();
-            Countdown.Dispose();
-            Session.Dispose();
-        }
     }
 }

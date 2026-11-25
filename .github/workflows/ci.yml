@@ -39,7 +39,7 @@ env:
 jobs:
   # Every run but a push runs every job on every runner but tools, which runs on the schedule and on a dispatch that asks
   # for it; a dispatch, the schedule or a tag's own run counts toward a release, ci's only with its tools jobs.
-  # Only NuGet restores are cached, by every lock file's hash with no fallback key; release builds restore fresh (B.5).
+  # Only NuGet restores are cached, by every lock file's hash with no fallback key; release builds restore fresh.
   # checks runs first, and the jobs that build and test start only once it passes; format runs beside them.
   # A push that changes only documents no job reads, or only the extension, which app.yml tests, runs checks alone. Every
   # other event runs every job, because a release counts only a ci run that skipped none.
@@ -97,7 +97,7 @@ jobs:
         shell: bash
         run: scripts/verify-release-destination.sh --with-real-aws
 
-      # Packed and checked only; nothing uploads or publishes the bundle (G.6b).
+      # Packed and checked only; nothing uploads or publishes the bundle.
       - name: Pack and check the Claude Desktop extension
         shell: bash
         timeout-minutes: 2
@@ -347,7 +347,7 @@ jobs:
 
   # The AI tools keypaste connects, at the versions install-real-tools.sh pins, connected by keypaste setup, read back
   # with each tool's own command where it has one (VS Code's, Claude Desktop's and Windows Cursor's at the file level)
-  # and removed again; on Linux and macOS, Codex's sandbox refuses an agent's write to keypaste's home (L.3).
+  # and removed again; on Linux and macOS, Codex's sandbox refuses an agent's write to keypaste's home.
   tools:
     name: tools (${{ matrix.os }})
     if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (inputs.tools || inputs.only_tools))

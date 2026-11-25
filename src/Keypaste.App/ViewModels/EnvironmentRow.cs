@@ -5,7 +5,7 @@ namespace Keypaste.App.ViewModels;
 /// <summary>One line of the item preview's Environments card: a project and environment the item is in, and whether agents ask.</summary>
 /// <remarks>
 /// A name and a fixed word, never a value. "approval required" means no agent's settings let it have the item
-/// without a person's answer (D-0441, D-0371); otherwise the item is simply set there. Nothing is said about
+/// without a person's answer; otherwise the item is simply set there. Nothing is said about
 /// approval when this computer's ceilings cannot be read, since every agent request is refused until they can.
 /// </remarks>
 internal sealed class EnvironmentRow

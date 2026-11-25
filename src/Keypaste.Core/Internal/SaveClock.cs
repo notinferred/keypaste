@@ -2,7 +2,7 @@ using System.Diagnostics;
 
 namespace Keypaste.Core.Internal;
 
-/// <summary>Where one save's caller wait went, component by component (task F.10a).</summary>
+/// <summary>Where one save's caller wait went, component by component.</summary>
 /// <remarks>
 /// The components are disjoint and together are the caller's whole wait: <see cref="Total"/> is
 /// <see cref="Check"/> + <see cref="Redirect"/> + <see cref="Produce"/> + every attempt's parts + <see cref="Stamp"/>, plus

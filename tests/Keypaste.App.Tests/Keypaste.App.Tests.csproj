@@ -24,14 +24,10 @@
     <ProjectReference Include="../../src/Keypaste.Cli/Keypaste.Cli.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
-  <!--
-    Compiled in rather than copied, for the reason Keypaste.Consistency.Tests gives about
-    CliHarness.cs: one statement of who publishes this project, checked in every front end's
-    own suite.
-  -->
+  <!-- Compiled in rather than copied, so every front end's suite checks the one statement of who publishes this project. -->
   <ItemGroup>
     <Compile Include="../Keypaste.Core.Tests/PublisherMetadata.cs" Link="PublisherMetadata.cs" />
-    <!-- Every vault these tests create takes a token Argon2 cost (D-0469). -->
+    <!-- Every vault these tests create takes a token Argon2 cost, so the suite does not pay the production cost per vault. -->
     <Compile Include="../Keypaste.Core.Tests/CheapKeyDerivation.cs" Link="CheapKeyDerivation.cs" />
     <!-- A project's variables written as env set writes them, for fixtures. -->
     <Compile Include="../Keypaste.Core.Tests/ProjectVariables.cs" Link="ProjectVariables.cs" />
@@ -42,9 +38,9 @@
     <Compile Include="../Keypaste.Core.Tests/FakeShareServer.cs" Link="FakeShareServer.cs" />
     <!-- The core's /v1/crash fake, which the app's sender is tested against too. -->
     <Compile Include="../Keypaste.Core.Tests/FakeCrashServer.cs" Link="FakeCrashServer.cs" />
-    <!-- The channels the core's scripted bridge speaks over, which need no thread-pool worker (F.41). -->
+    <!-- The channels the core's scripted bridge speaks over, which need no thread-pool worker. -->
     <Compile Include="../Keypaste.Core.Tests/ScriptedBridgeChannels.cs" Link="ScriptedBridgeChannels.cs" />
-    <!-- Another KeePass program's edit, as the core's lost-tag tests make one (V.11). -->
+    <!-- Another KeePass program's edit, as the core's lost-tag tests make one. -->
     <Compile Include="../Keypaste.Core.Tests/ForeignEdit.cs" Link="ForeignEdit.cs" />
     <!-- A vault's XML holding what another program wrote, as the core's tests make one. -->
     <Compile Include="../Keypaste.Core.Tests/ForeignXml.cs" Link="ForeignXml.cs" />
@@ -52,8 +48,6 @@
     <Compile Include="../Keypaste.Core.Tests/Kdbx31.cs" Link="Kdbx31.cs" />
     <!-- A folder the system cannot flush a rename into, for a save that says so. -->
     <Compile Include="../Keypaste.Core.Tests/UnflushableFolder.cs" Link="UnflushableFolder.cs" />
-    <!-- Time zones a test names on any runner, for the end of Automatic on this computer's clock. -->
-    <Compile Include="../Keypaste.Core.Tests/TestZones.cs" Link="TestZones.cs" />
   </ItemGroup>
 
   <ItemGroup>

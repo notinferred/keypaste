@@ -51,7 +51,7 @@ public sealed class ImportExportVerbTests : IDisposable
         var exit = _cli.Run("import", _export, "--vault", _cli.VaultPath, "--into", "imported", "--dry-run");
 
         _cli.AssertExit(CliApp.ExitSuccess, exit);
-        Assert.Equal(["Master password: "], _cli.Prompt.PromptsSeen);
+        Assert.Equal([CliHarness.MasterPasswordPrompt], _cli.Prompt.PromptsSeen);
         Assert.Contains("  export.fake · Fake · 2 items", _cli.Err, StringComparison.Ordinal);
         Assert.Equal(
             Lines(
@@ -76,7 +76,7 @@ public sealed class ImportExportVerbTests : IDisposable
         var exit = _cli.Run("import", _export, "--vault", _cli.VaultPath, "--into", "imported", "--skip-existing");
 
         _cli.AssertExit(CliApp.ExitSuccess, exit);
-        Assert.Equal(["Master password: "], _cli.Prompt.PromptsSeen);
+        Assert.Equal([CliHarness.MasterPasswordPrompt], _cli.Prompt.PromptsSeen);
         Assert.Contains(
             Lines(
                 "  ✓ 1 item · 0 projects · copied into imported",

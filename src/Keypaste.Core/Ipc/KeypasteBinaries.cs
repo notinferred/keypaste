@@ -48,18 +48,22 @@ internal sealed class KeypasteBinaries
         }
 
         var length = new FileInfo(canonical).Length;
+        string? callerHash = null;
 
-        return _known.Any(known => new FileInfo(known).Length == length && string.Equals(HashOf(known), HashOf(canonical), StringComparison.Ordinal));
+        return _known.Any(known => new FileInfo(known).Length == length && string.Equals(KnownHashOf(known), callerHash ??= HashOf(canonical), StringComparison.Ordinal));
     }
 
-    private string HashOf(string path)
+    // Only the known programs' are kept: a caller's path is new on each AppImage mount, so keeping its hash would grow with every bridge started.
+    private string KnownHashOf(string path)
     {
         var file = new FileInfo(path);
 
-        return _hashes.GetOrAdd((path, file.Length, file.LastWriteTimeUtc), static key =>
-        {
-            using var stream = File.OpenRead(key.Path);
-            return Convert.ToHexString(SHA256.HashData(stream));
-        });
+        return _hashes.GetOrAdd((path, file.Length, file.LastWriteTimeUtc), static key => HashOf(key.Path));
+    }
+
+    private static string HashOf(string path)
+    {
+        using var stream = File.OpenRead(path);
+        return Convert.ToHexString(SHA256.HashData(stream));
     }
 }

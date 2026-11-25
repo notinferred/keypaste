@@ -1,25 +1,17 @@
 #!/usr/bin/env bash
 # Decides whether a release destination is free, and is the only thing that uploads to it.
 #
-# F.4a's defect was one line of release.yml:
+# A check that discards the diagnostic and the exit code and reads emptiness as "free" gives
+# AccessDenied, an unreachable endpoint, a throttle and a genuinely absent prefix one answer, and all
+# but the last would reach a recursive upload over a published, immutable version on a bucket the
+# world can read (SECURITY.md law 7 and docs/RELEASE.md).
 #
-#   existing="$(aws s3 ls "$prefix" --endpoint-url "$endpoint" 2>/dev/null || true)"
-#   if [ -n "$existing" ]; then ... exit 1; fi     # else fall through to `aws s3 cp --recursive`
+# `aws s3 ls` reports the same exit code for "matched nothing" and "failed", so asking it more
+# carefully cannot fix that. This asks s3api list-objects-v2 instead, whose success is an API
+# response, and reads the body rather than its emptiness - so "verified empty" is a parsed answer about the prefix that was asked about.
 #
-# Three suppressions on one line: the diagnostic was discarded, the exit code was discarded, and
-# *emptiness* was the only signal. So AccessDenied, an unreachable endpoint, a throttle and a
-# genuinely absent prefix were one answer, and all but the last reached a recursive upload over a
-# published, immutable version on a bucket the world can read (SECURITY.md law 7 and docs/RELEASE.md).
-#
-# Two things follow, and the second is the one that matters.
-#
-# The question changed. `aws s3 ls` reports the same exit code for "matched nothing" and "failed",
-# which is what `|| true` was reached for; asking it more carefully cannot fix that. This asks
-# s3api list-objects-v2 instead, whose success is an API response, and reads the body rather than
-# its emptiness - so "verified empty" is a parsed answer about the prefix that was asked about.
-#
-# But a refusal that rests only on a nonzero exit still trusts the read path to *fail loudly*,
-# which is the assumption that failed the first time. So the check is a pair, and both halves must
+# A refusal that rests only on a nonzero exit still trusts the read path to *fail loudly*. So the
+# check is a pair, and both halves must
 # hold: a prefix known to be occupied must come back with at least one key, and only then is a
 # target prefix of zero keys believed. A denied token, a wrong endpoint, a token with no
 # ListBucket, a throttle awscli swallows and an SDK that starts answering `{}` all fail the first
@@ -27,10 +19,9 @@
 # scripts/verify-install.sh's rule, applied to a listing: a run that fails on its own proves
 # nothing; only the pair isolates the one thing being asserted.
 #
-# The upload lives here rather than in the workflow for the same reason the check does. V-F.4a
-# requires that only a verified-empty destination *reaches upload* and that every other case makes
-# zero write calls - a claim no test can make about a step body, and one the gate measures by
-# driving this file against a fake `aws` and counting what it invoked.
+# The upload lives here too, so verify-release-destination.sh can drive it against a fake `aws` and
+# count that only a verified-empty destination reaches an upload and every other case makes zero
+# write calls - a claim no test can make about a step body.
 #
 # Usage:
 #   publish-release.sh --check   <version>
@@ -152,7 +143,7 @@ keys_at() {
   # input, so on ubuntu-22.04 - the runner the publish job actually uses - an empty answer about
   # the destination came back as an empty string with a success status, sailed past the positive
   # control, failed `[ "$occupied" -ne 0 ]` with "integer expression expected", and was read as a
-  # free destination. Trusting an exit code to say "no answer" is the assumption F.4a was about.
+  # free destination. Trusting an exit code to say "no answer" is the fail-open assumption this script exists to refuse.
   case "$keys" in
     ''|*[!0-9]*) die "the answer for $prefix is not a listing this can act on; refusing" ;;
   esac
@@ -191,6 +182,6 @@ aws s3 cp "$dir" "s3://${bucket}/${target_prefix}" \
 
 # Informational, exactly as the step it replaces was. Turning it into a check needs a claim about
 # R2's list-after-write consistency this repository has not established, and a false failure here
-# would burn a version that had in fact been published; R.0b owns the completion record.
+# would burn a version that had in fact been published; release-completion.sh checks the published release.
 echo "published to ${target_prefix}:"
 listing "$target_prefix" 2>/dev/null | jq -r '.Contents[]?.Key' || true

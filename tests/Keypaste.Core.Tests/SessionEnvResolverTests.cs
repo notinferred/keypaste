@@ -5,7 +5,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// An env set resolved through an owner's session is released only while the lifetime that asked
-/// is live, from the vault as its file holds it, and only under the names a person confirmed (E.1a).
+/// is live, from the vault as its file holds it, and only under the names a person confirmed.
 /// </summary>
 public sealed class SessionEnvResolverTests : IDisposable
 {

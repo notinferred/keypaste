@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using Keypaste.Core;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Tests;
@@ -24,11 +25,9 @@ public sealed class OneLinePerRequestTests : IAsyncLifetime
     private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-one-line-").FullName;
     private readonly SessionLifetime _lifetime = new();
     private readonly Person _person = new();
-    private readonly CancellationTokenSource _stop = new();
     private Vault? _vault;
     private OwnerLog? _log;
-    private SessionServer? _server;
-    private Task? _serving;
+    private ServedOwner? _owner;
     private volatile bool _unwritable;
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
@@ -46,17 +45,21 @@ public sealed class OneLinePerRequestTests : IAsyncLifetime
         _vault.Save();
         _log = new OwnerLog(Home);
 
-        _server = SessionServer.Listen(Pipe, new SessionServerOptions
-        {
-            Vault = VaultIdentity.Of(Home, VaultPath),
-            Lifetime = _lifetime,
-            CurrentLifetime = () => _lifetime,
-            UnlockedFor = asked => ReferenceEquals(asked, _lifetime) && asked.IsLive ? _vault : null,
-            Channel = _person,
-            Rules = TestSession.Settings(),
-            Audit = () => _unwritable ? null : _log?.Log,
-        });
-        _serving = _server.RunAsync(_stop.Token);
+        _owner = ServedOwner.Listen(
+            new SessionServerOptions
+            {
+                Vault = VaultIdentity.Of(Home, VaultPath),
+                Lifetime = _lifetime,
+                CurrentLifetime = () => _lifetime,
+                UnlockedFor = asked => ReferenceEquals(asked, _lifetime) && asked.IsLive ? _vault : null,
+                Channel = _person,
+                Rules = TestSession.Settings(),
+                Audit = () => _unwritable ? null : _log?.Log,
+
+                // Set so this owner serves saves and item changes; no test here lets one be written.
+                WriteEdit = (_, _) => new AgentSave(AgentSaveOutcome.Locked, "nothing is written in these tests"),
+            },
+            Pipe);
 
         return ValueTask.CompletedTask;
     }
@@ -64,20 +67,13 @@ public sealed class OneLinePerRequestTests : IAsyncLifetime
     public async ValueTask DisposeAsync()
     {
         _lifetime.End();
-        await _stop.CancelAsync();
 
-        try
+        if (_owner is not null)
         {
-            await (_serving ?? Task.CompletedTask);
-        }
-        catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
-        {
-            // Tearing the listener down is how it stops.
+            await _owner.DisposeAsync();
         }
 
-        _server?.Dispose();
         _lifetime.Dispose();
-        _stop.Dispose();
         _log?.Dispose();
         _vault?.Dispose();
         Directory.Delete(_directory, recursive: true);
@@ -130,10 +126,32 @@ public sealed class OneLinePerRequestTests : IAsyncLifetime
     {
         _person.Hold = true;
         await using var harness = new McpHarness(Pipe, VaultPath);
-        await GiveUpWhileAskedAsync(harness);
+        await GiveUpWhileAskedAsync(harness, ToolText.CredentialToolName, Ask());
 
         var line = await OneOwnerLineAsync();
         Assert.Equal("request_credential", line.GetProperty("tool").GetString());
+        Assert.Equal("cancelled", line.GetProperty("method").GetString());
+        Assert.Equal(_lifetime.Id, line.GetProperty("session").GetString());
+        Assert.True(_person.Withdrawn);
+        Assert.Empty(harness.AuditLines());
+        Assert.DoesNotContain(_sentinel, harness.Transcript, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A client that gives up on a save or an item change while the person is being asked leaves one line, cancelled, and it
+    /// is the owner's, as a credential request's is: the bridge writes none of its own.
+    /// </summary>
+    [Theory]
+    [InlineData(ToolText.SaveToolName)]
+    [InlineData(ToolText.ItemChangeToolName)]
+    public async Task AClientThatGivesUpOnAChangeWhileAsked_IsOneCancelledLine_TheOwners(string tool)
+    {
+        _person.Hold = true;
+        await using var harness = new McpHarness(Pipe, VaultPath);
+        await GiveUpWhileAskedAsync(harness, tool, ChangeAsked(tool));
+
+        var line = await OneOwnerLineAsync();
+        Assert.Equal(tool, line.GetProperty("tool").GetString());
         Assert.Equal("cancelled", line.GetProperty("method").GetString());
         Assert.Equal(_lifetime.Id, line.GetProperty("session").GetString());
         Assert.True(_person.Withdrawn);
@@ -150,7 +168,7 @@ public sealed class OneLinePerRequestTests : IAsyncLifetime
     {
         _person.Hold = true;
         await using var harness = new McpHarness(Pipe, VaultPath);
-        await GiveUpWhileAskedAsync(harness, whileAsked: () => _unwritable = true);
+        await GiveUpWhileAskedAsync(harness, ToolText.CredentialToolName, Ask(), whileAsked: () => _unwritable = true);
 
         var line = await OneBridgeLineAsync(harness);
         Assert.Equal("request_credential", Field(line, "tool"));
@@ -182,12 +200,17 @@ public sealed class OneLinePerRequestTests : IAsyncLifetime
         Assert.DoesNotContain(_sentinel, harness.Transcript, StringComparison.Ordinal);
     }
 
-    /// <summary>Asks for the credential through the shipped bridge and withdraws the call once the person is being asked.</summary>
+    /// <summary>A save of the credential's password, or a change that marks its item expired: each one the person is asked about.</summary>
+    private static Dictionary<string, object?> ChangeAsked(string tool) => tool == ToolText.SaveToolName
+        ? new() { ["item"] = "env/dev/STRIPE_KEY", ["field"] = "password", ["reason"] = "store the rotated billing key" }
+        : new() { ["entry"] = "env/dev/STRIPE_KEY", ["change"] = "mark_expired", ["reason"] = "the billing key was rotated" };
+
+    /// <summary>Calls <paramref name="tool"/> through the shipped bridge and withdraws the call once the person is being asked.</summary>
     /// <remarks>
     /// The SDK's client never tells a server it gave up, so the notification a real client sends is
     /// written by hand here, as <c>RunToolTests.ClientCancel_KillsTheChild</c> writes it.
     /// </remarks>
-    private async Task GiveUpWhileAskedAsync(McpHarness harness, Action? whileAsked = null)
+    private async Task GiveUpWhileAskedAsync(McpHarness harness, string tool, Dictionary<string, object?> arguments, Action? whileAsked = null)
     {
         var channels = harness.Serve("--expose", "env/**");
         using var reader = new StreamReader(channels.ClientReads, leaveOpen: true);
@@ -202,7 +225,7 @@ public sealed class OneLinePerRequestTests : IAsyncLifetime
         await Send(new { jsonrpc = "2.0", id = 1, method = "initialize", @params = new { protocolVersion = "2025-11-25", capabilities = new { }, clientInfo = new { name = McpHarness.ClientName, version = McpHarness.ClientVersion } } });
         await reader.ReadLineAsync(Token);
         await Send(new { jsonrpc = "2.0", method = "notifications/initialized" });
-        await Send(new { jsonrpc = "2.0", id = 9, method = "tools/call", @params = new { name = ToolText.CredentialToolName, arguments = Ask() } });
+        await Send(new { jsonrpc = "2.0", id = 9, method = "tools/call", @params = new { name = tool, arguments } });
 
         await _person.Asked.Task.WaitAsync(_wait, Token);
         whileAsked?.Invoke();
@@ -254,7 +277,7 @@ public sealed class OneLinePerRequestTests : IAsyncLifetime
         return parsed.RootElement.TryGetProperty(name, out var value) ? value.GetString() : null;
     }
 
-    /// <summary>The person: answers as told, or holds the prompt up until it is withdrawn.</summary>
+    /// <summary>The person: answers as told, or holds any prompt up until it is withdrawn; never enters a value to save.</summary>
     private sealed class Person : IApprovalChannel
     {
         internal ApprovalAnswer Answer { get; set; } = ApprovalAnswer.Denied;
@@ -265,7 +288,14 @@ public sealed class OneLinePerRequestTests : IAsyncLifetime
 
         internal TaskCompletionSource Asked { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public async ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken)
+        public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken) => AnswerAsync(cancellationToken);
+
+        public ValueTask<ApprovalAnswer> AskAsync(ItemChangePrompt prompt, CancellationToken cancellationToken) => AnswerAsync(cancellationToken);
+
+        public async ValueTask<SaveAnswer> AskToSaveAsync(SavePrompt prompt, CancellationToken cancellationToken) =>
+            new(await AnswerAsync(cancellationToken), Value: null);
+
+        private async ValueTask<ApprovalAnswer> AnswerAsync(CancellationToken cancellationToken)
         {
             Asked.TrySetResult();
 

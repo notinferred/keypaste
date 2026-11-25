@@ -10,8 +10,8 @@ namespace Keypaste.Core;
 /// </para>
 /// <para>
 /// The rule lives in the core rather than in the CLI because "which vault are we talking about" is
-/// a product rule, not a command-line one: the MCP bridge has to answer it identically, or Stage
-/// 2.2 will hand an agent a credential out of one file while <c>keypaste ls</c> shows another, and
+/// a product rule, not a command-line one: the MCP bridge has to answer it identically, or the
+/// bridge will hand an agent a credential out of one file while <c>keypaste ls</c> shows another, and
 /// <c>keypaste log</c> will render history for a vault the user never opened. Two implementations
 /// of one rule is what the one-core rule in docs/ARCHITECTURE.md forbids. The CLI keeps a thin adapter that binds its own
 /// argument parser and environment seam to this.

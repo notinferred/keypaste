@@ -11,13 +11,11 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// Reading and restoring entry history (task V.2a).
+/// Reading and restoring entry history.
 /// </summary>
 /// <remarks>
-/// Retaining a replaced value has long been the promise; until now nothing could read one
-/// back, so the promise rested on a counter. These tests are what make the value itself, its age
-/// and its order assertable, and what stop a restore from being an edit that loses the thing it
-/// replaced.
+/// Retaining a replaced value is the promise. These tests make the value itself, its age and its
+/// order assertable, and stop a restore from being an edit that loses the thing it replaced.
 /// </remarks>
 public sealed class VaultHistoryTests : IDisposable
 {
@@ -73,7 +71,7 @@ public sealed class VaultHistoryTests : IDisposable
 
     /// <summary>
     /// KDBX4 writes a timestamp to the second, so revisions another application wrote a microsecond
-    /// apart, as keypaste did before F.27, come back from the file with one time between them. Order
+    /// apart, as keypaste itself once did, come back from the file with one time between them. Order
     /// is then the file's, newest last, and a stable sort left to itself returns exactly the wrong end
     /// first.
     /// </summary>
@@ -94,7 +92,7 @@ public sealed class VaultHistoryTests : IDisposable
 
     /// <summary>
     /// KeePassXC's merge keeps one version of an entry per second, so a version that shares its
-    /// second with another is lost at the next merge (F.27). Edits a microsecond apart are what an
+    /// second with another is lost at the next merge. Edits a microsecond apart are what an
     /// unsaved session or two quick saves produce, and each still reaches the file in its own second.
     /// </summary>
     [Fact]
@@ -225,7 +223,7 @@ public sealed class VaultHistoryTests : IDisposable
     /// <summary>
     /// A restore costs a history item like any other edit, so at the cap it evicts one — and the one
     /// it evicts is the revision being restored, because that is the oldest. Surprising in a list,
-    /// which is why V.2b should be written against it rather than against an assumption.
+    /// which is why anything built on restore should be written against this test rather than against an assumption.
     /// </summary>
     [Fact]
     public void RestoreRevision_KeepsTheHistoryWithinHistoryMaxItems()

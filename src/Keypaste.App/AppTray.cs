@@ -39,7 +39,6 @@ internal sealed class AppTray : IDisposable
 
     internal NativeMenu Menu { get; }
 
-    /// <summary>Whether the icon is showing.</summary>
     internal bool IsShown => _icon?.IsVisible == true;
 
     /// <summary>The icon, once it has been shown.</summary>

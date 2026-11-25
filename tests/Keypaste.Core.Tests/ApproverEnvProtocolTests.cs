@@ -117,26 +117,38 @@ public sealed class ApproverEnvProtocolTests
         Assert.Empty(decoded.Set.Variables);
     }
 
+    private const string _released = """{"kind":"env","project":"p","outcome":0,"reason":"","problems":[],"variables":[{"key":"A","value":"v"}]}""";
+    private const string _refused = """{"kind":"env","project":"p","outcome":7,"reason":"no","problems":[]}""";
+
     /// <summary>A reply that refuses and carries values, or releases with problems or no list, is not a release.</summary>
+    /// <remarks>Each row is <see cref="_released"/> or <see cref="_refused"/>, which decode, with one defect.</remarks>
     [Theory]
-    [InlineData("""{"v":2,"kind":"env","project":"p","outcome":7,"reason":"no","problems":[],"variables":[{"key":"A","value":"v"}]}""")]
-    [InlineData("""{"v":2,"kind":"env","project":"p","outcome":0,"reason":"","problems":[{"key":"A","reason":"r"}],"variables":[]}""")]
-    [InlineData("""{"v":2,"kind":"env","project":"p","outcome":0,"reason":"","problems":[]}""")]
-    [InlineData("""{"v":2,"kind":"env","project":"p","outcome":99,"reason":"","problems":[]}""")]
-    [InlineData("""{"v":2,"kind":"env","project":"p","outcome":0,"reason":"","problems":[],"variables":[{"key":"A"}]}""")]
+    [InlineData("""{"kind":"env","project":"p","outcome":7,"reason":"no","problems":[],"variables":[{"key":"A","value":"v"}]}""")]
+    [InlineData("""{"kind":"env","project":"p","outcome":0,"reason":"","problems":[{"key":"A","reason":"r"}],"variables":[{"key":"A","value":"v"}]}""")]
+    [InlineData("""{"kind":"env","project":"p","outcome":0,"reason":"","problems":[]}""")]
+    [InlineData("""{"kind":"env","project":"p","outcome":99,"reason":"no","problems":[]}""")]
+    [InlineData("""{"kind":"env","project":"p","outcome":0,"reason":"","problems":[],"variables":[{"key":"A"}]}""")]
     public void A_malformed_reply_is_refused(string frame)
     {
-        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out EnvReply? reply));
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned(_released), out EnvReply? _));
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned(_refused), out EnvReply? _));
+
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(frame), out EnvReply? reply));
         Assert.Null(reply);
     }
 
+    private const string _devRequest = """{"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":"dev"}""";
+
+    /// <summary>Each row is <see cref="_devRequest"/>, which decodes, with one defect.</summary>
     [Theory]
-    [InlineData("""{"v":2,"kind":"env-profile","vault":"/v","session":"s","project":"p","command":"npm start","directory":"/d","profile":"dev"}""")]
-    [InlineData("""{"v":2,"kind":"env-profile","vault":"/v","project":"p","command":["npm"],"directory":"/d","profile":"dev"}""")]
-    [InlineData("""{"v":2,"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm",1],"directory":"/d","profile":"dev"}""")]
+    [InlineData("""{"kind":"env-profile","vault":"/v","session":"s","project":"p","command":"npm start","directory":"/d","profile":"dev"}""")]
+    [InlineData("""{"kind":"env-profile","vault":"/v","project":"p","command":["npm"],"directory":"/d","profile":"dev"}""")]
+    [InlineData("""{"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm",1],"directory":"/d","profile":"dev"}""")]
     public void A_malformed_request_is_refused(string frame)
     {
-        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out EnvRequest? request));
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned(_devRequest), out EnvRequest? _));
+
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(frame), out EnvRequest? request));
         Assert.Null(request);
     }
 
@@ -183,26 +195,34 @@ public sealed class ApproverEnvProtocolTests
         Assert.Equal(["DB ← B", "PROXY=http://p"], request.FileLines);
     }
 
-    /// <summary>The reply's kind is no request: an owner answers a request only as <c>env-profile</c>.</summary>
+    /// <summary>The reply's kind is no request: an owner answers a request only as <c>env-profile</c>, as in <see cref="_devRequest"/>.</summary>
     [Theory]
-    [InlineData("""{"v":2,"kind":"env","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d"}""")]
-    [InlineData("""{"v":2,"kind":"env","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":"dev"}""")]
+    [InlineData("""{"kind":"env","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d"}""")]
+    [InlineData("""{"kind":"env","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":"dev"}""")]
     public void AnEnvFrame_IsNoRequest(string frame)
     {
-        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out EnvRequest? request));
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned(_devRequest), out EnvRequest? _));
+
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(frame), out EnvRequest? request));
         Assert.Null(request);
     }
 
+    /// <summary>Each row is <see cref="_devRequest"/>, or it naming keys and file lines, which decode, with one defect.</summary>
     [Theory]
-    [InlineData("""{"v":2,"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d"}""")]
-    [InlineData("""{"v":2,"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":"Prod"}""")]
-    [InlineData("""{"v":2,"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":1}""")]
-    [InlineData("""{"v":2,"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":"dev","keys":["BAD-KEY"]}""")]
-    [InlineData("""{"v":2,"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":"dev","keys":"A"}""")]
-    [InlineData("""{"v":2,"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":"dev","file_lines":[1]}""")]
+    [InlineData("""{"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d"}""")]
+    [InlineData("""{"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":"Prod"}""")]
+    [InlineData("""{"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":1}""")]
+    [InlineData("""{"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":"dev","keys":["BAD-KEY"]}""")]
+    [InlineData("""{"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":"dev","keys":"A"}""")]
+    [InlineData("""{"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":"dev","file_lines":[1]}""")]
     public void AnEnvProfileFrameWithABadProfileOrKey_IsRejected(string frame)
     {
-        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out EnvRequest? request));
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned(_devRequest), out EnvRequest? _));
+        Assert.True(ApproverProtocol.TryDecode(
+            ApproverFrame.Versioned("""{"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":"dev","keys":["A"],"file_lines":["A=1"]}"""),
+            out EnvRequest? _));
+
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(frame), out EnvRequest? request));
         Assert.Null(request);
     }
 
@@ -245,10 +265,13 @@ public sealed class ApproverEnvProtocolTests
     [InlineData("\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAé\"")]
     public void A_malformed_launch_pass_is_refused_at_decode(string launch)
     {
-        var frame = $$"""{"v":2,"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":"dev","launch":{{launch}}}""";
+        Assert.True(ApproverProtocol.TryDecode(Launching("\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA-_\""), out EnvRequest? _));
 
-        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out EnvRequest? request));
+        Assert.False(ApproverProtocol.TryDecode(Launching(launch), out EnvRequest? request));
         Assert.Null(request);
+
+        static byte[] Launching(string pass) =>
+            ApproverFrame.Versioned($$"""{"kind":"env-profile","vault":"/v","session":"s","project":"p","command":["npm"],"directory":"/d","profile":"dev","launch":{{pass}}}""");
     }
 
     [Fact]
@@ -258,8 +281,7 @@ public sealed class ApproverEnvProtocolTests
         Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(released), out EnvReply? refused));
         Assert.Equal("staging", refused.Set.Profile);
 
-        var frame = """{"v":2,"kind":"env","project":"p","outcome":0,"reason":"","problems":[],"variables":[{"key":"A","value":"v"}]}""";
-        Assert.True(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out EnvReply? old));
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned(_released), out EnvReply? old));
         Assert.Equal("dev", old.Set.Profile);
 
         var huge = new EnvReply(EnvResolved.Refused("billing", EnvOutcome.Unusable, [new EnvProblem("A", new string('x', ApproverProtocol.MaximumEnvReplyFrameBytes))], "prod"), string.Empty);

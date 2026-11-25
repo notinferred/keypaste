@@ -10,7 +10,7 @@ namespace Keypaste.Consistency.Tests;
 
 /// <summary>
 /// An entry the app's Environments adds to a stage is in the next <c>keypaste run</c>, and
-/// one it takes out is not (C.4).
+/// one it takes out is not.
 /// </summary>
 /// <remarks>
 /// The CLI is asked rather than the tags, because the claim is that the screen's tag change is what

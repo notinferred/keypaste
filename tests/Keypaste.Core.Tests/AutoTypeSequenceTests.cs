@@ -8,7 +8,7 @@ namespace Keypaste.Core.Tests;
 /// An Auto-Type sequence reads as KeePassXC 2.8's <c>parseSequence</c> reads it, against the cases and errors of its
 /// <c>TestAutoType</c>; what keypaste does not type and every reading KeePass 2 gives differently refuse it whole,
 /// naming the token and never a value; fields type what placeholders fill in; <c>{TOTP}</c> types the code current when
-/// typing reaches it; and a window pattern matches as KeePassXC matches it, under a timeout (P.4a1).
+/// typing reaches it; and a window pattern matches as KeePassXC matches it, under a timeout.
 /// </summary>
 public sealed class AutoTypeSequenceTests
 {

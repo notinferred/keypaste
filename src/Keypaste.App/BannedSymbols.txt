@@ -1,7 +1,7 @@
-// The clipboard is read in one place, which hashes it at once (D-0011).
+// The clipboard is read in one place, which hashes it at once.
 M:Avalonia.Input.Platform.ClipboardExtensions.TryGetTextAsync(Avalonia.Input.Platform.IClipboard);only AvaloniaClipboard reads the clipboard
 
-// The app hands another program only a web address, through one launcher (D-0534).
+// The app hands another program only a web address, through one launcher.
 T:Avalonia.Platform.Storage.ILauncher;only PlatformWebLauncher hands an address to another program
 T:Avalonia.Platform.Storage.LauncherExtensions;the app opens no file or folder in another program
 M:System.Diagnostics.Process.Start(System.Diagnostics.ProcessStartInfo);only OpenerProcess and DiagnosticsRelaunch start a program
@@ -14,7 +14,7 @@ T:System.Diagnostics.ProcessStartInfo;only OpenerProcess and DiagnosticsRelaunch
 T:Keypaste.App.Views.OpenerProcess;only PlatformWebLauncher hands an address to another program
 M:Keypaste.App.Session.IWebLauncher.OpenAsync(System.Uri);a web address is opened only where a person asked for one
 
-// Only the item pane's two attachment files reach an attachment (D-0534).
+// Only the item pane's two attachment files reach an attachment.
 M:Keypaste.Core.Vault.Attachments(Keypaste.Core.EntryName);only the item pane's attachment files reach an attachment
 M:Keypaste.Core.Vault.AddAttachment(Keypaste.Core.EntryName,System.String,System.IO.Stream,System.Boolean@);only the item pane's attachment files reach an attachment
 M:Keypaste.Core.Vault.ReplaceAttachment(Keypaste.Core.EntryName,System.String,System.IO.Stream,System.Boolean@);only the item pane's attachment files reach an attachment

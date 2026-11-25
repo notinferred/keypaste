@@ -1,4 +1,6 @@
+using System.Globalization;
 using Keypaste.Cli.Clipboard;
+using Keypaste.Cli.Commands;
 using Keypaste.Core;
 using Keypaste.Core.Tests;
 using Xunit;
@@ -76,7 +78,7 @@ public sealed class VerbTests
     /// <remarks>
     /// Confirming a password nobody typed is a question with no useful answer. The rule that refuses
     /// it lives in <c>VaultCreation</c>; what this pins is that the verb does not ask twice on the
-    /// way to it, which is what it did before the rules moved.
+    /// way to it.
     /// </remarks>
     [Fact]
     public void Init_EmptyPassword_IsNotAskedToConfirm()
@@ -143,7 +145,7 @@ public sealed class VerbTests
     }
 
     /// <summary>
-    /// The false refusal F.1e removes. An entry titled <c>b/c</c> in <c>a</c> makes the *path*
+    /// No false refusal for a taken path. An entry titled <c>b/c</c> in <c>a</c> makes the *path*
     /// <c>a/b/c</c> taken, and that alone used to refuse a genuinely different entry called
     /// <c>c</c> in <c>a/b</c>. KeePassXC would make it, so keypaste does — and says what it costs,
     /// because the path is ambiguous from that moment on.
@@ -213,8 +215,73 @@ public sealed class VerbTests
     }
 
     /// <summary>
-    /// No clipboard means a loud failure, never a quiet fallback to printing the secret
-    /// (SECURITY.md law 7).
+    /// A clipboard that could not be read back straight after the copy has no baseline to compare,
+    /// and is cleared anyway rather than left holding the secret.
+    /// </summary>
+    [Fact]
+    public void Get_AClipboardThatCouldNotBeReadBackAfterTheCopy_IsStillCleared()
+    {
+        using var harness = new CliHarness();
+        harness.SeedVault(Master, ("solo", "solo-secret"));
+        harness.Clipboard.FailingReads = 1;
+
+        harness.Prompt.Enqueue(Master);
+        var exit = harness.Run("get", "solo", "--vault", harness.VaultPath);
+
+        Assert.Equal(CliApp.ExitSuccess, exit);
+        Assert.True(harness.ClearStrategy.Cleared);
+        Assert.Null(harness.Clipboard.Content);
+    }
+
+    /// <summary>The clipboard wait holds only the copied value: the vault is closed and the master password zeroed before it starts.</summary>
+    [Fact]
+    public void Get_WaitsToClearTheClipboard_OnlyAfterTheMasterPasswordIsZeroed()
+    {
+        using var harness = new CliHarness();
+        harness.SeedVault(Master, ("solo", "solo-secret"));
+        var zeroedWhenTheWaitBegan = false;
+        harness.ClearStrategy.DuringWait = () =>
+            zeroedWhenTheWaitBegan = harness.Prompt.IssuedSecrets.TrueForAll(secret => secret.IsZeroed);
+
+        harness.Prompt.Enqueue(Master);
+        var exit = harness.Run("get", "solo", "--vault", harness.VaultPath);
+
+        Assert.Equal(CliApp.ExitSuccess, exit);
+        Assert.NotNull(harness.ClearStrategy.RequestedDelay);
+        Assert.True(zeroedWhenTheWaitBegan, "the master password was still live when the clipboard wait began");
+    }
+
+    /// <summary>A timeout past what a timer can wait is refused before anything is asked, since the timer would throw with the secret copied.</summary>
+    [Fact]
+    public void Get_ATimeoutPastTheTimersCeiling_IsRefusedBeforeTheVaultOpens()
+    {
+        using var harness = new CliHarness();
+
+        var tooLong = (GetCommand.MaximumTimeoutSeconds + 1).ToString(CultureInfo.InvariantCulture);
+        var exit = harness.Run("get", "solo", "--vault", harness.VaultPath, "--timeout", tooLong);
+
+        Assert.Equal(CliApp.ExitUsageError, exit);
+        Assert.Contains($"at most {GetCommand.MaximumTimeoutSeconds}", harness.Err, StringComparison.Ordinal);
+        Assert.Empty(harness.Prompt.PromptsSeen);
+        Assert.Equal(0, harness.Clipboard.SetCount);
+    }
+
+    /// <summary>The longest timeout is exactly the system timer's ceiling: it takes that one and refuses a second more.</summary>
+    [Fact]
+    public void Get_TheLongestTimeout_IsTheSystemTimersCeiling()
+    {
+        var longest = TimeSpan.FromSeconds(GetCommand.MaximumTimeoutSeconds);
+
+        TimeProvider.System.CreateTimer(_ => { }, null, longest, System.Threading.Timeout.InfiniteTimeSpan).Dispose();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+        {
+            using var timer = TimeProvider.System.CreateTimer(_ => { }, null, longest + TimeSpan.FromSeconds(1), System.Threading.Timeout.InfiniteTimeSpan);
+        });
+    }
+
+    /// <summary>
+    /// No clipboard means a loud failure, never a quiet fallback to printing the secret.
     /// </summary>
     [Fact]
     public void Get_NoClipboardTool_FailsAndSuggestsReveal_WithoutLeakingTheSecret()
@@ -316,7 +383,7 @@ public sealed class VerbTests
         Assert.Empty(harness.Out);
         Assert.Equal(0, harness.Clipboard.SetCount);
         Assert.Contains(
-            "keypaste get: the password of 'web/db' holds the KeePass placeholder {S:Recovery codes}, which names a field keypaste never releases; keypaste show 'web/db' --reveal shows it as the vault holds it",
+            $"keypaste get: the password of 'web/db' {new PlaceholderRefusal("{S:Recovery codes}", "names a field keypaste never releases").Reason}; keypaste show 'web/db' --reveal shows it as the vault holds it",
             harness.Err,
             StringComparison.Ordinal);
         Assert.DoesNotContain("dbuser-5d1e", harness.Err, StringComparison.Ordinal);

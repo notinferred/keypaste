@@ -77,9 +77,8 @@ internal sealed record ServerOptions
 
     /// <summary>The vaults this bridge serves, in the order named; none when no vault was named or chosen.</summary>
     /// <remarks>
-    /// Each one's pipe is resolved at startup so a malformed name is a startup failure, but nothing connects until a call
-    /// needs an answer: the bridge is spawned by a client long before anybody unlocks a vault, and refusing to start without
-    /// an owner would make keypaste look broken in the client's log rather than saying so in an answer an agent can act on.
+    /// Each pipe is resolved at startup, so a malformed name is a startup failure; connecting waits for the first call that
+    /// needs an answer, as <see cref="ApproverConnection"/> explains.
     /// </remarks>
     internal required IReadOnlyList<BridgeVault> Vaults { get; init; }
 
@@ -159,8 +158,8 @@ internal sealed record ServerOptions
             return false;
         }
 
-        // The rule an agent's name is kept under, so a bridge starts only with a name run can be turned
-        // on for, and one the owner would reject on attach never reaches it.
+        // Held to the owner's rule for agent names, so a label the owner would reject on attach,
+        // or that run could not be turned on for, stops the bridge at startup instead.
         if (label is not null && !AgentNames.IsNamed(label))
         {
             error = $"--client-label must be 1 to {AgentNames.MaximumLength} characters with no quote, backslash, slash or control character, and not \"*\"";

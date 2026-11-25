@@ -93,7 +93,7 @@ public sealed class LoginLookup
         }
 
         if (text.Contains('*', StringComparison.Ordinal)
-            || !WebOrigin.TryReadItem(text, out var item)
+            || !WebOrigin.TryReadItemParts(text, out var item)
             || item.Scheme != Page.Scheme
             || item.Port != Page.Port)
         {
@@ -105,9 +105,8 @@ public sealed class LoginLookup
             return item.Host == Page.Host;
         }
 
-        return item.Site is not null
-            && item.Site == Page.Site
-            && (item.Host == Page.Host || Page.Host.EndsWith("." + item.Host, StringComparison.Ordinal));
+        // The page's own host is on the page's site, which is never null; only a parent label's site needs looking up.
+        return item.Host == Page.Host || (IsParentLabelOfPage(item.Host) && item.Site == Page.Site);
     }
 
     /// <summary>Whether an item matches the page by its URL or by a field whose name starts <c>KP2A_URL</c>, as KeePassXC reads more addresses.</summary>
@@ -121,4 +120,9 @@ public sealed class LoginLookup
         return Matches(url)
             || fields.Any(field => field.Key.StartsWith(_moreAddresses, StringComparison.Ordinal) && Matches(field.Value));
     }
+
+    private bool IsParentLabelOfPage(string host) =>
+        Page.Host.Length > host.Length
+        && Page.Host.EndsWith(host, StringComparison.Ordinal)
+        && Page.Host[Page.Host.Length - host.Length - 1] == '.';
 }

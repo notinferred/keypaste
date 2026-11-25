@@ -45,7 +45,7 @@ public sealed class ItemChangeViewModelTests
         Assert.Equal("An agent created it on 2026-11-15. Trash will not hold it, and nothing can bring it back.", prompt.Explainer);
         Assert.False(prompt.AnswersReturn);
 
-        prompt.DenyCommand.Execute(null);
+        prompt.DenyCommand.Press();
 
         Assert.Equal(ApprovalAnswer.Denied, await prompt.Answer);
     }

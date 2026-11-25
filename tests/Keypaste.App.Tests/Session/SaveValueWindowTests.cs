@@ -11,7 +11,7 @@ using static Keypaste.App.Tests.Session.DesktopApprovalTests;
 namespace Keypaste.App.Tests.Session;
 
 /// <summary>
-/// An agent's request to save a value in the app's own prompt window (F.79): focus on Cancel, no value entered for the
+/// An agent's request to save a value in the app's own prompt window: focus on Cancel, no value entered for the
 /// person, Save pressable as soon as a value is entered, and the value handed back only on Save.
 /// </summary>
 public sealed class SaveValueWindowTests

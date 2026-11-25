@@ -37,7 +37,8 @@ internal static class SaveTimings
 
     /// <summary>
     /// Space-separated <c>key=value</c>, milliseconds rounded, <c>-</c> for a step not taken. Every list
-    /// has one slash-separated value per attempt, and <c>held</c> marks the F.12 shape for the reader.
+    /// has one slash-separated value per attempt, and <c>held</c> is how long each attempt kept the
+    /// gate, so a gate held through a retry sleep stands out.
     /// </summary>
     internal static string Describe(SaveTiming timing) =>
         string.Create(

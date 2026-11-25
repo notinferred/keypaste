@@ -1,8 +1,5 @@
 using System.Reflection;
-using Keypaste.App.Clipboard;
 using Keypaste.App.Controls;
-using Keypaste.App.Session;
-using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Tests;
@@ -13,7 +10,7 @@ namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
 /// The entry pane shows an item's TOTP as a masked code and the seconds until the next one, computes the
-/// code only at a hold or a copy, and holds neither the code nor the seed (9.2b); its one-time code is added,
+/// code only at a hold or a copy, and holds neither the code nor the seed; its one-time code is added,
 /// replaced and removed through core's TOTP write.
 /// </summary>
 public sealed class EntryTotpTests : IDisposable
@@ -57,7 +54,7 @@ public sealed class EntryTotpTests : IDisposable
     [Fact]
     public void An_item_with_a_TOTP_shows_a_masked_code_and_its_countdown_and_holds_neither_code_nor_seed()
     {
-        using var context = new Context(_vaultPath);
+        using var context = New();
         var detail = context.Open(_github);
         var totp = detail.Totp!;
 
@@ -82,7 +79,7 @@ public sealed class EntryTotpTests : IDisposable
     [Fact]
     public void The_countdown_follows_the_clock_and_the_next_hold_reads_the_next_code()
     {
-        using var context = new Context(_vaultPath);
+        using var context = New();
         var totp = context.Open(_github).Totp!;
         List<string?> raised = [];
         totp.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
@@ -98,7 +95,7 @@ public sealed class EntryTotpTests : IDisposable
     [Fact]
     public void The_row_says_its_code_moved_on_when_the_period_ends_and_not_before()
     {
-        using var context = new Context(_vaultPath);
+        using var context = New();
         var totp = context.Open(_github).Totp!;
         var changes = 0;
         totp.Changed += (_, _) => changes++;
@@ -117,7 +114,7 @@ public sealed class EntryTotpTests : IDisposable
     [Fact]
     public Task A_shown_code_is_redrawn_as_the_next_code_when_its_period_ends() => HeadlessSession.On(() =>
     {
-        using var context = new Context(_vaultPath);
+        using var context = New();
         var totp = context.Open(_github).Totp!;
         var cell = new RevealedValue { Source = totp, MaskedLength = totp.MaskedLength };
 
@@ -134,7 +131,7 @@ public sealed class EntryTotpTests : IDisposable
     [Fact]
     public async Task Copy_puts_the_current_code_through_the_clipboard_countdown()
     {
-        using var context = new Context(_vaultPath);
+        using var context = New();
         var totp = context.Open(_github).Totp!;
 
         await totp.CopyCommand.PressAsync();
@@ -148,7 +145,7 @@ public sealed class EntryTotpTests : IDisposable
     [Fact]
     public void A_TOTP_keypaste_refuses_says_why_and_offers_no_code()
     {
-        using var context = new Context(_vaultPath);
+        using var context = New();
         var detail = context.Open(_broken);
 
         Assert.Null(detail.Totp);
@@ -162,7 +159,7 @@ public sealed class EntryTotpTests : IDisposable
     [Fact]
     public void An_item_with_a_readable_otp_lists_no_otp_custom_field_and_keeps_its_other_fields()
     {
-        using var context = new Context(_vaultPath);
+        using var context = New();
         var detail = context.Open(_keePassXc);
 
         Assert.True(detail.ShowsTotp);
@@ -182,7 +179,7 @@ public sealed class EntryTotpTests : IDisposable
     [Fact]
     public void An_item_whose_otp_cannot_be_read_keeps_the_explanation_and_lists_its_otp_field()
     {
-        using var context = new Context(_vaultPath);
+        using var context = New();
         var detail = context.Open(_broken);
 
         Assert.True(detail.ShowsTotpProblem);
@@ -192,7 +189,7 @@ public sealed class EntryTotpTests : IDisposable
     [Fact]
     public void An_item_without_a_TOTP_has_no_TOTP_row()
     {
-        using var context = new Context(_vaultPath);
+        using var context = New();
         var detail = context.Open(_plain);
 
         Assert.Null(detail.Totp);
@@ -203,7 +200,7 @@ public sealed class EntryTotpTests : IDisposable
     [Fact]
     public void Letting_go_of_the_pane_stops_the_countdown()
     {
-        using var context = new Context(_vaultPath);
+        using var context = New();
         var detail = context.Open(_github);
         var totp = detail.Totp!;
 
@@ -217,7 +214,7 @@ public sealed class EntryTotpTests : IDisposable
     [Fact]
     public void Add_one_time_code_sets_up_an_item_without_one_and_its_code_shows_at_once()
     {
-        using var context = new Context(_vaultPath);
+        using var context = New();
         var detail = context.Open(_plain);
 
         Assert.True(detail.CanAddTotp);
@@ -243,7 +240,7 @@ public sealed class EntryTotpTests : IDisposable
     [Fact]
     public void Replace_writes_a_new_one_time_code_over_one_keypaste_refused()
     {
-        using var context = new Context(_vaultPath);
+        using var context = New();
         var detail = context.Open(_broken);
 
         Assert.False(detail.CanAddTotp);
@@ -259,7 +256,7 @@ public sealed class EntryTotpTests : IDisposable
     public void A_setup_core_refuses_says_why_keeps_the_form_open_and_writes_nothing()
     {
         var before = File.ReadAllBytes(_vaultPath);
-        using var context = new Context(_vaultPath);
+        using var context = New();
         var detail = context.Open(_plain);
 
         detail.BeginSetTotpCommand.Press();
@@ -282,7 +279,7 @@ public sealed class EntryTotpTests : IDisposable
     [Fact]
     public void Remove_asks_first_and_then_removes_the_one_time_code_keeping_it_in_the_history()
     {
-        using var context = new Context(_vaultPath);
+        using var context = New();
         var detail = context.Open(_broken);
 
         detail.BeginRemoveTotpCommand.Press();
@@ -307,7 +304,7 @@ public sealed class EntryTotpTests : IDisposable
     [Fact]
     public void Remove_is_offered_only_for_the_otp_fields_it_removes_and_not_for_KeePass_2s_alone()
     {
-        using var context = new Context(_vaultPath);
+        using var context = New();
         var keePass2 = context.Open(_github);
 
         Assert.True(keePass2.ShowsTotp);
@@ -333,7 +330,7 @@ public sealed class EntryTotpTests : IDisposable
     [Fact]
     public void Opening_another_field_form_closes_the_one_time_code_form_and_clears_what_was_typed()
     {
-        using var context = new Context(_vaultPath);
+        using var context = New();
         var detail = context.Open(_plain);
 
         detail.BeginSetTotpCommand.Press();
@@ -355,7 +352,7 @@ public sealed class EntryTotpTests : IDisposable
     [Fact]
     public void Editing_offers_no_one_time_code_change()
     {
-        using var context = new Context(_vaultPath);
+        using var context = New();
         var detail = context.Open(_plain);
 
         detail.EditCommand.Press();
@@ -401,43 +398,6 @@ public sealed class EntryTotpTests : IDisposable
         }
     }
 
-    private sealed class Context : IDisposable
-    {
-        internal Context(string vaultPath)
-        {
-            Session = new AppVaultSession(Clock);
-
-            using (var master = TempVault.Secret(_master))
-            {
-                Assert.Equal(UnlockOutcome.Opened, Session.TryUnlock(vaultPath, master.Value));
-            }
-
-            Countdown = new ClipboardCountdown(Clipboard, new ManualClock(AppClock.Start));
-            Entries = new EntriesViewModel(Session, Countdown);
-        }
-
-        /// <summary>The session's clock, at RFC 6238's 1111111109 s.</summary>
-        internal ManualClock Clock { get; } = new(DateTimeOffset.FromUnixTimeSeconds(1111111109));
-
-        internal AppVaultSession Session { get; }
-
-        internal FakeClipboard Clipboard { get; } = new();
-
-        internal ClipboardCountdown Countdown { get; }
-
-        internal EntriesViewModel Entries { get; }
-
-        internal EntryDetailViewModel Open(EntryName name)
-        {
-            Entries.Selected = Entries.Rows.Single(row => row.Title == name.Title && row.GroupPath == name.GroupPath);
-            return Entries.Detail!;
-        }
-
-        public void Dispose()
-        {
-            Entries.Dispose();
-            Countdown.Dispose();
-            Session.Dispose();
-        }
-    }
+    /// <summary>The screens on a session whose clock is at RFC 6238's 1111111109 s.</summary>
+    private UnlockedScreens New() => new(_vaultPath, _master, new ManualClock(DateTimeOffset.FromUnixTimeSeconds(1111111109)));
 }

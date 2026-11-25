@@ -103,7 +103,7 @@ public sealed class RoutedEditTests : IDisposable
             _harness.AssertExit(CliApp.ExitSuccess, _harness.Run(args));
         }
 
-        Assert.DoesNotContain("Master password: ", _harness.Prompt.PromptsSeen);
+        Assert.DoesNotContain(CliHarness.MasterPasswordPrompt, _harness.Prompt.PromptsSeen);
         Assert.Equal(1, owner.Channel.EditsAsked);
         Assert.Contains("holds this vault; it will ask you to allow this change", _harness.Err, StringComparison.Ordinal);
         Assert.NotEqual(before, File.ReadAllBytes(_harness.VaultPath));

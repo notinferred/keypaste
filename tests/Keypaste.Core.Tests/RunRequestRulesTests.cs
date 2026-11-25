@@ -93,7 +93,7 @@ public sealed class RunRequestRulesTests
         Assert.Null(RunRequestRules.Check(References(("DATABASE_URL", "kp://acme-api/dev/DATABASE_URL"), ("GH", "kp:///personal/github#username"))));
     }
 
-    /// <summary>A run's reference is parsed once, when it is made, and every rule reads that (F.55).</summary>
+    /// <summary>A run's reference is parsed once, when it is made, and every rule reads that.</summary>
     [Fact]
     public void AReference_CarriesWhatItNames()
     {

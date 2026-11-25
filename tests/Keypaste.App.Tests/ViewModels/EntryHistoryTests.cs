@@ -1,6 +1,4 @@
-using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
-using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Tests;
@@ -287,7 +285,7 @@ public sealed class EntryHistoryTests : IDisposable
     /// A revision the reading no longer holds at that index is refused rather than guessed at.
     /// </summary>
     /// <remarks>
-    /// An index is an ordinal within one reading (D-0229), and any change to the entry renumbers
+    /// An index is an ordinal within one reading, and any change to the entry renumbers
     /// every one of them. Restoring position 2 of a list that has moved on would put back a revision
     /// nobody chose, silently and correctly-looking. The change here is made on the open vault
     /// rather than through the pane, which is what a merge or a second window does; the pane's own
@@ -538,7 +536,7 @@ public sealed class EntryHistoryTests : IDisposable
 
     /// <summary>
     /// A revision names its custom fields with their protection and its tags beside the item's own, and
-    /// never a field's value (D-0487).
+    /// never a field's value.
     /// </summary>
     [Fact]
     public void A_revision_names_its_custom_fields_and_tags_and_no_value()
@@ -575,7 +573,7 @@ public sealed class EntryHistoryTests : IDisposable
 
     /// <summary>
     /// A restore puts back the revision's tags, so one that would put the item in a project first says what that does,
-    /// as every tag change does (D-0415), and writes only once confirmed; Cancel writes nothing.
+    /// as every tag change does, and writes only once confirmed; Cancel writes nothing.
     /// </summary>
     [Fact]
     public void A_restore_that_would_add_a_project_tag_asks_first()
@@ -646,14 +644,14 @@ public sealed class EntryHistoryTests : IDisposable
         vault.Save();
     }
 
-    private static EntryHistoryViewModel Select(string path, Context context)
+    private static EntryHistoryViewModel Select(string path, UnlockedScreens context)
     {
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Path == path);
 
         return context.Entries.Detail!.History;
     }
 
-    private static EntryHistoryViewModel Opened(string path, Context context)
+    private static EntryHistoryViewModel Opened(string path, UnlockedScreens context)
     {
         var history = Select(path, context);
         history.ToggleCommand.Press();
@@ -661,37 +659,7 @@ public sealed class EntryHistoryTests : IDisposable
         return history;
     }
 
-    private Context New() => new(_vaultPath);
+    private UnlockedScreens New() => new(_vaultPath, _master);
 
-    private static Context New(string vaultPath) => new(vaultPath);
-
-    /// <summary>An unlocked session, a fake clipboard and a screen looking at them.</summary>
-    private sealed class Context : IDisposable
-    {
-        internal Context(string vaultPath)
-        {
-            Session = new AppVaultSession(new ManualClock(AppClock.Start));
-
-            using (var master = TempVault.Secret(_master))
-            {
-                Assert.Equal(UnlockOutcome.Opened, Session.TryUnlock(vaultPath, master.Value));
-            }
-
-            Countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock(AppClock.Start));
-            Entries = new EntriesViewModel(Session, Countdown);
-        }
-
-        internal AppVaultSession Session { get; }
-
-        internal ClipboardCountdown Countdown { get; }
-
-        internal EntriesViewModel Entries { get; }
-
-        public void Dispose()
-        {
-            Entries.Dispose();
-            Countdown.Dispose();
-            Session.Dispose();
-        }
-    }
+    private static UnlockedScreens New(string vaultPath) => new(vaultPath, _master);
 }

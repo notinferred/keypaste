@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>C.2: dismissals are kept by vault, entry identifier and key as an HMAC under the vault's key, and a bad file dismisses nothing.</summary>
+/// <summary>Dismissals are kept by vault, entry identifier and key as an HMAC under the vault's key, and a bad file dismisses nothing.</summary>
 public sealed class RecommendationDismissalsTests : IDisposable
 {
     private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-dismissals-tests-").FullName;
@@ -84,6 +84,18 @@ public sealed class RecommendationDismissalsTests : IDisposable
 
         Assert.False(dismissals.IsDismissed(_noteKey, _key));
         Assert.False(dismissals.IsDismissed(hidden, _key));
+    }
+
+    [Fact]
+    public void Review_again_lists_a_finding_the_file_holds_twice()
+    {
+        var row = $$"""{"vault":"{{_noteKey.Vault}}","entry":"{{_noteKey.Entry}}","kind":"{{_noteKey.Kind}}","key":"{{_noteKey.Key}}"}""";
+        File.WriteAllText(Path_, $$"""{"dismissed":[{{row}},{{row}}]}""");
+
+        Assert.True(RecommendationDismissals.TryLoad(Path_, out var dismissals));
+        dismissals.ReviewAgain([_noteKey], null);
+
+        Assert.False(dismissals.IsDismissed(_noteKey, null));
     }
 
     [Fact]

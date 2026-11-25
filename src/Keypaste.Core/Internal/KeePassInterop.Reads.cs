@@ -21,20 +21,31 @@ internal sealed partial class KeePassInterop
         return entries;
     }
 
-    /// <summary>The name of each entry <see cref="ReadEntries"/> returns whose UUID the vault also holds a tombstone for.</summary>
-    internal IReadOnlySet<EntryName> ReadTombstoned()
+    /// <summary>Each entry <see cref="ReadEntries"/> returns whose <see cref="VaultEntry.Path"/> is <paramref name="entryPath"/>, in its order; no other entry's value is read.</summary>
+    internal IReadOnlyList<VaultEntry> ReadEntriesAt(string entryPath)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        List<VaultEntry> entries = [];
+        CollectAt(_database.RootGroup, string.Empty, entryPath, entries, Bin());
+        return entries;
+    }
+
+    /// <summary>
+    /// Each entry <see cref="ReadEntries"/> returns whose <see cref="VaultEntry.GroupPath"/> is <paramref name="groupPath"/>, in its
+    /// order, and the name of each of them whose UUID the vault also holds a tombstone for; no other entry's value is read.
+    /// </summary>
+    internal IReadOnlyList<VaultEntry> ReadEntriesIn(string groupPath, out IReadOnlySet<EntryName> tombstoned)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         HashSet<PwUuid> deleted = [.. _database.DeletedObjects.Select(tombstone => tombstone.Uuid)];
+        List<VaultEntry> entries = [];
         HashSet<EntryName> names = [];
 
-        if (deleted.Count > 0)
-        {
-            CollectTombstoned(_database.RootGroup, string.Empty, deleted, names, Bin());
-        }
-
-        return names;
+        CollectIn(_database.RootGroup, string.Empty, groupPath, entries, deleted, names, Bin());
+        tombstoned = names;
+        return entries;
     }
 
     /// <summary>Every entry whose title, group path, username, URL or one of whose own tags contains the query.</summary>
@@ -167,13 +178,16 @@ internal sealed partial class KeePassInterop
         }
     }
 
-    private static void CollectTombstoned(PwGroup group, string groupPath, HashSet<PwUuid> deleted, HashSet<EntryName> names, PwGroup? bin)
+    private static void CollectAt(PwGroup group, string groupPath, string entryPath, List<VaultEntry> entries, PwGroup? bin)
     {
         foreach (PwEntry entry in group.Entries)
         {
-            if (deleted.Contains(entry.Uuid))
+            string title = ReadField(entry, PwDefs.TitleField);
+
+            // Joined as VaultEntry.Path joins it, so this finds exactly what comparing every read entry's path found.
+            if (string.Equals(groupPath.Length == 0 ? title : groupPath + "/" + title, entryPath, StringComparison.Ordinal))
             {
-                names.Add(new EntryName(groupPath, ReadField(entry, PwDefs.TitleField)));
+                entries.Add(Read(entry, groupPath));
             }
         }
 
@@ -181,10 +195,56 @@ internal sealed partial class KeePassInterop
         {
             if (!ReferenceEquals(child, bin))
             {
-                CollectTombstoned(child, ChildPath(groupPath, child.Name), deleted, names, bin);
+                CollectAt(child, ChildPath(groupPath, child.Name), entryPath, entries, bin);
             }
         }
     }
+
+    private static void CollectIn(
+        PwGroup group,
+        string groupPath,
+        string wanted,
+        List<VaultEntry> entries,
+        HashSet<PwUuid> deleted,
+        HashSet<EntryName> tombstoned,
+        PwGroup? bin)
+    {
+        if (string.Equals(groupPath, wanted, StringComparison.Ordinal))
+        {
+            foreach (PwEntry entry in group.Entries)
+            {
+                var read = Read(entry, groupPath);
+                entries.Add(read);
+
+                if (deleted.Contains(entry.Uuid))
+                {
+                    tombstoned.Add(new EntryName(groupPath, read.Title));
+                }
+            }
+        }
+
+        foreach (PwGroup child in group.Groups)
+        {
+            if (ReferenceEquals(child, bin))
+            {
+                continue;
+            }
+
+            var childPath = ChildPath(groupPath, child.Name);
+
+            if (MayLeadTo(childPath, wanted))
+            {
+                CollectIn(child, childPath, wanted, entries, deleted, tombstoned, bin);
+            }
+        }
+    }
+
+    /// <summary>Whether a group or one below it can have the path wanted, as <see cref="ChildPath"/> joins paths.</summary>
+    /// <remarks>Below a group whose path is empty a path is its child's name alone; below any other it starts with the group's path and a <c>/</c>.</remarks>
+    private static bool MayLeadTo(string groupPath, string wanted) =>
+        groupPath.Length == 0
+        || (wanted.StartsWith(groupPath, StringComparison.Ordinal)
+            && (wanted.Length == groupPath.Length || wanted[groupPath.Length] == '/'));
 
     private static void CollectUsernames(PwGroup group, string groupPath, SortedSet<string> usernames, PwGroup? bin)
     {

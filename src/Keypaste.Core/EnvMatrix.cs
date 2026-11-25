@@ -53,12 +53,20 @@ public sealed record EnvMatrix(string Project, IReadOnlyList<EnvProfileInfo> Pro
         ArgumentNullException.ThrowIfNull(project);
         ArgumentNullException.ThrowIfNull(clock);
 
-        var snapshot = vault.ReadEnvSnapshot();
-        List<EnvProfileInfo> profiles = ProjectCatalog.Read(vault).Projects
+        return Build(vault.ReadEnvSnapshot(), project, clock.GetUtcNow());
+    }
+
+    /// <summary>Builds the matrix from one read of a vault, so its profiles and their values come from the same state.</summary>
+    /// <param name="snapshot">The vault's entries, tags and group paths, read together.</param>
+    /// <param name="project">The project.</param>
+    /// <param name="now">What expiry is judged against.</param>
+    /// <returns>The matrix; empty when the project does not exist.</returns>
+    internal static EnvMatrix Build(EnvSnapshot snapshot, string project, DateTimeOffset now)
+    {
+        List<EnvProfileInfo> profiles = ProjectCatalog.Read(snapshot).Projects
             .FirstOrDefault(listing => string.Equals(listing.Name, project, StringComparison.Ordinal))?.Environments
             .Select(environment => new EnvProfileInfo(environment.Name, environment.IsProtected))
             .ToList() ?? [];
-        var now = clock.GetUtcNow();
 
         var held = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
         var holders = new Dictionary<(string Profile, string Key), List<EntryName>>();
@@ -66,12 +74,12 @@ public sealed record EnvMatrix(string Project, IReadOnlyList<EnvProfileInfo> Pro
 
         foreach (var profile in profiles)
         {
-            var resolved = EnvResolution.Resolve(snapshot, project, profile.Name, keys: null, now);
+            var resolved = EnvResolution.Resolve(snapshot, project, profile.Name, keys: null, now, out var members);
             var values = new Dictionary<string, string>(StringComparer.Ordinal);
 
-            foreach (var member in EnvResolution.Members(snapshot, project, profile.Name, out _))
+            foreach (var member in members)
             {
-                values[member.Key] = EnvResolution.Filled(member) ?? member.Value;
+                values[member.Key] = member.Value;
 
                 if (!holders.TryGetValue((profile.Name, member.Key), out var entries))
                 {

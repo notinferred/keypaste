@@ -3,7 +3,7 @@ using Xunit;
 namespace Keypaste.Processes.Tests;
 
 /// <summary>
-/// <c>keypaste run --session</c> takes a project's set from the process holding the vault (E.1c), across real processes: the built keypaste,
+/// <c>keypaste run --session</c> takes a project's set from the process holding the vault, across real processes: the built keypaste,
 /// tests/Keypaste.AppDriver holding the vault with its prompt drawn and clicked, or keypaste approve answering in its terminal, and a child
 /// that prints the set from its own environment.
 /// </summary>

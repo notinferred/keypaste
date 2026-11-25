@@ -8,7 +8,7 @@ namespace Keypaste.App.Tests;
 
 /// <summary>
 /// The operating system's light or dark setting as the headless platform reports it, which the app
-/// follows while no theme is chosen (N.7).
+/// follows while no theme is chosen.
 /// </summary>
 /// <remarks>
 /// Raised the way a platform raises it, through the settings' own change notification, so the

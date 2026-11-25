@@ -1,6 +1,3 @@
-using Keypaste.App.Clipboard;
-using Keypaste.App.Session;
-using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Tests;
@@ -18,9 +15,8 @@ namespace Keypaste.App.Tests.ViewModels;
 /// stored something else would pass any assertion made against the view model.
 /// </para>
 /// <para>
-/// The env form is here as well as the entry form because both screens generate, and until V.6
-/// nothing asserted the shape of a value the env form generated at all — the entry form's
-/// twenty-character test stood alone.
+/// The env form is here as well as the entry form because both screens generate, and the entry
+/// form's twenty-character test says nothing about the shape of a value the env form generates.
 /// </para>
 /// </remarks>
 public sealed class GeneratedPassphraseTests : IDisposable
@@ -141,14 +137,13 @@ public sealed class GeneratedPassphraseTests : IDisposable
             $"'{piece}' is not a word from the list"));
     }
 
-    private static EnvProjectViewModel Billing(Context context)
+    private static EnvProjectViewModel Billing(UnlockedScreens context)
     {
         context.EnvSets.OpenCommand.Press("billing");
         return context.EnvSets.OpenProject!;
     }
 
-    /// <summary>Opens the file again, from nothing, and reads one entry's password.</summary>
-    /// <summary>A new key the screen added, from billing's home entry (D-0413).</summary>
+    /// <summary>Opens the file again, from nothing, and reads a key the screen added to billing's home entry.</summary>
     private string RereadHomeField(string key)
     {
         using var vault = ClaimedVault.Open(_vaultPath, Master);
@@ -158,6 +153,7 @@ public sealed class GeneratedPassphraseTests : IDisposable
         return value;
     }
 
+    /// <summary>Opens the file again, from nothing, and reads one entry's password.</summary>
     private string Reread(string path)
     {
         using var vault = ClaimedVault.Open(_vaultPath, Master);
@@ -167,42 +163,5 @@ public sealed class GeneratedPassphraseTests : IDisposable
         return found.Password;
     }
 
-    private Context New() => new(_vaultPath);
-
-    /// <summary>An unlocked session with both generating screens on it.</summary>
-    private sealed class Context : IDisposable
-    {
-        internal Context(string vaultPath)
-        {
-            Session = new AppVaultSession(new ManualClock(AppClock.Start));
-
-            using (var master = TempVault.Secret(Master))
-            {
-                Assert.Equal(UnlockOutcome.Opened, Session.TryUnlock(vaultPath, master.Value));
-            }
-
-            Clipboard = new FakeClipboard();
-            Countdown = new ClipboardCountdown(Clipboard, new ManualClock(AppClock.Start));
-            Entries = new EntriesViewModel(Session, Countdown);
-            EnvSets = new EnvSetsViewModel(Session, Countdown);
-        }
-
-        internal AppVaultSession Session { get; }
-
-        internal ClipboardCountdown Countdown { get; }
-
-        internal EntriesViewModel Entries { get; }
-
-        internal EnvSetsViewModel EnvSets { get; }
-
-        internal FakeClipboard Clipboard { get; }
-
-        public void Dispose()
-        {
-            EnvSets.Dispose();
-            Entries.Dispose();
-            Countdown.Dispose();
-            Session.Dispose();
-        }
-    }
+    private UnlockedScreens New() => new(_vaultPath, Master, envSets: true);
 }

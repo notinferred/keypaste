@@ -70,7 +70,7 @@ internal static class ShowCommand
     /// <summary>The standard fields that hold something, in the order agents name them, then <c>totp</c> with no value, then every custom field.</summary>
     /// <remarks>
     /// A custom field's value is read only when it will be printed. One KeePassXC made under a standard
-    /// name in another case, such as <c>password</c>, has no value core reads (V.7a), so it stays masked.
+    /// name in another case, such as <c>password</c>, has no value core reads, so it stays masked.
     /// </remarks>
     private static List<ShownField> Fields(Vault vault, VaultEntry entry, bool reveal)
     {

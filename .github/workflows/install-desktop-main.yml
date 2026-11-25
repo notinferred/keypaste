@@ -1,7 +1,7 @@
 name: install-desktop-main
 
 # After each successful app.yml run on main, installs that run's Linux package and performs the install exercise and
-# R.1a's acts through install-desktop.yml, so a change that breaks them fails on main within the day. A rehearsal
+# the desktop acts through install-desktop.yml, so a change that breaks them fails on main within the day. A rehearsal
 # with main's scripts, never release evidence; Windows and macOS stay dispatched by hand.
 
 on:

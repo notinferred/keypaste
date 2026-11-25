@@ -122,6 +122,17 @@ public sealed class AccessIndexTests : IDisposable
     }
 
     [Fact]
+    public void An_item_names_the_projects_its_tags_hold_after_they_change_or_a_reach_narrows_it()
+    {
+        var item = Item("Work", "GitHub");
+        var tagged = item with { Listing = item.Listing with { Tags = ["env:web:prod", "env:api", "env:web", "env:web:a:b", "other"] } };
+
+        Assert.Empty(item.Projects);
+        Assert.Equal(["api", "web"], tagged.Projects);
+        Assert.Equal(["api", "web"], tagged.Within(ExposureReach.ProjectFields).Projects);
+    }
+
+    [Fact]
     public void The_projects_of_what_was_found_count_only_admitted_members()
     {
         var entries = Everything();

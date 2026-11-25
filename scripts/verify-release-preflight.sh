@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Holds the three decisions a tag used to be the first thing to execute.
+# Drives the three release decisions with fixtures, so none of them is first executed by a real tag.
 #
 # require-changelog-section.sh, require-tag-matches-source.sh and require-release-assets.sh were
 # step bodies in release.yml's guard and publish job, behind ref_type == tag and behind publish's
@@ -15,7 +15,7 @@
 #
 # NEGATIVE CONTROL: two, one per direction that has a previous wrong answer on record.
 #   - the changelog lookup weakened back to an unanchored match must ACCEPT 0.2.0 against a file
-#     that only has a 0.2.0-rc.1 heading, which is the defect R.0a found;
+#     that only has a 0.2.0-rc.1 heading, a defect this gate has already caught;
 #   - the asset count with its published floor deleted must ACCEPT a release that dropped a target,
 #     which is the edit equality alone agrees with.
 # If either weakened copy refuses, this gate fails.
@@ -158,7 +158,7 @@ run_case "weakened-takes-a-dropped-target" 0 "advertised assets, their checksums
 
 echo "== a desktop package is published signed, or it is not published"
 
-# The definition as 3.6b will leave it: the policy on, both packages offered and signed, and the
+# The definition as signing will leave it: the policy on, both packages offered and signed, and the
 # internal-and-unsigned label gone from their names. Every desktop case below is a mutation of this
 # one, so the accepts describe the release that will actually happen rather than a shape invented here.
 SIGNED="$WORK/signed.json"

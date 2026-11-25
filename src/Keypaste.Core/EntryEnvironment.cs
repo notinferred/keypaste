@@ -10,9 +10,10 @@ namespace Keypaste.Core;
 /// <param name="Environment">The environment.</param>
 /// <param name="ApprovalRequired">
 /// Whether an agent's request for the entry's project variables is asked or blocked rather than allowed, by this
-/// computer's rules. Null when its <c>agents.toml</c> could not be read, which refuses every agent request until it reads again.
+/// computer's rules or because one of the entry's own tags names a protected environment, which is asked every time.
+/// Null when the vault's rules file in <see cref="Audit.KeypasteHome.AgentsDirectory"/> could not be read, which refuses every agent request until it reads again.
 /// </param>
-/// <remarks>The rule is one for every project, so every environment of one entry says the same.</remarks>
+/// <remarks>The rule is one for every project and live approval goes by the entry's tags, so every environment of one entry says the same.</remarks>
 public sealed record EntryEnvironment(string Project, string Environment, bool? ApprovalRequired)
 {
     /// <summary>The environments an entry's own project tags put it in, in the order of its tags.</summary>
@@ -44,7 +45,9 @@ public sealed record EntryEnvironment(string Project, string Environment, bool? 
             return [];
         }
 
-        bool? required = rules.TryRead(out var read, out _) ? read.RuleFor(FieldCategory.ProjectVariable) != CategoryRule.Allow : null;
+        bool? required = rules.TryRead(out var read, out _)
+            ? read.RuleFor(FieldCategory.ProjectVariable) != CategoryRule.Allow || EnvProfileNames.RequiresLiveApproval(tags)
+            : null;
 
         return [.. places.Select(place => new EntryEnvironment(place.Project, place.Environment, required))];
     }

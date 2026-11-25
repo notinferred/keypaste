@@ -21,9 +21,9 @@ internal enum KeyOutcome
 
 /// <summary>Releases a key of keypaste's own for a challenge once the person proves they are at the computer.</summary>
 /// <remarks>
-/// One challenge must always give one key, because its SHA-256 is the key a quick unlock's copy is sealed under
-/// (D-0550): Windows Hello's key signs with RSA PKCS #1 v1.5, which gives one signature per challenge, and Touch ID
-/// releases the random key it was given for that challenge (D-0681).
+/// One challenge must always give one key, because its SHA-256 is the key a quick unlock's copy is sealed under:
+/// Windows Hello's key signs with RSA PKCS #1 v1.5, which gives one signature per challenge, and Touch ID
+/// releases the random key it was given for that challenge.
 /// </remarks>
 internal interface IQuickUnlockKeys
 {

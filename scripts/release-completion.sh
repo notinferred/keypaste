@@ -2,15 +2,15 @@
 # The completion record for a published component release, and the check that the bytes actually
 # being served are the ones it names.
 #
-# R.0b. `require-release-assets.sh` decides whether a STAGED directory is a whole release; this
+# `require-release-assets.sh` decides whether a STAGED directory is a whole release; this
 # decides whether a PUBLISHED one is, which is a different question with a different failure mode.
 # An upload that stops partway through leaves a prefix that looks published and is not, and the
-# destination guard will then refuse that version forever (F.4a, deliberately) - so the only safe
+# destination guard will then refuse that version forever (deliberately) - so the only safe
 # recovery is a new version number, and the only way to know a recovery is needed is to ask the
 # public origin what it is serving. Nothing did.
 #
 # The record is the release manifest. release.yml writes it into the staged directory before the one
-# upload, so it is published beside the assets it names and attested with them (3.8): an outsider
+# upload, so it is published beside the assets it names and attested with them: an outsider
 # checks the manifest's provenance first, then every asset against it (verify-provenance.sh).
 #
 # What it does NOT do:
@@ -29,7 +29,7 @@
 #
 # A component publishes either its archives or its packages, and the definition says which, so this
 # never infers it from whether a target happens to declare one. --component defaults to cli, so every
-# caller written before a second component existed still asks the question it always asked (4.7c).
+# caller written before a second component existed still asks the question it always asked.
 #
 # Environment:
 #   KEYPASTE_RELEASE_DEFINITION  the definition to read   (default: release-targets.json)
@@ -96,8 +96,8 @@ expected_pairs() {
         printf '%s\t-\tSHA256SUMS\n'                       "$COMPONENT"
       } | sed '/^$/d' ;;
     packages)
-      # Only a package the definition offers for publication: internal: false is the flag 3.6b flips,
-      # and until it does this component contributes nothing and the release is the CLI's alone.
+      # Only a package the definition offers for publication: internal: false is the flag that turns on
+      # when signing does, and until it does this component contributes nothing and the release is the CLI's alone.
       rows="$(jqr --arg v "$version" --arg c "$COMPONENT" '
         .components[$c].targets[]
         | . as $t
@@ -108,7 +108,7 @@ expected_pairs() {
         | split("{rid}")     | join($t.rid)
         | [$c, $t.rid, .] | @tsv
       ' "$DEFINITION")"
-      # No offered package is the ordinary state until 3.6b flips internal: false, and it must print
+      # No offered package is the ordinary state until signing flips internal: false, and it must print
       # nothing at all: an empty line through `sed 's/$/.sha256/'` becomes the asset named ".sha256".
       [ -n "$rows" ] || return 0
       {
@@ -197,7 +197,7 @@ cmd_verify() {
     local attempt=1 why=""
     # Tried more than once, and this is not superstition. The bytes are ALREADY uploaded by the time
     # this runs, so a false refusal here does not fail a bad release - it condemns a good one, and
-    # F.4a's destination guard then refuses that version forever, making the only recovery a version
+    # publish-release.sh's destination guard then refuses that version forever, making the only recovery a version
     # number spent for nothing. An origin that has not caught up yet is a wait, not an answer. A
     # mismatch is retried for the same reason: a cache mid-fill can serve a short or stale object.
     while :; do

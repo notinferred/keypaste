@@ -3,7 +3,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// 4.11a's rules about where crash-report code may be: only the scrubber reads an exception or builds a report's text,
+/// Rules about where crash-report code may be: only the scrubber reads an exception or builds a report's text,
 /// nothing in the crash code reaches a message, a path, a name or the environment, and only the sender names the route
 /// (THREATS.md T-9).
 /// </summary>

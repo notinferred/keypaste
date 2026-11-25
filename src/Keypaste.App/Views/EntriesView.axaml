@@ -125,11 +125,67 @@
 
     <ctl:ListDetail x:Name="Split" ListWidth="280" DetailLeast="380" ShowsDetail="{Binding HasOpenPane}">
 
-      <!-- The list: the search, its header with the title and sort, then the two-line rows. Drawn above the detail so its menus can lie over it. -->
+      <!-- The list: its header with the title and sort, the search, then the two-line rows. Drawn above the detail so its menus can lie over it. -->
       <Border x:Name="ListColumn" ZIndex="1" BorderBrush="{DynamicResource KpBorderSubtle}" BorderThickness="0,0,1,0">
         <DockPanel>
-          <StackPanel DockPanel.Dock="Top" ZIndex="1" Margin="12,10,12,0">
-            <!-- The app's only search, over the place the list shows. -->
+          <StackPanel DockPanel.Dock="Top" ZIndex="1" Margin="12,8,12,8" Spacing="8">
+            <!-- The place's title, how many items it lists and the vault it is in, muted, on one line with the sort, as Outlook names a folder and its account. -->
+            <Grid Height="28" Margin="4,0,0,0" ColumnDefinitions="Auto,Auto,Auto,*,Auto">
+              <TextBlock x:Name="ListTitle"
+                         Classes="list-title"
+                         Text="{Binding ListTitle}"
+                         ToolTip.Tip="{Binding ListTitle}"
+                         TextTrimming="CharacterEllipsis"
+                         MaxWidth="150"
+                         VerticalAlignment="Center" />
+              <TextBlock x:Name="ListCount"
+                         Grid.Column="1"
+                         Classes="size-11 muted"
+                         Margin="6,0,0,0"
+                         Text="{Binding ListCount}"
+                         IsVisible="{Binding ListCount, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                         VerticalAlignment="Center" />
+              <TextBlock Grid.Column="2"
+                         Classes="size-11 muted"
+                         Margin="6,0,0,0"
+                         Text="·"
+                         IsVisible="{Binding ListSubtitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                         VerticalAlignment="Center" />
+              <TextBlock x:Name="ListSubtitle"
+                         Grid.Column="3"
+                         Classes="size-11 muted"
+                         Margin="6,0,8,0"
+                         Text="{Binding ListSubtitle}"
+                         TextTrimming="CharacterEllipsis"
+                         HorizontalAlignment="Left"
+                         VerticalAlignment="Center" />
+              <Button x:Name="SortMenu"
+                      Grid.Column="4"
+                      Classes="icon sm"
+                      VerticalAlignment="Center"
+                      ToolTip.Tip="{x:Static res:Strings.SortThisList}"
+                      AutomationProperties.Name="{x:Static res:Strings.SortThisList}">
+                <ctl:KpIcon Icon="list-filter" Size="16" />
+                <Button.Flyout>
+                  <ctl:ButtonMenu Placement="BottomEdgeAlignedRight" ItemsSource="{Binding SortChoices}">
+                    <ctl:ButtonMenu.ItemContainerTheme>
+                      <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:SortChoice">
+                        <Setter Property="Header" Value="{Binding Name}" />
+                        <Setter Property="AutomationProperties.Name" Value="{Binding Spoken}" />
+                        <Setter Property="Command" Value="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).SortByCommand}" />
+                        <Setter Property="CommandParameter" Value="{Binding Column}" />
+                        <Setter Property="Icon">
+                          <Template>
+                            <ctl:KpIcon Icon="{Binding Arrow}" Size="14" />
+                          </Template>
+                        </Setter>
+                      </ControlTheme>
+                    </ctl:ButtonMenu.ItemContainerTheme>
+                  </ctl:ButtonMenu>
+                </Button.Flyout>
+              </Button>
+            </Grid>
+            <!-- The app's only search, over the place the list shows, with the chord that reaches it from anywhere at its end. -->
             <TextBox x:Name="ListSearch"
                      Classes="search"
                      Text="{Binding $parent[views:ShellView].((vm:ShellViewModel)DataContext).Search, FallbackValue={x:Null}}"
@@ -139,50 +195,12 @@
               <TextBox.InnerLeftContent>
                 <ctl:KpIcon Icon="search" Size="14" Margin="2,0,6,0" Foreground="{DynamicResource KpTextMuted}" VerticalAlignment="Center" />
               </TextBox.InnerLeftContent>
+              <TextBox.InnerRightContent>
+                <Border x:Name="ListSearchShortcut" Classes="keycap" Margin="6,0,0,0" IsHitTestVisible="False">
+                  <TextBlock Text="{x:Static vm:ShellViewModel.SearchShortcut}" />
+                </Border>
+              </TextBox.InnerRightContent>
             </TextBox>
-            <Grid Height="46" Margin="4,0,0,0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="4">
-              <!-- The place's title, with the vault it is in muted after it, as Outlook names a folder and its account. -->
-              <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <TextBlock x:Name="ListTitle"
-                           Classes="list-title"
-                           Text="{Binding ListTitle}"
-                           ToolTip.Tip="{Binding ListTitle}"
-                           TextTrimming="CharacterEllipsis"
-                           MaxWidth="180"
-                           VerticalAlignment="Center" />
-                <TextBlock x:Name="ListSubtitle"
-                           Classes="size-11 muted"
-                           Text="{Binding ListSubtitle}"
-                           TextTrimming="CharacterEllipsis"
-                           MaxWidth="90"
-                           VerticalAlignment="Center" />
-              </StackPanel>
-              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
-                <Button x:Name="SortMenu"
-                        Classes="more"
-                        ToolTip.Tip="{x:Static res:Strings.SortThisList}"
-                        AutomationProperties.Name="{x:Static res:Strings.SortThisList}">
-                  <ctl:KpIcon Icon="list-filter" Size="16" />
-                  <Button.Flyout>
-                    <ctl:ButtonMenu Placement="BottomEdgeAlignedRight" ItemsSource="{Binding SortChoices}">
-                      <ctl:ButtonMenu.ItemContainerTheme>
-                        <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:SortChoice">
-                          <Setter Property="Header" Value="{Binding Name}" />
-                          <Setter Property="AutomationProperties.Name" Value="{Binding Spoken}" />
-                          <Setter Property="Command" Value="{Binding $parent[views:EntriesView].((vm:EntriesViewModel)DataContext).SortByCommand}" />
-                          <Setter Property="CommandParameter" Value="{Binding Column}" />
-                          <Setter Property="Icon">
-                            <Template>
-                              <ctl:KpIcon Icon="{Binding Arrow}" Size="14" />
-                            </Template>
-                          </Setter>
-                        </ControlTheme>
-                      </ctl:ButtonMenu.ItemContainerTheme>
-                    </ctl:ButtonMenu>
-                  </Button.Flyout>
-                </Button>
-              </StackPanel>
-            </Grid>
           </StackPanel>
 
           <Panel>
@@ -787,7 +805,7 @@
                                              Command="{Binding CopyValueCommand}"
                                              ToolTip.Tip="{x:Static res:Strings.CopyTheValueTheClipboardClearsItself}"
                                              AutomationProperties.Name="{Binding DisplayName, StringFormat={x:Static res:Strings.CopyValue}}">
-                              <!-- Not a TextBlock, for the reason CurrentPassword is not one. -->
+                              <!-- Not a TextBlock: its automation peer would publish its text as the element's name. -->
                               <ctl:RevealedValue x:Name="FieldValue"
                                                  Source="{Binding}"
                                                  MaskedLength="{Binding MaskedLength}"

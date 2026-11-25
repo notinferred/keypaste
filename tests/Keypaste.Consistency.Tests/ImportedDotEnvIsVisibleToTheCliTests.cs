@@ -9,7 +9,7 @@ namespace Keypaste.Consistency.Tests;
 
 /// <summary>
 /// A <c>.env</c> imported on the app's Env Sets screen is exactly what the next <c>keypaste run</c>
-/// injects (V-E.1b).
+/// injects.
 /// </summary>
 /// <remarks>
 /// The CLI is asked rather than the file, because the claim is that both front ends read the import

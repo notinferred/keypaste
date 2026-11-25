@@ -14,7 +14,7 @@ using Xunit;
 
 namespace Keypaste.App.Tests.Views;
 
-/// <summary>What a screen reader gets: every field and row named, headings levelled and each message said once (Q.7).</summary>
+/// <summary>What a screen reader gets: every field and row named, headings levelled and each message said once.</summary>
 public sealed class AssistiveTechnologyTests
 {
     public static TheoryData<int> Places => new()

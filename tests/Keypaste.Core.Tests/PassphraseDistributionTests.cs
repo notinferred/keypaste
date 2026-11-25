@@ -12,7 +12,7 @@ namespace Keypaste.Core.Tests;
 /// <b>The defect this exists for is modulo bias</b> — an index taken as
 /// <c>random % list.Length</c>, which is the obvious way to write this and is wrong.
 /// SECURITY.md law 6 is why the shipped draw is <c>RandomNumberGenerator.GetItems</c>
-/// instead, and V-V.6 asks for a check that fails on the biased version and passes on the one
+/// instead, and this pair is a check that fails on the biased version and passes on the one
 /// keypaste uses.
 /// </para>
 /// <para>

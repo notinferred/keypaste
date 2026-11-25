@@ -7,7 +7,7 @@ namespace Keypaste.AppDriver;
 
 /// <summary>
 /// A stand-in for api.keypaste.com's <c>/v1/crash</c> on loopback, which <c>CrashReportTests</c> points
-/// <c>KEYPASTE_CRASH_URL</c> at (4.11c): it answers each request 204 and keeps its request line and headers as
+/// <c>KEYPASTE_CRASH_URL</c> at: it answers each request 204 and keeps its request line and headers as
 /// <c>&lt;n&gt;.head</c> and its body as <c>&lt;n&gt;.json</c> in a folder, or, with <c>--silent</c>, takes each
 /// connection and never answers, as an unreachable server that holds the line open would.
 /// </summary>

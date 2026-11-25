@@ -90,7 +90,7 @@ public sealed class ClientsVerbTests : IDisposable
         Assert.Contains("is not sealed, so keypaste ignores it", _harness.Err, StringComparison.Ordinal);
     }
 
-    /// <summary>The list shows each agent's own rules and the answers kept for it, each by the key --forget takes (F.78b).</summary>
+    /// <summary>The list shows each agent's own rules and the answers kept for it, each by the key --forget takes.</summary>
     [Fact]
     public void The_list_shows_an_agents_own_rules_and_kept_answers_by_their_keys()
     {

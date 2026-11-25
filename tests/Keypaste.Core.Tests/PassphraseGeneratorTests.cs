@@ -18,7 +18,7 @@ namespace Keypaste.Core.Tests;
 /// echo.
 /// </para>
 /// <para>
-/// <b>Why V.6 adds no KeePassXC gate, which is a claim and so belongs somewhere checkable.</b> A
+/// <b>Why passphrases add no KeePassXC gate, which is a claim and so belongs somewhere checkable.</b> A
 /// passphrase is stored as an ordinary KDBX Protected String through the same
 /// <c>Vault.AddEntry</c> or <c>EnvStore.Set</c> then <c>Vault.Save</c> path the character
 /// generator already uses, and the only characters it introduces are ASCII lowercase letters, the

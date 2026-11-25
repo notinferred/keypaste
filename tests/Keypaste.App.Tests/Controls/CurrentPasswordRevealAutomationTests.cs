@@ -18,7 +18,7 @@ namespace Keypaste.App.Tests.Controls;
 
 /// <summary>
 /// The selected entry's current password: dots until its cell is revealed, and a screen that says
-/// nothing different but its toggle while it is (V.10).
+/// nothing different but its toggle while it is.
 /// </summary>
 /// <remarks>
 /// The click is hit-tested through the window onto the toggle the template built, which keeps every

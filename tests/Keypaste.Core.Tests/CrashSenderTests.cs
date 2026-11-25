@@ -6,7 +6,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// 4.11a: the sender posts each waiting report's exact bytes to api.keypaste.com or a loopback server and nowhere else, keeps
+/// The sender posts each waiting report's exact bytes to api.keypaste.com or a loopback server and nowhere else, keeps
 /// what was not accepted, waits when told to, and never throws or holds anyone up, since local use works without a network.
 /// </summary>
 /// <remarks>

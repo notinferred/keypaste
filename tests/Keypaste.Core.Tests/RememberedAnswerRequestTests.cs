@@ -8,7 +8,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// F.78b's acceptance on the request path: a real vault, the owner's own authority and log, and only the person faked.
+/// Remembered answers on the request path, with a real vault, the owner's own authority and log, and only the person faked.
 /// The most specific answer decides, an item's field, then the agent's category, then Settings; an always holds only once
 /// confirmed, Remove asks again, a remembered pick answers that agent alone for that name, and a lock releases nothing.
 /// </summary>

@@ -5,7 +5,7 @@ namespace Keypaste.App;
 
 /// <summary>
 /// Draws <see cref="AppCommands"/> as the macOS menu bar and Dock menu, or as the menu button's flyout on Windows and
-/// Linux (Q.2).
+/// Linux.
 /// </summary>
 /// <remarks>
 /// Each item's command asks its <see cref="AppCommand.CanRun"/> again just before macOS shows a menu or matches a

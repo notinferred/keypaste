@@ -8,7 +8,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// 9.1d1's 1PUX reader over archives each test builds in memory from 1Password's documented layout and KeePassXC's own
+/// The 1PUX reader over archives each test builds in memory from 1Password's documented layout and KeePassXC's own
 /// test export: every vault's items land with their fields, TOTP, files, history and times, every part that lands nowhere
 /// is named with why, and an archive past a cap, with a path that leaves it, or damaged is refused before it is unpacked,
 /// with no value in anything said.
@@ -521,18 +521,8 @@ public sealed class OnePassword1PuxReaderTests : IDisposable
         using var source = Open(Archive(_export, _files));
         var plan = source.Plan(_vault, "imported");
 
-        var said = new List<string?> { plan.Into, plan.Refusal };
-        said.AddRange(plan.Rows.SelectMany(row => new[] { row.Item, row.Note, row.ToString() }));
-        said.AddRange(plan.Losses.Select(loss => loss.ToString()));
-        said.AddRange(source.Unread.Select(unread => unread.ToString()));
-        said.AddRange(source.Items.SelectMany(item => item.Omitted).Select(omitted => omitted.ToString()));
-        said.AddRange(source.Items.Select(item => item.ToString()));
-        said.AddRange(source.Items.SelectMany(item => item.Fields).Select(field => field.ToString()));
-        said.AddRange(source.Items.SelectMany(item => item.History).Select(version => version.ToString()));
-        said.AddRange(source.Items.SelectMany(item => item.Attachments).Select(attachment => attachment.ToString()));
-
         string[] values = [_valueMark, _seed];
-        Assert.All(values, value => Assert.DoesNotContain(said, text => text is not null && text.Contains(value, StringComparison.Ordinal)));
+        ExportLeakCheck.AssertNothingSaidHoldsAValue(source, plan, values);
     }
 
     [Fact]

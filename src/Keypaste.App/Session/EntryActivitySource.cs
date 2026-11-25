@@ -7,12 +7,13 @@ namespace Keypaste.App.Session;
 
 /// <summary>
 /// The picture of what agents did with this vault's entries, read again every few seconds: this
-/// vault's granted audit lines, the session's release ledger, and what the authority holds now
-/// (D-0361). Never a value.
+/// vault's granted audit lines, the session's release ledger, and what the authority holds now.
+/// Never a value.
 /// </summary>
 /// <remarks>
 /// The audit log is read from where the last read stopped, and lines older than
-/// <see cref="Horizon"/> are dropped, so a refresh never reads the whole file again.
+/// <see cref="Horizon"/> are dropped, so a refresh never reads the whole file again. The first read
+/// does read the whole file, so with a <c>post</c> it runs on a pool thread and only its picture is posted.
 /// </remarks>
 internal sealed class EntryActivitySource : IDisposable
 {
@@ -31,6 +32,7 @@ internal sealed class EntryActivitySource : IDisposable
     private readonly Lock _gate = new();
     private readonly List<AuditEntry> _read = [];
     private AuditPosition _position = AuditPosition.Start;
+    private AuditReleases? _released;
     private bool _disposed;
 
     /// <param name="authority">What answers agents for this vault.</param>
@@ -50,10 +52,20 @@ internal sealed class EntryActivitySource : IDisposable
         _auditPath = auditPath;
         _vaultKey = vaultKey;
         _clock = clock;
-        _post = post ?? (run => run());
 
-        Refresh();
-        _timer = clock.CreateTimer(_ => _post(Refresh), null, Interval, Interval);
+        if (post is null)
+        {
+            _post = run => run();
+            Refresh();
+            _timer = clock.CreateTimer(_ => _post(Refresh), null, Interval, Interval);
+        }
+        else
+        {
+            // The first read parses the whole log, every vault's lines and refusals, so it must not hold the thread post runs on.
+            _post = post;
+            _timer = clock.CreateTimer(_ => _post(Refresh), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            _ = Task.Run(ReadFirst);
+        }
     }
 
     /// <summary>Raised after the picture was rebuilt, on the thread <c>post</c> runs on.</summary>
@@ -75,6 +87,7 @@ internal sealed class EntryActivitySource : IDisposable
             }
 
             var now = _clock.GetUtcNow();
+            var changed = false;
 
             if (AuditReader.TryReadFrom(_auditPath, _position, out var appended, out var next, out _, out _))
             {
@@ -82,22 +95,86 @@ internal sealed class EntryActivitySource : IDisposable
                 if (appended.Count > 0 && appended[0].Line <= _position.Line)
                 {
                     _read.Clear();
+                    changed = true;
                 }
 
                 _position = next;
-                _read.AddRange(appended);
+                var before = _read.Count;
+                _read.AddRange(appended.Where(Usable));
+                changed |= _read.Count != before;
             }
 
-            _read.RemoveAll(entry => entry.At is not { } at || now - at > Horizon);
-            picture = EntryActivity.Build(_read, _vaultKey, _authority.Activity, _authority.Released, now, Reach());
+            changed |= _read.RemoveAll(entry => entry.At is not { } at || now - at > Horizon) > 0;
+
+            // Cleared before folding again, so a fold that throws is retried next tick instead of a stale one standing in.
+            if (changed)
+            {
+                _released = null;
+            }
+
+            _released ??= EntryActivity.Fold(_read, _vaultKey);
+
+            picture = EntryActivity.Build(_released, _authority.Activity, _authority.Released, now, Reach());
             Current = picture;
         }
 
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>Reads the whole log off the thread <c>post</c> runs on, then posts the first picture.</summary>
+    private void ReadFirst()
+    {
+        try
+        {
+            if (AuditReader.TryReadFrom(_auditPath, AuditPosition.Start, out var appended, out var next, out _, out _))
+            {
+                var usable = appended.Where(Usable).ToList();
+
+                lock (_gate)
+                {
+                    if (!_disposed)
+                    {
+                        _position = next;
+                        _read.AddRange(usable);
+                        _released = null;
+                    }
+                }
+            }
+        }
+        finally
+        {
+            // Posted even when the read threw, so the failure surfaces where a refresh's would.
+            _post(Start);
+        }
+    }
+
+    /// <summary>Builds the first picture where <c>post</c> runs it, then starts the interval.</summary>
+    private void Start()
+    {
+        Refresh();
+
+        lock (_gate)
+        {
+            if (!_disposed)
+            {
+                _timer.Change(Interval, Interval);
+            }
+        }
+    }
+
     /// <summary>
-    /// What agents can name here: for each attached bridge, named as a screen names its client, its announced exposure (D-0378).
+    /// Whether the picture can use the line: only this vault's granted releases are held, so other vaults' lines, refusals,
+    /// a terminal's edit, an agent's item change and a merge are not kept and walked for a month.
+    /// </summary>
+    private bool Usable(AuditEntry entry) =>
+        entry.Granted
+        && (entry.Vault.Length == 0 || string.Equals(entry.Vault, _vaultKey, StringComparison.Ordinal))
+        && !string.Equals(entry.Tool, AuditTools.Edit, StringComparison.Ordinal)
+        && !string.Equals(entry.Tool, AuditTools.ItemChange, StringComparison.Ordinal)
+        && !string.Equals(entry.Tool, AuditTools.Merge, StringComparison.Ordinal);
+
+    /// <summary>
+    /// What agents can name here: for each attached bridge, named as a screen names its client, its announced exposure.
     /// </summary>
     private List<AgentReach> Reach()
     {
@@ -120,6 +197,7 @@ internal sealed class EntryActivitySource : IDisposable
         {
             _disposed = true;
             _read.Clear();
+            _released = null;
             Current = null;
         }
 

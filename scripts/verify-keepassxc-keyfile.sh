@@ -1,16 +1,13 @@
 #!/usr/bin/env bash
-#
-# verify-keepassxc-keyfile.sh
-#
 # PERMANENT COMPATIBILITY GATE — SECURITY.md law 14, for a vault unlocked with a key file.
 #
 # verify-keepassxc-compat.sh proves a vault keypaste CREATES opens in KeePassXC,
 # verify-keepassxc-writeback.sh proves a vault keypaste MODIFIES still does,
 # Keypaste.Core.Tests.KeePassXC proves restored revisions, recovered deletions, kept backups and renamed
 # entries are what KeePassXC reads.
-# This one covers what task V.1a1 added: a vault KeePassXC protected with a KEYFILE is one
+# This one covers keyfiles: a vault KeePassXC protected with a KEYFILE is one
 # keypaste opens, writes and hands back, in every form such a keyfile can take. It also covers
-# V.1a2: `keypaste access` changes a vault's password and keyfile, and KeePassXC opens the result
+# `keypaste access`, which changes a vault's password and keyfile, and KeePassXC opens the result
 # with the new factors and refuses the old ones. Last, the one keyfile keypaste makes: the desktop's
 # create form makes a vault with a keyfile it writes, and its Settings replaces that keyfile with
 # another it writes, each through tests/Keypaste.AppDriver, and KeePassXC opens the vault with the
@@ -30,7 +27,7 @@
 #
 #   * EVERY read and write on the keypaste side is the SHIPPED BINARY, through the real
 #     command line with --keyfile. A core test that called Vault.Open would prove the library and
-#     not the product; V-V.1a1 says so in as many words. The keyfiles keypaste makes are the
+#     not the product. The keyfiles keypaste makes are the
 #     exception, because only the desktop makes one: the app driver presses the screens' own
 #     buttons, which call the code the shipped app runs.
 #
@@ -286,7 +283,7 @@ if printf '%s\n' "$pw" | "$kp" ls --vault "$backup" >/dev/null 2>&1; then
 fi
 
 # ---------------------------------------------------------------------------------------
-# keypaste access (V.1a2): keypaste changes the key, KeePassXC opens the result.
+# keypaste access: keypaste changes the key, KeePassXC opens the result.
 # ---------------------------------------------------------------------------------------
 new_pw="next-$pw"
 acc="$dir/$stem-access.kdbx"

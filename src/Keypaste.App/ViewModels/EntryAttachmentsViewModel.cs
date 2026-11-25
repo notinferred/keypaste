@@ -4,7 +4,7 @@ using Keypaste.Core.Ownership;
 
 namespace Keypaste.App.ViewModels;
 
-/// <summary>An item's attachments in its pane: each one's name and size, with add, replace, remove and save (V.8b).</summary>
+/// <summary>An item's attachments in its pane: each one's name and size, with add, replace, remove and save.</summary>
 /// <remarks>
 /// <para>
 /// No attachment's content is in this object or passes through it. Adding and replacing hand the vault a stream over the

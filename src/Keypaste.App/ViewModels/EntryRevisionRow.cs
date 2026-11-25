@@ -124,7 +124,7 @@ internal sealed class EntryRevisionRow : ObservableObject, IRevealSource
         (UrlDiffers, Resources.Strings.URL), (NotesDiffer, Resources.Strings.Notes), (FieldNamesDiffer, Resources.Strings.CustomFields), (TagsDiffer, Resources.Strings.Tags),
     }.Where(part => part.Differs).Select(part => part.Name));
 
-    /// <summary>This revision's custom fields by name, each protected one saying so, and never a value (D-0487).</summary>
+    /// <summary>This revision's custom fields by name, each protected one saying so, and never a value.</summary>
     internal string FieldsSummary { get; }
 
     /// <summary>This revision's own tags.</summary>

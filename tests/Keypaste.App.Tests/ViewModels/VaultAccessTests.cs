@@ -11,7 +11,7 @@ namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
 /// Changing a vault's master password and keyfile from Settings, then locking, reopening and
-/// restoring through the unlock screen (V-V.1b).
+/// restoring through the unlock screen.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -524,7 +524,7 @@ public sealed class VaultAccessTests : IDisposable
         Assert.Empty(cancelled.Except(raised));
     }
 
-    /// <summary>V.1b's limit, done in 4.10a: a reopen that fails after the change was written locks with its own reason and says why.</summary>
+    /// <summary>A reopen that fails after the change was written locks with its own reason and says why.</summary>
     [Fact]
     public async Task A_reopen_that_fails_after_a_committed_password_change_locks_says_why_and_the_new_password_opens_it()
     {
@@ -554,7 +554,6 @@ public sealed class VaultAccessTests : IDisposable
         AssertRefused(_vaultPath, _master, null);
         AssertOpens(_vaultPath, _later, null);
 
-        // The unlock screen the app shows after that lock.
         var landed = 0;
         using var unlock = new UnlockViewModel(session, _home, _picker, () => landed++, message: App.LockMessage(raised), lockedBy: raised);
         Assert.Equal(App.AccessChangedMessage, unlock.Message);

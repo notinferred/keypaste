@@ -3,9 +3,8 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// Covers the open-modify-save cycle, which Stage 0.2 never exercised: it only ever created a
-/// vault and saved it once. Every CLI verb except <c>init</c> reopens an existing file, so the
-/// durability of that path is now on the secret path (CONTRIBUTING.md requires tests on the secret path).
+/// Covers the open-modify-save cycle. Every CLI verb except <c>init</c> reopens an existing file,
+/// so the durability of that path is on the secret path (CONTRIBUTING.md requires tests on the secret path).
 /// </summary>
 public sealed class VaultRemoveTests : IDisposable
 {

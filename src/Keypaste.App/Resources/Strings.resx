@@ -99,6 +99,7 @@
   <data name="RemoveFromFavorites" xml:space="preserve"><value>Remove from Favorites</value></data>
   <data name="Security" xml:space="preserve"><value>Security</value></data>
   <data name="ServerPlace" xml:space="preserve"><value>Server</value></data>
+  <data name="OtherPlace" xml:space="preserve"><value>Other</value></data>
   <data name="GenerateANewPasswordLabel" xml:space="preserve"><value>Generate a new password…</value></data>
   <data name="NewItemAddsOneHere" xml:space="preserve"><value>New item adds one here.</value></data>
   <data name="Copy" xml:space="preserve"><value>Copy</value></data>

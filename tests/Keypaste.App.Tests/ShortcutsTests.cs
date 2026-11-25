@@ -11,7 +11,7 @@ using Xunit;
 namespace Keypaste.App.Tests;
 
 /// <summary>
-/// The window's chords fire on the command modifier alone (Q.1). Windows reports AltGr as Ctrl+Alt,
+/// The window's chords fire on the command modifier alone. Windows reports AltGr as Ctrl+Alt,
 /// so a chord that also holds Alt is a character being typed, "ł" on a Polish layout or "²" on a
 /// German one, and must reach the focused field instead of locking, opening or moving anything.
 /// </summary>

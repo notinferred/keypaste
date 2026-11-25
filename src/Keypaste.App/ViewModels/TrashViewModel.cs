@@ -165,7 +165,7 @@ internal sealed partial class TrashViewModel : ObservableObject, IDisposable
     [NotifyCanExecuteChangedFor(nameof(CancelPurgeCommand), nameof(EmptyCommand))]
     internal partial bool IsConfirmingPurge { get; private set; }
 
-    /// <summary>What that confirmation asks.</summary>
+    /// <summary>What the delete-for-good confirmation asks.</summary>
     internal string PurgePrompt => _selected is { } row
         ? $"Delete {row.DisplayTitle} for good?"
         : string.Empty;

@@ -7,14 +7,13 @@ using Xunit;
 namespace Keypaste.App.Tests.Session;
 
 /// <summary>
-/// 4.10b's Touch ID as far as a machine with no person reaches it: what each keychain status comes to, one keychain
+/// Touch ID as far as a machine with no person reaches it: what each keychain status comes to, one keychain
 /// service per home, and a test host the keychain does not admit, which reads as no Touch ID, so a password unlock keeps
 /// nothing and the screen offers only the full unlock.
 /// </summary>
 /// <remarks>
-/// A test host carries no provisioning profile, so the data protection keychain refuses it as an ad-hoc build is refused
-/// (D-0681). Touch ID itself needs a person at a Mac with a fingerprint enrolled and the Developer ID build, which 4.10b's
-/// record holds.
+/// A test host carries no provisioning profile, so the data protection keychain refuses it as an ad-hoc build is refused.
+/// Touch ID itself needs a person at a Mac with a fingerprint enrolled and the Developer ID build, so it is checked by hand.
 /// </remarks>
 [SupportedOSPlatform("macos")]
 public sealed class TouchIdTests : IDisposable

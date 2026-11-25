@@ -87,8 +87,8 @@ public sealed class EntryIdentityTests : IDisposable
     /// <summary>
     /// The joined form stays addressable — a person types it and a policy file holds it — so it
     /// refuses a collision rather than resolving to whichever entry the file happens to list
-    /// first. F.1a left this one: it repaired removal, and until F.1e this returned
-    /// <c>slashed</c> and <c>keypaste get</c> handed that secret out (SECURITY.md law 7).
+    /// first. Taking the first match would return <c>slashed</c> and let <c>keypaste get</c> hand
+    /// that secret out (SECURITY.md law 7).
     /// </summary>
     [Fact]
     public void Finding_ByPath_WhenTwoEntriesAnswerToIt_IsRefused()
@@ -161,8 +161,8 @@ public sealed class EntryIdentityTests : IDisposable
 
     /// <summary>
     /// The property rather than one worked example of it: whatever the vault holds, locating an
-    /// entry and removing it agree about which one that is. This is the assertion that would have
-    /// caught the original defect without anyone having thought of <c>nested/TOKEN</c>.
+    /// entry and removing it agree about which one that is. This assertion catches a lookup and a
+    /// removal that disagree without anyone having to think of <c>nested/TOKEN</c>.
     /// </summary>
     [Fact]
     public void FindingAndRemoving_AgreeAboutEveryEntryInACollidingVault()

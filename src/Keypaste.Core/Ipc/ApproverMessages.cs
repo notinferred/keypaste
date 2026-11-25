@@ -46,7 +46,7 @@ public enum ApproverMessageKind
     /// <summary>A change to this computer's agent rules from <c>keypaste clients</c>, which the owner makes and seals.</summary>
     RulesChange = 19,
 
-    /// <summary>An agent's request that the person save a value it never sees (F.79).</summary>
+    /// <summary>An agent's request that the person save a value it never sees.</summary>
     Save = 20,
 
     /// <summary>An agent's search of the items it may be shown, by text, host, kind, related item or project.</summary>

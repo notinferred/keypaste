@@ -129,12 +129,12 @@ internal sealed partial class KeePassInterop
     /// came from in <c>PreviousParentGroup</c> so <see cref="RestoreRecycled"/> can put it back.
     /// It gets no tombstone: a tombstone says an object was deleted, and a merge that believed one
     /// would delete the entry in the other copy of the vault. <see cref="PurgeRecycled"/> is where
-    /// the tombstone belongs, and it is what this method used to do unconditionally.
+    /// the tombstone belongs.
     /// </para>
     /// <para>
-    /// The cost of that change is stated where it matters: a deleted value is still in the file,
-    /// so erasing one is now two deliberate steps rather than one. The alternative was the defect
-    /// V.3a exists to repair — an ordinary mis-click taking an entry and its history with it.
+    /// The cost of recycling is stated where it matters: a deleted value is still in the file,
+    /// so erasing one is two deliberate steps rather than one. The alternative is an ordinary
+    /// mis-click taking an entry and its history with it.
     /// </para>
     /// </remarks>
     internal DeletionOutcome RemoveEntry(EntryName name, out RecycledEntryId recycled)
@@ -556,15 +556,21 @@ internal sealed partial class KeePassInterop
     private List<(PwGroup Group, PwEntry Entry)> LiveHolders(string uuidHex)
     {
         List<(PwGroup Group, PwEntry Entry)> holders = [];
-        CollectLiveHolders(_database.RootGroup, string.Empty, uuidHex, Bin(), holders);
+
+        // Only the upper-case hex an entry's UUID prints as names it, so any other spelling finds nothing.
+        if (uuidHex.Length == 32 && uuidHex.All(char.IsAsciiHexDigitUpper))
+        {
+            CollectLiveHolders(_database.RootGroup, string.Empty, new PwUuid(Convert.FromHexString(uuidHex)), Bin(), holders);
+        }
+
         return holders;
     }
 
-    private static void CollectLiveHolders(PwGroup group, string groupPath, string uuidHex, PwGroup? bin, List<(PwGroup Group, PwEntry Entry)> holders)
+    private static void CollectLiveHolders(PwGroup group, string groupPath, PwUuid uuid, PwGroup? bin, List<(PwGroup Group, PwEntry Entry)> holders)
     {
         foreach (PwEntry entry in group.Entries)
         {
-            if (string.Equals(entry.Uuid.ToHexString(), uuidHex, StringComparison.Ordinal))
+            if (entry.Uuid.Equals(uuid))
             {
                 holders.Add((group, entry));
             }
@@ -576,7 +582,7 @@ internal sealed partial class KeePassInterop
 
             if (!ReferenceEquals(child, bin) && !ReservedGroups.IsReserved(childPath))
             {
-                CollectLiveHolders(child, childPath, uuidHex, bin, holders);
+                CollectLiveHolders(child, childPath, uuid, bin, holders);
             }
         }
     }

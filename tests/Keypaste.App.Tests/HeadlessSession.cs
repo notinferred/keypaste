@@ -5,9 +5,7 @@ using Xunit;
 
 namespace Keypaste.App.Tests;
 
-/// <summary>
-/// The one headless Avalonia session this assembly is allowed to have.
-/// </summary>
+/// <summary>The one headless Avalonia session this assembly is allowed to have.</summary>
 /// <remarks>
 /// <para>
 /// <b>One per process, and that is not a style choice.</b> A second
@@ -24,7 +22,7 @@ namespace Keypaste.App.Tests;
 /// on a repository that counts them (SECURITY.md law 9).
 /// </para>
 /// <para>
-/// Most of this stage's tests need none of this. <c>AppVaultSession</c> and the settings and
+/// Most of this assembly's tests need none of this. <c>AppVaultSession</c> and the settings and
 /// recent-vault stores name no Avalonia type, so they are ordinary facts against a
 /// <see cref="TimeProvider"/> — which is faster, deterministic, and where the security assertions
 /// live. This session is for the handful of claims that are only true of a real visual tree.
@@ -35,7 +33,7 @@ internal static class HeadlessSession
     internal static HeadlessUnitTestSession Instance { get; } =
         HeadlessUnitTestSession.StartNew(typeof(HeadlessSession));
 
-    /// <summary>The app drawn by Skia, so a test can read what a frame actually shows (4.6).</summary>
+    /// <summary>The app drawn by Skia, so a test can read what a frame actually shows.</summary>
     public static AppBuilder BuildAvaloniaApp() =>
         AppBuilder.Configure<App>()
             .UseSkia()
@@ -73,7 +71,7 @@ internal static class HeadlessSession
     /// <c>async void</c>.</b> The returned task then completes at the body's first <c>await</c>, so
     /// every assertion after it runs outside the lifetime xunit observes and a failure surfaces as
     /// an unobserved exception rather than a red test. Four tests in
-    /// <c>MaskedInputAutomationTests</c> were written that way, two of them D-0099 differentials.
+    /// <c>MaskedInputAutomationTests</c> were written that way, two of them length-only differentials.
     /// </para>
     /// <para>
     /// <see cref="HeadlessUnitTestSession"/> offers <c>Dispatch(Action)</c>,

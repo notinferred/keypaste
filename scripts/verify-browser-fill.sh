@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 8.3a3: keypaste fills a login in real browsers, with keypaste's extension as built. tests/Keypaste.AppDriver holds a vault of
+# Keypaste fills a login in real browsers, with keypaste's extension as built. tests/Keypaste.AppDriver holds a vault of
 # logins and answers its pairing prompt; every browser pairs, then visits pages a local HTTPS server serves under test names, and the
 # page's fields and the owner's log must show what keypaste's matching rules allow (extension/tests/fill-in-browsers.js).
 #

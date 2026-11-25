@@ -6,7 +6,7 @@ using Keypaste.Core.Activity;
 
 namespace Keypaste.App.ViewModels;
 
-/// <summary>How the Secrets rows and the detail pane word when something was last used.</summary>
+/// <summary>How the Items rows and the detail pane word when something was last used.</summary>
 internal static class UseText
 {
     /// <summary>"in use", "4m ago", "3h ago", "2d ago" or "never".</summary>

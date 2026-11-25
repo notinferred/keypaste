@@ -23,7 +23,7 @@ namespace Keypaste.App.ViewModels;
 /// </para>
 /// <para>
 /// Custom fields are listed by name and protection only, and each value, plain or protected, is read
-/// the same way as the password (V.7b). Every change to a field or a tag is one core call and one
+/// the same way as the password. Every change to a field or a tag is one core call and one
 /// save, so it is one revision in the entry's history.
 /// </para>
 /// <para>
@@ -605,7 +605,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
         return null;
     }
 
-    /// <summary>What a value generated in the pane's forms is made of (V.12).</summary>
+    /// <summary>What a value generated in the pane's forms is made of.</summary>
     internal GeneratorViewModel Generator { get; } = new();
 
     /// <summary>Generate, beside a form's secret field: a generated value in place of what the field holds.</summary>
@@ -903,12 +903,11 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     [NotifyPropertyChangedFor(nameof(ExpiryLabel))]
     internal partial bool IsExpired { get; private set; }
 
-    /// <summary>The expiry row's label.</summary>
     internal string ExpiryLabel => IsExpired ? "Expired" : "Expires";
 
     /// <summary>
     /// Whether the Agent access card shows: an agent attached here whose settings reach this entry
-    /// can name it, or it has left the vault or is being asked for (N.5). False until the first reading,
+    /// can name it, or it has left the vault or is being asked for. False until the first reading,
     /// and always when nothing answers agents.
     /// </summary>
     [ObservableProperty]
@@ -1012,7 +1011,6 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     /// <summary>The entry's title. Read-only: a new title is a different entry (core's rule).</summary>
     internal string Title => _title;
 
-    /// <summary>The entry's group.</summary>
     internal string GroupPath => _groupPath;
 
     /// <summary>
@@ -1020,8 +1018,8 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     /// </summary>
     /// <remarks>
     /// The pane used to reach for <see cref="Path"/>, and two entries can answer to one of those —
-    /// so a copy served a secret the person had not selected and an edit wrote to its neighbour
-    /// (task F.1e). Every vault access below goes through this instead.
+    /// so a copy served a secret the person had not selected and an edit wrote to its neighbour.
+    /// Every vault access below goes through this instead.
     /// </remarks>
     internal EntryName Name => new(_groupPath, _title) { Uuid = _uuid };
 
@@ -1160,7 +1158,7 @@ internal sealed partial class EntryDetailViewModel : ObservableObject, IRevealSo
     /// </remarks>
     internal EntryHistoryViewModel History { get; }
 
-    /// <summary>The item's attachments by name and size, and the way to add, replace, remove and save them (V.8b).</summary>
+    /// <summary>The item's attachments by name and size, and the way to add, replace, remove and save them.</summary>
     internal EntryAttachmentsViewModel Attachments { get; }
 
     [ObservableProperty]

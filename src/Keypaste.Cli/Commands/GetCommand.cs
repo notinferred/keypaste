@@ -17,6 +17,9 @@ namespace Keypaste.Cli.Commands;
 /// </remarks>
 internal static class GetCommand
 {
+    /// <summary>The longest <c>--timeout</c>: a timer waits at most 2^32 - 2 milliseconds, about 49.7 days.</summary>
+    internal const int MaximumTimeoutSeconds = 4_294_967;
+
     /// <summary>How long the secret stays on the clipboard by default.</summary>
     /// <remarks>
     /// Read from the core rather than written here, so this and the desktop app's countdown are one
@@ -69,9 +72,10 @@ internal static class GetCommand
         var timeoutText = line.GetValue(_timeout);
         if (timeoutText is not null
             && (!int.TryParse(timeoutText, NumberStyles.None, CultureInfo.InvariantCulture, out timeout)
-                || timeout < 0))
+                || timeout < 0
+                || timeout > MaximumTimeoutSeconds))
         {
-            context.Stderr.WriteLine("keypaste get: --timeout needs a whole number of seconds");
+            context.Stderr.WriteLine($"keypaste get: --timeout needs a whole number of seconds, at most {MaximumTimeoutSeconds}");
             return CliApp.ExitUsageError;
         }
 
@@ -84,77 +88,76 @@ internal static class GetCommand
         var entryPath = line.GetValue(_item)!;
         var reveal = line.GetValue(_reveal);
 
-        return VaultSession.Open(path, line, context, vault =>
-        {
-            var entry = vault.Find(entryPath);
-            if (entry is null)
+        // The vault is closed and the master password zeroed before the value is printed or the clipboard wait starts.
+        return VaultSession.OpenThen<string>(
+            path,
+            line,
+            context,
+            vault => Read(context, vault, entryPath, field, totp),
+            secret =>
             {
-                context.Stderr.WriteLine($"keypaste get: no item '{entryPath}'");
-                return CliApp.ExitNotFound;
-            }
+                if (reveal)
+                {
+                    context.Stdout.WriteLine(secret);
+                    return CliApp.ExitSuccess;
+                }
 
-            var name = EntryName.Of(entry);
-
-            if (totp)
-            {
-                return GetTotp(context, vault, name, entryPath, reveal, timeout);
-            }
-
-            var stored = field is null ? entry.Password : vault.ReadField(name, field);
-            if (stored is null)
-            {
-                context.Stderr.WriteLine($"keypaste get: '{entryPath}' has no field '{field}'");
-                return CliApp.ExitNotFound;
-            }
-
-            var fill = vault.FillPlaceholders(name, stored);
-            if (fill is null)
-            {
-                context.Stderr.WriteLine($"keypaste get: no item '{entryPath}'");
-                return CliApp.ExitNotFound;
-            }
-
-            if (fill.Value is not { } secret)
-            {
-                context.Stderr.WriteLine(
-                    $"keypaste get: the {field ?? "password"} of '{entryPath}' {fill.Refusal}; keypaste show '{entryPath}' --reveal shows it as the vault holds it");
-                return CliApp.ExitInternalError;
-            }
-
-            if (reveal)
-            {
-                context.Stdout.WriteLine(secret);
-                return CliApp.ExitSuccess;
-            }
-
-            return Copy(context, secret, timeout);
-        });
+                return Copy(context, secret, timeout);
+            });
     }
 
-    private static int GetTotp(CliContext context, Vault vault, EntryName name, string entryPath, bool reveal, int timeoutSeconds)
+    private static (int Exit, string? Secret) Read(CliContext context, Vault vault, string entryPath, string? field, bool totp)
     {
-        string code;
-
-        using (var spec = vault.ReadTotp(name, out var refusal))
+        var entry = vault.Find(entryPath);
+        if (entry is null)
         {
-            if (spec is null)
-            {
-                context.Stderr.WriteLine(refusal is null
-                    ? $"keypaste get: '{entryPath}' has no TOTP"
-                    : $"keypaste get: the TOTP of '{entryPath}' cannot be computed: {refusal}");
-                return refusal is null ? CliApp.ExitNotFound : CliApp.ExitInternalError;
-            }
-
-            code = spec.Code(context.Clock).Value;
+            context.Stderr.WriteLine($"keypaste get: no item '{entryPath}'");
+            return (CliApp.ExitNotFound, null);
         }
 
-        if (reveal)
+        var name = EntryName.Of(entry);
+
+        if (totp)
         {
-            context.Stdout.WriteLine(code);
-            return CliApp.ExitSuccess;
+            return ReadTotp(context, vault, name, entryPath);
         }
 
-        return Copy(context, code, timeoutSeconds);
+        var stored = field is null ? entry.Password : vault.ReadField(name, field);
+        if (stored is null)
+        {
+            context.Stderr.WriteLine($"keypaste get: '{entryPath}' has no field '{field}'");
+            return (CliApp.ExitNotFound, null);
+        }
+
+        var fill = vault.FillPlaceholders(name, stored);
+        if (fill is null)
+        {
+            context.Stderr.WriteLine($"keypaste get: no item '{entryPath}'");
+            return (CliApp.ExitNotFound, null);
+        }
+
+        if (fill.Value is not { } secret)
+        {
+            context.Stderr.WriteLine(
+                $"keypaste get: the {field ?? "password"} of '{entryPath}' {fill.Refusal}; keypaste show '{entryPath}' --reveal shows it as the vault holds it");
+            return (CliApp.ExitInternalError, null);
+        }
+
+        return (CliApp.ExitSuccess, secret);
+    }
+
+    private static (int Exit, string? Code) ReadTotp(CliContext context, Vault vault, EntryName name, string entryPath)
+    {
+        using var spec = vault.ReadTotp(name, out var refusal);
+        if (spec is null)
+        {
+            context.Stderr.WriteLine(refusal is null
+                ? $"keypaste get: '{entryPath}' has no TOTP"
+                : $"keypaste get: the TOTP of '{entryPath}' cannot be computed: {refusal}");
+            return (refusal is null ? CliApp.ExitNotFound : CliApp.ExitInternalError, null);
+        }
+
+        return (CliApp.ExitSuccess, spec.Code(context.Clock).Value);
     }
 
     private static int Copy(CliContext context, string secret, int timeoutSeconds)
@@ -175,13 +178,9 @@ internal static class GetCommand
             return CliApp.ExitSuccess;
         }
 
-        // The baseline is read straight after the copy, so whatever the platform's read-back
-        // does to the bytes it does identically at both ends of the wait.
-        context.Clipboard.TryReadHash(out var expected, out _);
-
         context.ClipboardClear.ClearAfter(
             context.Clipboard,
-            expected,
+            ClipboardBaseline.Take(context.Clipboard),
             TimeSpan.FromSeconds(timeoutSeconds),
             context.Stderr);
 

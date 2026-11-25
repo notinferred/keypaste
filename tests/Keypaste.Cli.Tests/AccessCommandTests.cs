@@ -23,7 +23,7 @@ public sealed class AccessCommandTests
 
         harness.AssertExit(CliApp.ExitSuccess, exit);
         Assert.Equal(
-            ["Master password: ", "New master password: ", "Confirm master password: "],
+            [CliHarness.MasterPasswordPrompt, "New master password: ", "Confirm master password: "],
             harness.Prompt.PromptsSeen);
         AssertOpens(harness.VaultPath, _next, null);
         Assert.Throws<InvalidMasterPasswordException>(() => ClaimedVault.Open(harness.VaultPath, _master));
@@ -39,7 +39,7 @@ public sealed class AccessCommandTests
         var exit = harness.Run("access", "--new-keyfile", keyfile, "--vault", harness.VaultPath);
 
         harness.AssertExit(CliApp.ExitSuccess, exit);
-        Assert.Equal(["Master password: "], harness.Prompt.PromptsSeen);
+        Assert.Equal([CliHarness.MasterPasswordPrompt], harness.Prompt.PromptsSeen);
         AssertOpens(harness.VaultPath, _master, keyfile);
     }
 
@@ -126,7 +126,7 @@ public sealed class AccessCommandTests
 
         Assert.Equal(CliApp.ExitAuthFailed, exit);
         Assert.Contains("hardware key", harness.Err, StringComparison.Ordinal);
-        Assert.Equal(["Master password: "], harness.Prompt.PromptsSeen);
+        Assert.Equal([CliHarness.MasterPasswordPrompt], harness.Prompt.PromptsSeen);
         Assert.Equal(bytes, File.ReadAllBytes(harness.VaultPath));
     }
 

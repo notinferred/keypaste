@@ -45,7 +45,7 @@ internal sealed record AgentVaultChoice(string? Path, string Label)
 internal sealed partial class SettingsViewModel : ObservableObject, IDisposable, IHoldsDraft
 {
     private const string _translocatedNote =
-        "macOS is running this copy from a temporary location. Move keypaste to Applications and open it again to link it.";
+        "This copy runs from the disk image or from a temporary copy macOS made, and is gone once it's ejected or quits. Move keypaste to Applications and open it from there to link it.";
 
     private readonly AppVaultSession _session;
     private readonly string? _home;
@@ -64,6 +64,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     private bool _exporting;
     private CliLinkStatus? _cliStatus;
     private IReadOnlyList<AgentVaultChoice>? _agentVaultChoices;
+    private IReadOnlyList<RecentVault>? _recentVaults;
 
     internal SettingsViewModel(
         AppVaultSession session,
@@ -143,7 +144,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     /// </summary>
     /// <remarks>
     /// A "never" option would be the one setting everybody chose the first time the countdown
-    /// interrupted them, and it would turn off the feature this stage exists to ship. Eight hours
+    /// interrupted them, and it would turn off the idle lock altogether. Eight hours
     /// covers a working day, which is the honest version of the same wish.
     /// </remarks>
     internal static IReadOnlyList<IdleChoice> Offered { get; } =
@@ -163,8 +164,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     /// <remarks>
     /// A hand-edited <c>idle_timeout_seconds</c> is honoured and named rather than snapped to the
     /// nearest offering. Snapping the label would put a number on the screen that the vault is not
-    /// using, which is the defect this task exists to close; snapping the session would discard a
-    /// legitimate edit; rewriting the file to match the list would clobber it. Whatever
+    /// using; snapping the session would discard a legitimate edit; rewriting the file to match the list would clobber it. Whatever
     /// the file asked for, <see cref="AppSettings.IdleTimeoutSeconds"/> has already clamped it into
     /// a range that locks.
     /// </remarks>
@@ -276,8 +276,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
 
     /// <summary>Whether this platform can tell the app that its window was minimized.</summary>
     /// <remarks>
-    /// The checkbox is omitted where the answer is no, rather than offered and inert — which is the
-    /// defect F.2b repairs, and it would be no better for being platform-shaped. An instance
+    /// The checkbox is omitted where the answer is no, rather than offered and inert. An instance
     /// property because a binding needs one, in the shape <see cref="ShellViewModel"/> already uses.
     /// </remarks>
 #pragma warning disable CA1822
@@ -380,9 +379,12 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
 
             if (!done)
             {
-                Message = value
-                    ? "keypaste could not add itself to what opens at login. Try again, or add it in your system's login items."
-                    : "keypaste could not remove itself from what opens at login. Try again, or remove it in your system's login items.";
+                Message = (value, Login.RunsFromTemporaryLocation) switch
+                {
+                    (true, true) => "This copy runs from the disk image or from a temporary copy macOS made. Move keypaste to Applications, open it from there, then turn on Open at login.",
+                    (true, false) => "keypaste could not add itself to what opens at login. Try again, or add it in your system's login items.",
+                    (false, _) => "keypaste could not remove itself from what opens at login. Try again, or remove it in your system's login items.",
+                };
             }
         }
     }
@@ -414,7 +416,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
         var chosen = ChosenVault.Read(_home);
         List<string> paths = [.. new[] { chosen, _session.VaultPath }.OfType<string>()];
         paths.AddRange(VaultChoices.Select(choice => choice.Vault?.VaultPath).OfType<string>());
-        paths.AddRange(RecentVaults.Load(KeypasteHome.RecentPath(_home)).Select(recent => recent.Path));
+        paths.AddRange(RecentList.Select(recent => recent.Path));
 
         List<AgentVaultChoice> choices = chosen is null ? [new(null, Strings.NoneWord)] : [];
         foreach (var path in paths.Where(path => !choicesHave(path)))
@@ -428,14 +430,17 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     }
 
     /// <summary>How many vaults keypaste remembers having opened on this computer.</summary>
-    internal string RecentVaultsCount => RecentVaults.Load(KeypasteHome.RecentPath(_home)).Count switch
+    internal string RecentVaultsCount => RecentList.Count switch
     {
         0 => Strings.NoneWord,
         1 => "1 vault",
         var count => string.Create(CultureInfo.InvariantCulture, $"{count} vaults"),
     };
 
-    internal bool HasRecentVaults => RecentVaults.Load(KeypasteHome.RecentPath(_home)).Count > 0;
+    internal bool HasRecentVaults => RecentList.Count > 0;
+
+    /// <summary>The recent-vaults file, read once for the screen and again after Settings writes it.</summary>
+    private IReadOnlyList<RecentVault> RecentList => _recentVaults ??= RecentVaults.Load(KeypasteHome.RecentPath(_home));
 
     /// <summary>Links the <c>keypaste</c> a terminal runs to this app's own, or null where Settings offers no link (Windows, and an app with no <c>keypaste</c> beside it).</summary>
     internal ICliLink? CliLink { get; init; }
@@ -734,6 +739,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     {
         IsConfirmingForgetAll = false;
         RecentVaults.Save(KeypasteHome.RecentPath(_home), []);
+        _recentVaults = null;
         Message = "The recent vaults list is empty.";
         OnPropertyChanged(nameof(RecentVaultsCount));
         OnPropertyChanged(nameof(HasRecentVaults));

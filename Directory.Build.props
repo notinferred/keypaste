@@ -24,8 +24,8 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
-  <!-- Analyzers on from day one so an AOT-hostile dependency surfaces the day it is
-       added (Stage 0.2), not at Stage 3 release. PublishAot itself flips in Stage 3. -->
+  <!-- Analyzers on in every project, so an AOT-hostile dependency fails the build the day it
+       is added; the CLI publishes with PublishAot. -->
   <PropertyGroup Label="Trim / AOT readiness">
     <IsAotCompatible>true</IsAotCompatible>
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>

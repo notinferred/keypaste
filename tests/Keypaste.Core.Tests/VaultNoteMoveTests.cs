@@ -4,7 +4,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// C.2: moving keys out of notes is one revision per entry, and a refused move changes nothing.
+/// Moving keys out of notes is one revision per entry, and a refused move changes nothing.
 /// </summary>
 public sealed class VaultNoteMoveTests : IDisposable
 {

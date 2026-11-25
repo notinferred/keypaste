@@ -58,7 +58,7 @@ internal sealed partial class KeePassInterop
     /// which is what <c>RestoreFromBackup</c> does when it is given the database's history settings.
     /// The entry is mutated in place, so it keeps its UUID, but <c>RestoreFromBackup</c> assigns the
     /// revision's strings, attachments, custom data, tags and auto-type: the entry becomes the revision
-    /// whole, as it does in KeePass and KeePassXC, and what it drops is in the revision just made (9.4). Since
+    /// whole, as it does in KeePass and KeePassXC, and what it drops is in the revision just made. Since
     /// that puts back the revision's project tags, a front end first asks what <see cref="ProjectTagChange.Restoring"/>
     /// says whenever they differ from the entry's.
     /// </remarks>

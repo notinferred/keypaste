@@ -32,8 +32,7 @@ public enum SourceCleanup
 /// deletion confirmation — four windows in which a person can add a variable in another window, an
 /// editor can save, or a <c>git checkout</c> can replace the file. Deleting whatever is at that
 /// path afterwards loses bytes that were never imported, and there is nowhere to recover them
-/// from: this command's offer is a trap unless it is bound to what was read,
-/// and it was bound only to the path (task F.1c).
+/// from: this command's offer is a trap unless it is bound to what was read, not only to the path.
 /// </para>
 /// <para>
 /// Identity here is two rules, not one. <see cref="PathIdentity"/> answers whether the path still
@@ -80,9 +79,8 @@ public sealed class SourceSnapshot
     /// <para>
     /// The whole file rather than its modification time. Several filesystems round mtime to a
     /// second or two, so a rewrite inside the same second would be missed — and a rewrite inside
-    /// the same second is the common case here, not the exotic one. A vault is kilobytes and a
-    /// <c>.env</c> is capped at <see cref="DotEnv.MaximumBytes"/>; hashing either is not worth
-    /// optimising around.
+    /// the same second is the common case here, not the exotic one. The file is hashed as it is
+    /// streamed, so a vault of many megabytes costs its read time and no allocation of its size.
     /// </para>
     /// <para>
     /// <b>A file that cannot be read is not a change.</b> "This holds something else now" is a
@@ -98,7 +96,8 @@ public sealed class SourceSnapshot
 
         try
         {
-            return SHA256.HashData(File.ReadAllBytes(path));
+            using var stream = File.OpenRead(path);
+            return SHA256.HashData(stream);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
         {

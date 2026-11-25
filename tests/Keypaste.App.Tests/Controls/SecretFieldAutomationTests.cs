@@ -17,14 +17,14 @@ using Xunit;
 namespace Keypaste.App.Tests.Controls;
 
 /// <summary>
-/// The four fields 4.9 adds, asked the same questions the master-password fields are asked, and
+/// The item, custom-field, API-key and env value fields, asked the same questions the master-password fields are asked, and
 /// asked what the paste gesture actually does.
 /// </summary>
 /// <remarks>
 /// <para>
 /// <b>Why not lean on <see cref="MaskedInputAutomationTests"/>.</b> These are the same control, and
 /// that is exactly why they need their own evidence: a field inherits the class and its template,
-/// not the surface it ends up with. Three of these four live inside <c>DataTemplate</c>s, beside
+/// not the surface it ends up with. Most of these live inside <c>DataTemplate</c>s, beside
 /// labels, notes and buttons that the unlock screen does not have, and the sweep runs over the
 /// whole screen.
 /// </para>
@@ -116,7 +116,7 @@ public sealed class SecretFieldAutomationTests
         });
 
     /// <summary>
-    /// The anti-vacuity guard for the four differentials: the mask reaches the tree, so each of
+    /// The anti-vacuity guard for the differentials: the mask reaches the tree, so each of
     /// them is comparing something rather than two empty lists.
     /// </summary>
     [Fact]
@@ -162,7 +162,7 @@ public sealed class SecretFieldAutomationTests
         Type(entries.Window, entries.NewEntryPassword, _fixture);
         AutomationSurface.AssertNothingExposes(entries.Window, _fixture);
 
-        // An API key's value, the other secret New item takes (N.4).
+        // An API key's value, the other secret New item takes.
         using var key = new EntriesScreen();
         key.BeginAddKey();
         Type(key.Window, key.NewItemKeyValue, _fixture);
@@ -224,7 +224,7 @@ public sealed class SecretFieldAutomationTests
 
     /// <summary>
     /// The master-password field answers the gesture through its own form rather than a sink: one
-    /// trailing line break goes, as D-0225 has it, and nothing of what arrived is on the screen.
+    /// trailing line break goes, and nothing of what arrived is on the screen.
     /// </summary>
     /// <remarks>
     /// The field is typed into afterwards and the length required to rise again, so the paste left

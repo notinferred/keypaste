@@ -3,7 +3,7 @@ using System.Globalization;
 namespace Keypaste.Core.Recommendations;
 
 /// <summary>
-/// A project environment an entry was in and is no longer, lost in a version that changed more than its tags (V.11).
+/// A project environment an entry was in and is no longer, lost in a version that changed more than its tags.
 /// </summary>
 /// <param name="Entry">The entry that lost it.</param>
 /// <param name="EntryUuid">The entry's KDBX identifier as hex, which survives a rename.</param>
@@ -25,7 +25,7 @@ public sealed record LostProjectTag(
     public string Key => string.Create(CultureInfo.InvariantCulture, $"{Tag}@{LostUtc:O}");
 }
 
-/// <summary>Finds project tags an entry lost while something else about it changed (V.11).</summary>
+/// <summary>Finds project tags an entry lost while something else about it changed.</summary>
 /// <remarks>
 /// A version that changed tags alone was a tag edit in keypaste, KeePassXC or another app that keeps
 /// tags, and is not reported; one that dropped a tag while changing anything else, as an app that does

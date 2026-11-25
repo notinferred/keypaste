@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Security;
+using Keypaste.Core.Clients;
 using Keypaste.Core.Processes;
 
 namespace Keypaste.Core.Login;
@@ -25,6 +26,7 @@ public sealed class MacLaunchAgent : ILoginItem
         ArgumentNullException.ThrowIfNull(approval);
 
         _approval = approval;
+        RunsFromTemporaryLocation = McpServerLocator.IsTransient(program, McpClientPlatform.MacOS);
         FilePath = Path.Combine(home, "Library", "LaunchAgents", Label + ".plist");
         Document = string.Join(
             '\n',
@@ -57,13 +59,16 @@ public sealed class MacLaunchAgent : ILoginItem
     public string Document { get; }
 
     /// <inheritdoc/>
+    public bool RunsFromTemporaryLocation { get; }
+
+    /// <inheritdoc/>
     public bool IsEnabled =>
         string.Equals(LoginItems.ReadFile(FilePath), Document, StringComparison.Ordinal) && !_approval.IsDisabled(Label);
 
     /// <inheritdoc/>
     /// <remarks>launchd is asked to forget its switch only when it holds one, so a Mac whose launchctl cannot answer still writes the agent.</remarks>
     public bool Enable() =>
-        LoginItems.WriteFile(FilePath, Document) && (!_approval.IsDisabled(Label) || _approval.Clear(Label));
+        !RunsFromTemporaryLocation && LoginItems.WriteFile(FilePath, Document) && (!_approval.IsDisabled(Label) || _approval.Clear(Label));
 
     /// <inheritdoc/>
     public bool Disable() => LoginItems.DeleteFile(FilePath);

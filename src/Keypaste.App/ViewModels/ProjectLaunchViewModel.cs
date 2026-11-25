@@ -12,7 +12,7 @@ namespace Keypaste.App.ViewModels;
 
 /// <summary>
 /// One project's directory and command on this machine, and the Run and Open terminal that start
-/// the platform's terminal there with the project's set (E.1b).
+/// the platform's terminal there with the project's set.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -23,14 +23,14 @@ namespace Keypaste.App.ViewModels;
 /// </para>
 /// <para>
 /// The released set is held only for the call that starts the terminal. The mapping saved to
-/// <c>projects.json</c> holds a directory and a command and nothing else (D-0339).
+/// <c>projects.json</c> holds a directory and a command and nothing else.
 /// </para>
 /// <para>
 /// On macOS the set never reaches Terminal: the confirmation is the same card, and the run
 /// Terminal starts presents the launch pass it earned to the app's launch endpoint, which answers
-/// whether or not agents can reach the vault (D-0451, D-0452). On Windows and Linux the app's
+/// whether or not agents can reach the vault. On Windows and Linux the app's
 /// authority writes the same History line before the terminal starts, and a Run whose line cannot
-/// be written starts nothing (D-0496).
+/// be written starts nothing.
 /// </para>
 /// </remarks>
 internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDisposable

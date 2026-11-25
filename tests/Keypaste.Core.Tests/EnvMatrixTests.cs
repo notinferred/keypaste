@@ -95,6 +95,23 @@ public sealed class EnvMatrixTests : IDisposable
     }
 
     [Fact]
+    public void ProfilesAndValues_ComeFromOneReadOfTheVault()
+    {
+        var read = _vault.ReadEnvSnapshot();
+        ProjectVariables.Set(_vault, "acme-api", "qa", "DATABASE_URL", "qa-db");
+        ProjectVariables.Set(_vault, "acme-api", "DATABASE_URL", "prod-db");
+
+        var matrix = EnvMatrix.Build(read, "acme-api", _clock.GetUtcNow());
+
+        Assert.Equal(["dev", "staging", "prod"], matrix.Profiles.Select(profile => profile.Name));
+        Assert.Empty(matrix.Row("DATABASE_URL")!.Cells[0].SameValueAs);
+
+        var now = EnvMatrix.Build(_vault, "acme-api", _clock);
+        Assert.Contains("qa", now.Profiles.Select(profile => profile.Name));
+        Assert.Equal(["prod"], now.Row("DATABASE_URL")!.Cells[0].SameValueAs);
+    }
+
+    [Fact]
     public void NoRecordHasAValueMember()
     {
         foreach (var type in new[] { typeof(EnvMatrix), typeof(EnvMatrixRow), typeof(EnvCell), typeof(EnvProfileInfo), typeof(EnvDiffLine) })

@@ -19,7 +19,7 @@ namespace Keypaste.Mcp.Tools;
 /// server was configured to expose, forwards it to whoever can ask a person, and answers the agent.
 /// </para>
 /// <para>
-/// <b>There is still no vault code path in this file, and now no decision either.</b> Not "there is
+/// <b>There is no vault code path in this file, and no decision either.</b> Not "there is
 /// one and it is guarded": there is none, and that is checkable by reading it (THREATS.md T-8). The
 /// credential arrives over a pipe from a process that already asked a human, and leaves in the
 /// result. Nothing here can release anything on its own.

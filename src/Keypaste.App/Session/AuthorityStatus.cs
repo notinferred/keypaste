@@ -19,7 +19,7 @@ internal abstract record AuthorityStatus
         /// <summary>The owner as Agent Activity says it.</summary>
         internal string Sentence => $"{Holder[..^1]}, and agents reach it there.";
 
-        /// <summary>The owner as the unlock screen says it, which speaks of no agent (N.2).</summary>
+        /// <summary>The owner as the unlock screen says it, which speaks of no agent.</summary>
         internal string Holder
         {
             get

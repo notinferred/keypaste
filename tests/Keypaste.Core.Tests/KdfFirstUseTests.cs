@@ -9,7 +9,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// The first vaults a process creates at the same moment all see one completely built KDF
-/// registry (task F.11).
+/// registry.
 /// </summary>
 /// <remarks>
 /// Each iteration loads keypaste's core and KeePassLib into a fresh collectible load context, so

@@ -24,7 +24,7 @@ using static Keypaste.App.Tests.Session.JourneyDriver;
 namespace Keypaste.App.Tests.Session;
 
 /// <summary>
-/// V-C.4: through the app as launch composes it (D-0342), Environments shows both projects,
+/// Through the app as launch composes it, Environments shows both projects,
 /// where each value lives, the entry two stages share and the tag that puts its entry in no
 /// project; it adds an entry to a stage, takes another out, replaces the shared value, adds a
 /// key with no entry chosen and imports a <c>.env</c>, and a declined or refused act writes nothing;
@@ -33,7 +33,7 @@ namespace Keypaste.App.Tests.Session;
 /// </summary>
 /// <remarks>
 /// Driven as <see cref="OneHomeJourneyTests"/> is, pressing controls where the window draws them,
-/// with every frame held to N.1a2's amber rule. The vault is written through Core in a project layout
+/// with every frame held to the amber rule. The vault is written through Core in a project layout
 /// KeePassXC reads in <c>Keypaste.Core.Tests.KeePassXC.ProjectsTests</c>. Run uses the machine's terminal as the app finds it: <c>cmd.exe</c> on Windows, on Linux
 /// a stand-in <c>x-terminal-emulator</c> put first on <c>PATH</c> that runs its <c>-e</c> command, since a
 /// runner has no display, and on macOS Terminal through an assembled <c>keypaste.app</c> and
@@ -293,7 +293,7 @@ public sealed class ProjectsJourneyTests
         return [.. report.Where(line => _reported.Any(name => line.StartsWith(name + "=", StringComparison.Ordinal) || line == name + " unset"))];
     }
 
-    /// <summary>The reason and items of the newest History line, which every Run writes (D-0452, D-0496), read beside the app holding the log open for writing.</summary>
+    /// <summary>The reason and items of the newest History line, which every Run writes, read beside the app holding the log open for writing.</summary>
     private static (string? Reason, List<string> Entries) LastRun()
     {
         var log = KeypasteHome.AuditPath(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable));

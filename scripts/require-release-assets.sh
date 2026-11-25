@@ -20,9 +20,9 @@
 #     alone is satisfied by an empty directory and by half a release.
 #   - a release without its manifest or its attestation bundle, or without the source and SHA256SUMS
 #     they vouch for. Once published a prefix cannot be completed, so a version uploaded without
-#     its provenance could never be verified (3.8).
+#     its provenance could never be verified.
 #   - a PACKAGE offered for publication that is not signed. A package is a thing a stranger
-#     double-clicks, so it is published signed or it is not published at all (4.7c). The cli
+#     double-clicks, so it is published signed or it is not published at all. The cli
 #     declares no packages, so this rule cannot reach it; it starts deciding the day the definition
 #     offers one.
 #
@@ -156,7 +156,7 @@ provenance_name() {
 }
 
 # A package is offered for publication by recording internal: false, and that flag is the only thing
-# read here. It is what 3.6b flips when signing turns on, so this same code refuses the desktop today
+# read here. It flips when signing turns on, so this same code refuses the desktop today
 # - nothing is offered - and demands a signature then, rather than being remembered.
 offered_packages() {
   local c

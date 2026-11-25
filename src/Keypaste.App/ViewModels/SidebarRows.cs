@@ -36,6 +36,9 @@ internal enum ItemPlace
 
     /// <summary>Payment cards.</summary>
     Cards = 9,
+
+    /// <summary>Items of a kind no other place lists: identities, SSH keys and Wi-Fi networks.</summary>
+    Other = 10,
 }
 
 /// <summary>The words, icon and kinds of each place.</summary>
@@ -46,7 +49,7 @@ internal static class ItemPlaces
 
     /// <summary>A vault's places in sidebar order.</summary>
     internal static IReadOnlyList<ItemPlace> InOrder { get; } =
-        [ItemPlace.All, ItemPlace.Logins, ItemPlace.ApiKeys, ItemPlace.Environments, ItemPlace.Cards, ItemPlace.Notes, ItemPlace.Servers, ItemPlace.Databases, ItemPlace.Trash];
+        [ItemPlace.All, ItemPlace.Logins, ItemPlace.ApiKeys, ItemPlace.Environments, ItemPlace.Cards, ItemPlace.Notes, ItemPlace.Servers, ItemPlace.Databases, ItemPlace.Other, ItemPlace.Trash];
 
     internal static string Title(ItemPlace place) => place switch
     {
@@ -57,6 +60,7 @@ internal static class ItemPlaces
         ItemPlace.Notes => Strings.Notes,
         ItemPlace.Servers => Strings.ServerPlace,
         ItemPlace.Databases => Strings.DatabasePlace,
+        ItemPlace.Other => Strings.OtherPlace,
         ItemPlace.Trash => Strings.Trash,
         ItemPlace.Favorites => Strings.Favorites,
         _ => Strings.AllItems,
@@ -71,6 +75,7 @@ internal static class ItemPlaces
         ItemPlace.Notes => "file-text",
         ItemPlace.Servers => "server",
         ItemPlace.Databases => "database",
+        ItemPlace.Other => "ellipsis",
         ItemPlace.Trash => "trash",
         ItemPlace.Favorites => "star",
         _ => "inbox",
@@ -89,6 +94,7 @@ internal static class ItemPlaces
         ItemPlace.Notes => kind == EntryKind.Note,
         ItemPlace.Servers => kind == EntryKind.Server,
         ItemPlace.Databases => kind == EntryKind.Database,
+        ItemPlace.Other => kind is EntryKind.Identity or EntryKind.SshKey or EntryKind.Wifi,
         _ => false,
     };
 
@@ -120,6 +126,9 @@ internal sealed class VaultSection
     private readonly Dictionary<ItemPlace, int> _counts = [];
     private readonly Func<string?> _heldPath;
 
+    // Weak, so a count never keeps a locked vault's copy alive.
+    private WeakReference<Vault>? _counted;
+
     /// <param name="session">The vault's session.</param>
     /// <param name="heldPath">The file the open vaults know the session for while it is locked, or null.</param>
     internal VaultSection(AppVaultSession session, Func<string?>? heldPath = null)
@@ -147,10 +156,21 @@ internal sealed class VaultSection
 
     internal int CountOf(ItemPlace place) => _counts.GetValueOrDefault(place);
 
+    /// <summary>The vault's projects as the last count read them, none while it is locked, or null when it locked as it was read.</summary>
+    internal IReadOnlyList<ProjectListing>? Projects { get; private set; } = [];
+
+    /// <summary>Whether the last count read the vault open now, or found it locked as it is now, so only an edit of it can have changed what it counted.</summary>
+    internal bool CountsVaultOpenNow =>
+        Session.Unlocked is { } vault
+            ? _counted is not null && _counted.TryGetTarget(out var counted) && ReferenceEquals(counted, vault)
+            : _counted is null;
+
     /// <summary>Counts each place from the vault's entries and projects, dropping each entry once counted; a locked vault counts nothing.</summary>
     internal void Count()
     {
         _counts.Clear();
+        _counted = null;
+        Projects = [];
 
         if (Session.Unlocked is not { } vault)
         {
@@ -171,12 +191,16 @@ internal sealed class VaultSection
                 }
             }
 
-            _counts[ItemPlace.Environments] = ProjectCatalog.Read(vault).Projects.Count;
+            var projects = ProjectCatalog.Read(vault).Projects;
+            _counts[ItemPlace.Environments] = projects.Count;
             _counts[ItemPlace.Favorites] = vault.ReadTags().Count(tagged => tagged.Tags.Contains(ItemPlaces.FavoriteTag, StringComparer.Ordinal));
+            Projects = projects;
+            _counted = new WeakReference<Vault>(vault);
         }
         catch (ObjectDisposedException)
         {
             _counts.Clear();
+            Projects = null;
         }
     }
 }

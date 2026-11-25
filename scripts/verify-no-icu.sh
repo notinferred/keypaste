@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The published Linux desktop starts on a machine with no ICU, falling back to invariant globalization
-# (src/Keypaste.App/Globalization/IcuFallback.cs, Q.16). Without that fallback .NET ends the process at
+# (src/Keypaste.App/Globalization/IcuFallback.cs). Without that fallback .NET ends the process at
 # its first use of a culture, and the app would not open at all.
 #
 # Usage: verify-no-icu.sh <directory holding the published keypaste-app | keypaste-app AppImage>

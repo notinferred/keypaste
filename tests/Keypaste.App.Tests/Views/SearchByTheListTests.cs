@@ -13,7 +13,7 @@ using Xunit;
 
 namespace Keypaste.App.Tests.Views;
 
-/// <summary>Items' one search, in the title bar, what the list's header names, and a pane that shows only what the list does (Q.18).</summary>
+/// <summary>Items' one search, atop the list, what the list's header names, and a pane that shows only what the list does.</summary>  (the search is ListSearch in EntriesView's ListColumn, and the first test asserts it sits above ListTitle, not in the title bar)
 public sealed class SearchByTheListTests
 {
 
@@ -51,7 +51,8 @@ public sealed class SearchByTheListTests
         Assert.Equal("Search", search.PlaceholderText);
         Assert.Equal("Search", AutomationProperties.GetName(search));
         Assert.Contains(search, shell.Named<Border>("ListColumn").GetVisualDescendants());
-        Assert.True(Bounds(shell, search).Bottom <= Bounds(shell, shell.Named<TextBlock>("ListTitle")).Top);
+        Assert.True(Bounds(shell, shell.Named<TextBlock>("ListTitle")).Bottom <= Bounds(shell, search).Top);
+        Assert.Equal(ShellViewModel.SearchShortcut, shell.Named<Border>("ListSearchShortcut").GetVisualDescendants().OfType<TextBlock>().Single().Text);
 
         Find(shell);
         WindowInput.Type(shell.Window, "box");
@@ -75,6 +76,12 @@ public sealed class SearchByTheListTests
 
         Assert.Equal("All items", title.Text);
         Assert.Equal("vault", shell.Named<TextBlock>("ListSubtitle").Text);
+        Assert.Equal(entries.Rows.Count.ToString(System.Globalization.CultureInfo.InvariantCulture), shell.Named<TextBlock>("ListCount").Text);
+
+        // The title, its count, its vault and the sort share one line, the sort as tall as the search under them.
+        var line = Bounds(shell, title).Center.Y;
+        Assert.All(new Control[] { shell.Named<TextBlock>("ListCount"), shell.Named<TextBlock>("ListSubtitle"), shell.Named<Button>("SortMenu") }, control => Assert.Equal(line, Bounds(shell, control).Center.Y, 0.5));
+        Assert.Equal(Bounds(shell, shell.Named<TextBox>("ListSearch")).Height, Bounds(shell, shell.Named<Button>("SortMenu")).Height, 0.5);
         Assert.False(shell.Named<TextBlock>("VaultSaveState").IsEffectivelyVisible, "a saved vault says nothing of it");
         Assert.Contains(shell.Session.VaultPath!, shell.Shell.VaultStatusDetail, StringComparison.Ordinal);
         Assert.DoesNotContain(shell.Window.GetVisualDescendants().OfType<TextBlock>(), block => block.IsEffectivelyVisible && block.Text?.Contains("vault.kdbx", StringComparison.Ordinal) == true);

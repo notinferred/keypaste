@@ -84,7 +84,7 @@ public sealed class ImportDialogKeyboardTests
     });
 
     /// <summary>
-    /// The imported file's password field answers the paste gesture as the master-password fields do (D-0495):
+    /// The imported file's password field answers the paste gesture as the master-password fields do:
     /// one trailing line break goes, nothing of it is on the screen, and what was pasted opens the file.
     /// </summary>
     [Fact]

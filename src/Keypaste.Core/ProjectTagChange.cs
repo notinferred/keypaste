@@ -172,7 +172,7 @@ public sealed record ProjectTagChange(EntryName Entry, IReadOnlyList<string> Tag
                 Read.Protects
                     ? Adding
                         ? "While the item carries it, every agent request for the item is asked live."
-                        : "It stops making agent requests for the item ask live, unless another tag or the item's group still does."
+                        : "It stops making agent requests for the item ask live, unless another tag still does."
                     : Adding ? "It changes no stage." : "Removing it changes no stage.",
             ];
         }

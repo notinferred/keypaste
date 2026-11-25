@@ -198,7 +198,7 @@
   <x:Double x:Key="KpGap40">40</x:Double>
   <x:Double x:Key="KpGap56">56</x:Double>
 
-  <!-- The first spacing scale, which views still use. -->
+  <!-- An earlier spacing scale; no view reads it. -->
   <x:Double x:Key="KpSpace1">4</x:Double>
   <x:Double x:Key="KpSpace2">8</x:Double>
   <x:Double x:Key="KpSpace3">12</x:Double>

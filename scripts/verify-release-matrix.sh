@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
 # Holds release-targets.json, the workflows, the csprojs and the download pages to one answer about
-# what keypaste ships (task R.0a, docs/RELEASE.md requirement 1).
-#
-# Before this file there was no such answer. The four CLI targets were written down independently in
-# release.yml's build matrix, its post-transport asset count, its publication allowlist, four
-# csprojs' RuntimeIdentifiers, verify-release-destination.sh's fixture, the install page's blocks,
-# keypaste.com's download page and docs/RELEASE.md's table. Adding one was five edits with nothing holding
-# them together, and nothing at all could fail when they disagreed.
+# what keypaste ships (docs/RELEASE.md requirement 1).
 #
 # THE DISTINCTION THIS FILE RESTS ON. release-targets.json holds two different records and they must
 # not be confused:
@@ -16,7 +10,7 @@
 #
 # The download pages advertise `.published`, never the tag. That is what stops a release candidate
 # demanding rc filenames on the install page: a candidate carries -rc.1 through binaries, archives and the
-# changelog while the install page keeps naming 0.1.0, because nothing has been published. docs/RELEASE.md
+# changelog while the install page keeps naming the last published version. docs/RELEASE.md
 # requirement 5's "keep the last verified release advertised until its replacement passes" is the
 # same rule seen from the other side, and it falls out of the shape rather than being a case here.
 #
@@ -38,11 +32,9 @@
 #
 #   - KEYPASTE.COM. The product builds and releases without the site, so this reads only the
 #     product's own pages; the site's own repository checks its download page. Checking the public origin is publication evidence - docs/RELEASE.md
-#     requirements 4 and 7, owned by R.0b/R.0c.
+#     requirements 4 and 7.
 #   - AUTHENTICITY. --with-public-origin proves a published asset is still fetchable, not that it is
-#     the bytes this project produced. That is 3.8.
-#   - ORDERING. Tasks 3.9a-d own adding targets and each ships after R.1. A definition edit that
-#     adds one early contradicts the plan, and review catches that, not a script.
+#     the bytes this project produced; scripts/verify-provenance.sh checks that.
 #
 # Usage:
 #   verify-release-matrix.sh                       fixtures, repository and git history
@@ -124,9 +116,8 @@ code_of() { grep -vE '^[[:space:]]*#' "$1" | noc; }
 # Asks whether a workflow's code contains a string, WITHOUT a pipe to a reader that exits early.
 # `grep -q` returns at its first match, and under `set -o pipefail` an upstream still writing into
 # that closed pipe makes the pipeline 141 - so a string that IS present reads as absent, and which
-# answer you get depends on who lost the race. Guard run 34400224237 reported that release.yml
-# "no longer looks a version up in CHANGELOG.md at all" while ci run 34391428689 read the same
-# commit correctly. `case` is what holds() already uses and starts no process to race with.
+# answer you get depends on who lost the race: one run of the guard reported a changelog lookup
+# release.yml still makes as absent while another read the same commit correctly. `case` is what holds() already uses and starts no process to race with.
 code_has() {
   local body
   body="$(code_of "$1")"
@@ -223,7 +214,7 @@ validate_definition() {
 
     # Whatever reaches a public origin is verified against a manifest and an attestation bundle, so
     # a component with an origin names both and names the workflow whose attestation covers them.
-    # That is not always the workflow that built it: release.yml attests what it publishes (4.7c).
+    # That is not always the workflow that built it: release.yml attests what it publishes.
     if [ -n "$origin" ]; then
       local pm pb pw
       pm="$(jqr ".components.\"$c\".provenance.manifest_pattern // empty" "$def")"
@@ -320,7 +311,7 @@ TARGETS
     done
 
     # An installer carries its version and target in its name, and while nothing of the component is
-    # signed or published it says internal and unsigned in that name and in its record (4.7a1).
+    # signed or published it says internal and unsigned in that name and in its record.
     local policy kind pattern internal signed tool_version tool_sha runtime_version runtime_sha tool_sha512
     policy="$(jqr ".components.\"$c\".signing.policy // empty" "$def")"
     case "$policy" in none | authenticode) ;; *) note "$c: signing policy '$policy' is neither none nor authenticode" ;; esac
@@ -331,7 +322,7 @@ TARGETS
       if [ "$policy" = "none" ]; then
         [ "$signed" = "false" ] || note "$c/$rid: $kind package is not recorded unsigned while the $c signing policy is none"
         # Offering a package for publication is internal: false, and nothing may be offered while
-        # nothing signs it. Until 4.7c the origin was what carried this, but an origin is now how a
+        # nothing signs it. An origin is how a
         # component says where it WILL publish, so the policy is what says whether it may yet.
         [ "$internal" = "true" ] || note "$c/$rid: $kind package is not recorded internal while the $c signing policy is none"
         case "$pattern" in *internal*unsigned*) ;; *) note "$c/$rid: $kind package '$pattern' is not named internal and unsigned while the $c signing policy is none" ;; esac
@@ -396,7 +387,7 @@ DLIB
       note "published[$i] has no version"
     else
       # Keyed on the component too: one version publishes the cli and the app as separate records
-      # into one prefix, and those are two releases of two things, not one listed twice (4.7c).
+      # into one prefix, and those are two releases of two things, not one listed twice.
       if holds "$versions" "$v/$pc"; then note "published lists $v twice"; fi
       versions="$versions $v/$pc"
     fi
@@ -434,7 +425,7 @@ archive_name() {
 
 # What a published (component, rid) actually serves. A component publishing packages serves the
 # package's name, not archive_pattern's, so asking the origin for the archive would report a
-# published desktop release as missing (4.7c).
+# published desktop release as missing.
 published_name() {
   local def="$1" c="$2" rid="$3" version="$4" publishes
   publishes="$(jqr --arg c "$c" '.components[$c].publishes // empty' "$def")"
@@ -669,7 +660,7 @@ EOF
 
   # An unsigned policy is disclosed where it is downloaded from, for as long as it holds - and only
   # where there is something to download. The desktop app owes nobody that sentence yet because it
-  # has no public release; 4.7c is where it starts owing it, and the check turns itself on then
+  # has no public release; its first public release is where it starts owing it, and the check turns itself on then
   # rather than being remembered.
   for c in $(jqr '.components | keys[]' "$def"); do
     [ "$(jqr ".components.\"$c\".signing.policy" "$def")" = "none" ] || continue
@@ -801,7 +792,7 @@ validate_source_version() {
 
 # A release candidate must keep its full prerelease version everywhere, which needs the suffix to
 # reach the build. release.yml passes it; app.yml did not, so every prerelease tag failed its own
-# version check and no desktop candidate could be built (task V-R.0a, 4.7a).
+# version check and no desktop candidate could be built.
 validate_prerelease_path() {
   local def="$1" root="$2" c workflow
   for c in $(jqr '.components | keys[]' "$def"); do
@@ -839,10 +830,10 @@ validate_prerelease_path() {
 
 # A workflow that builds an installer builds only one the definition declares, names it from the
 # definition, and builds it with the tool the definition pins. An undeclared installer is a package
-# nothing else in this file can see (4.7a1). A build may live in a script the workflow runs,
+# nothing else in this file can see. A build may live in a script the workflow runs,
 # so those scripts are read with it, except this gate, whose fixtures name every package kind.
 # sign-windows.sh names installers it signs and builds none, verify-desktop-candidate.sh names
-# the ones it refuses and builds none either - which is what lets release.yml call it (4.7c) -
+# the ones it refuses and builds none either - which is what lets release.yml call it -
 # macos-signing.sh and verify-macos-signature.sh notarize and check a DMG and build none, and
 # install-keepassxc.sh installs KeePassXC's own disk image, or Ubuntu's package, for the gates.
 package_code() {
@@ -900,8 +891,8 @@ $(jqr ".components.\"$c\".targets // [] | .[] | .packages // [] | .[] | [
 PROJECTS
   done
   # A component whose published bytes are attested by a workflow other than the one that built them
-  # must TAKE that build's run rather than rebuild: what a runner installed in 4.7b and upgraded in
-  # 4.7d is then what reaches the origin. The mechanism is resolving that run by id (4.7c).
+  # must TAKE that build's run rather than rebuild: what install-desktop.yml installed and
+  # upgrade-desktop.yml upgraded is then what reaches the origin. The mechanism is resolving that run by id.
   local build_wf attest_wf attest_code
   for c in $(jqr '.components | keys[]' "$def"); do
     [ -n "$(jqr ".components.\"$c\".origin // empty" "$def")" ] || continue
@@ -930,7 +921,7 @@ workflow_steps() {
 
 # A Windows build signs only through sign-windows.sh, which reads the policy from the definition, as a macOS build does
 # through macos-signing.sh;
-# a rehearsal signature lives only in app.yml's dispatch and never reaches an upload or attestation (3.6b).
+# a rehearsal signature lives only in app.yml's dispatch and never reaches an upload or attestation.
 validate_signing() {
   local def="$1" root="$2" c workflow code step project version pin pins
   pins="$(jqr '.signing.dlib.sha512 // empty, .signing.dlib.path_sha256 // empty' "$def")"
@@ -1079,7 +1070,7 @@ validate_history() {
     # Keyed on version AND component. One version can publish two components into one prefix, and
     # selecting on the version alone would union their rids - so dropping linux-x64 from the cli
     # record would be masked by the app record that still names it, and `published` would quietly
-    # stop being append-only for exactly the rid the two share (4.7c).
+    # stop being append-only for exactly the rid the two share.
     for pair in $(jqr '.published[]? | "\(.version)/\(.component // "cli")"' "$prior"); do
       v="${pair%/*}"; pc="${pair##*/}"
       if ! jq -e --arg v "$v" --arg c "$pc" '[.published[] | select(.version == $v and (.component // "cli") == $c)] | length > 0' "$current" >/dev/null 2>&1; then
@@ -1372,7 +1363,7 @@ expect_repo_refusal "installer-tool-unpinned" "and the definition pins WixToolse
 # suffix attached to the flag; BSD requires it as a separate argument, so `sed -i EXPR file` on macOS
 # reads EXPR as the suffix and dies with "invalid command code". ci.yml runs this on Linux only, and
 # the one macOS caller is install.yml, whose weekly cron last fired before any of these fixtures
-# existed - so the gate was simply broken on macOS from R.0a until install run 34544574182 said so.
+# existed - so the gate was broken on macOS until an install run showed it.
 sed_inplace() {
   local expr="$1" file="$2" tmp
   tmp="$(mktemp)"
@@ -1634,9 +1625,9 @@ fi
 # ---------------------------------------------------------------------------
 # 7b. NEGATIVE CONTROL. The reader that exits early, put back.
 #
-#    Not a taste question and not a hypothetical: guard run 34400224237 refused this repository
-#    for a changelog lookup release.yml has never stopped making, while ci run 34391428689 read
-#    the same commit correctly an hour earlier. `grep -q` returns at its first match and the
+#    Not a taste question and not a hypothetical: a guard run refused this repository for a
+#    changelog lookup release.yml has never stopped making, while a ci run read the same commit
+#    correctly an hour earlier. `grep -q` returns at its first match and the
 #    upstream, still writing, takes SIGPIPE; `pipefail` then makes the pipeline 141 and a present
 #    string reads as absent. Which answer a run gets depends on who lost the race, so the fixture
 #    forces the losing side: the needle is on line 1 and the remainder is far past any pipe buffer.

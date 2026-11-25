@@ -11,7 +11,7 @@ namespace Keypaste.Cli.Tests;
 /// <summary>
 /// <c>keypaste run --session</c> against a real owner on a real pipe: the set comes only from the
 /// process holding the vault, after the person there approves, and no refusal ever falls back to
-/// opening the vault or asking for its password (E.1c).
+/// opening the vault or asking for its password.
 /// </summary>
 public sealed class RunSessionTests : IDisposable
 {

@@ -54,7 +54,7 @@ internal static class CliApp
     /// </summary>
     internal const int ExitCommandNotExecutable = 126;
 
-    /// <summary>There is no such command. The shell convention, as above.</summary>
+    /// <summary>There is no such command. The shell convention, used because scripts already branch on it.</summary>
     internal const int ExitCommandNotFound = 127;
 
     internal static int Run(string[] args, TextWriter stdout, TextWriter stderr)

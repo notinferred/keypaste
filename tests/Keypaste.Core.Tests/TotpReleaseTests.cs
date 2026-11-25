@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>An agent is given an item's current TOTP code under a field's approval, once each time, and never the seed (9.2b).</summary>
+/// <summary>An agent is given an item's current TOTP code under a field's approval, once each time, and never the seed.</summary>
 public sealed class TotpReleaseTests : IDisposable
 {
     private const string _master = "correct horse battery staple";

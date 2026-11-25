@@ -1,6 +1,4 @@
-using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
-using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Tests;
@@ -13,9 +11,7 @@ namespace Keypaste.App.Tests.ViewModels;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Before 4.9 the app could only invent a value, so every one of these journeys ended at
-/// <c>keypaste add</c> in a terminal. The claim under test is the whole of that gap: what was typed
-/// or pasted is what the file holds afterwards, and nothing of it survives in the screen.
+/// The claim under test is that what was typed or pasted is what the file holds afterwards, and nothing of it survives in the screen.
 /// </para>
 /// <para>
 /// <b>The reread is done through a second unlock rather than through the open session.</b> A field
@@ -154,7 +150,7 @@ public sealed class ExistingSecretTests : IDisposable
     }
 
     /// <summary>
-    /// An entry with no password is still allowed, as it was before 4.9 and as KDBX permits.
+    /// An entry with no password is allowed, as KDBX permits.
     /// </summary>
     [Fact]
     public void An_untyped_password_makes_an_entry_with_none_rather_than_a_refusal()
@@ -424,68 +420,31 @@ public sealed class ExistingSecretTests : IDisposable
         }
     }
 
-    private static EntryDetailViewModel Github(Context context)
+    private static EntryDetailViewModel Github(UnlockedScreens context)
     {
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "github");
         return context.Entries.Detail!;
     }
 
-    private static EnvProjectViewModel Billing(Context context)
+    private static EnvProjectViewModel Billing(UnlockedScreens context)
     {
         context.EnvSets.OpenCommand.Press("billing");
         return context.EnvSets.OpenProject!;
     }
 
-    /// <summary>Opens the file again, from nothing, and reads one entry's password.</summary>
-    /// <summary>A new key the screen added, from billing's home entry (D-0413).</summary>
+    /// <summary>Opens the file again, from nothing, and reads a key the screen added to billing's home entry.</summary>
     private string? RereadHomeField(string key)
     {
         using var vault = ClaimedVault.Open(_vaultPath, _master);
         return vault.ReadField(new EntryName("env/billing", ".env"), key);
     }
 
+    /// <summary>Opens the file again, from nothing, and reads one entry's password.</summary>
     private string? Reread(string path)
     {
         using var vault = ClaimedVault.Open(_vaultPath, _master);
         return vault.Find(path)?.Password;
     }
 
-    private Context New() => new(_vaultPath);
-
-    /// <summary>An unlocked session with both screens on it, built the way the shell builds them.</summary>
-    private sealed class Context : IDisposable
-    {
-        internal Context(string vaultPath)
-        {
-            Session = new AppVaultSession(new ManualClock(AppClock.Start));
-
-            using (var master = TempVault.Secret(_master))
-            {
-                Assert.Equal(UnlockOutcome.Opened, Session.TryUnlock(vaultPath, master.Value));
-            }
-
-            Clipboard = new FakeClipboard();
-            Countdown = new ClipboardCountdown(Clipboard, new ManualClock(AppClock.Start));
-            Entries = new EntriesViewModel(Session, Countdown);
-            EnvSets = new EnvSetsViewModel(Session, Countdown);
-        }
-
-        internal AppVaultSession Session { get; }
-
-        internal ClipboardCountdown Countdown { get; }
-
-        internal EntriesViewModel Entries { get; }
-
-        internal EnvSetsViewModel EnvSets { get; }
-
-        internal FakeClipboard Clipboard { get; }
-
-        public void Dispose()
-        {
-            EnvSets.Dispose();
-            Entries.Dispose();
-            Countdown.Dispose();
-            Session.Dispose();
-        }
-    }
+    private UnlockedScreens New() => new(_vaultPath, _master, envSets: true);
 }

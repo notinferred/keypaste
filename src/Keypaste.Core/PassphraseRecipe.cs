@@ -85,7 +85,7 @@ public readonly record struct PassphraseRecipe
 /// <summary>Either kind of recipe, and which kind it is.</summary>
 /// <remarks>
 /// <para>
-/// This is what task V.6 means by the recipe recording which kind produced a value.
+/// This type is how a recipe records which kind produced a value.
 /// Nothing in keypaste persists a recipe — a <see cref="VaultEntry"/> has no field for one — so
 /// the kind travels with the recipe to the surface that stores the value, which is what lets
 /// <c>keypaste add</c> say it generated a six-word passphrase rather than a password.

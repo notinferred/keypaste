@@ -146,7 +146,7 @@ Everything outside the sandbox still runs as you ([THREATS](../THREATS.md)):
 
 ## How keypaste checks this
 
-CI's `tools` jobs on Linux and macOS run Codex 0.162.1's `codex sandbox` with `sandbox_mode = "workspace-write"` from a project folder: a write in that folder succeeds, and appends to `~/.keypaste/agents.toml` and to Codex's `config.toml` are refused and leave both unchanged. Nothing else here is checked by keypaste: not Claude Code, Cursor, Codex's Windows sandbox, or a project's `.mcp.json` (L.3).
+CI's `tools` jobs on Linux and macOS run Codex 0.162.1's `codex sandbox` with `sandbox_mode = "workspace-write"` from a project folder: a write in that folder succeeds, and appends to a vault's agent settings in `~/.keypaste/agents/` and to Codex's `config.toml` are refused and leave both unchanged. Nothing else here is checked by keypaste: not Claude Code, Cursor, Codex's Windows sandbox, or a project's `.mcp.json`.
 
 ## Sources
 

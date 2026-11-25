@@ -28,7 +28,7 @@ public enum AuditMethod
     /// <summary>The vault could not be opened, so there was nothing to answer with.</summary>
     VaultLocked = 0,
 
-    /// <summary>No approval path existed. Written by keypaste 2.1; kept because the log is
+    /// <summary>No approval path existed. Written before keypaste could ask a person, when every request was denied; kept because the log is
     /// append-only and old lines still mean what they meant when written.</summary>
     NotImplemented = 1,
 

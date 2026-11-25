@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Refuses a desktop installation candidate unless it is the package app.yml attested for its tag (4.7b).
+# Refuses a desktop installation candidate unless it is the package app.yml attested for its tag.
 #
 # app.yml attests the MSI, AppImage and DMG it builds on a tag and uploads them with a .sha256 beside each,
 # but publishes no Sigstore bundle, so `gh attestation verify` asks GitHub's attestation store and needs
@@ -68,7 +68,7 @@ verify() {
   [ "$digest" = "$recorded" ] || die "$name does not match its .sha256"
 
   # The app's own provenance record, and the workflow that BUILT the candidate. release.yml's
-  # provenance.workflow is about what it publishes; this asks who compiled these bytes (4.7c).
+  # provenance.workflow is about what it publishes; this asks who compiled these bytes.
   repo="$(jqr '.components.app.provenance.repository // empty' "$(definition)")"
   workflow="$(jqr '.components.app.workflow // empty' "$(definition)")"
   [ -n "$repo" ] && [ -n "$workflow" ] || die "$(definition) names no provenance repository or app workflow"

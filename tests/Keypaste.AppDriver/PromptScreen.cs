@@ -23,7 +23,7 @@ internal sealed class PromptScreen : IDisposable
 {
     private static readonly TimeSpan _armingWait = TimeSpan.FromSeconds(10);
 
-    // One per process, never disposed: Avalonia 12.1's StartNew can return a session whose Dispose throws (F.51).
+    // One per process, never disposed: Avalonia 12.1's StartNew can return a session whose Dispose throws.
     private static readonly HeadlessUnitTestSession _display = HeadlessUnitTestSession.StartNew(typeof(PromptScreen));
 
     private readonly TaskCompletionSource _closing = new(TaskCreationOptions.RunContinuationsAsynchronously);

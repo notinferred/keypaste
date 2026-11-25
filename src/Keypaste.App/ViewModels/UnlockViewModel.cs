@@ -47,7 +47,6 @@ internal sealed class KeePassXcDatabaseItem(string path)
 
     internal string Location { get; } = DisplayTextSanitizer.Escaped(path);
 
-    /// <summary>The row's automation id.</summary>
     internal string AutomationId => $"KeePassXc:{Title}";
 
     public override string ToString() => Name;
@@ -146,7 +145,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     /// <summary>What the person knows the quick unlock as, such as "Windows Hello", or empty where the app offers none.</summary>
     internal string QuickUnlockName => _session.QuickUnlock?.Name ?? string.Empty;
 
-    /// <summary>The quick unlock button's label, one of the screen's literal labels (F.25).</summary>
+    /// <summary>The quick unlock button's label, one of the screen's literal labels.</summary>
     internal string QuickUnlockLabel => QuickUnlockName == MachineQuickUnlock.TouchIdName ? Strings.UnlockWithTouchId : Strings.UnlockWithWindowsHello;
 
     /// <summary>What the screen says while Windows Hello or Touch ID asks, after a password unlock, to keep this unlock for a quick one.</summary>
@@ -245,7 +244,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
 
     internal bool IsRestoring => Restore is not null;
 
-    /// <summary>Whether the selected vault has backups V.4a's saves left beside it.</summary>
+    /// <summary>Whether the selected vault has backups that keypaste's saves left beside it.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(OffersRestore), nameof(OffersRestoreLink))]
     [NotifyCanExecuteChangedFor(nameof(StartRestoreCommand))]
@@ -542,7 +541,6 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
         AfterTyping();
     }
 
-    /// <summary>Empties the field.</summary>
     internal void ClearPassword()
     {
         if (_disposed)
@@ -858,7 +856,7 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// After a password unlock, has Windows Hello or Touch ID asked whether to keep this unlock for a quick one, as
-    /// KeePassXC's Windows Hello asks after each (D-0552, D-0683), then hands the shell the vault, which is open whatever the answer.
+    /// KeePassXC's Windows Hello asks after each, then hands the shell the vault, which is open whatever the answer.
     /// </summary>
     /// <remarks>
     /// A screen replaced meanwhile still hands it over while the unlock is the session's own, so the app locks a vault
@@ -1020,9 +1018,8 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
 
         try
         {
-            // Argon2 is a good fraction of a second by design. Off the UI thread, or the window
-            // stops painting and the app looks broken at the exact moment it is working hardest.
-            // A hardware key waits for its touch there too, while this screen says to touch it.
+            // Off the UI thread: Argon2 takes a good fraction of a second and a hardware key waits
+            // for its touch, and the window must keep painting meanwhile.
             var keyfile = KeyfilePath;
             var slot = HardwareKeySlot;
             var outcome = await Task.Run(() => _session.TryUnlock(path, _master.Value, keyfile, slot))
@@ -1154,8 +1151,8 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
 
         try
         {
-            // Argon2 again, and off the UI thread again. Creating derives a key exactly as opening
-            // does, so the window would stop painting for the same good fraction of a second.
+            // Off the UI thread: creating derives an Argon2 key as opening does, which would stop the
+            // window painting for a good fraction of a second.
             var keyfile = KeyfilePath;
             var slot = HardwareKeySlot;
             var outcome = await Task.Run(() => _session.TryCreate(path, _new.Value, _confirm.Value, keyfile, slot))

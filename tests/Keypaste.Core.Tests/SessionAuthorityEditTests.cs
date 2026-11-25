@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
@@ -355,20 +354,14 @@ public sealed class SessionAuthorityEditTests : IDisposable
 
     private sealed class Owner : IAsyncDisposable
     {
-        private readonly CancellationTokenSource _stop = new();
-        private readonly ApproverListener _listener;
-        private readonly Task _running;
+        private readonly ServedOwner _served;
         private readonly string _vault;
 
-        private Owner(string pipeName, SessionAuthority authority, string vault)
+        private Owner(ServedOwner served, string vault)
         {
-            PipeName = pipeName;
+            _served = served;
             _vault = vault;
-            _listener = new ApproverListener(pipeName, authority);
-            _running = _listener.RunAsync(_stop.Token);
         }
-
-        private string PipeName { get; }
 
         internal static Owner Start(SessionAuthorityEditTests test, Func<AuditLog?>? audit = null, bool editing = true)
         {
@@ -383,40 +376,24 @@ public sealed class SessionAuthorityEditTests : IDisposable
                 : null;
 
             return new(
-                "keypaste-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8)),
-                new SessionAuthority(
+                ServedOwner.Serve(new SessionAuthority(
                     VaultIdentity.Of(test._directory, test.VaultPath),
                     () => test._lifetime,
                     test._fixture.Handler,
                     audit ?? (() => test.LogOpens ? test._log.Log : null),
                     clock: test._fixture.Clock,
-                    editor: editor),
+                    editor: editor)),
                 test.VaultPath);
         }
 
         internal async Task<ApproverClient> AttachAsync()
         {
-            var client = await ApproverClient.TryConnectAsync(PipeName, _wait, Token);
+            var client = await ApproverClient.TryConnectAsync(_served.PipeName, _wait, Token);
             Assert.NotNull(client);
             Assert.True((await client.AttachAsync(new AttachRequest(_vault), Token))?.Attached);
             return client;
         }
 
-        public async ValueTask DisposeAsync()
-        {
-            await _stop.CancelAsync();
-
-            try
-            {
-                await _running;
-            }
-            catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
-            {
-                // Tearing the listener down is how it stops.
-            }
-
-            _listener.Dispose();
-            _stop.Dispose();
-        }
+        public ValueTask DisposeAsync() => _served.DisposeAsync();
     }
 }

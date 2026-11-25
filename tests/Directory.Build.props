@@ -2,8 +2,7 @@
 
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
 
-  <!-- Relaxed for test projects only. Suppressing at the root would disable these
-       for src/ too, which is exactly what we want them for. -->
+  <!-- Tests only: src/ keeps the AOT, trim and single-file analyzers, and test code needs no XML docs. -->
   <PropertyGroup>
     <IsAotCompatible>false</IsAotCompatible>
     <EnableTrimAnalyzer>false</EnableTrimAnalyzer>

@@ -17,7 +17,7 @@ namespace Keypaste.App.Tests.Session;
 /// The app's session answers agents from the vault as last saved: an edit made on a screen is the next
 /// value released, what it touched is asked about again, and a file another program saved is refused
 /// until keypaste has merged that save in the same session, or a person reloads a file it would not
-/// merge, either withdrawing what was waiting on a person (U.3, N.16, D-0317, D-0318, D-0412, D-0542).
+/// merge, either withdrawing what was waiting on a person.
 /// </summary>
 /// <remarks>
 /// Each act goes through the screen a person uses, and each request through the app's real endpoint,
@@ -176,7 +176,7 @@ public sealed class CurrentStateTests : IDisposable
 
     /// <summary>
     /// Another program's save refuses requests until keypaste merges it; the app's edit whose save it refused is merged with it
-    /// and saved, and the next request is answered from the merged copy in the same session, asked about again (D-0542).
+    /// and saved, and the next request is answered from the merged copy in the same session, asked about again.
     /// </summary>
     [Fact]
     public async Task A_merge_keeps_the_session_and_the_next_request_is_asked()
@@ -216,7 +216,7 @@ public sealed class CurrentStateTests : IDisposable
 
     /// <summary>
     /// A terminal's edit allowed after another program saved the vault under another key is answered, and the app then locks as a
-    /// refused merge locks, rather than the lock waiting for the very connection the edit came on (D-0392, D-0543).
+    /// refused merge locks, rather than the lock waiting for the very connection the edit came on.
     /// </summary>
     [Fact]
     public async Task A_terminal_edit_meeting_another_key_is_answered_and_the_app_locks()
@@ -246,7 +246,7 @@ public sealed class CurrentStateTests : IDisposable
 
     /// <summary>
     /// A file holding another vault is not merged: requests stay refused, the notice says why and offers Reload, and Reload
-    /// answers from what the file holds in the same session, asking again (D-0412, D-0543).
+    /// answers from what the file holds in the same session, asking again.
     /// </summary>
     [Fact]
     public async Task Reload_serves_a_file_keypaste_would_not_merge_in_the_same_session_and_asks_again()
@@ -283,7 +283,7 @@ public sealed class CurrentStateTests : IDisposable
 
     /// <summary>
     /// The person presses Allow only after the shell merged another program's save, on the prompt the merge withdrew: nothing
-    /// leaves, the line says the vault was merged, and the agent's next request is asked about anew (D-0542, D-0620).
+    /// leaves, the line says the vault was merged, and the agent's next request is asked about anew.
     /// </summary>
     [Fact]
     public async Task A_prompt_waiting_when_another_programs_save_is_merged_is_withdrawn_and_releases_nothing()

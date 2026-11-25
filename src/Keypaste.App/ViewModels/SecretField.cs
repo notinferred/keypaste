@@ -8,10 +8,9 @@ namespace Keypaste.App.ViewModels;
 /// </summary>
 /// <remarks>
 /// <para>
-/// 4.9 adds four of these — a new entry's password, a replacement password, a new variable's value
-/// and a replacement value — and they differ only in which form owns them. Four hand-rolled buffers
-/// would be four chances to forget one of the clearing paths, which is the failure that matters
-/// here, so the rules live once and each form holds an instance.
+/// Each form a secret is typed into holds one of these, and they differ only in which form owns
+/// them. A hand-rolled buffer per form would be one more chance to forget a clearing path, which is
+/// the failure that matters here, so the rules live once and each form holds an instance.
 /// </para>
 /// <para>
 /// <b>The value leaves through <see cref="Compose"/>, which is a method on purpose.</b>
@@ -60,7 +59,7 @@ internal sealed partial class SecretField(ClipboardCountdown clipboard) : Observ
     [ObservableProperty]
     internal partial string Note { get; private set; } = string.Empty;
 
-    /// <summary>Whether the value was generated, so the next key typed or pasted replaces it whole rather than adding to it (V.12).</summary>
+    /// <summary>Whether the value was generated, so the next key typed or pasted replaces it whole rather than adding to it.</summary>
     [ObservableProperty]
     internal partial bool IsGenerated { get; private set; }
 

@@ -9,7 +9,7 @@ namespace Keypaste.Core.Tests.Browser;
 
 /// <summary>
 /// keypaste turns itself on and off as each browser's host for its extension at the user-level place the browser reads, under
-/// a temporary home and, on Windows, a throwaway registry branch, and touches only a manifest it wrote (8.1e).
+/// a temporary home and, on Windows, a throwaway registry branch, and touches only a manifest it wrote.
 /// </summary>
 public sealed class BrowserHostsTests : IDisposable
 {

@@ -128,7 +128,7 @@ public sealed class GenerateFlagTests
     /// list holds ordinary English, so a generated `keep` was found inside the backup note's
     /// `keeping` (ci run 35682288136), and `case`, `last`, `open` and `word` occur in stderr as whole
     /// words. An exact line still fails if the passphrase is printed joined, split or one word at a
-    /// time. V.4a's one-time backup note is the only other line a first save prints, and it is the
+    /// time. The one-time backup note is the only other line a first save prints, and it is the
     /// same whatever was generated.
     /// </remarks>
     [Fact]

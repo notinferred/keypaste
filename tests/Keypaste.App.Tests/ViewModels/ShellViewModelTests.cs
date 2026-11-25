@@ -2,6 +2,7 @@ using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
+using Keypaste.Core.Agents;
 using Keypaste.Core.Tests;
 using Xunit;
 
@@ -127,6 +128,32 @@ public sealed class ShellViewModelTests : IDisposable
         var entries = Assert.IsType<EntriesViewModel>(shell.Content);
         Assert.Contains(entries.Rows, row => row.GroupPath == "env/billing");
         Assert.Contains(entries.Rows, row => row.GroupPath == "Work");
+    }
+
+    /// <summary>An identity, an SSH key and a Wi-Fi network, which no kind's place lists, are counted and listed under Other, after Notes and before Trash.</summary>
+    [Fact]
+    public void Items_no_kinds_place_lists_are_counted_and_listed_under_Other_before_Trash()
+    {
+        var vault = _session.Unlocked!;
+        foreach (var (title, kind) in new[] { ("deploy key", ItemKind.SshKey), ("office", ItemKind.Wifi) })
+        {
+            vault.AddEntry(new VaultEntry { Title = title, Password = "kind-secret", GroupPath = "Work" });
+            Assert.True(vault.SetKind(new EntryName("Work", title), kind));
+        }
+
+        vault.AddEntry(new VaultEntry { Title = "me", Password = "id-secret", GroupPath = "Work" });
+        Assert.True(vault.AddTag(new EntryName("Work", "me"), FieldCategories.IdentityTag));
+        vault.AddEntry(new VaultEntry { Title = "wiki", Notes = "read me", GroupPath = "Work" });
+        using var shell = Shell();
+
+        Assert.Equal(["Favorites", "All items 8", "Logins 2", "Environments 1", "Notes 1", "Other 3", "Trash"], Titles(shell));
+
+        shell.SelectedSidebarRow = shell.Place(ItemPlace.Other);
+        var entries = Assert.IsType<EntriesViewModel>(shell.Content);
+        Assert.Equal("Other", entries.ListTitle);
+        Assert.Equal(["deploy key", "me", "office"], entries.Rows.Select(row => row.Title).Order(StringComparer.Ordinal));
+        Assert.Equal("3", entries.ListCount);
+        Assert.Equal(shell.Place(ItemPlace.Other), shell.SelectedSidebarRow);
     }
 
     private static IEnumerable<string> Titles(ShellViewModel shell) =>

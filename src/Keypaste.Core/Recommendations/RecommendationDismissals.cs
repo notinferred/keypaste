@@ -28,10 +28,10 @@ public sealed class RecommendationDismissals
     /// <summary>The kind a key left in notes is dismissed under.</summary>
     public const string NoteKey = "note-key";
 
-    /// <summary>The kind a project tag an entry lost is dismissed under (V.11).</summary>
+    /// <summary>The kind a project tag an entry lost is dismissed under.</summary>
     public const string LostProjectTag = "lost-project-tag";
 
-    /// <summary>The kind a weak, reused or expired password is dismissed under (V.9).</summary>
+    /// <summary>The kind a weak, reused or expired password is dismissed under.</summary>
     public const string Password = "password";
 
     /// <summary>The kind an item expiring soon or marked as needing an update is dismissed under.</summary>
@@ -46,10 +46,10 @@ public sealed class RecommendationDismissals
     /// <summary>The largest file read, in bytes.</summary>
     public const int MaximumBytes = 256 * 1024;
 
-    private readonly List<(string Vault, string Digest)> _digests;
-    private readonly List<Dismissal> _inTheClear;
+    private readonly HashSet<(string Vault, string Digest)> _digests;
+    private readonly HashSet<Dismissal> _inTheClear;
 
-    private RecommendationDismissals(List<(string Vault, string Digest)> digests, List<Dismissal> inTheClear)
+    private RecommendationDismissals(HashSet<(string Vault, string Digest)> digests, HashSet<Dismissal> inTheClear)
     {
         _digests = digests;
         _inTheClear = inTheClear;
@@ -102,8 +102,8 @@ public sealed class RecommendationDismissals
                 return false;
             }
 
-            List<(string, string)> digests = [];
-            List<Dismissal> inTheClear = [];
+            HashSet<(string, string)> digests = [];
+            HashSet<Dismissal> inTheClear = [];
 
             foreach (var item in items.EnumerateArray())
             {
@@ -138,7 +138,27 @@ public sealed class RecommendationDismissals
     public bool IsDismissed(Dismissal finding, byte[]? key)
     {
         ArgumentNullException.ThrowIfNull(finding);
-        return _inTheClear.Contains(finding) || (key is not null && _digests.Contains((finding.Vault, Digest(finding, key))));
+
+        if (_inTheClear.Contains(finding))
+        {
+            return true;
+        }
+
+        if (key is null)
+        {
+            return false;
+        }
+
+        var subkey = Subkey(key);
+
+        try
+        {
+            return _digests.Contains((finding.Vault, Digest(finding, subkey)));
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(subkey);
+        }
     }
 
     /// <summary>Dismisses recommendations of one vault, and keeps that vault's dismissals written in the clear as their HMAC from now on.</summary>
@@ -149,10 +169,24 @@ public sealed class RecommendationDismissals
         ArgumentNullException.ThrowIfNull(findings);
         ArgumentNullException.ThrowIfNull(key);
 
-        foreach (var finding in findings)
+        var subkey = Subkey(key);
+        HashSet<string> hidden = new(StringComparer.Ordinal);
+
+        try
         {
-            HideInTheClear(finding.Vault, key);
-            Keep(finding, key);
+            foreach (var finding in findings)
+            {
+                if (hidden.Add(finding.Vault))
+                {
+                    HideInTheClear(finding.Vault, subkey);
+                }
+
+                Keep(finding, subkey);
+            }
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(subkey);
         }
     }
 
@@ -163,15 +197,32 @@ public sealed class RecommendationDismissals
     {
         ArgumentNullException.ThrowIfNull(findings);
 
-        foreach (var finding in findings)
-        {
-            if (key is not null)
-            {
-                HideInTheClear(finding.Vault, key);
-                _digests.Remove((finding.Vault, Digest(finding, key)));
-            }
+        var subkey = key is null ? null : Subkey(key);
+        HashSet<string> hidden = new(StringComparer.Ordinal);
 
-            _inTheClear.Remove(finding);
+        try
+        {
+            foreach (var finding in findings)
+            {
+                if (subkey is not null)
+                {
+                    if (hidden.Add(finding.Vault))
+                    {
+                        HideInTheClear(finding.Vault, subkey);
+                    }
+
+                    _digests.Remove((finding.Vault, Digest(finding, subkey)));
+                }
+
+                _inTheClear.Remove(finding);
+            }
+        }
+        finally
+        {
+            if (subkey is not null)
+            {
+                CryptographicOperations.ZeroMemory(subkey);
+            }
         }
     }
 
@@ -223,28 +274,24 @@ public sealed class RecommendationDismissals
         }
     }
 
-    private void HideInTheClear(string vault, byte[] key)
+    private void HideInTheClear(string vault, byte[] subkey)
     {
         foreach (var dismissal in _inTheClear.Where(dismissal => dismissal.Vault == vault).ToList())
         {
             _inTheClear.Remove(dismissal);
-            Keep(dismissal, key);
+            Keep(dismissal, subkey);
         }
     }
 
-    private void Keep(Dismissal dismissal, byte[] key)
-    {
-        var kept = (dismissal.Vault, Digest(dismissal, key));
+    private void Keep(Dismissal dismissal, byte[] subkey) => _digests.Add((dismissal.Vault, Digest(dismissal, subkey)));
 
-        if (!_digests.Contains(kept))
-        {
-            _digests.Add(kept);
-        }
-    }
+    /// <summary>The HMAC key derived from a vault's key, which the caller zeroes once its digests are taken.</summary>
+    private static byte[] Subkey(byte[] key) =>
+        HKDF.DeriveKey(HashAlgorithmName.SHA256, key, 32, info: "keypaste recommendations.json dismissal"u8.ToArray());
 
-    private static string Digest(Dismissal dismissal, byte[] key) =>
+    private static string Digest(Dismissal dismissal, byte[] subkey) =>
         Convert.ToBase64String(HMACSHA256.HashData(
-            HKDF.DeriveKey(HashAlgorithmName.SHA256, key, 32, info: "keypaste recommendations.json dismissal"u8.ToArray()),
+            subkey,
             Encoding.UTF8.GetBytes($"{dismissal.Vault}\n{dismissal.Entry}\n{dismissal.Kind}\n{dismissal.Key}")));
 
     private static string? Text(JsonElement item, string name) =>

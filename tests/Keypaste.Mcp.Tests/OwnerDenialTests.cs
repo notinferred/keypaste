@@ -14,7 +14,7 @@ namespace Keypaste.Mcp.Tests;
 /// <summary>
 /// The shipped bridge against a real vault's owner: a request is answered by the owner's gate under
 /// the session it attached to and recorded by the owner, and every way of not reaching that session
-/// is a denial, recorded by the bridge when nothing answered and by the owner when it refused (4.3a).
+/// is a denial, recorded by the bridge when nothing answered and by the owner when it refused.
 /// </summary>
 /// <remarks>
 /// Nothing is faked but the person, who says yes to anything they are asked, so a request that
@@ -148,9 +148,7 @@ public sealed class OwnerDenialTests : IDisposable
     {
         private readonly Vault _vault;
         private readonly ApprovalGate _gate;
-        private readonly ApproverListener _listener;
-        private readonly CancellationTokenSource _stop = new();
-        private readonly Task _serving;
+        private readonly ServedOwner _served;
         private SessionLifetime? _lifetime = new();
 
         private Owner(OwnerDenialTests test, string holds, bool relockOnFirstRequest)
@@ -162,26 +160,19 @@ public sealed class OwnerDenialTests : IDisposable
 
             _gate = new ApprovalGate(this, TimeProvider.System, ApprovalLimits.Default);
 
-            var handler = new ApproverHandler(
-                new VaultCredentialSource(() => _vault),
-                new VaultEntryNameLister(() => _vault),
-                _gate,
-                TestSession.Settings());
+            var authority = new SessionAuthority(
+                VaultIdentity.Of(test._directory, holds),
+                () => _lifetime,
+                ServedOwner.VaultHandler(() => _vault, _gate, TestSession.Settings()),
+                audit: () => Log.Log);
 
-            IApproverHandler authority = new SessionAuthority(
-                VaultIdentity.Of(test._directory, holds), () => _lifetime, handler, audit: () => Log.Log);
-
-            if (relockOnFirstRequest)
-            {
-                authority = new RelockingOnce(authority, Relock);
-            }
-
-            PipeName = "keypaste-owner-denial-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
-            _listener = new ApproverListener(PipeName, authority);
-            _serving = _listener.RunAsync(_stop.Token);
+            _served = ServedOwner.Serve(
+                authority,
+                ServedOwner.NewPipeName("keypaste-owner-denial-"),
+                answering: relockOnFirstRequest ? new RelockingOnce(authority, Relock) : null);
         }
 
-        internal string PipeName { get; }
+        internal string PipeName => _served.PipeName;
 
         /// <summary>The owner's own log, in its home.</summary>
         internal OwnerLog Log { get; }
@@ -207,19 +198,7 @@ public sealed class OwnerDenialTests : IDisposable
 
         public async ValueTask DisposeAsync()
         {
-            await _stop.CancelAsync();
-
-            try
-            {
-                await _serving;
-            }
-            catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
-            {
-                // Tearing the listener down is how it stops.
-            }
-
-            _listener.Dispose();
-            _stop.Dispose();
+            await _served.DisposeAsync();
             Lock();
             _gate.Dispose();
             _vault.Dispose();

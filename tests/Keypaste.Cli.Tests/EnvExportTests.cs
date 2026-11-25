@@ -351,7 +351,7 @@ public sealed class EnvExportTests
     // ---- the vault is not a destination --------------------------------------------------
 
     /// <summary>
-    /// The reported defect. <c>--force</c> deletes the destination and writes a <c>.env</c> in its
+    /// <c>--force</c> deletes the destination and writes a <c>.env</c> in its
     /// place; when the destination is the vault, one project's variables replace every entry in the
     /// file, in plaintext, with no history and nothing to recover from.
     /// </summary>
@@ -488,7 +488,7 @@ public sealed class EnvExportTests
     {
         using var harness = Seeded(("API_KEY", "sk_live_secret"), ("OTP_URL", "otpauth://{TOTP}"));
         var path = Target(harness);
-        const string said = "keypaste env export: OTP_URL holds the KeePass placeholder {TOTP}, which keypaste does not fill in (env/billing/.env); nothing was written.";
+        var said = $"keypaste env export: OTP_URL {new PlaceholderRefusal("{TOTP}", "keypaste does not fill in").Reason} (env/billing/.env); nothing was written.";
 
         harness.Prompt.Enqueue(Master);
         harness.AssertExit(CliApp.ExitInternalError, harness.Run("env", "export", "billing", "--dotenv", "--stdout", "--vault", harness.VaultPath));

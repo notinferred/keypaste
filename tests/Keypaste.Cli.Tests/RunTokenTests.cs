@@ -1,12 +1,10 @@
 using System.Security.Cryptography;
 using Keypaste.Cli.Commands;
 using Keypaste.Core;
-using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Launch;
-using Keypaste.Core.Ownership;
 using Keypaste.Core.Tests;
 using Keypaste.Core.Tokens;
 using Xunit;
@@ -153,7 +151,7 @@ public sealed class RunTokenTests : IDisposable
     public async Task Session_Releases_AndTheOwnerAudited()
     {
         var token = TokenVerbTests.Mint(_harness, "ci-staging", "read:acme-api/staging/*");
-        await using var owner = Owner.Start(this, audited: true);
+        await using var owner = StartOwner();
         RunAsARunner(token);
 
         _harness.AssertExit(0, Run("-p", "staging", "acme-api"));
@@ -186,7 +184,7 @@ public sealed class RunTokenTests : IDisposable
         }
 
         var token = TokenVerbTests.Mint(_harness, "ci-staging", "read:acme-api/staging/*");
-        await using var owner = Owner.Start(this, audited: true);
+        await using var owner = StartOwner();
         RunAsARunner(token);
 
         _harness.AssertExit(0, Run("-p", "staging", "acme-api"));
@@ -201,7 +199,7 @@ public sealed class RunTokenTests : IDisposable
     public async Task Session_Refused_StartsNothing()
     {
         var token = TokenVerbTests.Mint(_harness, "ci-staging", "read:acme-api/staging/*,read:acme-api/qa/*");
-        await using var owner = Owner.Start(this, audited: true);
+        await using var owner = StartOwner();
         RunAsARunner(token);
 
         _harness.AssertExit(CliApp.ExitInternalError, Run("acme-api"));
@@ -297,100 +295,13 @@ public sealed class RunTokenTests : IDisposable
     private int Run(params string[] target) =>
         _harness.Run(["run", "--token", "env", "--vault", _harness.VaultPath, .. target, "--", "deploy", "--to", "staging"]);
 
-    /// <summary>Answers env prompts with approval and remembers the last one.</summary>
-    private sealed class ScriptedChannel : IApprovalChannel
-    {
-        internal EnvReleasePrompt? Last { get; private set; }
-
-        public ValueTask<ApprovalAnswer> AskAsync(ApprovalPrompt prompt, CancellationToken cancellationToken) =>
-            ValueTask.FromResult(ApprovalAnswer.Denied);
-
-        public ValueTask<ApprovalAnswer> AskAsync(EnvReleasePrompt prompt, CancellationToken cancellationToken)
-        {
-            Last = prompt;
-            return ValueTask.FromResult(ApprovalAnswer.ApprovedOnce);
-        }
-    }
-
-    /// <summary>The vault held unlocked and served on the test's pipe, with the owner's own audit log.</summary>
-    private sealed class Owner : IAsyncDisposable
-    {
-        private readonly Vault _vault;
-        private readonly ApprovalGate _gate;
-        private readonly AuditLog? _audit;
-        private readonly ApproverListener _listener;
-        private readonly CancellationTokenSource _stop = new();
-        private readonly Task _running;
-        private readonly string _auditPath;
-
-        private Owner(RunTokenTests test, bool audited)
-        {
-            _vault = ClaimedVault.Open(test._harness.VaultPath, _master);
-            _gate = new ApprovalGate(Channel, TimeProvider.System, ApprovalLimits.Default);
-            _auditPath = Path.Combine(test._harness.Directory, "owner-audit.jsonl");
-
-            if (audited)
-            {
-                Assert.True(AuditLog.TryOpen(_auditPath, TimeProvider.System, out _audit, out var error), error);
-            }
-
-            var handler = new ApproverHandler(
-                new VaultCredentialSource(() => _vault),
-                new VaultEntryNameLister(() => _vault),
-                _gate,
-                IAgentRules.Defaults);
-
-            var authority = new SessionAuthority(
-                VaultIdentity.Of(test._harness.Directory, test._harness.VaultPath),
-                () => Lifetime,
-                handler,
-                () => _audit,
-                new SessionEnvironments(
-                    _gate,
-                    asked => ReferenceEquals(asked, Lifetime) && asked.IsLive ? _vault : null,
-                    test._harness.Clock));
-
-            _listener = new ApproverListener(test._pipe, authority);
-            _running = _listener.RunAsync(_stop.Token);
-        }
-
-        internal ScriptedChannel Channel { get; } = new();
-
-        internal SessionLifetime Lifetime { get; } = new();
-
-        internal static Owner Start(RunTokenTests test, bool audited) => new(test, audited);
-
-        internal List<string> AuditLines()
-        {
-            if (!File.Exists(_auditPath))
-            {
-                return [];
-            }
-
-            using var stream = new FileStream(_auditPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-            using var reader = new StreamReader(stream);
-            return [.. reader.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries)];
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            await _stop.CancelAsync();
-
-            try
-            {
-                await _running;
-            }
-            catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
-            {
-                // Tearing the listener down is how it stops.
-            }
-
-            _listener.Dispose();
-            Lifetime.Dispose();
-            _gate.Dispose();
-            _audit?.Dispose();
-            _vault.Dispose();
-            _stop.Dispose();
-        }
-    }
+    /// <summary>The vault held unlocked and served on the test's pipe, approving every env prompt, with a log of its own beside the harness home's.</summary>
+    private UnlockedOwner StartOwner() =>
+        UnlockedOwner.Start(
+            _harness,
+            _pipe,
+            _master,
+            ApprovalAnswer.ApprovedOnce,
+            auditPath: Path.Combine(_harness.Directory, "owner-audit.jsonl"),
+            clock: _harness.Clock);
 }

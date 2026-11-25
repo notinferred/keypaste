@@ -29,7 +29,7 @@
 #   verify-green-gates.sh
 #
 # NEGATIVE CONTROL: the last phase runs a copy of the script with `app` removed from the required
-# set - the shape the guard had before R.0a - and requires it to ACCEPT the commit whose app run is
+# set - the guard's older shape - and requires it to ACCEPT the commit whose app run is
 # missing. If the weakened one refuses too, this gate proves nothing about the fix. A second
 # copy without the tools requirement - the shape before ci's tools jobs were required - must accept the ci run whose tools
 # jobs were skipped.
@@ -199,7 +199,7 @@ run_case "wait-api-garbage"   api-garbage "$BOTH_GREEN" "$SUBJECT" 1 "refusing w
 echo "== negative control"
 WEAK="$WORK/weakened.sh"
 # Deleting the one line that reads the definition leaves `echo ci` behind, which is exactly the
-# required set the guard had before R.0a. Asserted rather than assumed: a copy that still derived
+# guard's older required set. Asserted rather than assumed: a copy that still derived
 # the set would make this control vacuous and the gate would pass while proving nothing.
 sed '/jq -r --arg self/d' "$SUBJECT" > "$WEAK"
 grep -q 'jq -r --arg self' "$WEAK" \

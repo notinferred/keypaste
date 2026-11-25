@@ -35,7 +35,7 @@ public sealed record ApprovalLimits
     /// <summary>How long the same refused request is auto-denied for.</summary>
     public const int DefaultCooldownSeconds = 60;
 
-    /// <summary>How many of one agent's requests may wait behind the prompt on screen (F.80).</summary>
+    /// <summary>How many of one agent's requests may wait behind the prompt on screen (THREATS.md T-11).</summary>
     public const int MaximumWaiting = 3;
 
     /// <summary>The limits keypaste ships with.</summary>

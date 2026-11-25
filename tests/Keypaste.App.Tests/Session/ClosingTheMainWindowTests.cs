@@ -21,8 +21,8 @@ namespace Keypaste.App.Tests.Session;
 
 /// <summary>
 /// Closing the main window ends the session even while a request's prompt window is open: the request is refused
-/// as locked and the prompt comes down (V-F.21). Without the tray the app quits; with it the app stays, locked, in
-/// the menu bar or tray (G.4a).
+/// as locked and the prompt comes down. Without the tray the app quits; with it the app stays, locked, in
+/// the menu bar or tray.
 /// </summary>
 /// <remarks>
 /// <para>

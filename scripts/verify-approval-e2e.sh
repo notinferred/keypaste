@@ -17,7 +17,7 @@ readonly MASTER='ci-approval-master-pw'
 readonly SECRET='SENTINEL-E2E-PASSWORD-7c31f9'
 readonly ENTRY='env/ci/DEPLOY_KEY'
 
-# One entry with two custom fields, each asked about by name, and the TOTP seeds and capitalized standard names refused (C.5a).
+# One entry with two custom fields, each asked about by name, and the TOTP seeds and capitalized standard names refused.
 readonly API_ENTRY='api/OpenAI'
 readonly API_PASSWORD='SENTINEL-E2E-OPENAI-PASSWORD-2b8d41'
 readonly API_KEY='SENTINEL-E2E-OPENAI-API-KEY-9e0c57'
@@ -233,7 +233,7 @@ grep -q '"decision":"denied"'  "$AUDIT" || die "the refusal was not recorded as 
 grep -q '"label":"ci-probe"'   "$AUDIT" || die "the operator-supplied client label was not recorded"
 
 # The request with no agent reached no session; both later answers came from the agent's own gate,
-# under the session it unlocked (4.3a).
+# under the session it unlocked.
 jq -e -s --arg s "$SESSION" \
   'length == 9
    and .[0].decision == "denied" and .[0].method == "no-approver" and (.[0] | has("session") | not)

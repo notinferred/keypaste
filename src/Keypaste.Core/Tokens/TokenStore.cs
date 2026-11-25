@@ -321,7 +321,7 @@ public sealed class TokenStore(Vault vault)
 
         try
         {
-            switch (_vault.ReadSavedWithTombstones(out var saved, out var tombstoned))
+            switch (_vault.ReadSavedIn(ReservedGroups.Tokens, out var saved, out var tombstoned))
             {
                 case SavedRead.Current:
                     break;
@@ -359,11 +359,11 @@ public sealed class TokenStore(Vault vault)
     /// <summary>Each entry of the tokens group as the open vault holds it, read back.</summary>
     private List<TokenRecord> Records()
     {
-        var tombstoned = _vault.ReadTombstoned();
+        var entries = _vault.ReadEntriesIn(ReservedGroups.Tokens, out var tombstoned);
 
         return
         [
-            .. Entries(_vault.ReadEntries(includeReserved: true)).Select(entry =>
+            .. Entries(entries).Select(entry =>
             {
                 _ = TryRead(entry, out var info, out var lasts, out var revoked);
                 return new TokenRecord(entry, info, lasts, revoked || tombstoned.Contains(EntryName.Of(entry)));

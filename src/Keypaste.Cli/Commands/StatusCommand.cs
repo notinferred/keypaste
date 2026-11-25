@@ -103,7 +103,7 @@ internal static class StatusCommand
         List<List<string>> said =
         [
             [Fitted(writer, DoctorCommand.Shown(path, int.MaxValue))],
-            [vault.Source == VaultSource.Variable ? $"from {VaultLocator.EnvironmentVariable}" : "chosen in the app"],
+            [vault.Source == VaultSource.Variable ? $"from {VaultLocator.EnvironmentVariable}" : "chosen in the app or with keypaste use"],
         ];
 
         var state = vault.State switch

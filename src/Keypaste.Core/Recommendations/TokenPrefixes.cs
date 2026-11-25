@@ -5,7 +5,7 @@ namespace Keypaste.Core.Recommendations;
 /// <param name="Field">The env-named field a moved token is written to.</param>
 public sealed record TokenKind(string Name, string Field);
 
-/// <summary>The short list of token prefixes the notes check recognises (C.2).</summary>
+/// <summary>The short list of token prefixes the notes check recognises.</summary>
 /// <remarks>
 /// Each prefix is one its service documents as its own, so a line that is exactly such a token is a
 /// secret rather than a guess. A token counts only as a whole line: the prefix, then at least

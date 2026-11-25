@@ -4,9 +4,8 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// Deleting an entry used to be the one irreversible thing keypaste did, and the one act that
-/// could erase a value it had written. V.3a splits those apart: an ordinary delete is recoverable,
-/// and erasing is a second deliberate step through the bin.
+/// Deleting an entry and erasing a value are separate acts: an ordinary delete is recoverable, and
+/// erasing is a second deliberate step through the bin.
 /// </summary>
 /// <remarks>
 /// <para>

@@ -54,7 +54,7 @@ public sealed class LockVerbTests : IDisposable
 
     /// <summary>
     /// The owner's reply is the confirmation, so an owner whose connection neither answers nor ends after
-    /// it replies, as <c>keypaste approve</c>'s closing one did on Windows for three seconds (F.62), is
+    /// it replies, as <c>keypaste approve</c>'s closing one did on Windows for three seconds, is
     /// reported locked at once and asked nothing more.
     /// </summary>
     [Fact]

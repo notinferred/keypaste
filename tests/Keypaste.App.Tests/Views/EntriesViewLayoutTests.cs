@@ -15,7 +15,7 @@ namespace Keypaste.App.Tests.Views;
 /// takes the whole view, where both cannot fit the entry replaces the list with a way back, and an Environments line keeps its remove button however narrow it is.
 /// </summary>
 /// <remarks>
-/// Observed on Linux in F.2b3b: in the default window the toolbar was wider than the list's column,
+/// Observed on Linux: in the default window the toolbar was wider than the list's column,
 /// so the search box shrank under Add and the entry's title met Delete. Bounds are read from the window's own layout after a frame is drawn, as <see cref="RenderedShell"/> lays out any screen.
 /// </remarks>
 public sealed class EntriesViewLayoutTests

@@ -7,11 +7,11 @@ internal static class MachineQuickUnlock
     internal const string TouchIdName = "Touch ID";
 
     /// <summary>
-    /// Windows Hello in the app's Windows build on Windows 10 2004 or later (D-0549), Touch ID on macOS (D-0681), and
+    /// Windows Hello in the app's Windows build on Windows 10 2004 or later, Touch ID on macOS, and
     /// nothing elsewhere.
     /// </summary>
     /// <param name="home">The keypaste home, whose app alone keeps Touch ID's keys under it.</param>
-    /// <param name="unexpected">Keeps a report of a failure the keys do not report as an outcome, at the site it names, or null (D-0596).</param>
+    /// <param name="unexpected">Keeps a report of a failure the keys do not report as an outcome, at the site it names, or null.</param>
     /// <remarks>Touch ID deletes the keys an earlier run under this home left, so the app composes it once.</remarks>
     internal static IQuickUnlockKeys? Keys(string home, Action<Exception, string>? unexpected = null)
     {

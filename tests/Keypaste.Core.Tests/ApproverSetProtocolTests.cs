@@ -1,4 +1,5 @@
 using System.Text;
+using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Ipc;
 using Keypaste.Infrastructure;
@@ -50,10 +51,15 @@ public sealed class ApproverSetProtocolTests
     }
 
     [Theory]
-    [InlineData(1)]
-    [InlineData(5)]
-    public void A_request_of_the_wrong_size_is_refused(int fields) =>
+    [InlineData(SetRequestRules.MinimumFields - 1)]
+    [InlineData(SetRequestRules.MaximumFields + 1)]
+    public void A_request_of_the_wrong_size_is_refused(int fields)
+    {
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(Request(SetRequestRules.MinimumFields)), out SetRequest? _));
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(Request(SetRequestRules.MaximumFields)), out SetRequest? _));
+
         Assert.False(ApproverProtocol.TryDecode(ApproverProtocol.Encode(Request(fields)), out SetRequest? _));
+    }
 
     [Fact]
     public void A_request_past_any_bound_is_refused()
@@ -64,13 +70,20 @@ public sealed class ApproverSetProtocolTests
         Assert.False(ApproverProtocol.TryDecode(ApproverProtocol.Encode(Request() with { Exposure = [.. Enumerable.Repeat("**", ApproverProtocol.MaximumExposureGlobs + 1)] }), out SetRequest? _));
     }
 
+    /// <summary>Each row is a set of a and b, which decodes, with one defect.</summary>
     [Theory]
-    [InlineData("""{"v":2,"kind":"set","vault":"/v","session":"s","items":[{"entry":"a","field":"p"},null],"reason":"r","exposure":[]}""")]
-    [InlineData("""{"v":2,"kind":"set","vault":"/v","session":"s","items":[{"entry":"a"},{"entry":"b","field":"p"}],"reason":"r","exposure":[]}""")]
-    [InlineData("""{"v":2,"kind":"set","vault":"/v","session":"s","items":"a","reason":"r","exposure":[]}""")]
-    [InlineData("""{"v":2,"kind":"set","vault":"/v","session":"s","items":[{"entry":"a","field":"p"},{"entry":"b","field":"p"}],"reason":"r","reason":"s","exposure":[]}""")]
-    public void A_malformed_request_is_refused(string frame) =>
-        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out SetRequest? _));
+    [InlineData("""{"kind":"set","vault":"/v","session":"s","items":[{"entry":"a","field":"p"},null],"reason":"r","exposure":[]}""")]
+    [InlineData("""{"kind":"set","vault":"/v","session":"s","items":[{"entry":"a"},{"entry":"b","field":"p"}],"reason":"r","exposure":[]}""")]
+    [InlineData("""{"kind":"set","vault":"/v","session":"s","items":"a","reason":"r","exposure":[]}""")]
+    [InlineData("""{"kind":"set","vault":"/v","session":"s","items":[{"entry":"a","field":"p"},{"entry":"b","field":"p"}],"reason":"r","reason":"s","exposure":[]}""")]
+    public void A_malformed_request_is_refused(string frame)
+    {
+        Assert.True(ApproverProtocol.TryDecode(
+            ApproverFrame.Versioned("""{"kind":"set","vault":"/v","session":"s","items":[{"entry":"a","field":"p"},{"entry":"b","field":"p"}],"reason":"r","exposure":[]}"""),
+            out SetRequest? _));
+
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(frame), out SetRequest? _));
+    }
 
     [Fact]
     public void A_granted_reply_round_trips_every_field_in_order()
@@ -104,13 +117,21 @@ public sealed class ApproverSetProtocolTests
     }
 
     /// <summary>A grant must carry two to four fields, each with a value; a refusal must carry none.</summary>
+    /// <remarks>Each row is a grant of a and b, or a refusal of nothing, which decode, with one defect.</remarks>
     [Theory]
-    [InlineData("""{"v":2,"kind":"set","decision":"granted","method":1,"reason":"r","fields":[{"entry":"a","field":"p","value":"v","code_seconds":0}]}""")]
-    [InlineData("""{"v":2,"kind":"set","decision":"granted","method":1,"reason":"r","fields":[{"entry":"a","field":"p","value":"","code_seconds":0},{"entry":"b","field":"p","value":"v","code_seconds":0}]}""")]
-    [InlineData("""{"v":2,"kind":"set","decision":"denied","method":1,"reason":"r","fields":[{"entry":"a","field":"p","value":"v","code_seconds":0},{"entry":"b","field":"p","value":"v","code_seconds":0}]}""")]
-    [InlineData("""{"v":2,"kind":"set","decision":"granted","method":1,"reason":"r"}""")]
-    public void A_reply_outside_its_bounds_is_refused(string frame) =>
-        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out SetReply? _));
+    [InlineData("""{"kind":"set","decision":"granted","method":1,"reason":"r","fields":[{"entry":"a","field":"p","value":"v","code_seconds":0}]}""")]
+    [InlineData("""{"kind":"set","decision":"granted","method":1,"reason":"r","fields":[{"entry":"a","field":"p","value":"","code_seconds":0},{"entry":"b","field":"p","value":"v","code_seconds":0}]}""")]
+    [InlineData("""{"kind":"set","decision":"denied","method":1,"reason":"r","fields":[{"entry":"a","field":"p","value":"v","code_seconds":0},{"entry":"b","field":"p","value":"v","code_seconds":0}]}""")]
+    [InlineData("""{"kind":"set","decision":"granted","method":1,"reason":"r"}""")]
+    public void A_reply_outside_its_bounds_is_refused(string frame)
+    {
+        Assert.True(ApproverProtocol.TryDecode(
+            ApproverFrame.Versioned("""{"kind":"set","decision":"granted","method":1,"reason":"r","fields":[{"entry":"a","field":"p","value":"v","code_seconds":0},{"entry":"b","field":"p","value":"v","code_seconds":0}]}"""),
+            out SetReply? _));
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned("""{"kind":"set","decision":"denied","method":1,"reason":"r","fields":[]}"""), out SetReply? _));
+
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(frame), out SetReply? _));
+    }
 
     [Fact]
     public void A_refusal_round_trips_with_no_fields()

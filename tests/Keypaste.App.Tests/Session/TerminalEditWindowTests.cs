@@ -15,7 +15,7 @@ using static Keypaste.App.Tests.Session.DesktopApprovalTests;
 namespace Keypaste.App.Tests.Session;
 
 /// <summary>
-/// A terminal's edit is allowed in the app's own prompt window (D-0464): the command, the item and what
+/// A terminal's edit is allowed in the app's own prompt window: the command, the item and what
 /// changes, never a value, where it came from said as a claim; Deny focused, Allow answering a click at once and a key
 /// only after a moment, and every way but Allow a refusal (THREATS.md T-2).
 /// </summary>

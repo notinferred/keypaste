@@ -8,7 +8,8 @@ using Xunit;
 namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
-/// 4.10a on the unlock screen: Windows Hello is asked after every password unlock before the shell shows, and a vault a
+/// Quick unlock on the unlock screen: Windows Hello, or Touch ID on a Mac, is asked after every password unlock before the
+/// shell shows, and a vault a
 /// lock left resumable is offered it as the screen's amber action while the master password stays.
 /// </summary>
 public sealed class UnlockQuickUnlockTests : IDisposable

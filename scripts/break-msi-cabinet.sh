@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Replaces an MSI's cabinet stream with a cabinet header and nothing else, so the package still opens and
-# still costs and sequences, and the file installation inside the transaction is what fails (F.14).
+# still costs and sequences, and the file installation inside the transaction is what fails.
 #
 # This is how an interrupted upgrade is produced on a runner: no power cut, no killed process - five other
 # ways were measured and none interrupted anything. Only ever run against a copy.

@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # The KeePassXC gates' setup and readers, sourced after common.sh. Sourcing it sets pw and cli and fails
-# the gate when either is missing, because a gate that passes without KeePassXC proves nothing (D-0008).
+# the gate when either is missing, because a gate that passes without KeePassXC proves nothing.
 #
 # Env: KP_COMPAT_PASSWORD  the master password of every vault a gate makes (required)
 #      KPXC_CLI            path to keepassxc-cli (default: PATH lookup)
@@ -46,7 +46,7 @@ uuid() { printf '%-16.16s' "$1" | base64; }
 copies() { if [ -d "$1.backups" ]; then find "$1.backups" -maxdepth 1 -type f | wc -l | tr -d ' '; else echo 0; fi; }
 
 # The entry's own <UUID> line, the last before the first <History>. A flag rather than exit or head,
-# because leaving the stream early breaks tr's pipe and pipefail then fails the gate (F.16).
+# because leaving the stream early breaks tr's pipe and pipefail then fails the gate.
 entry_uuid() {
   kpxc export -f xml "$1" \
     | tr -d '\t' \

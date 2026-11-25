@@ -1,7 +1,4 @@
-using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
-using Keypaste.App.Tests.Clipboard;
-using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Tests;
 using Xunit;
@@ -12,7 +9,7 @@ namespace Keypaste.App.Tests.ViewModels;
 /// The Entries screen, driven without a display.
 /// </summary>
 /// <remarks>
-/// <see cref="EntriesViewModel"/> names no Avalonia type, so everything it does — searching, the
+/// <see cref="Keypaste.App.ViewModels.EntriesViewModel"/> names no Avalonia type, so everything it does — searching, the
 /// group tree, adding, editing, deleting — is assertable against a real KDBX with no application and
 /// no window. The headless session is for claims that are only true of a visual tree.
 /// </remarks>
@@ -56,7 +53,7 @@ public sealed class EntriesViewModelTests : IDisposable
         Assert.Equal(4, context.Entries.TotalCount);
     }
 
-    /// <summary>The list shows each item's username and web address beside its title, and no other field (D-0488).</summary>
+    /// <summary>The list shows each item's username and web address beside its title, and no other field.</summary>
     [Fact]
     public void Each_row_shows_its_username_and_web_address()
     {
@@ -191,7 +188,7 @@ public sealed class EntriesViewModelTests : IDisposable
     public void Deleting_takes_the_selected_row_when_another_entry_shares_its_path()
     {
         var path = CollidingVault();
-        using var context = new Context(path);
+        using var context = new UnlockedScreens(path, Master);
 
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "nested/TOKEN");
         context.Entries.DeleteCommand.Press();
@@ -259,13 +256,13 @@ public sealed class EntriesViewModelTests : IDisposable
     /// The same collision, on the read side. The pane resolved its entry by the joined path, so
     /// selecting <c>TOKEN</c> in <c>env/dev/nested</c> and editing it wrote to whichever of the two
     /// the file listed first — which could be <c>nested/TOKEN</c> in <c>env/dev</c>, an entry the
-    /// person never selected (task F.1e).
+    /// person never selected.
     /// </summary>
     [Fact]
     public void An_inline_edit_writes_the_selected_identity_and_not_its_colliding_neighbour()
     {
         var path = CollidingVault();
-        using var context = new Context(path);
+        using var context = new UnlockedScreens(path, Master);
 
         context.Entries.Selected = context.Entries.Rows.Single(row => row.GroupPath == "env/dev/nested");
         var detail = context.Entries.Detail!;
@@ -290,7 +287,7 @@ public sealed class EntriesViewModelTests : IDisposable
     public async Task Copying_a_password_takes_the_selected_identity_when_another_entry_shares_its_path()
     {
         var path = CollidingVault();
-        using var context = new Context(path);
+        using var context = new UnlockedScreens(path, Master);
 
         context.Entries.Selected = context.Entries.Rows.Single(row => row.GroupPath == "env/dev/nested");
 
@@ -387,43 +384,5 @@ public sealed class EntriesViewModelTests : IDisposable
         return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
     }
 
-    private Context New() => new(_vaultPath);
-
-    /// <summary>An unlocked session, a fake clipboard and a screen looking at them.</summary>
-    /// <remarks>
-    /// Everything is built inside the constructor rather than handed in, so no disposable escapes
-    /// the method that made it — which is what satisfies CA2000, an error in this repository, by
-    /// construction rather than by suppression.
-    /// </remarks>
-    private sealed class Context : IDisposable
-    {
-        internal Context(string vaultPath)
-        {
-            Session = new AppVaultSession(new ManualClock(AppClock.Start));
-
-            using (var master = TempVault.Secret(Master))
-            {
-                Assert.Equal(UnlockOutcome.Opened, Session.TryUnlock(vaultPath, master.Value));
-            }
-
-            Clipboard = new FakeClipboard();
-            Countdown = new ClipboardCountdown(Clipboard, new ManualClock(AppClock.Start));
-            Entries = new EntriesViewModel(Session, Countdown);
-        }
-
-        internal AppVaultSession Session { get; }
-
-        internal ClipboardCountdown Countdown { get; }
-
-        internal EntriesViewModel Entries { get; }
-
-        internal FakeClipboard Clipboard { get; }
-
-        public void Dispose()
-        {
-            Entries.Dispose();
-            Countdown.Dispose();
-            Session.Dispose();
-        }
-    }
+    private UnlockedScreens New() => new(_vaultPath, Master);
 }

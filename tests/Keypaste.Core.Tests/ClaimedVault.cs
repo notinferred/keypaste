@@ -18,7 +18,6 @@ internal static class ClaimedVault
 
     /// <summary>A claim on <paramref name="path"/> in the first of the tests' homes where nothing holds it.</summary>
     /// <param name="path">The vault, which need not exist yet.</param>
-    /// <returns>The claim.</returns>
     internal static VaultClaim Claim(string path)
     {
         var refusal = string.Empty;

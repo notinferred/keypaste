@@ -5,9 +5,9 @@ namespace Keypaste.Core.Approval;
 /// </summary>
 /// <remarks>
 /// <para>
-/// One method, because a channel has one job. A terminal prompt, a native OS dialog, and — from
-/// Stage 4.3 — the desktop app's Agent Activity screen are all implementations of this, which is
-/// what stops the approval flow being rebuilt when the GUI arrives.
+/// One method, because a channel has one job. A terminal prompt, a native OS dialog and the
+/// desktop app's approval window are all implementations of this, so every front end shares one
+/// approval flow.
 /// </para>
 /// <para>
 /// <b>The contract a channel has to keep.</b> It must honour its cancellation token by

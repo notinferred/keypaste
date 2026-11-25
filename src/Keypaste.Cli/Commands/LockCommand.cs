@@ -9,7 +9,7 @@ namespace Keypaste.Cli.Commands;
 /// <remarks>
 /// The owner answers once its lock has ended the session the verb attached to, so "locked" is never
 /// printed about a vault that is still being served, and the verb asks nothing more on a connection the
-/// lock is closing (F.62).
+/// lock is closing.
 /// </remarks>
 internal static class LockCommand
 {

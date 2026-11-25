@@ -8,7 +8,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// The app leaves Terminal's launcher each run as one owner-only file in an owner-only folder, one field per line in
-/// printable ASCII and never a value, so a path holding a line break is carried like any other (E.1d).
+/// printable ASCII and never a value, so a path holding a line break is carried like any other.
 /// </summary>
 [UnsupportedOSPlatform("windows")]
 public sealed class TerminalRequestsTests : IDisposable

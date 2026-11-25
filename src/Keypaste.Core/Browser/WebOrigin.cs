@@ -16,14 +16,14 @@ public sealed record WebOrigin
 {
     private static readonly SearchValues<char> _authorityEnds = SearchValues.Create("/?#\\");
 
-    private WebOrigin(string scheme, string host, int port, bool isExactHost, bool isSingleLabel)
+    private WebOrigin(Parts parts)
     {
-        Scheme = scheme;
-        Host = host;
-        Port = port;
-        IsExactHost = isExactHost;
-        IsSingleLabel = isSingleLabel;
-        Site = isExactHost ? host : PublicSuffixList.RegistrableDomain(host);
+        Scheme = parts.Scheme;
+        Host = parts.Host;
+        Port = parts.Port;
+        IsExactHost = parts.IsExactHost;
+        IsSingleLabel = parts.IsSingleLabel;
+        Site = parts.Site;
     }
 
     /// <summary><c>http</c> or <c>https</c>.</summary>
@@ -59,7 +59,58 @@ public sealed record WebOrigin
     /// <summary>Reads a URL the browser sent, which names its scheme.</summary>
     internal static bool TryRead([NotNullWhen(true)] string? url, [NotNullWhen(true)] out WebOrigin? origin, out LookupRefusal refusal)
     {
-        origin = null;
+        if (!TryReadParts(url, out var parts, out refusal))
+        {
+            origin = null;
+            return false;
+        }
+
+        origin = new WebOrigin(parts);
+        return true;
+    }
+
+    /// <summary>Reads an item's web address, in which a missing scheme means <c>https</c>, as the item pane opens it.</summary>
+    /// <param name="address">The item's web address.</param>
+    /// <param name="origin">Its origin, or null.</param>
+    /// <returns><see langword="true"/> when it has one.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="address"/> is null.</exception>
+    public static bool TryReadItem(string address, [NotNullWhen(true)] out WebOrigin? origin)
+    {
+        ArgumentNullException.ThrowIfNull(address);
+
+        if (!TryReadItemParts(address, out var parts))
+        {
+            origin = null;
+            return false;
+        }
+
+        origin = new WebOrigin(parts);
+        return true;
+    }
+
+    /// <summary><see cref="TryReadItem"/> without looking up the site, which only an item whose host could match a page needs.</summary>
+    /// <param name="address">The item's web address.</param>
+    /// <param name="parts">Its origin's parts, or default.</param>
+    /// <returns><see langword="true"/> when it has an origin.</returns>
+    internal static bool TryReadItemParts(string address, out Parts parts)
+    {
+        if (!address.Contains("://", StringComparison.Ordinal))
+        {
+            if (NamesAScheme(address))
+            {
+                parts = default;
+                return false;
+            }
+
+            address = "https://" + address;
+        }
+
+        return TryReadParts(address, out parts, out _);
+    }
+
+    private static bool TryReadParts([NotNullWhen(true)] string? url, out Parts parts, out LookupRefusal refusal)
+    {
+        parts = default;
         refusal = LookupRefusal.NotAWebPage;
 
         if (string.IsNullOrEmpty(url) || url.Any(character => char.IsWhiteSpace(character) || char.IsControl(character)))
@@ -112,32 +163,9 @@ public sealed record WebOrigin
         }
 
         var isSingleLabel = !isExactHost && !host.Contains('.', StringComparison.Ordinal) && !PublicSuffixList.Names(host);
-        origin = new WebOrigin(scheme, host, port, isExactHost || isSingleLabel, isSingleLabel);
+        parts = new Parts(scheme, host, port, isExactHost || isSingleLabel, isSingleLabel);
         refusal = LookupRefusal.None;
         return true;
-    }
-
-    /// <summary>Reads an item's web address, in which a missing scheme means <c>https</c>, as the item pane opens it.</summary>
-    /// <param name="address">The item's web address.</param>
-    /// <param name="origin">Its origin, or null.</param>
-    /// <returns><see langword="true"/> when it has one.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="address"/> is null.</exception>
-    public static bool TryReadItem(string address, [NotNullWhen(true)] out WebOrigin? origin)
-    {
-        ArgumentNullException.ThrowIfNull(address);
-        origin = null;
-
-        if (!address.Contains("://", StringComparison.Ordinal))
-        {
-            if (NamesAScheme(address))
-            {
-                return false;
-            }
-
-            address = "https://" + address;
-        }
-
-        return TryRead(address, out origin, out _);
     }
 
     /// <summary>Whether text with no <c>://</c> starts with a scheme such as <c>mailto:</c>, rather than a host and port.</summary>
@@ -225,6 +253,18 @@ public sealed record WebOrigin
 
         canonical = uri.Host;
         return true;
+    }
+
+    /// <summary>An origin as its URL names it, whose site is looked up only when read.</summary>
+    /// <param name="Scheme"><c>http</c> or <c>https</c>.</param>
+    /// <param name="Host">The host, in lowercase ASCII.</param>
+    /// <param name="Port">The port, the scheme's default when the URL names none.</param>
+    /// <param name="IsExactHost">Whether the host is an IP address, <c>localhost</c> or a single label, which matches only itself.</param>
+    /// <param name="IsSingleLabel">Whether the host is a single label such as <c>nas</c>.</param>
+    internal readonly record struct Parts(string Scheme, string Host, int Port, bool IsExactHost, bool IsSingleLabel)
+    {
+        /// <summary>The site, as <see cref="WebOrigin.Site"/> names it, looked up in the Public Suffix List on each read.</summary>
+        public string? Site => IsExactHost ? Host : PublicSuffixList.RegistrableDomain(Host);
     }
 
     private static bool TryReadPort(string? portText, int defaultPort, out int port)

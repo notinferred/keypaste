@@ -13,7 +13,7 @@ namespace Keypaste.Mcp.Tests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>This exists because of F.8.</b> On 2026-09-11
+/// <b>This exists because of a one-off CI failure.</b> On 2026-09-11
 /// <see cref="ListingSizeTests.AVaultTooBigForOneReply_StillListsTheNamesThatFit"/> failed once on
 /// <c>windows-2025</c> reading <c>StructuredContent</c> on a result that had none, and threw a
 /// sentence of its own before anything read the text the tool had actually returned. Eight refusals
@@ -65,9 +65,8 @@ internal sealed class ListingCall
     {
         ArgumentNullException.ThrowIfNull(client);
 
-        // Timed apart from the test. F.8's thirteen seconds are attributable to no wait on this path
-        // - the handshake grace is one second and the connect budget five hundred milliseconds - so
-        // whether they were spent inside the call or around it is the next sighting's first question.
+        // Timed apart from the test, so a slow listing shows whether its time went inside the call or
+        // around it.
         var started = Stopwatch.GetTimestamp();
         var result = await client.CallToolAsync(ToolText.ListToolName, cancellationToken: cancellationToken);
         var elapsed = Stopwatch.GetElapsedTime(started);

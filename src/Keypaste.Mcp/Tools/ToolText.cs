@@ -465,11 +465,11 @@ internal static class ToolText
         needs it. This call was recorded in the audit log as denied.
         """;
 
-    /// <summary>Why a call was refused because this connection was already carrying one.</summary>
+    /// <summary>Why a call was refused because every connection this bridge may open to the owner was already carrying an exchange.</summary>
     /// <remarks>
     /// BUSY, not DENIED: every other refusal here is a decision, and an agent reading this as one
     /// learns the wrong thing about what the user wants.
-    /// It does not say which call holds the connection — a listing and a request share one pipe, and
+    /// It does not say which calls hold them — listings and requests share the connections, and
     /// naming it would tell an agent which of its own calls is running, or imply a person is looking.
     /// No "do not retry", but it says the wait may be human-length or an agent told only "try
     /// again" retries immediately into a held prompt. No number: the approver's window is configurable

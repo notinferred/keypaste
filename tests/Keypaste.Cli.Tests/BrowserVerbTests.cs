@@ -9,7 +9,7 @@ namespace Keypaste.Cli.Tests;
 
 /// <summary>
 /// <c>keypaste browser</c> lists who each browser starts for keypaste's extension and whether the extension is installed, and
-/// turns this keypaste on and off as that host, under the harness's folders and, on Windows, its own registry branch (8.1e).
+/// turns this keypaste on and off as that host, under the harness's folders and, on Windows, its own registry branch.
 /// </summary>
 public sealed partial class BrowserVerbTests : IDisposable
 {

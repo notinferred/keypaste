@@ -196,7 +196,7 @@ internal sealed partial class KeePassInterop
 
             if (piece.Scope == ImportScope.EntriesOnly)
             {
-                Merge(copy, EnsureImportGroup(piece.Destination));
+                Merge(copy, EnsureImportGroup(piece.Destination, Bin()));
             }
             else if (LocateGroup(piece.Destination) is { } existing)
             {
@@ -206,7 +206,7 @@ internal sealed partial class KeePassInterop
             {
                 int slash = piece.Destination.LastIndexOf('/');
                 copy.Name = piece.Destination[(slash + 1)..];
-                EnsureImportGroup(slash < 0 ? string.Empty : piece.Destination[..slash]).AddGroup(copy, true);
+                EnsureImportGroup(slash < 0 ? string.Empty : piece.Destination[..slash], Bin()).AddGroup(copy, true);
             }
         }
 
@@ -288,9 +288,17 @@ internal sealed partial class KeePassInterop
             built.Add((imported.Name.GroupPath, entry));
         }
 
+        PwGroup? bin = Bin();
+        Dictionary<string, PwGroup> groups = new(StringComparer.Ordinal);
         foreach (var (groupPath, entry) in built)
         {
-            EnsureImportGroup(groupPath).AddEntry(entry, true);
+            if (!groups.TryGetValue(groupPath, out PwGroup? group))
+            {
+                group = EnsureImportGroup(groupPath, bin);
+                groups.Add(groupPath, group);
+            }
+
+            group.AddEntry(entry, true);
         }
 
         _database.Modified = true;
@@ -426,6 +434,13 @@ internal sealed partial class KeePassInterop
             var changed = false;
             for (var i = 0; i + _uuidReferenceLength <= utf8.Length; i++)
             {
+                int brace = utf8.AsSpan(i, utf8.Length - _uuidReferenceLength + 1 - i).IndexOf((byte)'{');
+                if (brace < 0)
+                {
+                    break;
+                }
+
+                i += brace;
                 Span<byte> candidate = utf8.AsSpan(i, _uuidReferenceLength);
                 Span<byte> hex = candidate[9..41];
 
@@ -482,9 +497,8 @@ internal sealed partial class KeePassInterop
     }
 
     /// <summary><see cref="EnsureGroup"/> that never walks into the recycle bin, whatever it is called.</summary>
-    private PwGroup EnsureImportGroup(string groupPath)
+    private PwGroup EnsureImportGroup(string groupPath, PwGroup? bin)
     {
-        PwGroup? bin = Bin();
         PwGroup current = _database.RootGroup;
 
         foreach (string segment in groupPath.Split('/', StringSplitOptions.RemoveEmptyEntries))

@@ -7,7 +7,7 @@ namespace Keypaste.Core.Tests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <c>PasswordGenerator</c> has said since 4.2 that uniformity comes from
+/// <c>PasswordGenerator</c> has long said that uniformity comes from
 /// <c>RandomNumberGenerator.GetItems</c> and that the <c>%</c> operator does not appear in the
 /// file, citing SECURITY.md law 6. Nothing held it to that, and as written it was not even
 /// checkable as text: <c>Symbols</c> is a string literal with a <c>%</c> in it, because a
@@ -17,11 +17,11 @@ namespace Keypaste.Core.Tests;
 /// So the rule this asserts is the one that was meant: on the generation path, the only <c>%</c>
 /// in code is inside that character set. It is read from the source because <c>%</c> on integers
 /// is the compiler's own operator, with no symbol a ban list can name. Comment lines are skipped, because prose explaining the
-/// rule necessarily names the operator — which is how the first draft of this test failed.
+/// rule necessarily names the operator.
 /// </para>
 /// <para>
 /// An index taken modulo a list length fails here the day it is written, which is the point:
-/// V-V.6's distribution pair can only catch a bias that was shipped, and this catches the shape
+/// <c>PassphraseDistributionTests</c>' distribution pair can only catch a bias that was shipped, and this catches the shape
 /// of it in review.
 /// </para>
 /// </remarks>

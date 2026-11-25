@@ -35,24 +35,24 @@ namespace Keypaste.AppDriver;
 /// launch does, unlocks, prints the session it holds, and then locks or unlocks again on each line
 /// read from standard input until it closes, which it answers as the app answers quitting. Each of
 /// those prints a <c>status</c> line as the authority reports it.
-/// <c>Keypaste.Processes.Tests</c> drives it (U.1). With <c>--locked</c> it starts at the
+/// <c>Keypaste.Processes.Tests</c> drives it. With <c>--locked</c> it starts at the
 /// unlock screen, as a launch does, and waits for <c>unlock</c>, so
-/// <c>SessionLifecycleTests</c> can relaunch after a crash (4.4b). With <c>--held-prompt</c> a request
+/// <c>SessionLifecycleTests</c> can relaunch after a crash. With <c>--held-prompt</c> a request
 /// that needs a person is put in front of one who never answers, printing <c>asking</c> and then
 /// <c>withdrawn</c>, so <c>LockBoundaryTests</c> can lock the app with a real request
-/// waiting at its session (U.2). With <c>--approving-prompt</c> a person approves every request,
+/// waiting at its session. With <c>--approving-prompt</c> a person approves every request,
 /// printing <c>asking</c> and <c>approved</c>, and the lines <c>edit</c> and <c>delete</c>
 /// act on the held vault through the entries screen, so
-/// <c>CurrentStateTests</c> can change it between two real requests (U.3). With
+/// <c>CurrentStateTests</c> can change it between two real requests. With
 /// neither, a request is put to the person in the app's own prompt window, as launch does, drawn on
 /// a headless display: <c>prompt</c> prints what the window shows and <c>prompt withdrawn</c> when it
 /// comes down, and the lines <c>once</c>, <c>always</c>, <c>allow</c>, <c>deny</c> and <c>close</c> click its buttons through
 /// the display's hit-testing or close it, so <c>DesktopApprovalTests</c> can answer a
-/// real request as a person would (4.4). With <c>--terminal-bundle</c> on macOS, the line
+/// real request as a person would. With <c>--terminal-bundle</c> on macOS, the line
 /// <c>terminal</c> saves a project's directory and command on the Env Sets screen and presses Run in
 /// a terminal or Open terminal and then Start, so Terminal opens that <c>keypaste.app</c>'s launcher
 /// and the run it starts asks this hold for the set, which <c>MacTerminalRunTests</c>
-/// watches (E.1d).
+/// watches.
 /// </para>
 /// <para>
 /// A hold prints a <c>merged</c> line for each merge of another program's save the session makes, the notice's own words
@@ -270,7 +270,7 @@ internal sealed class Driver(string home)
         return await UnlockAsync(unlock, session, vault).ConfigureAwait(true) ?? Did("opened");
     }
 
-    /// <summary>Prints the databases the first run offers from KeePassXC, one path a line, as the welcome lists them (N.2).</summary>
+    /// <summary>Prints the databases the first run offers from KeePassXC, one path a line, as the welcome lists them.</summary>
     internal int Welcome(Func<IReadOnlyList<string>> keePassXcConfigs)
     {
         using var session = new AppVaultSession(TimeProvider.System, home: home);
@@ -352,7 +352,7 @@ internal sealed class Driver(string home)
         });
 
     /// <summary>
-    /// Makes an item from a template through New item (N.4), at the vault's top level: the template, the title,
+    /// Makes an item from a template through New item, at the vault's top level: the template, the title,
     /// the template's plain fields, tags and notes from <paramref name="options"/>,
     /// and the one secret, a password or a key's value, typed from <c>KEYPASTE_DRIVER_NEW_PASSWORD</c>.
     /// </summary>
@@ -734,7 +734,7 @@ internal sealed class Driver(string home)
             : Refused(settings.Message);
     }
 
-    /// <summary>Lists the project tags Settings › Recommendations found dropped, and how many need review: entry, tag and state, never a value (V.11).</summary>
+    /// <summary>Lists the project tags Settings › Recommendations found dropped, and how many need review: entry, tag and state, never a value.</summary>
     internal Task<int> ReviewLostTagsAsync(string vault) =>
         WithRecommendationsAsync(vault, list =>
         {

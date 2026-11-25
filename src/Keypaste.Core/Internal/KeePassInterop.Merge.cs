@@ -154,6 +154,13 @@ internal sealed partial class KeePassInterop
         private readonly List<MergeKeptItem> _kept = [];
         private readonly List<(PwGroup Group, string LostName)> _renamed = [];
 
+        // A history version keeps its content through a merge but for Hold's mark, which digests leave out, so its digests are taken once.
+        private readonly Dictionary<PwEntry, byte[]> _versionDigests = new(ReferenceEqualityComparer.Instance);
+        private readonly Dictionary<PwEntry, byte[]> _versionHistoryCopyDigests = new(ReferenceEqualityComparer.Instance);
+
+        // The file's entries' digests from before the merge, each valid until that entry's own merge reads it and changes it.
+        private readonly Dictionary<PwEntry, byte[]> _unmergedDigests = new(ReferenceEqualityComparer.Instance);
+
         internal Merger(KeePassInterop open, KeePassInterop file, MergeBase lineage)
         {
             _open = open;
@@ -179,7 +186,7 @@ internal sealed partial class KeePassInterop
         /// <summary>Builds the result and says what it did.</summary>
         internal VaultMergeReport Run()
         {
-            byte[] before = StateOf(_result);
+            byte[] before = StateOf(_result, _unmergedDigests);
 
             MergeGroups();
             AdoptMyBin();
@@ -208,7 +215,7 @@ internal sealed partial class KeePassInterop
                 }
             }
 
-            return new VaultMergeReport(!Same(before, StateOf(_result)), conflicts, [.. _kept], renamed)
+            return new VaultMergeReport(!Same(before, StateOf(_result, currentDigests: null)), conflicts, [.. _kept], renamed)
             {
                 Combined = [.. _combined.Select(entry => NameIn(_file, entry))],
                 Taken = [.. _taken.Select(entry => NameIn(_file, entry)).Where(name => !ReservedGroups.IsReserved(name.GroupPath))],
@@ -402,7 +409,7 @@ internal sealed partial class KeePassInterop
         {
             _base.Entries.TryGetValue(theirs.Uuid, out BaseRecord? known);
             byte[] myDigest = _digests.Of(mine);
-            byte[] theirDigest = _digests.Of(theirs);
+            byte[] theirDigest = _unmergedDigests.Remove(theirs, out byte[]? unmerged) ? unmerged : _digests.Of(theirs);
             List<HistoryVersion> history = [.. theirs.History.Select(Held)];
             int theirCount = history.Count;
 
@@ -479,7 +486,7 @@ internal sealed partial class KeePassInterop
         private bool IsAncestor(PwEntry version, PwEntry later)
         {
             byte[] digest = _digests.OfHistoryCopy(version);
-            return later.History.Any(held => Same(_digests.OfHistoryCopy(held), digest));
+            return later.History.Any(held => Same(HistoryCopyDigestOfVersion(held), digest));
         }
 
         private bool IsReservedEntry(PwEntry mine, PwEntry theirs) =>
@@ -515,10 +522,10 @@ internal sealed partial class KeePassInterop
         /// <summary>The newest version in both histories, matched without custom data, which KeePassXC leaves out of those it keeps.</summary>
         private PwEntry? LatestSharedVersion(PwEntry mine, PwEntry theirs)
         {
-            List<byte[]> held = [.. theirs.History.Select(_digests.OfHistoryCopy)];
+            List<byte[]> held = [.. theirs.History.Select(HistoryCopyDigestOfVersion)];
 
             return mine.History
-                .Where(version => { byte[] digest = _digests.OfHistoryCopy(version); return held.Exists(other => Same(other, digest)); })
+                .Where(version => { byte[] digest = HistoryCopyDigestOfVersion(version); return held.Exists(other => Same(other, digest)); })
                 .OrderByDescending(version => version.LastModificationTime)
                 .FirstOrDefault();
         }
@@ -648,7 +655,7 @@ internal sealed partial class KeePassInterop
                 MemProtCmpMode.Full);
 
         private bool KeptByKeePassXc(PwEntry theirs, BaseRecord known) =>
-            theirs.History.Any(version => Same(_digests.OfHistoryCopy(version), known.HistoryCopyDigest));
+            theirs.History.Any(version => Same(HistoryCopyDigestOfVersion(version), known.HistoryCopyDigest));
 
         private static PwEntry Unstamped(PwEntry entry)
         {
@@ -727,7 +734,7 @@ internal sealed partial class KeePassInterop
         /// </remarks>
         private bool Hold(List<HistoryVersion> history, PwEntry version, bool copy, bool kept)
         {
-            byte[] digest = _digests.Of(version);
+            byte[] digest = DigestOfVersion(version);
 
             if (HeldIn(history, digest))
             {
@@ -735,6 +742,7 @@ internal sealed partial class KeePassInterop
             }
 
             PwEntry held = copy ? version.CloneDeep() : version;
+            _versionDigests[held] = digest;
 
             if (kept)
             {
@@ -745,7 +753,29 @@ internal sealed partial class KeePassInterop
             return true;
         }
 
-        private HistoryVersion Held(PwEntry version) => new(version, _digests.Of(version), IsKept(version));
+        private HistoryVersion Held(PwEntry version) => new(version, DigestOfVersion(version), IsKept(version));
+
+        private byte[] DigestOfVersion(PwEntry version)
+        {
+            if (!_versionDigests.TryGetValue(version, out byte[]? digest))
+            {
+                digest = _digests.Of(version);
+                _versionDigests.Add(version, digest);
+            }
+
+            return digest;
+        }
+
+        private byte[] HistoryCopyDigestOfVersion(PwEntry version)
+        {
+            if (!_versionHistoryCopyDigests.TryGetValue(version, out byte[]? digest))
+            {
+                digest = _digests.OfHistoryCopy(version);
+                _versionHistoryCopyDigests.Add(version, digest);
+            }
+
+            return digest;
+        }
 
         private static bool IsKept(PwEntry version) => version.CustomData.Exists(PwEntry.KeptVersionKey);
 
@@ -896,7 +926,9 @@ internal sealed partial class KeePassInterop
         }
 
         /// <summary>A digest of everything a merge can change, to tell whether the result took anything from the open copy.</summary>
-        private byte[] StateOf(PwDatabase database)
+        /// <param name="database">The copy to digest.</param>
+        /// <param name="currentDigests">Collects each current entry's digest, unless null.</param>
+        private byte[] StateOf(PwDatabase database, Dictionary<PwEntry, byte[]>? currentDigests)
         {
             using IncrementalHash state = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
 
@@ -908,13 +940,15 @@ internal sealed partial class KeePassInterop
 
             foreach (PwEntry entry in database.RootGroup.GetEntries(true).OrderBy(entry => entry.Uuid.ToHexString(), StringComparer.Ordinal))
             {
+                byte[] digest = _digests.Of(entry);
+                currentDigests?.Add(entry, digest);
                 AppendPlace(state, entry);
-                state.AppendData(_digests.Of(entry));
+                state.AppendData(digest);
                 AppendNumber(state, entry.History.UCount);
 
                 foreach (PwEntry version in entry.History)
                 {
-                    state.AppendData(_digests.Of(version));
+                    state.AppendData(DigestOfVersion(version));
                 }
             }
 

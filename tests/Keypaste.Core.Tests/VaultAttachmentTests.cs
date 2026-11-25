@@ -6,7 +6,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// An item's attachments: listed by name and size, added and replaced under the cap, removed, each as one revision,
-/// and saved once to a new file (V.8a).
+/// and saved once to a new file.
 /// </summary>
 public sealed class VaultAttachmentTests : IDisposable
 {

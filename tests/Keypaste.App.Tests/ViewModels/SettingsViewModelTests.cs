@@ -109,7 +109,7 @@ public sealed class SettingsViewModelTests
 
     /// <summary>
     /// There is deliberately no "never" — it would be the one setting everybody chose the first
-    /// time the countdown interrupted them, and it would turn off the feature 4.1 exists to ship.
+    /// time the countdown interrupted them, and it would turn off the idle lock altogether.
     /// </summary>
     [Fact]
     public void Every_offered_timeout_actually_locks()
@@ -127,7 +127,7 @@ public sealed class SettingsViewModelTests
 
     /// <summary>
     /// A number the list does not offer is named rather than rounded off, because the alternative
-    /// is a screen showing a timeout the vault is not using — which is the whole of F.2a.
+    /// is a screen showing a timeout the vault is not using.
     /// </summary>
     [Fact]
     public void A_timeout_the_list_does_not_offer_is_shown_as_the_one_in_force()

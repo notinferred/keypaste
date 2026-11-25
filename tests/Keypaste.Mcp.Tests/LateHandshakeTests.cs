@@ -13,12 +13,11 @@ namespace Keypaste.Mcp.Tests;
 
 /// <summary>
 /// A call that overtook the handshake naming its client reaches the owner, which records it, under the
-/// name the handshake gave, once the call has waited for it (F.61).
+/// name the handshake gave, once the call has waited for it.
 /// </summary>
 /// <remarks>
-/// F.5 made a call wait for the handshake but kept the identity it had read before waiting, so a
-/// client that named itself while its call waited was put to the owner and logged as an unnamed
-/// client. A real client cannot produce that ordering in process (<see cref="HandshakeGraceTests"/>);
+/// A call that waited for the handshake but kept the identity it had read before waiting would put
+/// a client that named itself while its call waited to the owner, and log it, as an unnamed client. A real client cannot produce that ordering in process (<see cref="HandshakeGraceTests"/>);
 /// a server whose client is unnamed the first time anybody asks and named every time after can, and
 /// each tool is called on it as the server's dispatch would call it. A credential request and a run
 /// carry the name in the request; a listing and a change to the agent's settings carry nothing, so the

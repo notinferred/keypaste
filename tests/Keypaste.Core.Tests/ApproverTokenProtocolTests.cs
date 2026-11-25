@@ -30,16 +30,28 @@ public sealed class ApproverTokenProtocolTests
         Assert.Equal("s1", decoded.Session);
     }
 
+    private const string _wellFormed = """{"kind":"token-env","vault":"/v","session":"s","token":"t","project":"p","profile":"dev","command":["x"],"directory":"/d"}""";
+
+    /// <summary>Each row is <see cref="_wellFormed"/>, which decodes, with one defect.</summary>
     [Theory]
-    [InlineData("""{"v":2,"kind":"token-env","vault":"/v","session":"s","project":"p","profile":"dev","command":["x"],"directory":"/d"}""")]
-    [InlineData("""{"v":2,"kind":"token-env","vault":"/v","session":"s","token":"t","project":"p","command":["x"],"directory":"/d"}""")]
-    [InlineData("""{"v":2,"kind":"token-env","vault":"/v","session":"s","token":"t","project":"p","profile":"dev","command":"x","directory":"/d"}""")]
-    [InlineData("""{"v":1,"kind":"token-env","vault":"/v","session":"s","token":"t","project":"p","profile":"dev","command":["x"],"directory":"/d"}""")]
-    [InlineData("""{"v":2,"kind":"env","vault":"/v","session":"s","token":"t","project":"p","profile":"dev","command":["x"],"directory":"/d"}""")]
-    [InlineData("""{"v":2,"kind":"token-env","vault":"/v","session":"s","token":"t","token":"u","project":"p","profile":"dev","command":["x"],"directory":"/d"}""")]
-    [InlineData("not json")]
-    public void AMalformedRequest_IsRejected(string frame) =>
-        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out TokenEnvRequest? _));
+    [InlineData("""{"kind":"token-env","vault":"/v","session":"s","project":"p","profile":"dev","command":["x"],"directory":"/d"}""")]
+    [InlineData("""{"kind":"token-env","vault":"/v","session":"s","token":"t","project":"p","command":["x"],"directory":"/d"}""")]
+    [InlineData("""{"kind":"token-env","vault":"/v","session":"s","token":"t","project":"p","profile":"dev","command":"x","directory":"/d"}""")]
+    [InlineData("""{"kind":"env","vault":"/v","session":"s","token":"t","project":"p","profile":"dev","command":["x"],"directory":"/d"}""")]
+    [InlineData("""{"kind":"token-env","vault":"/v","session":"s","token":"t","token":"u","project":"p","profile":"dev","command":["x"],"directory":"/d"}""")]
+    public void AMalformedRequest_IsRejected(string frame)
+    {
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned(_wellFormed), out TokenEnvRequest? _));
+
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(frame), out TokenEnvRequest? _));
+    }
+
+    [Fact]
+    public void ARequestFromVersionOneOrNotJson_IsRejected()
+    {
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(_wellFormed, version: 1), out TokenEnvRequest? _));
+        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes("not json"), out TokenEnvRequest? _));
+    }
 
     [Fact]
     public void ToString_Redacts()

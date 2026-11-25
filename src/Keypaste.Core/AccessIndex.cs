@@ -240,7 +240,7 @@ public static class AccessIndex
         }
 
         var site = entry.Origin?.Site is { } own && own == other.Origin?.Site ? own : null;
-        List<string> projects = [.. entry.Projects.Intersect(other.Projects, StringComparer.Ordinal)];
+        IReadOnlyList<string> projects = entry.Projects.Count == 0 || other.Projects.Count == 0 ? [] : [.. entry.Projects.Intersect(other.Projects, StringComparer.Ordinal)];
         var link = new AccessLink(other.Listing.Name, site, projects)
         {
             SameAccount = entry.Username is { } username && username == other.Username,

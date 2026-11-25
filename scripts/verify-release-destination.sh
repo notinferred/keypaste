@@ -1,18 +1,16 @@
 #!/usr/bin/env bash
 # Holds scripts/publish-release.sh to refusing every destination it cannot positively verify.
 #
-# Nothing in this repository can execute a step out of a workflow, which is why F.4a's defect
-# survived: the fail-open line lived in release.yml, and the only thing that ever ran it was a tag
-# against a public bucket. So the decision moved into a script, and this drives that script against
-# a fake `aws` on PATH - the technique verify-install.sh uses to shadow curl - through every answer
+# A workflow step cannot be run outside a tag, so the destination decision lives in
+# publish-release.sh, and this drives that script against a fake `aws` on PATH - the technique verify-install.sh uses to shadow curl - through every answer
 # a listing can give. No credential, no network, and no real bucket is involved.
 #
-# What it holds, per V-F.4a:
+# What it holds:
 #   - exactly one scenario reaches an upload, and it is the one where a listing succeeded, parsed,
 #     named the prefix that was asked about, and said zero keys;
 #   - every other scenario makes zero write calls, counted from an allowlist of read verbs rather
 #     than a denylist of write ones, and leaves the pre-existing objects byte-identical;
-#   - the pre-fix one-liner, run through the same harness against the same fake, uploads on two of
+#   - the old fail-open one-liner, run through the same harness against the same fake, uploads on two of
 #     those scenarios. That pair is the whole argument: same fake, one difference.
 #
 # Usage:
@@ -28,10 +26,10 @@
 # some other shape, the positive control below turns that into a refused release rather than an
 # overwrite, which is the direction law 7 asks for; only a real dispatch or tag can observe it.
 #
-# NEGATIVE CONTROL: phase G writes F.4a's defect back out verbatim - `aws s3 ls ... 2>/dev/null ||
-# true` and an unguarded `cp` - and requires it to reach an upload on the denied-quiet and
+# NEGATIVE CONTROL: phase G runs the old fail-open check - `aws s3 ls ... 2>/dev/null || true` and
+# an unguarded `cp` - and requires it to reach an upload on the denied-quiet and
 # always-empty scenarios. If the old code refuses, this gate fails: a fixture that cannot reproduce
-# the fail-open condition proves nothing about the fix.
+# the fail-open condition proves nothing about the check that replaced it.
 #
 # The real-awscli phase must never be skipped or soft-passed: it dies where it cannot run, and the
 # closing lines say how many of its cases were reached rather than implying a number.
@@ -83,7 +81,7 @@ done
 echo 'archive win-x64' > "$DIST/keypaste-${VERSION}-win-x64.zip"
 echo 'source' > "$DIST/keypaste-${VERSION}-source.tar.gz"
 # The desktop packages ride in the same directory and the same upload, because they publish to the
-# same version prefix (4.7c). Their names come from the definition rather than being written out
+# same version prefix. Their names come from the definition rather than being written out
 # here, so a renamed package changes this fixture with it.
 jq -r --arg v "$VERSION" '.components.app.targets[] | . as $t | (.packages // [])[]
   | .pattern | split("{version}") | join($v) | split("{rid}") | join($t.rid)
@@ -174,8 +172,8 @@ case "$verb" in
     esac
     ;;
   's3 ls')
-    # Only the pre-fix one-liner asks this. Real awscli exits 1 with no output for a prefix that
-    # matches nothing, which is the ambiguity F.4a is about, so the fake reproduces it.
+    # Only the old fail-open one-liner asks this. Real awscli exits 1 with no output for a prefix that
+    # matches nothing, which is the ambiguity that made it fail open, so the fake reproduces it.
     case "$SCENARIO" in
       honest|always-empty)
         target="${2#s3://}"; target="${target#*/}"
@@ -361,8 +359,8 @@ echo '  ok  no mode means no upload'
 echo '--- G. NEGATIVE CONTROL: what the code being replaced did with the same answers'
 cat > "$WORK/old-publisher.sh" <<'OLD'
 #!/usr/bin/env bash
-# F.4a's defect, verbatim from release.yml's "Upload to R2" step before this repair, kept here so
-# the gate can prove it is caught. Not a copy of the fix: a copy of what the fix replaced.
+# The old fail-open upload check, verbatim, kept here so the gate can prove it is caught. Not a
+# copy of the current check: a copy of what it replaced.
 set -euo pipefail
 mode="$1"; version="$2"; dir="${3:-}"
 endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"

@@ -15,7 +15,7 @@ namespace Keypaste.App.Tests.Session;
 
 /// <summary>
 /// With the tray on and the app running in a home, a second start under the same user and home shows the first one's
-/// window and exits, and a second start at login exits showing nothing (V-F.38).
+/// window and exits, and a second start at login exits showing nothing.
 /// </summary>
 /// <remarks>
 /// The first app is composed by <see cref="App.Launch"/> into Avalonia's own lifetime holding the claim
@@ -95,13 +95,12 @@ public sealed class SecondStartTests
             using var stderr = new StringWriter();
             Assert.Equal(0, Program.Run(["--background"], home.Path, null, NoSecondApp, stderr, _wait));
 
-            await Task.Delay(_settle, Token);
             WindowInput.Drain();
             Assert.False(app.Main!.IsVisible, "a start at login showed the running app's window");
             Assert.Null(lifetime.MainWindow);
             Assert.Equal(0, claim.Requests);
 
-            // The running app was listening all along: a person's start still reaches it.
+            // The running app was listening all along: a person's start still reaches it, the first request it hears.
             Assert.Equal(0, await SecondStartAsync([], home, stderr, _wait));
             Assert.True(app.Main.IsVisible);
             Assert.Equal(1, claim.Requests);

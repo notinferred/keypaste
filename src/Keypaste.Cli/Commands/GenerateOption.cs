@@ -17,9 +17,8 @@ namespace Keypaste.Cli.Commands;
 /// printed is what kind and how much of it there was.
 /// </para>
 /// <para>
-/// <b>This file used to say there could be no <c>keypaste generate</c> verb at all, and V.6
-/// overturned that for exactly one case.</b> A passphrase for a share
-/// (5.4a) exists to leave by a second channel, and no vault holds it, so there is no store for it
+/// <b>The one exception is <c>keypaste generate</c>, which prints a share passphrase on stdout.</b>
+/// A passphrase for a share exists to leave by a second channel, and no vault holds it, so there is no store for it
 /// to go into and <c>get --reveal</c>'s discipline has nothing to protect. That verb generates
 /// passphrases only; a character password on stdout still has no argument, because
 /// <c>add --generate</c> already stores one and <c>get --reveal</c> already prints it.

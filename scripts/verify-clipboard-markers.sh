@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# N.12: what the platform clipboard offers after the app copies a secret, after its clear and after a
+# What the platform clipboard offers after the app copies a secret, after its clear and after a
 # plain copy. Reads type names only, never a value.
 set -euo pipefail
 

@@ -96,7 +96,7 @@ internal sealed class AppCommandHost
 
 /// <summary>
 /// The app's commands, each written once, for the macOS menu bar and Dock menu, the menu button on Windows and Linux,
-/// and the window's chords (Q.2).
+/// and the window's chords.
 /// </summary>
 /// <remarks>
 /// On macOS an enabled menu item takes its chord before any control sees it, and a disabled one lets it through, so

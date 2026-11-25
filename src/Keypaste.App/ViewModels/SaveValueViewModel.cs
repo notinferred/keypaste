@@ -4,7 +4,7 @@ using Keypaste.Core.Approval;
 namespace Keypaste.App.ViewModels;
 
 /// <summary>
-/// An agent's request that the person save a value, in front of the person at this desktop (F.79): they type, paste or
+/// An agent's request that the person save a value, in front of the person at this desktop: they type, paste or
 /// generate it, and Save writes it where the agent named; the agent never receives it.
 /// </summary>
 /// <remarks>

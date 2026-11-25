@@ -6,7 +6,7 @@
     Fields and choices. A field, a masked field and a pop-up button are 32px tall on the surface with the control edge
     round them; focused, the border is the accent's ring with a 3px glow of it outside. A checkbox is square, a radio
     round, and a checked box, a chosen radio and a switch that is on all take the accent. Classes:
-      TextBox.search       28px titlebar/list search field, the one field not 32px
+      TextBox.search       28px list search field, the one field not 32px, on the card with a hairline until pointed at or focused
       TextBox.mono         the system's monospace for keys, values and paths
       AutoCompleteBox.mono the same for a field that suggests, its suggestions included
       Border.segmented     the track around a segmented control; put RadioButton.segment (or
@@ -40,8 +40,10 @@
   <Style Selector="TextBox.search">
     <Setter Property="MinHeight" Value="28" />
     <Setter Property="Height" Value="28" />
-    <Setter Property="Padding" Value="8,0" />
+    <Setter Property="Padding" Value="8,0,4,0" />
     <Setter Property="FontSize" Value="13" />
+    <Setter Property="Background" Value="{DynamicResource KpBgCard}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource KpBorderSubtle}" />
   </Style>
 
   <Style Selector="ComboBox">

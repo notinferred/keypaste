@@ -132,7 +132,7 @@
     <Setter Property="Foreground" Value="{DynamicResource KpTextSecondary}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
-  <!-- A 20px target; the margins keep the 16px it used to take in the chip's row. -->
+  <!-- A 20px target whose negative margins keep it 16px tall in the chip's row. -->
   <Style Selector="Button.chip-remove">
     <Setter Property="Width" Value="20" />
     <Setter Property="Height" Value="20" />

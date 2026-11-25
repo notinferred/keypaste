@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>A locked app whose thread pool has no thread free still takes the next bridge that knocks (F.70).</summary>
+/// <summary>A locked app whose thread pool has no thread free still takes the next bridge that knocks.</summary>
 /// <remarks>
 /// Alone in its collection, because it caps this process's pool and holds every thread of it, which would hold up any
 /// test running beside it.
@@ -29,7 +29,7 @@ public sealed class LockedAppStarvedPoolTests : IDisposable
         string? unreachable = null;
         using var endpoint = LockedAppEndpoint.Listen(_name, () => Interlocked.Increment(ref heard), why => unreachable = why);
 
-        // Windows queues no connection, so before F.100 the third bridge timed out waiting for a pool thread to make it an instance.
+        // Windows queues no connection, so an instance made on a pool thread would leave the third bridge timing out while the pool is starved.
         const int bridges = 5;
         var reached = await Task.Factory.StartNew(
             () => WhileNoPoolThreadIsFree(() => Enumerable.Range(0, bridges).Select(_ => Knock()).ToArray()),

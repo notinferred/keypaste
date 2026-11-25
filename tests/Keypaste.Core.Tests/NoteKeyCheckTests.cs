@@ -5,7 +5,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// C.2: keys left in notes are found in a saved vault by entry and key, never by value.
+/// Keys left in notes are found in a saved vault by entry and key, never by value.
 /// </summary>
 public sealed class NoteKeyCheckTests : IDisposable
 {

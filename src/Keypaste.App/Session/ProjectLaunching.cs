@@ -10,7 +10,7 @@ namespace Keypaste.App.Session;
 /// <param name="Parent">The environment the terminal would inherit before the set is added, on Windows and Linux; on macOS the one <c>open</c> is given, less every <c>KEYPASTE_</c> variable.</param>
 /// <remarks>
 /// On macOS the app hands Terminal no set: it leaves a request in <see cref="Requests"/>, asks
-/// <see cref="Authority"/> for the run's launch pass and opens Terminal with <see cref="Opener"/> (D-0451).
+/// <see cref="Authority"/> for the run's launch pass and opens Terminal with <see cref="Opener"/>.
 /// </remarks>
 internal sealed record ProjectLaunching(
     TerminalLaunch Terminal,

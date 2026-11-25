@@ -82,22 +82,22 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Keypaste.Core.Tests" />
-    <!-- V-F.6 saves from its own process, so the retry budget it pins has to be reachable
-         from there too. A tests/ helper; nothing shipped references it. -->
+    <!-- Core's save tests save from a process of their own, so the retry budget they pin has to be
+         reachable from there too. A tests/ helper; nothing shipped references it. -->
     <InternalsVisibleTo Include="Keypaste.VaultSaver" />
-    <!-- V-V.2b asks whether a restore kept the entry's UUID, and no CLI verb prints one, so the
-         claim is unassertable from either front end without EntryUuid. That one seam; a tests/
+    <!-- A consistency test asks whether a restore kept the entry's UUID, and no CLI verb prints one,
+         so the claim is unassertable from either front end without EntryUuid. That one seam; a tests/
          project, in neither solution, that nothing shipped references. -->
     <InternalsVisibleTo Include="Keypaste.Consistency.Tests" />
-    <!-- 1.4b3's merge gate has KeePassXC merge the copy the app holds open, and no front end writes an
-         open copy anywhere but its own file, so Vault.WriteCopyTo is that one seam; a tests/ helper. -->
+    <!-- The driver that runs the desktop app from outside for the desktop exercises; a tests/ helper
+         nothing shipped references. -->
     <InternalsVisibleTo Include="Keypaste.AppDriver" />
-    <!-- V-V.3b asks what the Trash screen says about a vault whose owner turned the recycle bin
+    <!-- The Trash screen's tests ask what it says about a vault whose owner turned the recycle bin
          off in KeePassXC, and SetRecyclesDeletedEntries is the only way to build one without a
          KeePassXC installation. That one seam; a tests/ project. A fixture needs it to be a seam
          rather than public API. -->
     <InternalsVisibleTo Include="Keypaste.App.Tests" />
-    <!-- V-V.1a2 asks what the CLI says when its XML keyfile loader falls back to hashing the file,
+    <!-- The CLI's tests ask what it says when its XML keyfile loader falls back to hashing the file,
          which only a NativeAOT build does and no test runs as. VaultKeyfile.SimulateXmlFallback is
          that one seam. -->
     <InternalsVisibleTo Include="Keypaste.Cli.Tests" />

@@ -2,7 +2,6 @@ using System.Security.Cryptography;
 using Keypaste.Core;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
-using Keypaste.Core.Ipc;
 using Keypaste.Core.Tests;
 using Keypaste.Core.Totp;
 using Keypaste.Mcp.Tools;
@@ -47,7 +46,7 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     internal const string SentinelUrl = "https://SENTINEL-URL-c39f5e.example";
     internal const string SentinelNotes = "SENTINEL-NOTES-d40a6f";
 
-    /// <summary>An env-named custom field of the same entry, which may leave by name (C.5a).</summary>
+    /// <summary>An env-named custom field of the same entry, which may leave by name.</summary>
     internal const string SentinelApiKey = "SENTINEL-OPENAI-API-KEY-a93d1e";
 
     /// <summary>A custom field of the same entry that is not env-named, so it never leaves.</summary>
@@ -103,15 +102,8 @@ public sealed class SecretHygieneTests : IAsyncLifetime
     private Vault? _vault;
     private OwnerLog? _log;
     private readonly ScriptedHuman _human = new();
-    private ApprovalGate? _gate;
-    private ApproverListener? _listener;
-    private CancellationTokenSource? _stop;
-    private Task? _serving;
-
-    private ApprovalGate? _automaticGate;
-    private ApproverListener? _automaticListener;
-    private CancellationTokenSource? _automaticStop;
-    private Task? _automaticServing;
+    private RealOwner? _owner;
+    private RealOwner? _automaticOwner;
 
     private readonly FakeAgentRules _settings = new();
     private readonly FakeAgentRules _automaticSettings = new();
@@ -168,74 +160,27 @@ public sealed class SecretHygieneTests : IAsyncLifetime
         _settings.Rules = Sees;
         _automaticSettings.Rules = AllowsEverything;
 
-        _gate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);
         _log = new OwnerLog(Path.Combine(_directory, "home"));
-
-        var handler = new ApproverHandler(
-            new VaultCredentialSource(() => _vault),
-            new VaultEntryNameLister(() => _vault),
-            _gate,
-            _settings);
-
-        _stop = new CancellationTokenSource();
-        _listener = new ApproverListener(PipeName, TestSession.Over(_vault, handler, _log.Log));
-        _serving = _listener.RunAsync(_stop.Token);
+        _owner = RealOwner.Start(_vault, _human, _log.Log, _settings, PipeName);
 
         // A second approver over the same vault, where the agent is Automatic for billing. Two
         // listeners rather than one whose settings change per test, so neither test's answers depend
         // on what another left behind.
-
-        _automaticGate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);
-        _automaticStop = new CancellationTokenSource();
-        _automaticListener = new ApproverListener(
-            AutomaticPipeName,
-            TestSession.Over(
-                _vault,
-                new ApproverHandler(
-                    new VaultCredentialSource(() => _vault),
-                    new VaultEntryNameLister(() => _vault),
-                    _automaticGate,
-                    _automaticSettings),
-                _log.Log));
-
-        _automaticServing = _automaticListener.RunAsync(_automaticStop.Token);
+        _automaticOwner = RealOwner.Start(_vault, _human, _log.Log, _automaticSettings, AutomaticPipeName);
 
         return ValueTask.CompletedTask;
     }
 
     public async ValueTask DisposeAsync()
     {
-        foreach (var stop in new[] { _stop, _automaticStop })
+        foreach (var owner in new[] { _owner, _automaticOwner })
         {
-            if (stop is not null)
+            if (owner is not null)
             {
-                await stop.CancelAsync();
+                await owner.DisposeAsync();
             }
         }
 
-        foreach (var serving in new[] { _serving, _automaticServing })
-        {
-            if (serving is null)
-            {
-                continue;
-            }
-
-            try
-            {
-                await serving;
-            }
-            catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
-            {
-                // Tearing the listener down is how it stops.
-            }
-        }
-
-        _listener?.Dispose();
-        _automaticListener?.Dispose();
-        _stop?.Dispose();
-        _automaticStop?.Dispose();
-        _gate?.Dispose();
-        _automaticGate?.Dispose();
         _vault?.Dispose();
         _log?.Dispose();
 
@@ -771,20 +716,18 @@ public sealed class SecretHygieneTests : IAsyncLifetime
         _human.Answer = answer;
         Keypaste.Core.Tests.ProjectVariables.Set(_vault!, "dev", "STRIPE_KEY", SentinelPassword);
         _vault!.Save();
-        var pipe = "keypaste-hygiene-run-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
         using var gate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);
         using var lifetime = new Keypaste.Core.Ownership.SessionLifetime(TestSession.Id);
-        var authority = new Keypaste.Core.Ownership.SessionAuthority(
-            Keypaste.Core.Ownership.VaultIdentity.Of(Path.GetDirectoryName(_vault!.Path)!, _vault.Path),
-            () => lifetime,
-            new ApproverHandler(new VaultCredentialSource(() => _vault), new VaultEntryNameLister(() => _vault), gate, _settings),
-            audit: () => _log!.Log,
-            new Keypaste.Core.Ownership.SessionEnvironments(gate, _ => _vault, TimeProvider.System));
-        using var stop = new CancellationTokenSource();
-        using var listener = new ApproverListener(pipe, authority);
-        var serving = listener.RunAsync(stop.Token);
+        await using var owner = ServedOwner.Serve(
+            new Keypaste.Core.Ownership.SessionAuthority(
+                Keypaste.Core.Ownership.VaultIdentity.Of(Path.GetDirectoryName(_vault!.Path)!, _vault.Path),
+                () => lifetime,
+                ServedOwner.VaultHandler(() => _vault, gate, _settings),
+                audit: () => _log!.Log,
+                new Keypaste.Core.Ownership.SessionEnvironments(gate, _ => _vault, TimeProvider.System)),
+            ServedOwner.NewPipeName("keypaste-hygiene-run-"));
 
-        await using (var harness = new McpHarness(pipe, _vault.Path))
+        await using (var harness = new McpHarness(owner.PipeName, _vault.Path))
         {
             var client = await harness.StartAsync("--allow-run");
             var work = Directory.CreateDirectory(Path.Combine(_directory, "work")).FullName;
@@ -818,17 +761,6 @@ public sealed class SecretHygieneTests : IAsyncLifetime
             {
                 AssertNowhere(harness, sentinel, TextOf(run) + TextOf(outside), $"run answered {answer}");
             }
-        }
-
-        await stop.CancelAsync();
-
-        try
-        {
-            await serving;
-        }
-        catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
-        {
-            // Tearing the listener down is how it stops.
         }
     }
 

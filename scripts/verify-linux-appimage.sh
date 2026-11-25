@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Holds a built Linux AppImage to what release-targets.json declares about it (4.7a3).
+# Holds a built Linux AppImage to what release-targets.json declares about it.
 #
 # What it refuses:
 #   - a file name other than the declared appimage pattern expanded for this version;
@@ -10,11 +10,11 @@
 #   - a payload whose files differ from the staged payload, whose binary reports another version
 #     or fails --selftest, or whose binaries do not publish as keypaste;
 #   - an image whose AppRun does not start the CLI it carries for `cli`, which is what the terminal's
-#     keypaste linked from Settings runs (G.5), and through it the bridge a connected client starts
-#     as `~/.local/bin/keypaste mcp` (G.2).
+#     keypaste linked from Settings runs, and through it the bridge a connected client starts
+#     as `~/.local/bin/keypaste mcp`.
 #
 # This script never executes the image; verify-no-icu.sh does. The squashfs starts where the runtime's ELF ends, at its section
-# header table's end, and `unsquashfs -o` reads it from there. Installing it is 4.7b.
+# header table's end, and `unsquashfs -o` reads it from there. Installing it is install-desktop.yml's job.
 #
 # <version> names the package; <binary-version> is what the payload reports. They differ only on a
 # dispatch, where app.yml names the package <binary-version>-dryrun.

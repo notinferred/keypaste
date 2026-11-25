@@ -59,7 +59,7 @@ internal sealed partial class LogViewModel : ObservableObject
     private readonly ClipboardCountdown? _clipboard;
     private readonly Func<AuditCheckpointKey?>? _checkpointKey;
 
-    private AuditHistory _history = new(AuditReadKind.Missing, [], [], string.Empty);
+    private AuditHistory _history = new(AuditReadKind.Missing, string.Empty);
     private IReadOnlyList<LogRow> _all = [];
     private List<LogRow> _rows = [];
 
@@ -261,14 +261,7 @@ internal sealed partial class LogViewModel : ObservableObject
             _ => string.Empty,
         };
 
-        _all =
-        [
-            .. _history.Entries
-                .Select(entry => LogRow.From(entry, !_history.Unverified.Contains(entry.Line), _clock, _history.Edited.Contains(entry.Line)))
-                .OrderBy(row => row.Source.At is null)
-                .ThenByDescending(row => row.Source.At?.UtcTicks)
-                .ThenByDescending(row => row.Source.Line),
-        ];
+        _all = NewestFirst([.. _history.Entries.Select(entry => LogRow.From(entry, !_history.Unverified.Contains(entry.Line), _clock, _history.Edited.Contains(entry.Line)))]);
 
         OnPropertyChanged(nameof(HasTable));
         OnPropertyChanged(nameof(Verdict));
@@ -299,6 +292,48 @@ internal sealed partial class LogViewModel : ObservableObject
         return words.Length == 0
             ? string.Create(CultureInfo.InvariantCulture, $"{total} {noun}")
             : string.Create(CultureInfo.InvariantCulture, $"{shown} of {total} {noun} · {words}");
+    }
+
+    /// <summary>Dated rows newest first, a later line first on a tie, then the undated ones, a later line first.</summary>
+    /// <remarks>A log read in file order is already oldest first unless a clock went back, so it is reversed rather than sorted.</remarks>
+    private static List<LogRow> NewestFirst(List<LogRow> rows)
+    {
+        var dated = rows.Where(row => row.Source.At is not null).ToList();
+        var undated = rows.Where(row => row.Source.At is null).ToList();
+
+        if (!OldestFirst(dated) || !OldestFirst(undated))
+        {
+            return
+            [
+                .. rows
+                    .OrderBy(row => row.Source.At is null)
+                    .ThenByDescending(row => row.Source.At?.UtcTicks)
+                    .ThenByDescending(row => row.Source.Line),
+            ];
+        }
+
+        dated.Reverse();
+        undated.Reverse();
+        dated.AddRange(undated);
+
+        return dated;
+    }
+
+    /// <summary>Whether each row is strictly after the one before it by time, then line, since reversing a tie would swap what the sort keeps.</summary>
+    private static bool OldestFirst(List<LogRow> rows)
+    {
+        for (var i = 1; i < rows.Count; i++)
+        {
+            var before = (rows[i - 1].Source.At?.UtcTicks ?? 0, rows[i - 1].Source.Line);
+            var after = (rows[i].Source.At?.UtcTicks ?? 0, rows[i].Source.Line);
+
+            if (before.CompareTo(after) >= 0)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static string DayWords(DateTime? date, DateTime today) => date switch

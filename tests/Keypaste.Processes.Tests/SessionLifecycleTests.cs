@@ -6,8 +6,8 @@ using Xunit;
 namespace Keypaste.Processes.Tests;
 
 /// <summary>
-/// The app starts, holds and ends the session authority without a terminal (4.4b), across real processes: a built keypaste mcp asks
-/// tests/Keypaste.AppDriver composing the app's authority as its launch does, and keypaste-app itself runs once per home (F.38).
+/// The app starts, holds and ends the session authority without a terminal, across real processes: a built keypaste mcp asks
+/// tests/Keypaste.AppDriver composing the app's authority as its launch does, and keypaste-app itself runs once per home.
 /// </summary>
 public sealed partial class SessionLifecycleTests
 {

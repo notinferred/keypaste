@@ -13,7 +13,7 @@ namespace Keypaste.App.Tests.Session;
 
 /// <summary>
 /// The app starts, holds and ends its session authority, and says what agents meet as the authority
-/// answering them says it, over the app's real endpoint (4.4b).
+/// answering them says it, over the app's real endpoint.
 /// </summary>
 public sealed class AppAuthorityTests
 {
@@ -83,7 +83,7 @@ public sealed class AppAuthorityTests
 
     /// <summary>
     /// On macOS each unlock serves the app's own Runs on its launch endpoint, though agents cannot reach
-    /// the vault, a lock ends it and the next unlock serves the same name again (D-0451); elsewhere the
+    /// the vault, a lock ends it and the next unlock serves the same name again; elsewhere the
     /// app's launches need none, so none is served.
     /// </summary>
     [Fact]

@@ -116,7 +116,8 @@ public sealed partial class ApproverHandler
 
         if (_rules.TryRead(out var after, out _))
         {
-            _gate.ClearCooldowns(key => Moved(before, after, key));
+            // An expired refusal holds nothing back and IsInCooldown drops it, so only a standing one has its entry resolved.
+            _gate.ClearCooldowns(key => _gate.IsInCooldown(key) && Moved(before, after, key));
         }
 
         return true;

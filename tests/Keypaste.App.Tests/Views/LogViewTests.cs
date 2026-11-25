@@ -59,6 +59,24 @@ public sealed class LogViewTests
         Assert.DoesNotContain(Resources.Strings.ServedFromAnEarlierApprovalUnderAXde6ddd, window.GetVisualDescendants().OfType<TextBlock>().Select(block => block.Text));
     });
 
+    /// <summary>
+    /// The rows sit inside the page's scroller with their own vertical scrolling off, and nothing caps how many lines the log
+    /// holds, so the list must still realise only the rows the window shows rather than a container for every line.
+    /// </summary>
+    [Fact]
+    public Task A_long_log_realises_only_the_rows_in_view() => HeadlessSession.On(() =>
+    {
+        using var home = new TempAuditHome();
+        home.Write([.. Enumerable.Range(0, 1_000).Select(i => Release(AuditMethod.Prompt, $"release {i}"))]);
+
+        var model = new LogViewModel(home.Home);
+        Assert.Equal(1_000, model.Rows.Count);
+        var window = new Window { Width = 1200, Height = 800, Content = new LogView { DataContext = model } };
+        window.Show();
+
+        Assert.InRange(window.GetVisualDescendants().OfType<ListBoxItem>().Count(), 1, 100);
+    });
+
     private static AuditRecord Release(AuditMethod method, string reason) => new()
     {
         Tool = "request_credential",

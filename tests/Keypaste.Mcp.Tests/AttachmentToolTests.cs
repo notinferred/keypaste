@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
-using Keypaste.Core.Ipc;
 using Keypaste.Core.Tests;
 using Keypaste.Mcp.Tools;
 using ModelContextProtocol.Client;
@@ -24,10 +23,7 @@ public sealed class AttachmentToolTests : IAsyncLifetime
     private string _directory = string.Empty;
     private Vault? _vault;
     private OwnerLog? _log;
-    private ApprovalGate? _gate;
-    private ApproverListener? _listener;
-    private CancellationTokenSource? _stop;
-    private Task? _serving;
+    private RealOwner? _owner;
 
     private string PipeName { get; } = "keypaste-attachment-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
 
@@ -40,42 +36,19 @@ public sealed class AttachmentToolTests : IAsyncLifetime
         Assert.True(_vault.AddAttachment(item, "deploy.p12", new MemoryStream(_certificate), out _));
         _vault.Save();
 
-        _gate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);
         _log = new OwnerLog(Path.Combine(_directory, "home"));
-        _stop = new CancellationTokenSource();
-        _listener = new ApproverListener(
-            PipeName,
-            TestSession.Over(
-                _vault,
-                new ApproverHandler(new VaultCredentialSource(() => _vault), new VaultEntryNameLister(() => _vault), _gate, TestSession.Settings()),
-                _log.Log));
-        _serving = _listener.RunAsync(_stop.Token);
+        _owner = RealOwner.Start(_vault, _human, _log.Log, pipeName: PipeName);
 
         return ValueTask.CompletedTask;
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (_stop is not null)
+        if (_owner is not null)
         {
-            await _stop.CancelAsync();
+            await _owner.DisposeAsync();
         }
 
-        if (_serving is not null)
-        {
-            try
-            {
-                await _serving;
-            }
-            catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
-            {
-                // Tearing the listener down is how it stops.
-            }
-        }
-
-        _listener?.Dispose();
-        _stop?.Dispose();
-        _gate?.Dispose();
         _vault?.Dispose();
         _log?.Dispose();
         Directory.Delete(_directory, recursive: true);

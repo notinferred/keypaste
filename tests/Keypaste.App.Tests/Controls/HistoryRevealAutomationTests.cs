@@ -24,7 +24,7 @@ namespace Keypaste.App.Tests.Controls;
 /// <b>Why not lean on <see cref="RevealedValueTests"/>.</b> That file proves the control, built by
 /// hand against a fake row, outside any template. This one proves the <em>screen</em>: the bindings
 /// in the comparison template, the labels and buttons around the cell, and the list item the
-/// selection came from. Three of 4.9's four masked fields needed their own evidence for the same
+/// selection came from. The masked fields inside templates needed their own evidence for the same
 /// reason, and a drawn value is the harder case.
 /// </para>
 /// <para>

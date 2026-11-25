@@ -5,7 +5,7 @@ using Xunit;
 namespace Keypaste.Processes.Tests;
 
 /// <summary>
-/// A built keypaste verb that saves while the app or keypaste approve holds the vault (N.10, N.11): access and import are refused naming
+/// A built keypaste verb that saves while the app or keypaste approve holds the vault: access and import are refused naming
 /// the holder before any password, and every verb that edits items sends its edit to the holder, which asks and saves it.
 /// </summary>
 /// <remarks>

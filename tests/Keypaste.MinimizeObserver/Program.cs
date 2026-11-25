@@ -23,7 +23,7 @@ namespace Keypaste.MinimizeObserver;
 /// <summary>
 /// Runs the desktop app's own composition on a real windowing backend so that
 /// <c>scripts/verify-clipboard-markers.sh</c> can read the platform clipboard after a secret copy, its
-/// clear and a plain copy (N.12). Exit 3 means the app could not be arranged.
+/// clear and a plain copy. Exit 3 means the app could not be arranged.
 /// </summary>
 internal static class Program
 {

@@ -17,7 +17,7 @@ namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
 /// Settings › Browser fill turns keypaste on and off as each browser's host for its extension, says who each browser starts
-/// and whether the extension is in it, and asks before replacing another program's manifest; each start re-points a stale one (8.1e).
+/// and whether the extension is in it, and asks before replacing another program's manifest; each start re-points a stale one.
 /// </summary>
 public sealed partial class BrowserHostSettingsTests : IDisposable
 {

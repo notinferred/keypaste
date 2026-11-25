@@ -5,9 +5,8 @@ namespace Keypaste.Mcp;
 
 /// <summary>What became of an exchange, beyond whether it produced a reply.</summary>
 /// <remarks>
-/// Three of these used to be a <c>bool Reachable</c>. <see cref="Busy"/> is the one that needed a
-/// name: it is not a failure and not an absent approver, it is keypaste declining to stack a second
-/// request behind one a person has not answered yet.
+/// <see cref="Busy"/> is neither a failure nor an absent approver: it is keypaste declining to stack
+/// another request behind the ones a person has not answered yet.
 /// </remarks>
 internal enum ApproverOutcome
 {
@@ -96,17 +95,15 @@ internal sealed class ApproverConnection(string? pipeName, string vaultPath) : I
     /// </para>
     /// <para>
     /// <b>Half a second is a measurement, not a guess.</b> A whole round trip
-    /// against a running approver — process start, connect, prompt, release — measured 248 ms, while
-    /// the same call with nothing listening measured 2306 ms against the two seconds this used to
-    /// be. Almost none of the budget is spent when somebody is there, because
-    /// <c>ApproverListener</c> always has a pending instance up, so the operating system completes
-    /// the connect with no application involvement. Cutting the ceiling therefore takes 1.8 s off
-    /// every refusal without touching the path that works.
+    /// against a running approver — process start, connect, prompt, release — measured 248 ms, and
+    /// almost none of that is the connect, because <c>ApproverListener</c> always has a pending
+    /// instance up, so the operating system completes the connect with no application involvement.
+    /// With nothing listening, the whole ceiling is added to every refusal.
     /// </para>
     /// </remarks>
     internal static readonly TimeSpan ConnectTimeout = TimeSpan.FromMilliseconds(500);
 
-    /// <summary>How many exchanges this bridge carries at once: one on screen and the agent's waiting behind it (F.80).</summary>
+    /// <summary>How many exchanges this bridge carries at once: the one on screen and the most its agent may have waiting behind it.</summary>
     internal const int Lanes = ApprovalLimits.MaximumWaiting + 1;
 
     private readonly object _lanesLock = new();

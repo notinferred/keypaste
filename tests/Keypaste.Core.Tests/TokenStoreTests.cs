@@ -332,6 +332,37 @@ public sealed class TokenStoreTests : IDisposable
         Assert.False(store.Revoke("ci", _now));
     }
 
+    [Fact]
+    public void AnItemElsewhereTitledWithATokensPath_NeitherForgesNorShadowsIt()
+    {
+        Create("kept", "read:a/dev/*", out var kept);
+        Create("revoked", "read:a/dev/*", out var revoked);
+        _vault.Save();
+        var records = _vault.ReadEntries(includeReserved: true).Where(entry => entry.GroupPath == ReservedGroups.Tokens).ToList();
+        Assert.True(new TokenStore(_vault).Revoke("revoked", _now));
+        _vault.Save();
+
+        InFile(VaultPath, database =>
+        {
+            foreach (var record in records)
+            {
+                PwEntry lookalike = new(true, true);
+                lookalike.Strings.Set(PwDefs.TitleField, new ProtectedString(false, $"{ReservedGroups.Tokens}/{record.Title}"));
+                lookalike.Strings.Set(PwDefs.UserNameField, new ProtectedString(false, record.Username));
+                lookalike.Strings.Set(PwDefs.PasswordField, new ProtectedString(true, record.Password));
+                lookalike.Strings.Set(PwDefs.NotesField, new ProtectedString(false, record.Notes));
+                database.RootGroup.AddEntry(lookalike, true);
+            }
+        });
+
+        using var reopened = ClaimedVault.Open(VaultPath, EnvStoreTests.MasterPassword);
+        var store = new TokenStore(reopened);
+
+        Assert.Equal(TokenCheck.Valid, store.Verify(kept, _now, out _));
+        Assert.Equal(TokenCheck.Unknown, store.Verify(revoked, _now, out _));
+        Assert.Equal(["kept"], store.List().Select(info => info.Name));
+    }
+
     /// <summary>This copy revoked the token and saved, and an older copy still holding it is moved over the file, as a sync service delivers one.</summary>
     [Fact]
     public void ARevocationHere_SurvivesAMergeWithAnOlderCopyOfTheFile()
@@ -374,7 +405,7 @@ public sealed class TokenStoreTests : IDisposable
     }
 
     /// <summary>
-    /// A tombstone wins over a token's record whatever the times or changes: one copy deleted the record, as keypaste before 1.4b5
+    /// A tombstone wins over a token's record whatever the times or changes: one copy deleted the record, as an older keypaste
     /// revoked and KeePassXC deletes, and the other changed it afterwards, which would keep an ordinary item in the bin.
     /// </summary>
     [Theory]
@@ -442,7 +473,7 @@ public sealed class TokenStoreTests : IDisposable
     }
 
     /// <summary>
-    /// A token deleted with only a tombstone, as keypaste before 1.4b5 revoked one, comes back when KeePassXC merges in an older copy,
+    /// A token deleted with only a tombstone, as an older keypaste revoked one, comes back when KeePassXC merges in an older copy,
     /// beside its tombstone; it reads as revoked, and keypaste's merge then removes it.
     /// </summary>
     [Fact]
@@ -527,7 +558,7 @@ public sealed class TokenStoreTests : IDisposable
     }
 
     /// <summary>
-    /// KeePassXC's default merge of one closed file into another, as 1.4a read KeePassXC 2.8's <c>Merger.cpp</c>: entries matched by
+    /// KeePassXC's default merge of one closed file into another, as KeePassXC 2.8's <c>Merger.cpp</c> performs it: entries matched by
     /// UUID, the source's version current with the target's in its history when it is the newer, an entry only the source holds added
     /// though the target holds its tombstone, and no deletion applied or carried.
     /// </summary>

@@ -111,7 +111,7 @@ internal static class SelfTest
                     stdout.WriteLine($"keypaste-app: notification add {(accepted ? "accepted" : "refused")}");
                 }
 
-                // Touch ID needs the data protection keychain, which admits only a bundle whose provisioning profile authorizes it (D-0681).
+                // Touch ID needs the data protection keychain, which admits only a bundle whose provisioning profile authorizes it.
                 var keychain = new TouchId(Path.Combine(scratch.FullName, "home")).Probe();
                 var profiled = File.Exists(Path.Combine(AppContext.BaseDirectory, "..", "embedded.provisionprofile"));
                 stdout.WriteLine($"keypaste-app: keychain {(keychain == TouchId.Succeeded ? "admits" : "refuses")} this build ({keychain.ToString(CultureInfo.InvariantCulture)}), provisioning profile {(profiled ? "embedded" : "absent")}");

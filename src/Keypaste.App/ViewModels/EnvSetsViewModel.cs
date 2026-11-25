@@ -261,8 +261,9 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
         }
     }
 
-    /// <summary>The command that injects a project, for the card's copy helper, for the person to finish, or null when the name gets none.</summary>
-    internal static string? RunCommandFor(string project) => CopiedRunCommand.For(project, environment: null, command: string.Empty);
+    /// <summary>The command that injects a project of this vault, for the card's copy helper, for the person to finish, or null when the vault's path or the name gets none.</summary>
+    internal string? RunCommandFor(string project) =>
+        _session.VaultPath is { } vault ? CopiedRunCommand.For(vault, project, environment: null, command: string.Empty) : null;
 
     /// <summary>Copies a project's run command, plainly and with no countdown, when it has one.</summary>
     internal async Task CopyRunCommandAsync(string project)
@@ -387,7 +388,7 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
 
         var project = NewProject.Trim();
 
-        // Core's rule again, for the same reason: `keypaste env set` refuses the same names.
+        // Core's rule, so this screen and `keypaste env set` refuse the same names and cannot drift.
         if (!EnvConvention.IsValidProject(project, out var invalid))
         {
             RefuseNewProject(invalid);

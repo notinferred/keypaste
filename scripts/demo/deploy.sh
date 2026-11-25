@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-#
-# deploy.sh
-#
 # The deploy in docs/demo.md. It builds nothing, opens no socket, and is safe to run any number
 # of times. It exists so the demo has a command that fails for exactly one reason — a missing
 # credential — and succeeds the moment that credential is present.

@@ -9,7 +9,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// F.79's acceptance on the save path: a real vault, the owner's own authority and log, and only the person faked. The value
+/// The save path end to end: a real vault, the owner's own authority and log, and only the person faked. The value
 /// the person enters reaches the place the agent named and never the agent, a cancel or a lock saves nothing, and a value is
 /// replaced only where the prompt said it would be.
 /// </summary>

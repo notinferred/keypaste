@@ -67,8 +67,8 @@ public sealed record SettingsReading(string Name, string Path, HealthFinding? Fi
         }
 
         var fix = LineOf(problem) is { } line
-            ? $"fix {line}, or delete it and run `keypaste use <path>`; deleting also resets the app's preferences"
-            : "fix or delete it, then run `keypaste use <path>`; deleting also resets the app's preferences";
+            ? $"fix {line}, or delete it and run `keypaste use <path>`; deleting also resets the app's preferences, and how long the agent log is kept goes back to one year"
+            : "fix or delete it, then run `keypaste use <path>`; deleting also resets the app's preferences, and how long the agent log is kept goes back to one year";
 
         return Unparsed(name, problem, path, fix);
     }

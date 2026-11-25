@@ -1,6 +1,4 @@
-using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
-using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Tests;
@@ -40,9 +38,9 @@ public sealed class SameNameItemsTests : IDisposable
     [InlineData("bob")]
     public void Each_opens_as_itself_and_reveals_its_own_password(string username)
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
 
-        var detail = context.Open(username);
+        var detail = OpenByUsername(context, username);
 
         Assert.Null(context.Entries.Error);
         Assert.Equal(username, detail.DisplayUsername);
@@ -55,8 +53,8 @@ public sealed class SameNameItemsTests : IDisposable
     [InlineData("bob")]
     public async Task Each_copies_its_own_values(string username)
     {
-        using var context = new Context(_vaultPath);
-        var detail = context.Open(username);
+        using var context = new UnlockedScreens(_vaultPath, _master);
+        var detail = OpenByUsername(context, username);
 
         await detail.CopyPasswordCommand.PressAsync();
         Assert.Equal(username + "-password", context.Clipboard.Content);
@@ -68,13 +66,13 @@ public sealed class SameNameItemsTests : IDisposable
     [Fact]
     public void Choosing_the_other_of_the_pair_moves_the_pane_and_the_highlight()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
 
-        context.Open("alice");
+        OpenByUsername(context, "alice");
         context.Entries.Reload();
         Assert.Equal("alice", context.Entries.Selected!.Username);
 
-        var detail = context.Open("bob");
+        var detail = OpenByUsername(context, "bob");
 
         Assert.Equal("bob-password", detail.Reveal());
         Assert.Equal("bob", context.Entries.Selected!.Username);
@@ -85,9 +83,9 @@ public sealed class SameNameItemsTests : IDisposable
     [InlineData("bob", "alice")]
     public void An_edit_writes_to_the_item_it_opened(string username, string other)
     {
-        using (var context = new Context(_vaultPath))
+        using (var context = new UnlockedScreens(_vaultPath, _master))
         {
-            var detail = context.Open(username);
+            var detail = OpenByUsername(context, username);
 
             detail.EditCommand.Press();
             detail.DraftNotes = "edited";
@@ -96,7 +94,7 @@ public sealed class SameNameItemsTests : IDisposable
             detail.SaveCommand.Press();
 
             Assert.Null(context.Entries.Error);
-            Assert.Equal("edited", context.Open(username).DisplayNotes);
+            Assert.Equal("edited", OpenByUsername(context, username).DisplayNotes);
         }
 
         Assert.Equal("replaced", Saved(username).Password);
@@ -111,9 +109,9 @@ public sealed class SameNameItemsTests : IDisposable
     [InlineData("bob", "alice")]
     public void A_rotation_changes_the_item_it_opened(string username, string other)
     {
-        using (var context = new Context(_vaultPath))
+        using (var context = new UnlockedScreens(_vaultPath, _master))
         {
-            var detail = context.Open(username);
+            var detail = OpenByUsername(context, username);
 
             detail.RotateCommand.Press();
             detail.ConfirmRotateCommand.Press();
@@ -130,9 +128,9 @@ public sealed class SameNameItemsTests : IDisposable
     [InlineData("bob", "alice")]
     public void Fields_and_tags_go_on_the_item_they_were_added_to(string username, string other)
     {
-        using (var context = new Context(_vaultPath))
+        using (var context = new UnlockedScreens(_vaultPath, _master))
         {
-            var detail = context.Open(username);
+            var detail = OpenByUsername(context, username);
 
             detail.BeginAddFieldCommand.Press();
             detail.DraftFieldName = "PIN";
@@ -162,9 +160,9 @@ public sealed class SameNameItemsTests : IDisposable
         var file = Path.Combine(_directory, "key.pem");
         File.WriteAllBytes(file, [1, 2, 3]);
 
-        using (var context = new Context(_vaultPath))
+        using (var context = new UnlockedScreens(_vaultPath, _master))
         {
-            var detail = context.Open(username);
+            var detail = OpenByUsername(context, username);
 
             detail.Attachments.AddDropped(file);
 
@@ -183,14 +181,14 @@ public sealed class SameNameItemsTests : IDisposable
     [InlineData("bob", "alice")]
     public void History_reads_and_restores_the_item_it_opened(string username, string other)
     {
-        using (var context = new Context(_vaultPath))
+        using (var context = new UnlockedScreens(_vaultPath, _master))
         {
-            var detail = context.Open(username);
+            var detail = OpenByUsername(context, username);
 
             detail.EditCommand.Press();
             Type(detail.NewPassword, "replaced");
             detail.SaveCommand.Press();
-            detail = context.Open(username);
+            detail = OpenByUsername(context, username);
 
             detail.History.ToggleCommand.Press();
             var revision = Assert.Single(detail.History.Rows);
@@ -216,9 +214,9 @@ public sealed class SameNameItemsTests : IDisposable
     [InlineData("bob", "alice")]
     public void A_rename_takes_the_item_it_opened_and_ends_the_pair(string username, string other)
     {
-        using (var context = new Context(_vaultPath))
+        using (var context = new UnlockedScreens(_vaultPath, _master))
         {
-            context.Open(username);
+            OpenByUsername(context, username);
             Assert.All(context.Entries.Rows.Where(row => row.GroupPath == "services" && row.Title == "Mail"), row => Assert.True(row.SharesItsName));
 
             context.Entries.OrganizeCommand.Press();
@@ -244,9 +242,9 @@ public sealed class SameNameItemsTests : IDisposable
     [Fact]
     public void A_rename_that_leaves_no_pair_behind_still_offers_undo()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
 
-        context.Open("carol");
+        OpenByUsername(context, "carol");
         context.Entries.OrganizeCommand.Press();
         context.Entries.DraftTitle = "Boards";
         context.Entries.ConfirmOrganizeCommand.Press();
@@ -264,9 +262,9 @@ public sealed class SameNameItemsTests : IDisposable
     [InlineData("bob", "alice")]
     public void A_delete_takes_the_item_it_opened_and_undo_brings_that_one_back(string username, string other)
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
 
-        context.Open(username);
+        OpenByUsername(context, username);
         context.Entries.DeleteCommand.Press();
 
         Assert.Null(context.Entries.Error);
@@ -290,12 +288,12 @@ public sealed class SameNameItemsTests : IDisposable
     [InlineData("bob", "alice")]
     public void Trash_restores_each_as_itself(string first, string second)
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
         var passwords = context.Session.Unlocked!.ReadEntries().ToDictionary(entry => entry.Uuid!, entry => entry.Password, StringComparer.Ordinal);
 
-        context.Open(first);
+        OpenByUsername(context, first);
         context.Entries.DeleteCommand.Press();
-        context.Open(second);
+        OpenByUsername(context, second);
         context.Entries.DeleteCommand.Press();
         Assert.Null(context.Entries.Error);
 
@@ -329,9 +327,9 @@ public sealed class SameNameItemsTests : IDisposable
             vault.Save();
         }
 
-        using (var context = new Context(_vaultPath))
+        using (var context = new UnlockedScreens(_vaultPath, _master))
         {
-            context.Open(username);
+            OpenByUsername(context, username);
             context.Entries.DeleteCommand.Press();
 
             Assert.Equal($"Delete Mail ({username}) for good?", context.Entries.DeletePrompt);
@@ -350,9 +348,9 @@ public sealed class SameNameItemsTests : IDisposable
     [InlineData("bob")]
     public void A_duplicate_copies_the_item_it_opened(string username)
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
 
-        context.Open(username);
+        OpenByUsername(context, username);
         context.Entries.DuplicateCommand.Press();
 
         Assert.Null(context.Entries.Error);
@@ -368,7 +366,7 @@ public sealed class SameNameItemsTests : IDisposable
     [Fact]
     public void A_search_lists_the_item_that_matched_and_not_the_other()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
 
         context.Entries.Search = "alice";
 
@@ -380,7 +378,7 @@ public sealed class SameNameItemsTests : IDisposable
     [Fact]
     public void Sorting_by_title_keeps_the_pair_in_a_settled_order()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
 
         context.Entries.Table.Press(TableStates.Title);
         var ascending = context.Entries.Rows.Where(row => row.GroupPath == "services" && row.Title == "Mail").Select(row => row.Username);
@@ -396,7 +394,7 @@ public sealed class SameNameItemsTests : IDisposable
     [Fact]
     public void Only_a_title_another_row_in_its_group_has_counts_as_shared()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
 
         var shared = context.Entries.Rows.Where(row => row.SharesItsName).Select(row => row.Username).Order();
 
@@ -406,18 +404,18 @@ public sealed class SameNameItemsTests : IDisposable
     [Fact]
     public void A_reference_is_offered_only_for_a_name_one_item_answers_to()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
 
-        Assert.Null(context.Open("alice").Reference);
+        Assert.Null(OpenByUsername(context, "alice").Reference);
         Assert.False(context.Entries.Detail!.HasReference);
-        Assert.NotNull(context.Open("dan").Reference);
+        Assert.NotNull(OpenByUsername(context, "dan").Reference);
     }
 
     [Fact]
     public void The_pane_follows_its_item_when_another_write_renames_it()
     {
-        using var context = new Context(_vaultPath);
-        var detail = context.Open("alice");
+        using var context = new UnlockedScreens(_vaultPath, _master);
+        var detail = OpenByUsername(context, "alice");
         var write = context.Session.Write(vault => vault.Relocate(detail.Name, new EntryName("services", "Webmail"), out _) == OrganizeOutcome.Renamed, renamed => renamed);
 
         Assert.Equal(WriteOutcome.Saved, write.Outcome);
@@ -432,8 +430,8 @@ public sealed class SameNameItemsTests : IDisposable
     [Fact]
     public void A_second_item_of_one_name_arriving_leaves_the_open_pane_on_its_own()
     {
-        using var context = new Context(_vaultPath);
-        var detail = context.Open("dan");
+        using var context = new UnlockedScreens(_vaultPath, _master);
+        var detail = OpenByUsername(context, "dan");
 
         context.Session.Unlocked!.AddEntry(new VaultEntry { Title = "Mail", Username = "eve", Password = "eve-password", GroupPath = "archive" });
 
@@ -523,7 +521,7 @@ public sealed class SameNameItemsTests : IDisposable
     {
         ForeignEdit.CloneKeepingItsUuid(_vaultPath, _master, "Forum", "Twin", "twin-password");
 
-        using (var context = new Context(_vaultPath))
+        using (var context = new UnlockedScreens(_vaultPath, _master))
         {
             var forum = context.Entries.Rows.Single(row => row.Title == "Forum");
             var twin = context.Entries.Rows.Single(row => row.Title == "Twin");
@@ -570,10 +568,10 @@ public sealed class SameNameItemsTests : IDisposable
             vault.Save();
         }
 
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
 
-        Assert.Equal(CodeOfALoneItem(seeds[username]), context.Open(username).Totp!.Reveal());
-        Assert.Equal(CodeOfALoneItem(seeds[other]), context.Open(other).Totp!.Reveal());
+        Assert.Equal(CodeOfALoneItem(seeds[username]), OpenByUsername(context, username).Totp!.Reveal());
+        Assert.Equal(CodeOfALoneItem(seeds[other]), OpenByUsername(context, other).Totp!.Reveal());
     }
 
     [Theory]
@@ -584,7 +582,7 @@ public sealed class SameNameItemsTests : IDisposable
     public void A_tell_is_what_only_that_item_has(string firstName, string secondName, string firstUrl, string secondUrl, string firstTell, string secondTell)
     {
         var path = PairWith(firstName, firstUrl, secondName, secondUrl);
-        using var context = new Context(path);
+        using var context = new UnlockedScreens(path, _master);
 
         var rows = context.Entries.Rows.Where(row => row.Title == "Pair").OrderBy(row => row.Name.Uuid == FirstUuid(path) ? 0 : 1).ToList();
 
@@ -596,7 +594,7 @@ public sealed class SameNameItemsTests : IDisposable
     public void Where_nothing_tells_them_apart_the_pane_says_so_and_offers_a_rename()
     {
         var path = PairWith(string.Empty, string.Empty, string.Empty, string.Empty, recycles: false);
-        using var context = new Context(path);
+        using var context = new UnlockedScreens(path, _master);
 
         context.Entries.Selected = context.Entries.Rows.First(row => row.Title == "Pair");
         var detail = context.Entries.Detail!;
@@ -614,20 +612,20 @@ public sealed class SameNameItemsTests : IDisposable
     [Fact]
     public void A_pair_a_username_tells_apart_does_not_say_nothing_does()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master);
 
-        var detail = context.Open("alice");
+        var detail = OpenByUsername(context, "alice");
 
         Assert.True(detail.SharesItsName);
         Assert.False(detail.NothingTellsItApart);
-        Assert.False(context.Open("carol").SharesItsName);
+        Assert.False(OpenByUsername(context, "carol").SharesItsName);
     }
 
     [Fact]
     public void A_pane_learns_when_another_write_ends_its_pair()
     {
-        using var context = new Context(_vaultPath);
-        var detail = context.Open("alice");
+        using var context = new UnlockedScreens(_vaultPath, _master);
+        var detail = OpenByUsername(context, "alice");
         Assert.False(detail.HasReference);
 
         Assert.True(context.Session.Write(
@@ -717,8 +715,8 @@ public sealed class SameNameItemsTests : IDisposable
             vault.Save();
         }
 
-        using var context = new Context(path);
-        return context.Open("lone").Totp!.Reveal()!;
+        using var context = new UnlockedScreens(path, _master);
+        return OpenByUsername(context, "lone").Totp!.Reveal()!;
     }
 
     /// <summary>A vault of its own holding one pair in <c>services</c> as given, of which <see cref="FirstUuid"/> is the first.</summary>
@@ -765,41 +763,10 @@ public sealed class SameNameItemsTests : IDisposable
         return new EntryName(entry.GroupPath, entry.Title) { Uuid = entry.Uuid };
     }
 
-    private sealed class Context : IDisposable
+    /// <summary>Selects the item <paramref name="username"/> names in Items, since the items here share a title, and returns its pane.</summary>
+    private static EntryDetailViewModel OpenByUsername(UnlockedScreens context, string username)
     {
-        internal Context(string vaultPath)
-        {
-            Session = new AppVaultSession(new ManualClock(AppClock.Start));
-
-            using (var master = TempVault.Secret(_master))
-            {
-                Assert.Equal(UnlockOutcome.Opened, Session.TryUnlock(vaultPath, master.Value));
-            }
-
-            Clipboard = new FakeClipboard();
-            Countdown = new ClipboardCountdown(Clipboard, new ManualClock(AppClock.Start));
-            Entries = new EntriesViewModel(Session, Countdown);
-        }
-
-        internal AppVaultSession Session { get; }
-
-        internal ClipboardCountdown Countdown { get; }
-
-        internal EntriesViewModel Entries { get; }
-
-        internal FakeClipboard Clipboard { get; }
-
-        internal EntryDetailViewModel Open(string username)
-        {
-            Entries.Selected = Entries.Rows.Single(row => row.Username == username);
-            return Entries.Detail!;
-        }
-
-        public void Dispose()
-        {
-            Entries.Dispose();
-            Countdown.Dispose();
-            Session.Dispose();
-        }
+        context.Entries.Selected = context.Entries.Rows.Single(row => row.Username == username);
+        return context.Entries.Detail!;
     }
 }

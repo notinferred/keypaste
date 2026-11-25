@@ -223,7 +223,7 @@ internal sealed record LogRow
 
     private static (string Secrets, string Where) Place(AuditEntry entry)
     {
-        // A run or a token names the sets it asked about, which are labels rather than groups (D-0416).
+        // A run or a token names the sets it asked about, which are labels rather than groups.
         string[] sets = Is(entry.Tool, "run") || Is(entry.Tool, "token bundle")
             ? entry.Entry.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             : [];

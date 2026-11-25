@@ -27,7 +27,8 @@ internal static class VaultSession
     /// <param name="line">
     /// The parsed command line, for <c>--keyfile</c>. Taken whole rather than as a resolved path so
     /// that every verb reaches the keyfile the same way, for the reason the vault path is resolved
-    /// once: twelve commands each deciding what an unreadable keyfile means is twelve wordings.
+    /// once: each verb deciding for itself what an unreadable keyfile means would give as many
+    /// wordings as verbs.
     /// </param>
     /// <param name="context">Where prompts and errors go.</param>
     /// <param name="body">What to do with the open vault.</param>
@@ -96,7 +97,7 @@ internal static class VaultSession
             // A command opens, edits and saves within milliseconds, so reaching this means
             // something wrote to the file during that window — a second keypaste, or KeePassXC.
             // Running the command again is the whole recovery, which is why no verb grows a
-            // --force: an override flag on five commands would buy nothing and be reached for.
+            // --force: an override flag on every command that saves would buy nothing and be reached for.
             context.Stderr.WriteLine(
                 "keypaste: that vault changed while keypaste was writing it. Nothing was saved — run the command again.");
             return CliApp.ExitInternalError;
@@ -333,8 +334,8 @@ internal static class VaultSession
     /// the rule <c>keypaste generate</c> already follows for what a passphrase is made of.
     /// </para>
     /// <para>
-    /// Here rather than in the five commands that save, because one wording is the point, and the
-    /// desktop is not here at all: its Settings screen names the directory instead (V.4b).
+    /// Here rather than in each command that saves, because one wording is the point, and the
+    /// desktop is not here at all: its Settings screen names the directory instead.
     /// </para>
     /// </remarks>
     private static void Announce(Vault vault, CliContext context)
@@ -425,7 +426,7 @@ internal static class VaultSession
 
         // Nothing typed, nothing to confirm. This decides no outcome — VaultCreation still refuses
         // the empty password and supplies the words — it only keeps somebody from being asked to
-        // retype a blank line, which is what this verb did before the rules moved.
+        // retype a blank line.
         if (first.Length == 0)
         {
             return new NewMasterPassword(first, new SecretBuffer());

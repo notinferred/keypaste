@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Keypaste.App.Tests;
 
-/// <summary>The terms of use the first run shows are read from the one copy the app carries, dated, in headed paragraphs (D-0597).</summary>
+/// <summary>The terms of use the first run shows are read from the one copy the app carries, dated, in headed paragraphs.</summary>
 public sealed class TermsOfUseTests
 {
     [Fact]

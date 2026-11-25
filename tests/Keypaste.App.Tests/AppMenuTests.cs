@@ -11,7 +11,7 @@ using Xunit;
 namespace Keypaste.App.Tests;
 
 /// <summary>
-/// The commands drawn as menus (Q.2): the macOS menu bar, its app menu and the Dock's, and the menu button's flyout on
+/// The commands drawn as menus: the macOS menu bar, its app menu and the Dock's, and the menu button's flyout on
 /// Windows and Linux, each item running its command, off while the command cannot run, and showing its chord.
 /// </summary>
 public sealed class AppMenuTests : IDisposable

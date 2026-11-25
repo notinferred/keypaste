@@ -13,7 +13,7 @@ using static Keypaste.App.Tests.Session.JourneyDriver;
 namespace Keypaste.App.Tests.Session;
 
 /// <summary>
-/// G.5: each start keeps the terminal's link current once, before the app runs, a start the running app takes included,
+/// Each start keeps the terminal's link current once, before the app runs, a start the running app takes included,
 /// and Settings links it from the button the install exercise presses.
 /// </summary>
 public sealed class TerminalLinkJourneyTests

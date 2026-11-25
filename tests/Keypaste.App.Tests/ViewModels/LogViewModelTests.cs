@@ -58,6 +58,22 @@ public sealed class LogViewModelTests : IDisposable
         Assert.Equal(["Today", null, "Yesterday", null], model.Rows.Select(row => row.Day));
     }
 
+    /// <summary>A record whose time does not parse goes below every dated one, a later line first, wherever the file has it.</summary>
+    [Fact]
+    public void Undated_rows_run_last_and_newest_line_first()
+    {
+        _home.AppendAt(AppClock.Start.AddHours(-2), "env/dev/FIRST");
+        _home.AppendAt(AppClock.Start.AddHours(-1), "env/dev/SECOND");
+        _home.AppendAt(AppClock.Start, "env/dev/THIRD");
+        _home.AppendAt(AppClock.Start.AddHours(1), "env/dev/FOURTH");
+        Undate(1, 3);
+
+        var model = new LogViewModel(_home.Home, new FixedClock(AppClock.Start.AddHours(2)));
+
+        Assert.Equal(["FOURTH", "SECOND", "THIRD", "FIRST"], model.Rows.Select(row => row.Secrets));
+        Assert.Equal([false, false, true, true], model.Rows.Select(row => row.Source.At is null));
+    }
+
     /// <summary>A table that runs over several days carries each day once, above its first row.</summary>
     [Fact]
     public void Each_day_is_divided_once()
@@ -331,6 +347,25 @@ public sealed class LogViewModelTests : IDisposable
 
         Assert.True(model.FilterEmpty);
         Assert.Equal("Log intact · 0 of 1 record · your own actions only", model.Status);
+    }
+
+    /// <summary>Gives the records on the 1-based <paramref name="lines"/> a time that does not parse, as a hand edit could.</summary>
+    private void Undate(params int[] lines)
+    {
+        var records = File.ReadAllText(_home.LogPath).Split('\n', StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (var line in lines)
+        {
+            const string Key = "\"ts\":\"";
+            var written = records[line - 1];
+            var start = written.IndexOf(Key, StringComparison.Ordinal);
+
+            Assert.True(start >= 0, written);
+            start += Key.Length;
+            records[line - 1] = string.Concat(written.AsSpan(0, start), "sometime", written.AsSpan(written.IndexOf('"', start)));
+        }
+
+        File.WriteAllText(_home.LogPath, string.Join('\n', records) + '\n');
     }
 
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider

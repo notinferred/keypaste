@@ -20,7 +20,7 @@
 
     <!--
       ILC analyses IL app-wide from this project, so the quarantine in third_party does not reach
-      it: vendored KeePassLib's eleven reflection sites are reported here, and TreatWarningsAsErrors
+      it: vendored KeePassLib's reflection sites are reported here, and TreatWarningsAsErrors
       would fail every publish. Blanket suppression was rejected - SuppressTrimAnalysisWarnings also
       sets EnableTrimAnalyzer=false, which would disarm the trim gate for our own code too.
 

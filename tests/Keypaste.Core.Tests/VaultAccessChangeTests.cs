@@ -8,7 +8,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// Changing what unlocks a vault (V.1a2): the new credentials open it, the old ones do not, every
+/// Changing what unlocks a vault: the new credentials open it, the old ones do not, every
 /// refusal leaves the file byte-identical, and the file the change replaced is kept.
 /// </summary>
 public sealed class VaultAccessChangeTests : IDisposable

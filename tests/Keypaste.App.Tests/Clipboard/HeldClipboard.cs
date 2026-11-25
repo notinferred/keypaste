@@ -14,7 +14,7 @@ namespace Keypaste.App.Tests.Clipboard;
 /// fire-and-forget paths assertable on the following line — and also what makes a whole class of
 /// defect unreachable. `AvaloniaClipboard` awaits the windowing system; on Windows that can wait on
 /// whichever process currently owns the clipboard. A lock, a quit or a second copy can happen
-/// while that await is outstanding, and F.2c exists because they did.
+/// while that await is outstanding, and in the shipped app they did.
 /// </para>
 /// <para>
 /// <b>The value lands when the hold is released, not when the call is entered.</b> A fixture that
@@ -30,14 +30,12 @@ internal sealed class HeldClipboard : IAppClipboard
     /// <summary>What is on it. A test reads this; production code has no equivalent.</summary>
     internal string? Content { get; private set; }
 
-    /// <summary>Whether it holds a secret set with the secret markers.</summary>
     internal bool ContentWasSetAsASecret { get; private set; }
 
     internal int ClearCount { get; private set; }
 
     internal int SetCount { get; private set; }
 
-    /// <summary>Forced failure of the write.</summary>
     internal bool SetFails { get; set; }
 
     /// <summary>Forced failure of the read-back.</summary>

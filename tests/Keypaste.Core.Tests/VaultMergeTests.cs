@@ -13,7 +13,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// Merging another program's save with the open copy of a vault (1.4b1), on real files the vendored
+/// Merging another program's save with the open copy of a vault, on real files the vendored
 /// library writes: the open copy's changes are keypaste's own, made through <see cref="Vault"/>, and the other program's are made
 /// through KeePassLib directly, a revision of the entry as it was before each change, as KeePass and KeePassXC save one.
 /// </summary>
@@ -709,7 +709,7 @@ public sealed class VaultMergeTests : IDisposable
         });
     }
 
-    /// <summary>Attachments travel inside the versions that hold them, never re-encoded (V.8a).</summary>
+    /// <summary>Attachments travel inside the versions that hold them, never re-encoded.</summary>
     [Fact]
     public void AnAttachmentNeitherSideEdited_IsKeptByteForByte_CurrentAndInHistory()
     {
@@ -818,7 +818,7 @@ public sealed class VaultMergeTests : IDisposable
         Assert.Equal("KeePass database 4.1", KeePassInterop.Probe(FilePath, out _)!.Version);
     }
 
-    /// <summary>An item's Auto-Type settings and window associations travel with its version, as P.4a reads them.</summary>
+    /// <summary>An item's Auto-Type settings and window associations travel with its version, as keypaste's Auto-Type reads them.</summary>
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

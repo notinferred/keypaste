@@ -23,8 +23,7 @@ public sealed record IndexedEntry(ListedEntry Listing, ItemKind Kind, WebOrigin?
     public IReadOnlyList<string> References { get; init; } = [];
 
     /// <summary>The projects its own tags make it a member of, ordinally and each once.</summary>
-    public IReadOnlyList<string> Projects =>
-        [.. Listing.Tags.Select(ProjectTag.Read).Select(tag => tag.Project).OfType<string>().Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)];
+    public IReadOnlyList<string> Projects => Listing.Projects;
 
     /// <summary>This entry as a reach shows it: the fields the reach covers, and its origin, username and references only when it reaches the whole entry.</summary>
     /// <param name="reach">How much of the entry an exposure reaches.</param>

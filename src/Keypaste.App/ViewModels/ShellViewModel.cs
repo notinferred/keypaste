@@ -24,7 +24,7 @@ namespace Keypaste.App.ViewModels;
 /// </para>
 /// <para>
 /// <b>The sidebar reads names and counts, never values.</b> A count comes from the entry list the
-/// Secrets screen reads or from the project catalog, and is dropped the moment it is counted.
+/// Items screen reads or from the project catalog, and is dropped the moment it is counted.
 /// </para>
 /// </remarks>
 /// <summary>How a status dot is drawn.</summary>
@@ -114,9 +114,8 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         _clock = clock ?? TimeProvider.System;
         _post = post;
 
-        // Owned here rather than by each screen, so a copy made on Secrets is still counting down
-        // after a move to Env profiles — and is cleared by the lock, because this is disposed with
-        // everything else the shell built.
+        // Owned here rather than by each screen, so a copy made on Items still counts down after a
+        // move to Environments, and the lock clears it with everything else the shell built.
         Clipboard = new ClipboardCountdown(
             clipboard ?? NoClipboard.Instance,
             _clock,
@@ -172,8 +171,8 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             }
         };
 
-        // Built here rather than left to the first navigation. Assigning Current to the destination
-        // it already holds changes nothing, so Show never ran and the shell opened on a blank pane.
+        // Shown here rather than on the first navigation: assigning Current the destination it
+        // already holds changes nothing, so the shell would open on a blank pane.
         Show(_current);
         ShowSecurityCount();
         ReadAuthority();
@@ -771,8 +770,8 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             DestinationKind.Entries => ItemsScreen(),
             DestinationKind.EnvSets => new EnvSetsViewModel(_itemsVault.Session, Clipboard, _picker, Launching ?? ProjectLaunching.ForThisMachine(AuthorityOf(_itemsVault.Session)), ShowToast, name => OpenEntry(name, itemsVault)),
             DestinationKind.Trash => new TrashViewModel(_itemsVault.Session, Tables.Trash),
-            DestinationKind.Sharing => Sharing(),
-            DestinationKind.Tokens => new ScopedTokensViewModel(_session, Clipboard, ShowDone),
+            DestinationKind.Sharing => Sharing(SettingsVault().Session),
+            DestinationKind.Tokens => new ScopedTokensViewModel(SettingsVault().Session, Clipboard, ShowDone),
             DestinationKind.Diagnostics => new DiagnosticsViewModel(_session, Home, _crashes, Authority, Clipboard),
             DestinationKind.Recommendations => SecurityInView,
             _ => null,
@@ -803,7 +802,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
                 return shown.Vaults;
             case EnvSetsViewModel or TrashViewModel:
                 return [_itemsVault.Session];
-            case SettingsViewModel:
+            case SettingsViewModel or SharingViewModel or ScopedTokensViewModel:
                 return [_settingsVault?.Session ?? _session];
             case AgentActivityViewModel:
                 return [_agentsVault?.Session ?? _session];
@@ -814,11 +813,18 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>Settings, its This vault on the vault in view or the one its picker chose.</summary>
-    private SettingsViewModel Settings()
+    /// <summary>The vault Settings and its sections' own screens act on: the one its picker chose, or the vault in view.</summary>
+    private VaultSection SettingsVault()
     {
         var vault = Chosen(_settingsVault, VaultForScreens);
         _settingsVault = vault;
+        return vault;
+    }
+
+    /// <summary>Settings, its This vault on the vault in view or the one its picker chose.</summary>
+    private SettingsViewModel Settings()
+    {
+        var vault = SettingsVault();
 
         var section = _openingSettingsSection ?? SettingsSectionChoice.General;
         _openingSettingsSection = null;
@@ -1047,8 +1053,9 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     private readonly CrashReporting? _crashes;
     private HttpMessageHandler? _ownShareTransport;
+    private AppVaultSession? _shareVault;
 
-    private SharingViewModel Sharing(EntryName? what = null, Action? cancel = null)
+    private SharingViewModel Sharing(AppVaultSession vault, EntryName? what = null, Action? cancel = null)
     {
         var resolved = ShareEndpoint.TryResolve(null, Environment.GetEnvironmentVariable(ShareEndpoint.EnvironmentVariable), out var endpoint, out _);
 #pragma warning disable RS0030 // The shell makes the share service's client.
@@ -1064,7 +1071,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             () => Core.Audit.AuditLog.TryOpen(auditPath, _clock, out var log, out _) ? log : null);
 
         return new SharingViewModel(
-            _session,
+            vault,
             Clipboard,
             service,
             ShowDone,
@@ -1073,7 +1080,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             cancel);
     }
 
-    /// <summary>Generate password…, as a dialog over whatever screen is showing (V.12).</summary>
+    /// <summary>Generate password…, as a dialog over whatever screen is showing.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasGeneratorDialog))]
     internal partial GeneratePasswordViewModel? GeneratorDialog { get; private set; }
@@ -1114,7 +1121,9 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             return;
         }
 
-        var share = Sharing(item, CloseShare);
+        // Another open vault can hold the item's UUID, so the share must read the vault the item is listed under.
+        _shareVault = EntriesInView?.VaultOfOpen(item) ?? VaultForScreens.Session;
+        var share = Sharing(_shareVault, item, CloseShare);
         share.Created += (_, _) => CloseShare();
         Share = share;
     }
@@ -1124,10 +1133,11 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     {
         var share = Share;
         Share = null;
+        _shareVault = null;
         share?.Dispose();
     }
 
-    /// <summary>New project, from Items' "+" menu: Env profiles, with its create form open.</summary>
+    /// <summary>New project, from Items' "+" menu: Environments, with its create form open.</summary>
     [RelayCommand]
     private void NewProject() => Leave(() =>
     {
@@ -1160,7 +1170,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         });
     }
 
-    /// <summary>Opens Env profiles on a project.</summary>
+    /// <summary>Opens Environments on a project.</summary>
     [RelayCommand]
     private void OpenProject(string? project)
     {
@@ -1340,6 +1350,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         }
 
         _followed.Remove(session);
+        _updatedAt.Remove(session);
     }
 
     /// <summary>A vault's watch saw its file change or a merge start or finish: the title bar reads the vault in view again, and the sidebar its marks.</summary>
@@ -1366,7 +1377,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     private string SaveMarkOf(VaultSection vault) =>
         vault.IsLocked ? string.Empty
         : WatchOf(vault.Session)?.IsMerging == true ? "merging"
-        : vault.Session.Unsaved.Count > 0 ? "unsaved"
+        : vault.Session.HasUnsaved ? "unsaved"
         : string.Empty;
 
     private void ReadVaultStatus()
@@ -1726,7 +1737,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         }
 
         _updatedAt.Remove(session);
-        Count();
+        Count(session);
         ReadVaultStatus();
     });
 
@@ -1853,9 +1864,8 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         _ownShareTransport?.Dispose();
 #pragma warning restore RS0030
 
-        // A secret on the clipboard is derived from an open vault, so it does not survive the lock
-        // either. Disposing clears it, conditionally — a clipboard the user has changed since is
-        // left alone.
+        // A clipboard secret came from the open vault, so the lock clears it, unless the person has
+        // copied something else since.
         Clipboard.Dispose();
     }
 }

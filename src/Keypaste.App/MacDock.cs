@@ -3,8 +3,8 @@ using System.Runtime.InteropServices;
 namespace Keypaste.App;
 
 /// <summary>
-/// Gives the app its Dock icon on macOS only while its window is open (D-0385), and answers the app menu's Hide
-/// keypaste, Hide others and Show all, which Avalonia offers no call for once its own app menu is off (Q.2).
+/// Gives the app its Dock icon on macOS only while its window is open, and answers the app menu's Hide
+/// keypaste, Hide others and Show all, which Avalonia offers no call for once its own app menu is off.
 /// </summary>
 /// <remarks>
 /// Avalonia sets the activation policy once, at start; this changes it while the app runs. A regular app has a Dock

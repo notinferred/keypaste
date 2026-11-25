@@ -22,7 +22,7 @@ using Xunit;
 
 namespace Keypaste.App.Tests.Views;
 
-/// <summary>What Q.17 finished: titles, the hand, toasts, scroll bars, the theme's place, right to left, the wider tight widths and asking for permission calmly.</summary>
+/// <summary>The app's finish: titles, the hand, toasts, scroll bars, the theme's place, right to left, the wider tight widths and asking for permission calmly.</summary>
 public sealed class FinishThePolishTests
 {
     [Fact]

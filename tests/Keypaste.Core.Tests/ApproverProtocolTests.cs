@@ -73,7 +73,7 @@ public sealed class ApproverProtocolTests
     }
 
     /// <summary>
-    /// A bridge from before Stage 2.3, or one started without <c>--client-label</c>, sends no label
+    /// A bridge older than client labels, or one started without <c>--client-label</c>, sends no label
     /// — and that has to decode rather than fail, because the wire version deliberately did not
     /// change for one optional field. An absent label matches no rule, so the request reaches a
     /// person: the same fallback a malformed policy file produces.
@@ -159,7 +159,7 @@ public sealed class ApproverProtocolTests
         Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(reply), out NamesReply? decoded));
         Assert.Equal(AuditMethod.VaultChanged, decoded.Refusal);
 
-        var unknown = """{"v":2,"kind":"names","unlocked":false,"reason":"","complete":true,"method":999,"names":[]}"""u8;
+        var unknown = ApproverFrame.Versioned("""{"kind":"names","unlocked":false,"reason":"","complete":true,"method":999,"names":[]}""");
 
         Assert.True(ApproverProtocol.TryDecode(unknown, out NamesReply? future));
         Assert.Equal(AuditMethod.Failed, future.Refusal);
@@ -215,13 +215,13 @@ public sealed class ApproverProtocolTests
         Listed(new("env/dev", string.Concat(Enumerable.Repeat("\U000E0041", runes))));
 
     /// <summary>
-    /// The reproduced case: a thousand ordinary names, which cost 98,060 bytes to encode whole.
+    /// A thousand ordinary names, 98,060 bytes encoded whole, still encode to a frame the framer will send.
     /// </summary>
     /// <remarks>
     /// The sixty-one byte envelope plus a thousand ninety-seven byte elements and their nine hundred
     /// and ninety-nine commas. That is over <see cref="MessageFramer.MaximumPayloadBytes"/>, so
-    /// before this bound existed the write threw, <see cref="ApproverListener"/> swallowed it, and
-    /// the connection went down carrying its grants with it.
+    /// without this bound the write would throw, <see cref="ApproverListener"/> would swallow it,
+    /// and the connection would go down carrying its grants with it.
     /// </remarks>
 
     [Fact]
@@ -270,7 +270,7 @@ public sealed class ApproverProtocolTests
     [Fact]
     public void AReplyWithNoCompleteField_DecodesAsIncomplete()
     {
-        var older = """{"v":2,"kind":"names","unlocked":true,"reason":"","names":[]}"""u8;
+        var older = ApproverFrame.Versioned("""{"kind":"names","unlocked":true,"reason":"","names":[]}""");
 
         Assert.True(ApproverProtocol.TryDecode(older, out NamesReply? decoded));
 
@@ -303,7 +303,7 @@ public sealed class ApproverProtocolTests
     /// Two bounds that must not overlap: the lister caps how much work the approver does, and the
     /// encoder caps what an agent sees. Were the lister's the tighter of the two, it would drop
     /// names the encoder never saw — and the encoder would then honestly report a complete listing
-    /// that was not one. That is the original defect, moved one layer up, so it is asserted with the
+    /// that was not one. That is an incomplete listing reported as complete, so it is asserted with the
     /// smallest element the format admits rather than argued about.
     /// </remarks>
     [Fact]
@@ -407,10 +407,11 @@ public sealed class ApproverProtocolTests
     [Fact]
     public void AGrantedReplyWithNoValue_IsRefused()
     {
-        var frame = Encoding.UTF8.GetBytes(
-            """{"v":2,"kind":"credential","decision":"granted","method":5,"reason":"ok","code_seconds":300}""");
+        const string grant = """{"kind":"credential","decision":"granted","method":5,"reason":"ok","code_seconds":300""";
 
-        Assert.False(ApproverProtocol.TryDecode(frame, out CredentialReply? reply));
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned(grant + ""","value":"v"}"""), out CredentialReply? _));
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(grant + ""","value":""}"""), out CredentialReply? _));
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(grant + "}"), out CredentialReply? reply));
         Assert.Null(reply);
     }
 
@@ -451,19 +452,28 @@ public sealed class ApproverProtocolTests
     [InlineData("not json at all")]
     [InlineData("[]")]
     [InlineData("\"a string\"")]
-    [InlineData("""{"v":2}""")]
-    [InlineData("""{"v":2,"kind":"credential"}""")]
-    [InlineData("""{"v":2,"kind":"credential","entry":"a","field":"password","reason":"r","exposure":[]}""")]
-    [InlineData("""{"v":2,"kind":"nonsense","entry":"a","field":"password","reason":"r","exposure":[]}""")]
-    [InlineData("""{"v":2,"kind":"credential","entry":1,"field":"password","reason":"r","exposure":[]}""")]
-    [InlineData("""{"v":2,"kind":"credential","entry":"a","field":"password","reason":9,"exposure":[]}""")]
-    [InlineData("""{"v":2,"kind":"credential","entry":"a","field":"password","reason":"r","exposure":[7]}""")]
-    [InlineData("""{"v":2,"kind":"credential","vault":"v","session":"s","entry":"a","field":"password","field":"notes","reason":"r","exposure":[]}""")]
+    public void AFrameThatIsNoJsonObject_IsRefusedRatherThanThrowing(string json)
+    {
+        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(json), out CredentialRequest? request));
+        Assert.Null(request);
+    }
+
+    private const string _credentialRequest = """{"kind":"credential","vault":"v","session":"s","entry":"a","field":"password","reason":"r","exposure":[]}""";
+
+    /// <summary>Each row is <see cref="_credentialRequest"/>, which decodes, with one defect.</summary>
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("""{"kind":"credential"}""")]
+    [InlineData("""{"kind":"nonsense","vault":"v","session":"s","entry":"a","field":"password","reason":"r","exposure":[]}""")]
+    [InlineData("""{"kind":"credential","vault":"v","session":"s","entry":1,"field":"password","reason":"r","exposure":[]}""")]
+    [InlineData("""{"kind":"credential","vault":"v","session":"s","entry":"a","field":"password","reason":9,"exposure":[]}""")]
+    [InlineData("""{"kind":"credential","vault":"v","session":"s","entry":"a","field":"password","reason":"r","exposure":[7]}""")]
+    [InlineData("""{"kind":"credential","vault":"v","session":"s","entry":"a","field":"password","field":"notes","reason":"r","exposure":[]}""")]
     public void AMalformedFrame_IsRefusedRatherThanThrowing(string json)
     {
-        var frame = Encoding.UTF8.GetBytes(json);
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned(_credentialRequest), out CredentialRequest? _));
 
-        Assert.False(ApproverProtocol.TryDecode(frame, out CredentialRequest? request));
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(json), out CredentialRequest? request));
         Assert.Null(request);
     }
 
@@ -472,14 +482,20 @@ public sealed class ApproverProtocolTests
     /// that into a denial, which is the fail-closed direction when two halves of keypaste have
     /// drifted apart.
     /// </summary>
-    [Fact]
-    public void AFrameFromAnotherVersion_IsRefused()
+    [Theory]
+    [InlineData(1)]
+    [InlineData(99)]
+    public void AFrameFromAnotherVersion_IsRefused(int version)
     {
-        var frame = Encoding.UTF8.GetBytes(
-            """{"v":99,"kind":"names","unlocked":true,"reason":"","names":[]}""");
+        const string reply = """{"kind":"names","unlocked":true,"reason":"","names":[]}""";
+        const string request = """{"kind":"names","vault":"v","session":"s","exposure":["env/**"]}""";
 
-        Assert.False(ApproverProtocol.TryDecode(frame, out NamesReply? reply));
-        Assert.Null(reply);
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned(reply), out NamesReply? _));
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned(request), out NamesRequest? _));
+
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(reply, version), out NamesReply? refused));
+        Assert.Null(refused);
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(request, version), out NamesRequest? _));
     }
 
     /// <summary>
@@ -490,8 +506,7 @@ public sealed class ApproverProtocolTests
     [Fact]
     public void AnUnknownMethod_BecomesAFailureRatherThanLosingTheReply()
     {
-        var frame = Encoding.UTF8.GetBytes(
-            """{"v":2,"kind":"credential","decision":"denied","method":9999,"reason":"who knows","code_seconds":0}""");
+        var frame = ApproverFrame.Versioned("""{"kind":"credential","decision":"denied","method":9999,"reason":"who knows","code_seconds":0}""");
 
         Assert.True(ApproverProtocol.TryDecode(frame, out CredentialReply? reply));
         Assert.Equal(AuditMethod.Failed, reply.Method);
@@ -505,8 +520,7 @@ public sealed class ApproverProtocolTests
     [Fact]
     public void ADeniedReplyCarryingAValue_ArrivesWithoutIt()
     {
-        var frame = Encoding.UTF8.GetBytes(
-            """{"v":2,"kind":"credential","decision":"denied","method":7,"reason":"nobody answered","code_seconds":0,"value":"sk_live_smuggled"}""");
+        var frame = ApproverFrame.Versioned("""{"kind":"credential","decision":"denied","method":7,"reason":"nobody answered","code_seconds":0,"value":"sk_live_smuggled"}""");
 
         Assert.True(ApproverProtocol.TryDecode(frame, out CredentialReply? reply));
         Assert.Null(reply.Value);
@@ -518,10 +532,10 @@ public sealed class ApproverProtocolTests
     [Fact]
     public void AReplyNamingItsValueTwice_IsRefused()
     {
-        var frame = Encoding.UTF8.GetBytes(
-            """{"v":2,"kind":"credential","decision":"granted","method":5,"reason":"ok","code_seconds":60,"value":"first","value":"second"}""");
+        const string grant = """{"kind":"credential","decision":"granted","method":5,"reason":"ok","code_seconds":60""";
 
-        Assert.False(ApproverProtocol.TryDecode(frame, out CredentialReply? reply));
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned(grant + ""","value":"first"}"""), out CredentialReply? _));
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(grant + ""","value":"first","value":"second"}"""), out CredentialReply? reply));
         Assert.Null(reply);
     }
 
@@ -547,9 +561,9 @@ public sealed class ApproverProtocolTests
     /// <summary>A note nobody could send is answered with a refusal, not with an unsendable frame.</summary>
     /// <remarks>
     /// <c>notes</c> is a releasable field and a KDBX note has no length limit, so this is an
-    /// ordinary vault entry rather than a hostile one. Before F.3d the frame was written anyway,
-    /// <see cref="MessageFramer"/> threw on the write, and the connection went down with the grants
-    /// scoped to it — after a person had already approved the release.
+    /// ordinary vault entry rather than a hostile one. A frame written anyway would make
+    /// <see cref="MessageFramer"/> throw on the write, and the connection would go down with the
+    /// grants scoped to it — after a person had already approved the release.
     /// </remarks>
     [Fact]
     public void AGrantedReplyTooBigForOneFrame_IsEncodedAsARefusal()
@@ -783,17 +797,22 @@ public sealed class ApproverProtocolTests
         Assert.Equal(sent.Session, names.Session);
     }
 
-    /// <summary>A bridge from before version 2 names no vault or session, so it is not answered.</summary>
+    /// <summary>A bridge from before version 2 names no vault or session, so it is not answered; one naming both is.</summary>
     [Theory]
-    [InlineData("""{"v":1,"kind":"names","exposure":["env/**"]}""")]
-    [InlineData("""{"v":2,"kind":"names","exposure":["env/**"]}""")]
-    [InlineData("""{"v":2,"kind":"credential","entry":"a","field":"password","reason":"r","exposure":[]}""")]
+    [InlineData("""{"kind":"names","exposure":["env/**"]}""")]
+    [InlineData("""{"kind":"credential","entry":"a","field":"password","reason":"r","exposure":[]}""")]
     public void ARequestNamingNoVaultOrSession_IsRefused(string frame)
     {
-        var bytes = Encoding.UTF8.GetBytes(frame);
+        Assert.True(Decodes(Naming("\"vault\":\"v\",\"session\":\"s\"")));
+        Assert.False(Decodes(Naming("\"vault\":\"v\"")));
+        Assert.False(Decodes(Naming("\"session\":\"s\"")));
+        Assert.False(Decodes(frame));
 
-        Assert.False(ApproverProtocol.TryDecode(bytes, out NamesRequest? _));
-        Assert.False(ApproverProtocol.TryDecode(bytes, out CredentialRequest? _));
+        string Naming(string members) => "{" + members + "," + frame[1..];
+
+        static bool Decodes(string json) =>
+            ApproverProtocol.TryDecode(ApproverFrame.Versioned(json), out NamesRequest? _)
+            || ApproverProtocol.TryDecode(ApproverFrame.Versioned(json), out CredentialRequest? _);
     }
 
     [Fact]
@@ -813,7 +832,7 @@ public sealed class ApproverProtocolTests
         Assert.Null(refused.Session);
     }
 
-    /// <summary>A bridge's announced exposure travels with its attach, and an older bridge's attach without one still decodes (N.5).</summary>
+    /// <summary>A bridge's announced exposure travels with its attach, and an older bridge's attach without one still decodes.</summary>
     [Fact]
     public void AnAttachCarriesTheBridgesExposure_OrNone()
     {
@@ -827,12 +846,12 @@ public sealed class ApproverProtocolTests
     }
 
     [Theory]
-    [InlineData("{\"v\":2,\"kind\":\"attach\",\"vault\":\"/v.kdbx\",\"exposure\":\"env/**\"}")]
-    [InlineData("{\"v\":2,\"kind\":\"attach\",\"vault\":\"/v.kdbx\",\"exposure\":[1]}")]
+    [InlineData("""{"kind":"attach","vault":"/v.kdbx","exposure":"env/**"}""")]
+    [InlineData("""{"kind":"attach","vault":"/v.kdbx","exposure":[1]}""")]
     public void AnAttachWithAMalformedExposure_IsRefused(string frame)
     {
-        Assert.True(ApproverProtocol.TryDecode("{\"v\":2,\"kind\":\"attach\",\"vault\":\"/v.kdbx\",\"exposure\":[\"env/**\"]}"u8, out AttachRequest? _));
-        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out AttachRequest? _));
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned("""{"kind":"attach","vault":"/v.kdbx","exposure":["env/**"]}"""), out AttachRequest? _));
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(frame), out AttachRequest? _));
     }
 
     [Fact]
@@ -844,14 +863,19 @@ public sealed class ApproverProtocolTests
             ApproverProtocol.Encode(new AttachRequest("/v.kdbx") { Exposure = globs }), out AttachRequest? _));
     }
 
-    /// <summary>A reply that both attaches and refuses, or does neither, is not taken as an attachment.</summary>
+    /// <summary>A reply that both attaches and refuses, or does neither, is not taken as an attachment; one that does either is.</summary>
     [Theory]
-    [InlineData("""{"v":2,"kind":"attach","session":"0123abcd","method":17,"reason":"no"}""")]
-    [InlineData("""{"v":2,"kind":"attach","reason":""}""")]
-    [InlineData("""{"v":2,"kind":"attach","session":"","reason":""}""")]
+    [InlineData("""{"kind":"attach","session":"0123abcd","method":17,"reason":"no"}""")]
+    [InlineData("""{"kind":"attach","reason":"no"}""")]
+    [InlineData("""{"kind":"attach","session":"","reason":"no"}""")]
     public void AnAmbiguousAttachReply_IsRefused(string frame)
     {
-        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out AttachReply? reply));
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned("""{"kind":"attach","session":"0123abcd","reason":"no"}"""), out AttachReply? attached));
+        Assert.True(attached.Attached);
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned("""{"kind":"attach","method":17,"reason":"no"}"""), out AttachReply? refused));
+        Assert.False(refused.Attached);
+
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(frame), out AttachReply? reply));
         Assert.Null(reply);
     }
 
@@ -877,7 +901,7 @@ public sealed class ApproverProtocolTests
     public void AnAttachReplyWithoutAReadableVersion_StillAttaches(string member)
     {
         Assert.True(ApproverProtocol.TryDecode(
-            Encoding.UTF8.GetBytes("{\"v\":2,\"kind\":\"attach\",\"session\":\"0123abcd\",\"reason\":\"\"" + member + "}"), out AttachReply? reply));
+            ApproverFrame.Versioned("{\"kind\":\"attach\",\"session\":\"0123abcd\",\"reason\":\"\"" + member + "}"), out AttachReply? reply));
 
         Assert.True(reply.Attached);
         Assert.Null(reply.OwnerVersion);
@@ -900,9 +924,9 @@ public sealed class ApproverProtocolTests
             Entries = ["env/acme-api/staging/DATABASE_URL"],
         };
 
-    private const string _namesFrame = """{"v":2,"kind":"names","unlocked":true,"reason":"","complete":true,"names":[]""";
-    private const string _credentialFrame = """{"v":2,"kind":"credential","decision":"granted","method":5,"reason":"ok","value":"sk_live_sentinel","code_seconds":60""";
-    private const string _runFrame = """{"v":2,"kind":"run","project":"p","profile":"dev","outcome":7,"reason":"no","method":5,"entries":[],"problems":[]""";
+    private const string _namesFrame = """{"kind":"names","unlocked":true,"reason":"","complete":true,"names":[]""";
+    private const string _credentialFrame = """{"kind":"credential","decision":"granted","method":5,"reason":"ok","value":"sk_live_sentinel","code_seconds":60""";
+    private const string _runFrame = """{"kind":"run","project":"p","profile":"dev","outcome":7,"reason":"no","method":5,"entries":[],"problems":[]""";
 
     [Theory]
     [InlineData(true)]
@@ -931,9 +955,9 @@ public sealed class ApproverProtocolTests
     [InlineData(",\"recorded\":true", true)]
     public void OnlyAnExplicitTrue_SaysAReplyWasRecorded(string member, bool recorded)
     {
-        Assert.True(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(_namesFrame + member + "}"), out NamesReply? names));
-        Assert.True(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(_credentialFrame + member + "}"), out CredentialReply? credential));
-        Assert.True(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(_runFrame + member + "}"), out RunReply? run));
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned(_namesFrame + member + "}"), out NamesReply? names));
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned(_credentialFrame + member + "}"), out CredentialReply? credential));
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned(_runFrame + member + "}"), out RunReply? run));
 
         Assert.Equal(recorded, names.Recorded);
         Assert.Equal(recorded, credential.Recorded);
@@ -947,11 +971,16 @@ public sealed class ApproverProtocolTests
     [InlineData("true", "false")]
     public void AReplySayingTwiceWhetherItWasRecorded_IsRefused(string first, string second)
     {
-        var members = $",\"recorded\":{first},\"recorded\":{second}}}";
+        var once = $",\"recorded\":{second}}}";
+        var twice = $",\"recorded\":{first},\"recorded\":{second}}}";
 
-        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(_namesFrame + members), out NamesReply? _));
-        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(_credentialFrame + members), out CredentialReply? _));
-        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(_runFrame + members), out RunReply? _));
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned(_namesFrame + once), out NamesReply? _));
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned(_credentialFrame + once), out CredentialReply? _));
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned(_runFrame + once), out RunReply? _));
+
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(_namesFrame + twice), out NamesReply? _));
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(_credentialFrame + twice), out CredentialReply? _));
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(_runFrame + twice), out RunReply? _));
     }
 
     /// <summary>
@@ -1099,14 +1128,19 @@ public sealed class ApproverProtocolTests
         Assert.Equal(new AccessQuery("stripe"), decoded.Query);
     }
 
+    /// <summary>Each row is a search for "stripe", which decodes, with one defect.</summary>
     [Theory]
-    [InlineData("""{"v":2,"kind":"find","vault":"v","session":"s","exposure":[],"item_kind":99}""")]
-    [InlineData("""{"v":2,"kind":"find","vault":"v","session":"s","exposure":[],"text":7}""")]
-    [InlineData("""{"v":2,"kind":"find","vault":"v","session":"s","exposure":[],"host":null}""")]
-    [InlineData("""{"v":2,"kind":"find","vault":"v","exposure":[],"text":"stripe"}""")]
-    [InlineData("""{"v":2,"kind":"find","vault":"v","session":"s","text":"stripe"}""")]
-    public void AMalformedFindRequest_IsRefused(string frame) =>
-        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out FindRequest? _));
+    [InlineData("""{"kind":"find","vault":"v","session":"s","exposure":[],"text":"stripe","item_kind":99}""")]
+    [InlineData("""{"kind":"find","vault":"v","session":"s","exposure":[],"text":7}""")]
+    [InlineData("""{"kind":"find","vault":"v","session":"s","exposure":[],"text":"stripe","host":null}""")]
+    [InlineData("""{"kind":"find","vault":"v","exposure":[],"text":"stripe"}""")]
+    [InlineData("""{"kind":"find","vault":"v","session":"s","text":"stripe"}""")]
+    public void AMalformedFindRequest_IsRefused(string frame)
+    {
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned("""{"kind":"find","vault":"v","session":"s","exposure":[],"text":"stripe"}"""), out FindRequest? _));
+
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(frame), out FindRequest? _));
+    }
 
     [Fact]
     public void AFindRequestBeyondItsBounds_IsRefused()
@@ -1161,16 +1195,23 @@ public sealed class ApproverProtocolTests
         Assert.True(link.SameAccount && link.References && link.ReferencedBy);
     }
 
-    private const string _reply = """{"v":2,"kind":"find","unlocked":true,"reason":"","complete":true,"found":[]""";
+    private const string _reply = """{"kind":"find","unlocked":true,"reason":"","complete":true,"found":[]""";
 
+    /// <summary>Each row is one project of billing's dev with one item, which decodes, with one defect.</summary>
     [Theory]
     [InlineData(_reply + ""","projects":{}}""")]
     [InlineData(_reply + ""","projects":[{"name":"billing","environments":["dev"],"items":0}]}""")]
     [InlineData(_reply + ""","projects":[{"name":"billing","environments":["dev"]}]}""")]
     [InlineData(_reply + ""","projects":[{"name":"billing","environments":["1","2","3","4","5","6","7","8","9"],"items":1}]}""")]
     [InlineData(_reply + ""","projects":[{"environments":["dev"],"items":1}]}""")]
-    public void AFindReplyWithMalformedProjects_IsRefused(string frame) =>
-        Assert.False(ApproverProtocol.TryDecode(Encoding.UTF8.GetBytes(frame), out FindReply? _));
+    public void AFindReplyWithMalformedProjects_IsRefused(string frame)
+    {
+        Assert.True(ApproverProtocol.TryDecode(
+            ApproverFrame.Versioned(_reply + ""","projects":[{"name":"billing","environments":["dev"],"items":1}]}"""),
+            out FindReply? _));
+
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(frame), out FindReply? _));
+    }
 
     [Fact]
     public void AFindReplyNamingMoreProjectsThanOneSearchDoes_IsRefused()
@@ -1219,6 +1260,7 @@ public sealed class ApproverProtocolTests
 
     private const string _row = """{"group":"g","title":"t","kind":1,"fields":[],"tags":[],"links":[]""";
 
+    /// <summary>Each row is a row that decodes, bare, with an origin, or with one link, given one defect.</summary>
     [Theory]
     [InlineData(_row + ""","origin":"https://stripe.com/login"}""")]
     [InlineData(_row + ""","origin":"https://stripe.com"}""")]
@@ -1230,10 +1272,23 @@ public sealed class ApproverProtocolTests
     [InlineData("""{"group":"g","title":"t","kind":1,"fields":[],"tags":[],"links":[{"group":"g","title":"u","projects":[null]}]}""")]
     [InlineData("""{"group":"g","title":"t","kind":1,"fields":[],"tags":[],"links":[{"group":"g","title":"u","projects":[],"same_account":1}]}""")]
     [InlineData("""{"group":"g","title":"t","kind":1,"fields":[],"tags":[],"links":[{"group":"g","title":"u","projects":[],"references":"yes"}]}""")]
-    public void AFindReplyWithAMalformedRow_IsRefused(string row) =>
-        Assert.False(ApproverProtocol.TryDecode(
-            Encoding.UTF8.GetBytes($$"""{"v":2,"kind":"find","unlocked":true,"reason":"","complete":true,"found":[{{row}}]}"""),
-            out FindReply? _));
+    public void AFindReplyWithAMalformedRow_IsRefused(string row)
+    {
+        foreach (var wellFormed in new[]
+                 {
+                     _row + "}",
+                     _row + ""","origin":"https://stripe.com:443"}""",
+                     """{"group":"g","title":"t","kind":1,"fields":[],"tags":[],"links":[{"group":"g","title":"u","projects":[]}]}""",
+                 })
+        {
+            Assert.True(Decodes(wellFormed));
+        }
+
+        Assert.False(Decodes(row));
+
+        static bool Decodes(string found) =>
+            ApproverProtocol.TryDecode(ApproverFrame.Versioned($$"""{"kind":"find","unlocked":true,"reason":"","complete":true,"found":[{{found}}]}"""), out FindReply? _);
+    }
 
     /// <summary>Rows too long for one frame are dropped whole from the end, and the reply says it is not complete.</summary>
     [Fact]

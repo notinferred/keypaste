@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests.Login;
 
-/// <summary>Each platform's open-at-login entry starts this app with no window, and turning it off removes it (G.4a).</summary>
+/// <summary>Each platform's open-at-login entry starts this app with no window, and turning it off removes it.</summary>
 public sealed class LoginItemTests : IDisposable
 {
     private readonly string _home = Directory.CreateTempSubdirectory("keypaste-login-").FullName;
@@ -148,6 +148,20 @@ public sealed class LoginItemTests : IDisposable
         Assert.True(new MacLaunchAgent(_home, "/old/keypaste-app", new FakeApproval()).Enable());
 
         Assert.False(new MacLaunchAgent(_home, "/new/keypaste-app", new FakeApproval()).IsEnabled);
+    }
+
+    [Theory]
+    [InlineData("/Volumes/keypaste/keypaste.app/Contents/MacOS/keypaste-app")]
+    [InlineData("/private/var/folders/x/AppTranslocation/0A1B/d/keypaste.app/Contents/MacOS/keypaste-app")]
+    public void A_launch_agent_for_a_copy_on_a_disk_image_or_translocated_is_refused_and_not_written(string program)
+    {
+        var item = new MacLaunchAgent(_home, program, new FakeApproval());
+
+        Assert.True(item.RunsFromTemporaryLocation);
+        Assert.False(item.Enable());
+        Assert.False(File.Exists(item.FilePath));
+        Assert.False(item.IsEnabled);
+        Assert.False(new MacLaunchAgent(_home, "/Applications/keypaste.app/Contents/MacOS/keypaste-app", new FakeApproval()).RunsFromTemporaryLocation);
     }
 
     [Fact]

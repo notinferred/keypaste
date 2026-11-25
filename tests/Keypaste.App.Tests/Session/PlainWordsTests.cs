@@ -173,10 +173,10 @@ public sealed partial class PlainWordsTests
     });
 
     /// <summary>
-    /// The screens a person meets before the shell (N.6's limit, done in 4.10a): the first-launch screen
+    /// The screens a person meets before the shell: the first-launch screen
     /// and the terms it links, the welcome with and without KeePassXC's databases, the lock screen with a YubiKey chosen, with
     /// Windows Hello and Touch ID offered, and after an access change, the create form, each step of the KeePass database import dialog,
-    /// and each of the export import dialog's (9.1f).
+    /// and each of the export import dialog's.
     /// </summary>
     [Fact]
     public Task TheUnlockScreensAndTheImportDialog_HoldNoneOfTheRetiredWords() => HeadlessSession.On(async () =>

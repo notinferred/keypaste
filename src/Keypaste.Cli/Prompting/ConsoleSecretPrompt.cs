@@ -80,9 +80,7 @@ internal sealed class ConsoleSecretPrompt : ISecretPrompt
         _isInputRedirected = isInputRedirected;
         _clock = clock;
 
-        // The raw stdin stream, decoded as UTF-8 by hand below. Console.In would decode with the
-        // console input code page — typically an OEM page on Windows — and silently mangle a
-        // non-ASCII password arriving through a pipe.
+        // Raw stdin, decoded as UTF-8 by hand rather than by Console.In's console code page.
         _redirectedInput = redirectedInput ?? Console.OpenStandardInput();
     }
 

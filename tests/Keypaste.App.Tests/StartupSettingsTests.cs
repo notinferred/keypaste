@@ -16,7 +16,7 @@ namespace Keypaste.App.Tests;
 /// <remarks>
 /// <para>
 /// <b>These run <see cref="App.Compose"/> itself</b> rather than a test-local re-implementation of
-/// it. That is the point: the defect F.2a repairs was not in <c>AppSettings</c>, which round-tripped
+/// it. That is the point: the defect this guards against was not in <c>AppSettings</c>, which round-tripped
 /// correctly and was well covered, nor in <c>AppVaultSession</c>, which honoured whatever timeout it
 /// was handed. It was that composition never introduced the two. A test that composes a session by
 /// hand would have passed against the broken app.
@@ -70,7 +70,7 @@ public sealed class StartupSettingsTests
     });
 
     /// <summary>
-    /// The whole of V-F.2a in one place: save preferences, throw the session away, compose a new
+    /// The whole round trip in one place: save preferences, throw the session away, compose a new
     /// one from the file alone, and the effective timeout, the displayed choice and the applied
     /// theme all agree without anyone visiting Settings again.
     /// </summary>
@@ -99,7 +99,7 @@ public sealed class StartupSettingsTests
     /// <summary>
     /// A file keypaste cannot read costs a preference and never costs a lock — and never costs the
     /// file either. Rewriting it with the defaults would destroy a hand edit at the moment its
-    /// author was most likely part-way through making it (D-0028).
+    /// author was most likely part-way through making it.
     /// </summary>
     [Fact]
     public Task Unreadable_preferences_take_the_defaults_and_leave_the_file_alone() => Started(fixture =>
@@ -142,8 +142,9 @@ public sealed class StartupSettingsTests
 
     /// <summary>
     /// Runs <paramref name="body"/> on the headless session's UI thread with its own temporary
-    /// home, and puts the shared application's theme back afterwards — it is one object for the
-    /// whole assembly, and a test that left it Dark would be changing what another test renders in.
+    /// home and the system's light or dark setting ignored, and puts both back afterwards: the
+    /// application is one object for the whole assembly, and a test that left it changed would
+    /// change what another test renders in.
     /// </summary>
     private static Task Started(Action<TempVault> body) => HeadlessSession.On(() =>
     {

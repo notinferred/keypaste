@@ -110,7 +110,7 @@ public sealed class KdbxImportViewModelTests : IDisposable
 
     /// <summary>
     /// The commit saves for itself, so a save another program's write refuses takes every copy back out of the open vault:
-    /// the vault is as it was, the dialog stays open saying nothing was imported, and a later save writes no copy (D-0567).
+    /// the vault is as it was, the dialog stays open saying nothing was imported, and a later save writes no copy.
     /// </summary>
     [Fact]
     public async Task ASaveThatFails_LeavesTheVaultAsItWas_AndKeepsTheDialogOpen()

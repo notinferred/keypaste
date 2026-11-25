@@ -8,13 +8,8 @@ namespace Keypaste.App;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Read once, at composition, and shared from there.</b> Before this existed the file was read
-/// in exactly one place — the Settings screen's constructor, built lazily on first navigation —
-/// while the session was armed from a constant. Somebody who chose one minute was shown "1 minute"
-/// and kept an unlocked vault for five.
-/// </para>
-/// <para>
-/// The screen and the session now hold the same object, so what is displayed is what is in force
+/// <b>Read once, at composition, and shared from there.</b> The Settings screen and the session
+/// hold the same object, so the idle timeout shown is the one in force
 /// rather than a second read that happens to agree with the first. Only the chosen vault, and what
 /// this version does not read, are read again when saving; any other edit made by hand while the
 /// app is running takes effect at the next launch.

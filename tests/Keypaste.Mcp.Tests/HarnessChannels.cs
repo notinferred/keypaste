@@ -12,12 +12,12 @@ namespace Keypaste.Mcp.Tests;
 /// channel for as long as the harness is open. An anonymous pipe cannot read asynchronously, so each
 /// such read parked a thread-pool worker in a blocking <c>ReadFile</c> — two per open harness, for its
 /// whole life — and with a handful of harnesses open across the test classes running in parallel,
-/// nothing else in the test host could get a worker (F.9 class 2). A <see cref="Pipe"/> read that has
+/// nothing else in the test host could get a worker. A <see cref="Pipe"/> read that has
 /// nothing to return holds no thread at all.
 /// </para>
 /// <para>
-/// One place builds them, because <c>Keypaste.PoolStarver</c> compiles this file too: F.9's class-2
-/// regression opens exactly the channels the harness opens, and a copy of them would let the two drift.
+/// One place builds them, because <c>Keypaste.PoolStarver</c> compiles this file too: its <c>an-open-harness</c>
+/// scenario opens exactly the channels the harness opens, and a copy of them would let the two drift.
 /// </para>
 /// </remarks>
 internal sealed class HarnessChannels : IDisposable

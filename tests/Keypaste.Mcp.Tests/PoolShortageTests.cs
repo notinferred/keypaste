@@ -4,7 +4,7 @@ using Xunit;
 namespace Keypaste.Mcp.Tests;
 
 /// <summary>
-/// F.9's regressions: each runs the product in a process whose thread pool has no worker to spare,
+/// Thread-pool shortage regressions: each runs the product in a process whose thread pool has no worker to spare,
 /// and checks that it still answers the way it would with workers to spare.
 /// </summary>
 /// <remarks>

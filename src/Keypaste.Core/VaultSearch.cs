@@ -15,8 +15,8 @@ namespace Keypaste.Core;
 /// <para>
 /// <b>There is no member for a password or a note, and that is not an omission.</b>
 /// <see cref="Vault.Search"/> does not read those fields at all — a match on them is not suppressed
-/// on the way out, it never happens. Task V.5b requires that secret values are never
-/// indexed or matched, and a flag for one would be the first step to indexing it.
+/// on the way out, it never happens. Secret values are never indexed or matched, and a flag
+/// for one would be the first step to indexing it.
 /// </para>
 /// </remarks>
 [Flags]

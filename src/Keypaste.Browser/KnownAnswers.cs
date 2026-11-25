@@ -23,7 +23,7 @@ internal static class KnownAnswers
         + "01b6de56244a9e88d5f9b37973f622a43d14a6599b1f654cb45a74e355a5";
     private const string _emptyBox = "2539121d8e234e652d651fa4c8cff880";
 
-    // Sealed in dev run 40898854142 by the nacl.min.js KeePassXC-Browser 1.10.4.1 carries, TweetNaCl.js 1.0.3's, with
+    // Sealed by the nacl.min.js KeePassXC-Browser 1.10.4.1 carries, TweetNaCl.js 1.0.3's, with
     // nacl.box from a new extension key pair to a new host key pair under a random nonce, as the extension's client seals
     // a request, and printed in base64 as the extension sends it.
     private const string _tweetNaClExtensionPublicKey = "MQu2Pw2EUqX0XIK3ujeb1Gf9xf0LHcNSVW+uaR7kk1c=";

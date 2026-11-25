@@ -20,7 +20,7 @@ internal sealed partial class KeePassInterop
     /// <summary>The common-password list in KeePassLib's estimator, which every estimate in this process shares, loaded once before the first rating.</summary>
     private static readonly Lazy<bool> _commonPasswords = new(LoadCommonPasswords, LazyThreadSafetyMode.ExecutionAndPublication);
 
-    /// <summary>Every live entry's lost project memberships, by the traversal <see cref="Collect"/> uses (V.11).</summary>
+    /// <summary>Every live entry's lost project memberships, by the traversal <see cref="Collect"/> uses.</summary>
     internal IReadOnlyList<LostProjectTag> ReadLostProjectTags()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -30,7 +30,7 @@ internal sealed partial class KeePassInterop
         return lost;
     }
 
-    /// <summary>Every live entry's password rating and expiry outside keypaste's own groups, by the traversal <see cref="Collect"/> uses (V.9).</summary>
+    /// <summary>Every live entry's password rating and expiry outside keypaste's own groups, by the traversal <see cref="Collect"/> uses.</summary>
     /// <remarks>
     /// No password in <see cref="ReservedGroups"/> is decrypted. The digests are HMACs under a key drawn for this read and
     /// zeroed after it, so they compare passwords within it and confirm nothing outside it.

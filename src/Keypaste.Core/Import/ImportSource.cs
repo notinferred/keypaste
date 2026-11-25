@@ -130,19 +130,19 @@ public sealed class ImportSource : IDisposable
     private static string Below(string destination, string relative) =>
         relative.Length == 0 ? destination : destination + "/" + relative;
 
-    private static List<string> At(Dictionary<string, List<string>> titles, string path)
+    private static HashSet<string> At(Dictionary<string, HashSet<string>> titles, string path)
     {
         if (!titles.TryGetValue(path, out var there))
         {
-            titles[path] = there = [];
+            titles[path] = there = new HashSet<string>(StringComparer.Ordinal);
         }
 
         return there;
     }
 
-    private static Dictionary<string, List<string>> Titles(Vault target) =>
+    private static Dictionary<string, HashSet<string>> Titles(Vault target) =>
         target.Search(string.Empty, includeReserved: true).GroupBy(match => match.Name.GroupPath, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.Select(match => match.Name.Title).ToList(), StringComparer.Ordinal);
+            .ToDictionary(group => group.Key, group => group.Select(match => match.Name.Title).ToHashSet(StringComparer.Ordinal), StringComparer.Ordinal);
 
     /// <summary>What stops a plan, or is worth saying about it, against the vault it would change.</summary>
     /// <param name="target">The vault imported into.</param>
@@ -193,12 +193,12 @@ public sealed class ImportSource : IDisposable
             foreach (var (relative, list) in unit.Groups)
             {
                 var at = At(titles, Below(destination, relative));
-                var repeated = list.Count(title => at.Contains(title, StringComparer.Ordinal))
+                var repeated = list.Count(at.Contains)
                     + list.Count - list.Distinct(StringComparer.Ordinal).Count();
 
                 duplicates += repeated;
                 inSubgroups |= repeated > 0 && relative.Length > 0;
-                at.AddRange(list);
+                at.UnionWith(list);
             }
 
             if (duplicates > 0)

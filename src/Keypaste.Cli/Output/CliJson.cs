@@ -9,6 +9,9 @@ internal static class CliJson
 {
     internal const string Option = "json";
 
+    // Written out in chunks of about this size, so a long log is never held whole as bytes and again as a string.
+    private const int _chunkBytes = 64 * 1024;
+
     internal static void WriteArray<T>(TextWriter writer, IEnumerable<T> items, Action<Utf8JsonWriter, T> write)
     {
         ArgumentNullException.ThrowIfNull(writer);
@@ -24,11 +27,25 @@ internal static class CliJson
                 json.WriteStartObject();
                 write(json, item);
                 json.WriteEndObject();
+
+                // Only between objects, so a chunk always ends on a whole character.
+                if (json.BytesPending >= _chunkBytes)
+                {
+                    json.Flush();
+                    Drain(buffer, writer);
+                }
             }
 
             json.WriteEndArray();
         }
 
-        writer.WriteLine(Encoding.UTF8.GetString(buffer.ToArray()));
+        Drain(buffer, writer);
+        writer.WriteLine();
+    }
+
+    private static void Drain(MemoryStream buffer, TextWriter writer)
+    {
+        writer.Write(Encoding.UTF8.GetString(buffer.GetBuffer(), 0, (int)buffer.Length));
+        buffer.SetLength(0);
     }
 }

@@ -87,7 +87,6 @@ internal sealed class CrashReporting : IDisposable
     /// <summary>Where reports go, or null where nothing is sent.</summary>
     internal Uri? Endpoint { get; }
 
-    /// <summary>The outbox's folder.</summary>
     internal string Folder => _outbox.Folder;
 
     /// <summary>Whether reports are kept and sent: the person agreed to the terms this build carries and said yes to reports.</summary>

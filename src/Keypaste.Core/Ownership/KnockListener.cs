@@ -15,7 +15,7 @@ namespace Keypaste.Core.Ownership;
 /// On Windows the pipe admits only this user, so a peer gone before it was accepted can still be told of.
 /// On Unix one instance answers connection after connection: the kernel queues connections behind the one answered,
 /// and making the instance anew closes its socket and drops them. Windows queues none, so instances wait beside the
-/// one answered and a thread of its own replaces each as it is taken, however long the pool takes to answer (F.70, F.100);
+/// one answered and a thread of its own replaces each as it is taken, however long the pool takes to answer;
 /// each is made anew, since disconnecting discards a reply its peer has not yet read.
 /// </remarks>
 internal sealed class KnockListener : IDisposable
@@ -165,7 +165,7 @@ internal sealed class KnockListener : IDisposable
         return Task.WhenAll(listening.Task, AnswerArrivalsAsync(arrivals, answer, unreachable, goneBeforeAccepted, stop));
     }
 
-    // A thread of its own, not the pool's: a peer must always find an instance listening, and the pool has stood still for longer than a peer waits (F.100).
+    // A thread of its own, not the pool's: a peer must always find an instance listening, and the pool has stood still for longer than a peer waits.
     [SupportedOSPlatform("windows")]
     private static void KeepListening(
         string endpoint,

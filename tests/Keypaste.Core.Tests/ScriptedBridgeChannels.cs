@@ -3,7 +3,7 @@ using Keypaste.Core.Clients;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>In-memory channels between a connection check and a scripted bridge that run every continuation inline (F.41).</summary>
+/// <summary>In-memory channels between a connection check and a scripted bridge that run every continuation inline.</summary>
 /// <remarks>Start the bridge's loop by calling it, not with <c>Task.Run</c>.</remarks>
 internal sealed class ScriptedBridgeChannels : IDisposable
 {

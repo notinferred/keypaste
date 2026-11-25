@@ -7,7 +7,7 @@ namespace Keypaste.App.Tests.Session;
 
 /// <summary>
 /// <c>keypaste lock</c> reaching the app over its real endpoint locks the session, through the same
-/// action launch composes, with its own reason (D-0351).
+/// action launch composes, with its own reason.
 /// </summary>
 public sealed class LockRequestTests
 {

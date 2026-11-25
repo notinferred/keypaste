@@ -1,4 +1,5 @@
 using System.Globalization;
+using Keypaste.Core.Clients;
 using Keypaste.Core.Processes;
 
 namespace Keypaste.Core.Linking;
@@ -108,13 +109,13 @@ public sealed class MacCliLink : ICliLink
     {
         var (state, linkedTo) = Inspect();
 
-        return new CliLinkStatus(state, LinkPath, linkedTo, BackupPath, CliLinks.Occupied(BackupPath), DirectoryOnPath: true, IsTranslocated(_target), EarlierCopy());
+        return new CliLinkStatus(state, LinkPath, linkedTo, BackupPath, CliLinks.Occupied(BackupPath), DirectoryOnPath: true, RunsFromTemporaryLocation, EarlierCopy());
     }
 
     /// <inheritdoc/>
     public CliLinkResult Link()
     {
-        if (IsTranslocated(_target))
+        if (RunsFromTemporaryLocation)
         {
             return Refused(CliLinkRefusal.Translocated);
         }
@@ -130,7 +131,7 @@ public sealed class MacCliLink : ICliLink
     /// <inheritdoc/>
     public CliLinkResult Replace()
     {
-        if (IsTranslocated(_target))
+        if (RunsFromTemporaryLocation)
         {
             return Refused(CliLinkRefusal.Translocated);
         }
@@ -178,6 +179,9 @@ public sealed class MacCliLink : ICliLink
         linkPath + CliLinks.BackupSuffix,
         replace ? "replace" : "link",
     ];
+
+    // A link into a mounted disk image or a translocated copy dangles once it is ejected or quits.
+    private bool RunsFromTemporaryLocation => McpServerLocator.IsTransient(_target, McpClientPlatform.MacOS);
 
     private static CliLinkResult Refused(CliLinkRefusal refusal) => new(CliLinkOutcome.Refused, refusal);
 

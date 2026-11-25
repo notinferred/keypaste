@@ -31,8 +31,8 @@ public sealed class DeadlineTests
     }
 
     /// <summary>
-    /// The other half: an hour taken off the wall clock, which is the correction that used to make
-    /// an expired grant usable again.
+    /// An hour taken off the wall clock, the correction that would make an expired grant usable
+    /// again if the wall clock alone decided.
     /// </summary>
     [Fact]
     public void APermissionExpires_WhenOnlyTheMonotonicClockSaysSo()

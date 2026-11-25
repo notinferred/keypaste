@@ -133,6 +133,18 @@ public sealed class ShareVerbTests : IDisposable
         Assert.DoesNotContain(key, Audit(), StringComparison.Ordinal);
     }
 
+    /// <summary>The link carries the key, so a clipboard that could not be read back straight after the copy is cleared anyway.</summary>
+    [Fact]
+    public void Share_ALinkWhoseClipboardCouldNotBeReadBack_IsStillCleared()
+    {
+        _cli.Clipboard.FailingReads = 1;
+
+        _cli.AssertExit(CliApp.ExitSuccess, Share("env/acme-api/STRIPE_KEY"));
+
+        Assert.True(_cli.ClearStrategy.Cleared);
+        Assert.Null(_cli.Clipboard.Content);
+    }
+
     [Fact]
     public void Share_Print_PutsOnlyTheLinkOnStdout()
     {
@@ -300,7 +312,7 @@ public sealed class ShareVerbTests : IDisposable
         var exit = CliApp.Run(["share", "env/acme-api/STRIPE_KEY", "--passphrase", "--print", "--vault", _cli.VaultPath], _cli.NewContext(shareTransport: _server));
 
         _cli.AssertExit(CliApp.ExitSuccess, exit);
-        Assert.Equal(["Master password: ", "Passphrase: ", "Repeat passphrase: "], _cli.Prompt.SecretPrompts);
+        Assert.Equal([CliHarness.MasterPasswordPrompt, "Passphrase: ", "Repeat passphrase: "], _cli.Prompt.SecretPrompts);
         Assert.Contains("  passphrase: send it separately", _cli.Err, StringComparison.Ordinal);
         Assert.True(ShareLink.TryParse(_cli.Out.Trim(), out var id, out var key));
         Assert.True(ShareCrypto.TryOpen(_server.Shares[id].Envelope, key, "a long enough passphrase", out _, out _));
@@ -599,6 +611,8 @@ public sealed class ShareVerbTests : IDisposable
     [InlineData("--ttl", "4m")]
     [InlineData("--ttl", "8d")]
     [InlineData("--ttl", "24")]
+    [InlineData("--ttl", "20000000d")]
+    [InlineData("--ttl", "300000000h")]
     [InlineData("--views", "0")]
     [InlineData("--views", "11")]
     [InlineData("--field", "secret")]

@@ -113,6 +113,22 @@ public sealed class EntryActivityTests
         Assert.Equal(_now.AddMinutes(-2), use.LastUsed);
     }
 
+    /// <summary>One fold of the audit lines serves every refresh, so a refresh's session ledger must never add to it.</summary>
+    [Fact]
+    public void AFoldReusedAcrossRefreshes_CountsEachSessionReleaseOnce()
+    {
+        var folded = EntryActivity.Fold([Line("env/acme-api/STRIPE_KEY", 10, tool: "run")], _vault);
+        var seen = new ReleaseSeen("env/acme-api/STRIPE_KEY", "claude-code", "run --session", _now.AddMinutes(-2));
+
+        var first = EntryActivity.Build(folded, ApproverActivity.None, [seen], _now).Access(_stripe).Clients.Single();
+        var again = EntryActivity.Build(folded, ApproverActivity.None, [seen], _now).Access(_stripe).Clients.Single();
+        var without = EntryActivity.Build(folded, ApproverActivity.None, [], _now).Access(_stripe).Clients.Single();
+
+        Assert.Equal((2, _now.AddMinutes(-2), "run --session"), (first.Releases, first.LastAt, first.How));
+        Assert.Equal(first, again);
+        Assert.Equal((1, _now.AddMinutes(-10), "run"), (without.Releases, without.LastAt, without.How));
+    }
+
     [Fact]
     public void Access_ListsClientsNewestFirst()
     {
@@ -152,7 +168,7 @@ public sealed class EntryActivityTests
         Assert.False(reached.AgentsCanSee(_github, ["personal"]));
     }
 
-    /// <summary>The card names the agents that can see an entry, each once, by what their reach covers (N.5).</summary>
+    /// <summary>The card names the agents that can see an entry, each once, by what their reach covers.</summary>
     [Fact]
     public void Seeing_NamesEachAgentWhoseReachCoversTheEntry_Once()
     {

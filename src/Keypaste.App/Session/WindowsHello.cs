@@ -11,7 +11,7 @@ namespace Keypaste.App.Session;
 #if WINDOWS
 /// <summary>
 /// Windows Hello through WinRT's <c>KeyCredentialManager</c>, as KeePassXC 2.8's quick unlock reaches it: one key of
-/// keypaste's own, made on first use, signs a challenge once the person has shown Windows Hello it is them (D-0549).
+/// keypaste's own, made on first use, signs a challenge once the person has shown Windows Hello it is them.
 /// The signature is the challenge's key, so making a key and answering for one are the same signing.
 /// </summary>
 /// <remarks>

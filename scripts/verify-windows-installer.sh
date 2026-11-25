@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Holds a built Windows installer to what release-targets.json declares about it (4.7a1).
+# Holds a built Windows installer to what release-targets.json declares about it.
 #
 # What it refuses:
 #   - a file name other than the declared msi pattern expanded for this version;
@@ -7,17 +7,17 @@
 #     unsigned labels, a ProductVersion other than the numeric prefix, or a publisher other than keypaste;
 #   - a per-machine package, or a signature on a package the definition declares unsigned;
 #   - any Environment row but one appending the install folder to the per-user PATH, removed on
-#     uninstall, from the UserPath component rather than the payload's (G.5);
-#   - a Start menu shortcut without the AppUserModelID the app posts its notifications under (Q.14);
+#     uninstall, from the UserPath component rather than the payload's;
+#   - a Start menu shortcut without the AppUserModelID the app posts its notifications under;
 #   - a package whose Registry table lacks .kdbx's ProgId and OpenWithProgids rows, or that sets the
-#     default of .kdbx itself, which would take it from whoever holds it (Q.13);
+#     default of .kdbx itself, which would take it from whoever holds it;
 #   - an administrative extraction whose files differ from the staged payload, whose binary reports
 #     another version than the payload's or fails --selftest, or whose binaries do not publish as keypaste;
 #   - an extraction with no keypaste.exe beside the app answering mcp --help, which is what a client
-#     connected from the app is told to start (2.6a).
+#     connected from the app is told to start.
 #
 # The extraction uses `msiexec /a`, which lays the files out without installing, registering or
-# running anything from the package; the extracted binaries are then run. Installing it is 4.7b.
+# running anything from the package; the extracted binaries are then run. Installing it is install-desktop.yml's job.
 #
 # <version> names the package; <binary-version> is what the payload reports. They differ only on a
 # dispatch, where app.yml names the package <binary-version>-dryrun.

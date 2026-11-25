@@ -59,15 +59,14 @@ public sealed class VaultEntryNameLister(Func<Vault?> unlockedVault) : IEntryNam
     /// <b>This bounds the work, not the answer.</b> What an agent actually sees is bounded by what
     /// one frame can carry, decided in <see cref="Ipc.ApproverProtocol"/> — the only place that
     /// knows what a name costs once it is escaped. An unbounded walk is still a cost problem, so a
-    /// ceiling stays here; it is no longer the thing standing between a large vault and a context
-    /// window (THREATS.md T-1).
+    /// ceiling stays here; the frame bound, not this, keeps a large vault out of a context window
+    /// (THREATS.md T-1).
     /// </para>
     /// <para>
     /// <b>It sits deliberately above the most names any frame could hold.</b> The smallest possible
     /// element is forty-five bytes, so no frame carries more than about one thousand four hundred. A cap below that would drop names the encoder never sees, and the encoder would then
-    /// report as complete a listing that was not — which is the defect this replaced, moved one
-    /// layer up. <c>ApproverProtocolTests.NoFrameCanHoldMoreNamesThanTheListersCap</c> keeps the two
-    /// numbers apart.
+    /// report as complete a listing that was not. <c>ApproverProtocolTests.NoFrameCanHoldMoreNamesThanTheListersCap</c>
+    /// keeps the two numbers apart.
     /// </para>
     /// </remarks>
     public const int MaximumNames = 4096;

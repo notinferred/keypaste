@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 4.7b: installs an attested desktop candidate on a fresh runner and exercises the installed app from outside
+# Installs an attested desktop candidate on a fresh runner and exercises the installed app from outside
 # its process, then classifies each check from what the app, the vault and the CLI/MCP recorded.
 #
 # The app carries no automation hook. It is driven through the platform accessibility tree and real
@@ -7,13 +7,13 @@
 # (drive-desktop-linux.py), the accessibility API and System Events on macOS (drive-desktop-macos.js). The vault
 # is made by the CLI. The approval is a person's answer at the terminal agent, which holds the vault, so
 # the app's unlock is refused and its unlock screen names that agent. A new terminal must then run the keypaste
-# the install carries (G.5): on Windows the MSI puts its folder on the user PATH, and on Linux and macOS the person
+# the install carries: on Windows the MSI puts its folder on the user PATH, and on Linux and macOS the person
 # links it from Settings, which the first session does.
 #
 # On macOS the DMG is quarantined as a browser download and its keypaste.app copied to /Applications, where
 # Gatekeeper must refuse the unsigned copy (gatekeeper); docs/desktop.md's override then clears the quarantine
 # and the session runs on that copy. Whether Terminal runs the copy's launcher, quarantined and cleared, is
-# recorded and not judged (4.7e).
+# recorded and not judged.
 #
 # Checks, in order: candidate, install, gatekeeper (macOS), first-window, unlock, entry-list, edit, env-run,
 # approval, terminal. A check passes only on its evidence, is unreached when its action could not be done or an

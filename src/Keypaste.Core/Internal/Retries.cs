@@ -6,7 +6,7 @@ namespace Keypaste.Core.Internal;
 /// <summary>Retries whose waits block the calling thread.</summary>
 /// <remarks>
 /// The caller's <c>wait</c> runs between attempts and Polly's own delay is zero: Polly waits a synchronous retry on a pool
-/// timer, which a process with no pool worker free does not fire in time (F.9).
+/// timer, which a process with no pool worker free does not fire in time.
 /// </remarks>
 internal static class Retries
 {

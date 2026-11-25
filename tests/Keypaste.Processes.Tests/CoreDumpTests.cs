@@ -54,6 +54,10 @@ public sealed class CoreDumpTests
         approve.WaitForError("listening on");
         using var waiting = RunningProcess.Start("/bin/cat", workspace.Environment);
 
+        // Start returns once exec has begun, and the kernel shows a process's environment only once exec has laid it out; a line echoed proves cat is running.
+        waiting.Send("running");
+        waiting.WaitForOutput("^running$");
+
         Assert.NotEmpty(File.ReadAllBytes(Invariant($"/proc/{waiting.Id}/environ")));
         Assert.Throws<UnauthorizedAccessException>(() => File.ReadAllBytes(Invariant($"/proc/{approve.Id}/environ")));
     }

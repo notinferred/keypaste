@@ -18,7 +18,7 @@
     <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
   </Window.Styles>
 
-  <!-- About keypaste, from the app menu on macOS and the menu button elsewhere (Q.2): the icon alone, never beside
+  <!-- About keypaste, from the app menu on macOS and the menu button elsewhere: the icon alone, never beside
        the wordmark, what this copy is, and Close as its default. -->
 
   <Border Classes="prompt">

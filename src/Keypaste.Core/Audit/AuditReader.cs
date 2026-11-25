@@ -1,5 +1,7 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Unicode;
 
 namespace Keypaste.Core.Audit;
 
@@ -147,16 +149,75 @@ public static class AuditReader
     {
         ArgumentNullException.ThrowIfNull(path);
 
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            return TryRead(stream, out entries, out unreadable, out error);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                       or NotSupportedException or ArgumentException)
+        {
+            entries = [];
+            unreadable = 0;
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    /// <summary>Reads a log's bytes whole, opened as <see cref="TryRead(string, out IReadOnlyList{AuditEntry}, out int, out string)"/> opens it.</summary>
+    /// <param name="path">The log.</param>
+    /// <param name="bytes">Its bytes, or null when it could not be read.</param>
+    /// <param name="error">A message naming the problem, or empty on success.</param>
+    /// <returns><see langword="false"/> when the file could not be read at all.</returns>
+    /// <remarks>For a caller that reads the records and checks the chain over one copy of the file, so both see the same lines.</remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="path"/> is null.</exception>
+    public static bool TryReadBytes(string path, [NotNullWhen(true)] out byte[]? bytes, out string error)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+
+        try
+        {
+            using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var copy = new MemoryStream();
+            file.CopyTo(copy);
+            bytes = copy.ToArray();
+            error = string.Empty;
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                       or NotSupportedException or ArgumentException)
+        {
+            bytes = null;
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    /// <summary>Reads every record in a log that is already open, as <see cref="TryRead(string, out IReadOnlyList{AuditEntry}, out int, out string)"/> reads a file.</summary>
+    /// <param name="stream">The bytes of the log, positioned at its start; left open.</param>
+    /// <param name="entries">The records, in file order.</param>
+    /// <param name="unreadable">How many lines were not records this version understands.</param>
+    /// <param name="error">A message naming the problem, or empty on success.</param>
+    /// <returns><see langword="false"/> when the stream could not be read at all.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="stream"/> is null.</exception>
+    public static bool TryRead(
+        Stream stream,
+        out IReadOnlyList<AuditEntry> entries,
+        out int unreadable,
+        out string error)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+
         entries = [];
         unreadable = 0;
 
         var read = new List<AuditEntry>();
         var skipped = 0;
+        var sanitized = new Dictionary<string, string>(StringComparer.Ordinal);
 
         try
         {
-            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-            using var reader = new StreamReader(stream);
+            using var reader = new StreamReader(stream, leaveOpen: true);
 
             var number = 0;
             while (reader.ReadLine() is { } line)
@@ -168,7 +229,7 @@ public static class AuditReader
                     continue;
                 }
 
-                if (Parse(line, number) is { } entry)
+                if (Parse(line, number, sanitized) is { } entry)
                 {
                     if (!entry.IsCheckpoint && !entry.IsCompaction)
                     {
@@ -260,22 +321,29 @@ public static class AuditReader
         }
 
         var complete = Array.LastIndexOf(bytes, (byte)'\n') + 1;
-        var lines = complete == 0 ? [] : Encoding.UTF8.GetString(bytes, 0, complete - 1).Split('\n');
         var read = new List<AuditEntry>();
         var number = start.Line;
         var skipped = 0;
+        var sanitized = new Dictionary<string, string>(StringComparer.Ordinal);
 
-        foreach (var raw in lines)
+        for (var at = 0; at < complete;)
         {
+            var end = Array.IndexOf(bytes, (byte)'\n', at, complete - at);
+            var line = bytes.AsMemory(at, end - at);
+            at = end + 1;
             number++;
-            var line = raw.TrimEnd('\r');
+
+            while (line.Length > 0 && line.Span[^1] == (byte)'\r')
+            {
+                line = line[..^1];
+            }
 
             if (line.Length == 0)
             {
                 continue;
             }
 
-            if (Parse(line, number) is { } entry)
+            if (Parse(line, number, sanitized) is { } entry)
             {
                 if (!entry.IsCheckpoint && !entry.IsCompaction)
                 {
@@ -305,7 +373,7 @@ public static class AuditReader
     /// </remarks>
     private static void MarkUnreadReasons(List<AuditEntry> entries)
     {
-        var approved = new Dictionary<string, string>(StringComparer.Ordinal);
+        var approved = new Dictionary<(string Client, string Entry, string Field), string>();
 
         for (var i = 0; i < entries.Count; i++)
         {
@@ -316,7 +384,7 @@ public static class AuditReader
                 continue;
             }
 
-            var key = $"{entry.Client} {entry.Entry} {entry.Field}";
+            var key = (entry.Client, entry.Entry, entry.Field);
 
             if (string.Equals(entry.Method, "prompt", StringComparison.Ordinal))
             {
@@ -341,58 +409,79 @@ public static class AuditReader
         }
     }
 
-    private static AuditEntry? Parse(string line, int number)
+    private static AuditEntry? Parse(string line, int number, Dictionary<string, string> sanitized)
     {
         try
         {
             using var parsed = JsonDocument.Parse(line);
-            var root = parsed.RootElement;
-
-            if (root.ValueKind != JsonValueKind.Object)
-            {
-                return null;
-            }
-
-            var client = root.TryGetProperty("client", out var who) ? who : default;
-            var args = root.TryGetProperty("args", out var what) ? what : default;
-
-            var label = Text(client, "label");
-            var name = Text(client, "name");
-            var timestamp = Text(root, "ts");
-
-            return new AuditEntry
-            {
-                Line = number,
-                At = When(timestamp),
-                Timestamp = timestamp,
-                Client = label.Length > 0 ? label : name,
-                Label = label,
-                Name = name,
-                Tool = Text(root, "tool"),
-                Entry = EntryPath(args, "entry"),
-                Item = Text(args, "item"),
-                Field = Text(args, "field"),
-                Decision = Text(root, "decision"),
-                Method = Text(root, "method"),
-                Reason = Text(root, "reason"),
-                Session = Text(root, "session"),
-                ReasonSha256 = Text(args, "reason_sha256"),
-                GrantedSeconds = root.TryGetProperty("granted_seconds", out var granted)
-                    && granted.ValueKind == JsonValueKind.Number
-                    && granted.TryGetInt32(out var seconds)
-                        ? seconds
-                        : null,
-                Vault = Text(root, "vault"),
-                Entries = EntryPaths(root, "entries"),
-                Command = Text(root, "command"),
-                Summary = SummaryOf(root),
-                Removal = RemovalOf(root),
-            };
+            return Read(parsed.RootElement, number, sanitized);
         }
         catch (JsonException)
         {
             return null;
         }
+    }
+
+    private static AuditEntry? Parse(ReadOnlyMemory<byte> line, int number, Dictionary<string, string> sanitized)
+    {
+        try
+        {
+            // Invalid UTF-8 is decoded first, as it always was, which replaces the bad bytes where parsing them would refuse the line.
+            using var parsed = Utf8.IsValid(line.Span) ? JsonDocument.Parse(line) : JsonDocument.Parse(Encoding.UTF8.GetString(line.Span));
+            return Read(parsed.RootElement, number, sanitized);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>The record a parsed line holds, or null when it is not one.</summary>
+    /// <param name="root">The parsed line.</param>
+    /// <param name="number">Its physical line.</param>
+    /// <param name="sanitized">This read's sanitized text of the few-valued fields keypaste writes, by their raw text.</param>
+    private static AuditEntry? Read(JsonElement root, int number, Dictionary<string, string> sanitized)
+    {
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        var client = root.TryGetProperty("client", out var who) ? who : default;
+        var args = root.TryGetProperty("args", out var what) ? what : default;
+
+        var label = Repeated(client, "label", sanitized);
+        var name = Repeated(client, "name", sanitized);
+        var timestamp = Text(root, "ts");
+
+        return new AuditEntry
+        {
+            Line = number,
+            At = When(timestamp),
+            Timestamp = timestamp,
+            Client = label.Length > 0 ? label : name,
+            Label = label,
+            Name = name,
+            Tool = Repeated(root, "tool", sanitized),
+            Entry = EntryPath(args, "entry"),
+            Item = Text(args, "item"),
+            Field = Text(args, "field"),
+            Decision = Repeated(root, "decision", sanitized),
+            Method = Repeated(root, "method", sanitized),
+            Reason = Text(root, "reason"),
+            Session = Repeated(root, "session", sanitized),
+            ReasonSha256 = Text(args, "reason_sha256"),
+            GrantedSeconds = root.TryGetProperty("granted_seconds", out var granted)
+                && granted.ValueKind == JsonValueKind.Number
+                && granted.TryGetInt32(out var seconds)
+                    ? seconds
+                    : null,
+            Vault = Repeated(root, "vault", sanitized),
+            Entries = EntryPaths(root, "entries"),
+            Command = Text(root, "command"),
+            Summary = SummaryOf(root),
+            Removal = RemovalOf(root),
+        };
     }
 
     private static AuditSummary? SummaryOf(JsonElement root)
@@ -444,8 +533,28 @@ public static class AuditReader
         return raw.Length == 0 ? raw : EntryNameSanitizer.Sanitize(raw, FieldLength).Text;
     }
 
+    /// <summary>The same, sanitized once per read for a field that takes few values, so the lines repeating one share its text.</summary>
+    /// <remarks>Never for text an agent writes freely, such as a reason, which would grow the cache by a line's worth every line.</remarks>
+    private static string Repeated(JsonElement parent, string name, Dictionary<string, string> sanitized)
+    {
+        var raw = Raw(parent, name);
+
+        if (raw.Length == 0)
+        {
+            return raw;
+        }
+
+        if (!sanitized.TryGetValue(raw, out var text))
+        {
+            text = EntryNameSanitizer.Sanitize(raw, FieldLength).Text;
+            sanitized.Add(raw, text);
+        }
+
+        return text;
+    }
+
     /// <summary>
-    /// The same, segment by segment, so an entry keeps its separators.
+    /// The same as <see cref="Text"/>, segment by segment, so an entry keeps its separators.
     /// </summary>
     /// <remarks>
     /// <see cref="EntryNameSanitizer.Sanitize(string, int)"/> treats <c>/</c> as structural and would

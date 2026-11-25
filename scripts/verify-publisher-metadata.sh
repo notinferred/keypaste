@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 # Holds the packaged binaries to who this project says publishes them.
 #
-# F.4b's defect was not visible in Directory.Build.props. `Company` was never set there; the SDK
-# filled it from `Authors`, and the shipped executables reported a person's name in a field no
-# source file mentioned. So this reads the bytes that get archived, on the machine that built
-# them, rather than the property they came from.
+# The SDK fills `Company` from `Authors` when it is unset, a value no source file shows, so this
+# reads the bytes that get archived, on the machine that built them, rather than the property
+# they came from.
 #
-# It is one half of V-F.4b. The other half is tests/Keypaste.Core.Tests/PublisherMetadata.cs,
-# compiled into each front end's test project, which asserts the built assembly's
+# tests/Keypaste.Core.Tests/PublisherMetadata.cs, compiled into each front end's test project,
+# asserts the built assembly's
 # Company/Product/Copyright on every operating system CI runs. This is the packaged half,
 # including the NativeAOT binaries that have no managed assembly left to reflect over.
 #

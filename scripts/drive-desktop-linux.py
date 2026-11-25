@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""4.7b, R.1a: drives an installed keypaste desktop app from outside its process through AT-SPI and xdotool.
+"""Drives an installed keypaste desktop app from outside its process through AT-SPI and xdotool.
 
 One verb per call, as scripts/lib/desktop-drive.sh defines them; prints what it saw and exits 1 when the verb could
 not be done. DRIVE_WINDOW names the app's window to act in. Needs an X display, a session bus with org.a11y.Status
@@ -424,6 +424,12 @@ def act(action, args):
         # Not --sync, which waits for a motion that never comes when the pointer is already there.
         subprocess.run(["xdotool", "mousemove", str(x), str(y), "click", button], check=True, timeout=10)
         return f"{'clicked' if action == 'click' else 'right-clicked'} '{args[0]}' at {x},{y}"
+
+    if action == "raw-click":
+        # Not brought forward first: as with a person's click, only the click, which the window manager passes on, can.
+        x, y = centre(located(args[0]))
+        subprocess.run(["xdotool", "mousemove", str(x), str(y), "click", "1"], check=True, timeout=10)
+        return f"clicked '{args[0]}' at {x},{y} without bringing its window forward first"
 
     if action == "focus":
         element = located(args[0])

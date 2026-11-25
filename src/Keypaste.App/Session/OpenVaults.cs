@@ -6,15 +6,14 @@ using Keypaste.Core.Settings;
 
 namespace Keypaste.App.Session;
 
-/// <summary>One vault open in the app: its session, the authority serving it to agents and what tells the person an agent found it locked.</summary>
+/// <summary>One vault open in the app: its session and the authority serving it to agents.</summary>
 /// <param name="Session">The vault's session, with its own claim, lifetime, idle timer and quick unlock copies.</param>
 /// <param name="Authority">The authority serving it on its own pipe, which owns the session.</param>
-/// <param name="Notice">What tells the person an agent asked for it while locked, or null.</param>
 /// <param name="Watch">What merges another program's save of its file while it is unlocked.</param>
-internal sealed record OpenVault(AppVaultSession Session, AppAuthority Authority, LockedNotice? Notice, VaultFileWatch Watch);
+internal sealed record OpenVault(AppVaultSession Session, AppAuthority Authority, VaultFileWatch Watch);
 
 /// <summary>
-/// The vaults open in the app at once, each with a session, an authority and a locked notice of its own, and what they
+/// The vaults open in the app at once, each with a session and an authority of its own, and what they
 /// share: one prompt queue, so the person meets one prompt at a time whichever vault asks (THREATS.md T-11), each
 /// other's checkpoint keys for the one audit log their owners write to, and the lock.
 /// </summary>
@@ -34,7 +33,6 @@ internal sealed class OpenVaults : IIdleWatched, IDisposable
 {
     private readonly Func<AppVaultSession> _newSession;
     private readonly Func<OpenVaults, AppVaultSession, AppAuthority> _serve;
-    private readonly Func<AppVaultSession, LockedNotice?> _notice;
     private readonly DesktopPreferences? _preferences;
     private readonly Lock _gate = new();
     private readonly List<OpenVault> _vaults = [];
@@ -46,13 +44,11 @@ internal sealed class OpenVaults : IIdleWatched, IDisposable
     /// <param name="inView">The locked session of the vault the window shows, which this now owns.</param>
     /// <param name="newSession">Composes a locked session for each vault after it, as launch composed the first.</param>
     /// <param name="serve">Composes the authority serving a session, sharing <see cref="Turns"/> and <see cref="KeysBesides"/>.</param>
-    /// <param name="notice">Composes what tells the person an agent asked for a vault while locked, or returns null.</param>
     /// <param name="preferences">The preferences whose idle timeout every vault follows as it changes, or null.</param>
     internal OpenVaults(
         AppVaultSession inView,
         Func<AppVaultSession> newSession,
         Func<OpenVaults, AppVaultSession, AppAuthority> serve,
-        Func<AppVaultSession, LockedNotice?>? notice = null,
         DesktopPreferences? preferences = null)
     {
         ArgumentNullException.ThrowIfNull(inView);
@@ -61,7 +57,6 @@ internal sealed class OpenVaults : IIdleWatched, IDisposable
 
         _newSession = newSession;
         _serve = serve;
-        _notice = notice ?? (_ => null);
         _preferences = preferences;
         Pairings = new OwnerPairings(BrowserPairings.In(inView.Home), PairingVaults, LockedNames);
         InView = Place(inView);
@@ -93,7 +88,6 @@ internal sealed class OpenVaults : IIdleWatched, IDisposable
         }
     }
 
-    /// <summary>The vaults unlocked now.</summary>
     internal IReadOnlyList<OpenVault> Unlocked => [.. All.Where(vault => vault.Session.IsUnlocked)];
 
     /// <summary>The vaults the window lists: every one open, but the vault in view while it stays closed.</summary>
@@ -110,6 +104,12 @@ internal sealed class OpenVaults : IIdleWatched, IDisposable
 
     /// <summary>Raised on the locking thread when any open vault locks, after the vaults it locks with have locked.</summary>
     internal event EventHandler<VaultLockReason>? Locked;
+
+    /// <summary>Raised on the opening thread when any open vault opens, after a locked place that named its file has given way.</summary>
+    internal event EventHandler? Opened;
+
+    /// <summary>Raised on the thread that changed them when a place is added, learns its file or is closed.</summary>
+    internal event EventHandler? PlacesChanged;
 
     /// <summary>The file a vault holds, or held when it last unlocked or was opened by path, or null for a place that never held one.</summary>
     internal string? PathOf(AppVaultSession session)
@@ -143,7 +143,7 @@ internal sealed class OpenVaults : IIdleWatched, IDisposable
     internal static bool LocksTogether(VaultLockReason reason) =>
         reason is VaultLockReason.Idle or VaultLockReason.Manual or VaultLockReason.Minimized or VaultLockReason.Closed or VaultLockReason.Shutdown;
 
-    /// <summary>Opens a place for another vault: a locked session, with its own claim, authority on its own pipe and locked notice, unlocked as the first is.</summary>
+    /// <summary>Opens a place for another vault: a locked session, with its own claim and authority on its own pipe, unlocked as the first is.</summary>
     /// <returns>The vault's place.</returns>
     /// <exception cref="ObjectDisposedException">The app has quit.</exception>
     internal OpenVault Add()
@@ -153,7 +153,9 @@ internal sealed class OpenVaults : IIdleWatched, IDisposable
             ObjectDisposedException.ThrowIf(_disposed, this);
         }
 
-        return Place(_newSession());
+        var vault = Place(_newSession());
+        PlacesChanged?.Invoke(this, EventArgs.Empty);
+        return vault;
     }
 
     /// <summary>Opens a locked place for the vault at <paramref name="path"/>, or returns the place already holding it.</summary>
@@ -178,6 +180,7 @@ internal sealed class OpenVaults : IIdleWatched, IDisposable
             _paths[vault.Session] = full;
         }
 
+        PlacesChanged?.Invoke(this, EventArgs.Empty);
         return vault;
     }
 
@@ -222,22 +225,9 @@ internal sealed class OpenVaults : IIdleWatched, IDisposable
             throw;
         }
 
-        LockedNotice? notice;
-
-        try
-        {
-            notice = _notice(session);
-        }
-        catch
-        {
-            // The authority owns the session.
-            authority.Dispose();
-            throw;
-        }
-
         // The open vault owns its watch, which Drop disposes.
 #pragma warning disable CA2000
-        var vault = new OpenVault(session, authority, notice, new VaultFileWatch(session));
+        var vault = new OpenVault(session, authority, new VaultFileWatch(session));
 #pragma warning restore CA2000
         session.Locked += OnLocked;
         session.Opened += OnOpened;
@@ -265,6 +255,7 @@ internal sealed class OpenVaults : IIdleWatched, IDisposable
                 _inViewClosed = true;
             }
 
+            PlacesChanged?.Invoke(this, EventArgs.Empty);
             return;
         }
 
@@ -279,6 +270,7 @@ internal sealed class OpenVaults : IIdleWatched, IDisposable
         }
 
         Drop(vault);
+        PlacesChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>Locks every vault for <paramref name="reason"/>.</summary>
@@ -433,7 +425,6 @@ internal sealed class OpenVaults : IIdleWatched, IDisposable
         vault.Session.Locked -= OnLocked;
         vault.Session.Opened -= OnOpened;
         vault.Watch.Dispose();
-        vault.Notice?.Dispose();
         vault.Authority.Dispose();
     }
 
@@ -479,6 +470,7 @@ internal sealed class OpenVaults : IIdleWatched, IDisposable
         }
 
         LocalAccount.Hold(session.Home, path);
+        Opened?.Invoke(sender, e);
     }
 
     private void OnPreferencesChanged(object? sender, EventArgs e)

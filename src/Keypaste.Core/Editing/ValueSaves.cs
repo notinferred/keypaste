@@ -4,7 +4,7 @@ using Keypaste.Core.Ipc;
 
 namespace Keypaste.Core.Editing;
 
-/// <summary>What saving a value at the place an agent named would do, decided without the value (F.79).</summary>
+/// <summary>What saving a value at the place an agent named would do, decided without the value.</summary>
 public sealed record SaveCheck
 {
     /// <summary>Why it cannot be saved there, or null.</summary>

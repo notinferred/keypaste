@@ -1856,7 +1856,7 @@ public sealed class SessionAuthority : IApproverHandler
     /// <remarks>
     /// The lock runs on its own, since an owner's lock waits for its connections to end, and the reply waits for it to
     /// end the session it was asked under. The reply is then the confirmation, and nothing more is asked on a connection the
-    /// lock is closing (F.62).
+    /// lock is closing.
     /// </remarks>
     private async ValueTask<(bool Locked, string Reason)> LockNowAsync(SessionLifetime lifetime, CancellationToken cancellationToken)
     {

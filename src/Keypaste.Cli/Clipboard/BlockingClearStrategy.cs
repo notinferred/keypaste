@@ -35,12 +35,11 @@ internal sealed class BlockingClearStrategy : IClipboardClearStrategy
     /// <inheritdoc/>
     public void ClearAfter(
         IClipboard clipboard,
-        byte[] expectedHash,
+        byte[]? expectedHash,
         TimeSpan delay,
         TextWriter status)
     {
         ArgumentNullException.ThrowIfNull(clipboard);
-        ArgumentNullException.ThrowIfNull(expectedHash);
         ArgumentNullException.ThrowIfNull(status);
 
         using var interrupted = new ManualResetEventSlim(false);
@@ -65,14 +64,13 @@ internal sealed class BlockingClearStrategy : IClipboardClearStrategy
                 "Copied to clipboard. Clearing in {0}s (Ctrl+C to clear now).",
                 (int)delay.TotalSeconds));
 
-            Wait(delay, interrupted);
+            var deadlinePassed = WaitForDeadline(delay, interrupted);
 
             // On the interrupt path the read-back is skipped and the clear is unconditional: a
             // Windows console control handler gets only a couple of seconds before the process
             // is killed anyway, and "cleared something the user copied since" beats "left a
             // password on the clipboard".
-            var verify = !interrupted.IsSet;
-            Clear(clipboard, expectedHash, verify, status);
+            Clear(clipboard, expectedHash, verify: deadlinePassed, status);
         }
         finally
         {
@@ -84,22 +82,30 @@ internal sealed class BlockingClearStrategy : IClipboardClearStrategy
         }
     }
 
-    private void Wait(TimeSpan delay, ManualResetEventSlim interrupted)
+    /// <summary>Waits until the delay runs out or an interrupt arrives.</summary>
+    /// <returns><see langword="true"/> when the delay ran out, <see langword="false"/> when an interrupt ended the wait.</returns>
+    private bool WaitForDeadline(TimeSpan delay, ManualResetEventSlim interrupted)
     {
-        // TimeProvider rather than Thread.Sleep so a fake clock makes the whole wait instant in
-        // tests. Without this seam none of the auto-clear behaviour would be testable at all.
+        var deadlinePassed = false;
+
+        // TimeProvider rather than Thread.Sleep, so a fake clock makes the wait instant in tests.
         using var timer = _clock.CreateTimer(
-            _ => interrupted.Set(),
+            _ =>
+            {
+                deadlinePassed = true;
+                interrupted.Set();
+            },
             null,
             delay,
             System.Threading.Timeout.InfiniteTimeSpan);
 
         interrupted.Wait();
+        return deadlinePassed;
     }
 
     private static void Clear(
         IClipboard clipboard,
-        byte[] expectedHash,
+        byte[]? expectedHash,
         bool verify,
         TextWriter status)
     {
@@ -109,7 +115,8 @@ internal sealed class BlockingClearStrategy : IClipboardClearStrategy
 
             // The decision is Keypaste.Core.Clipboard.ClipboardClear.Should, not a copy of it: the
             // desktop app waits entirely differently and must still reach the same conclusion.
-            if (!ClipboardClear.Should(read == ClipboardStatus.Ok, current, expectedHash))
+            // A baseline that could not be read is a failed read-back too, so it clears anyway.
+            if (!ClipboardClear.Should(read == ClipboardStatus.Ok && expectedHash is not null, current, expectedHash ?? []))
             {
                 status.WriteLine("Clipboard changed since the copy; leaving it alone.");
                 return;

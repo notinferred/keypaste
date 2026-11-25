@@ -4,7 +4,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// A project's env set is released whole or not at all, and a refusal names each entry and why
-/// without its value (E.1a).
+/// without its value.
 /// </summary>
 public sealed class EnvResolutionTests : IDisposable
 {

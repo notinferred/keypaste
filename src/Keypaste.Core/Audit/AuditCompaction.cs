@@ -296,7 +296,9 @@ public static class AuditCompaction
     private readonly record struct Planned(AuditCompactionResult Result, byte[]? Contents);
 
     /// <summary>One physical line of the snapshot, as compaction sees it.</summary>
-    private sealed record Line(byte[] Bytes, AuditLine Inspected)
+    /// <param name="Terminated">The line in the snapshot, its newline included.</param>
+    /// <param name="Inspected">What its chain footer says.</param>
+    private sealed record Line(ReadOnlyMemory<byte> Terminated, AuditLine Inspected)
     {
         internal bool Chained => Inspected.Kind == AuditLineKind.Chained;
 
@@ -372,13 +374,21 @@ public static class AuditCompaction
 
         var groups = folded.GroupBy(line => (line.Label, line.Name, line.Vault, line.Day)).ToDictionary(group => group.Last(), group => group.ToList());
 
-        using var body = new MemoryStream(snapshot.Length);
+        // Kept lines stay slices of the snapshot and the new file is assembled once, so only the two are ever held whole.
+        var body = new List<ReadOnlyMemory<byte>>();
+        var bodyLength = 0L;
         using var sealedLines = new Digest();
         var previous = string.Empty;
 
-        void Write(byte[] bytes, string hash)
+        void Keep(ReadOnlyMemory<byte> bytes)
         {
-            body.Write(bytes);
+            body.Add(bytes);
+            bodyLength += bytes.Length;
+        }
+
+        void Write(ReadOnlyMemory<byte> bytes, string hash)
+        {
+            Keep(bytes);
             sealedLines.Add(hash);
             previous = hash;
         }
@@ -414,12 +424,11 @@ public static class AuditCompaction
 
             if (line.Chained)
             {
-                Write([.. line.Bytes, (byte)'\n'], line.Inspected.Hash);
+                Write(line.Terminated, line.Inspected.Hash);
             }
             else
             {
-                body.Write(line.Bytes);
-                body.WriteByte((byte)'\n');
+                Keep(line.Terminated);
             }
         }
 
@@ -439,9 +448,15 @@ public static class AuditCompaction
         };
 
         var first = AuditLog.Compose(record, now.UtcDateTime.ToString(AuditLog.TimestampFormat, CultureInfo.InvariantCulture), 0, AuditChain.Genesis, withReasonExcerpt: true, out _);
-        var contents = new byte[first.Length + body.Length];
+        var contents = new byte[first.Length + bodyLength];
         first.CopyTo(contents, 0);
-        body.GetBuffer().AsSpan(0, (int)body.Length).CopyTo(contents.AsSpan(first.Length));
+
+        var at = first.Length;
+        foreach (var bytes in body)
+        {
+            bytes.Span.CopyTo(contents.AsSpan(at));
+            at += bytes.Length;
+        }
 
         // The new file is checked as the verifier will check it before it replaces anything.
         using (var check = new MemoryStream(contents, writable: false))
@@ -509,31 +524,27 @@ public static class AuditCompaction
         };
     }
 
+    /// <summary>Every line of a snapshot that ends with a newline.</summary>
     private static List<Line> Split(byte[] snapshot)
     {
         var lines = new List<Line>();
-        var rest = snapshot.AsSpan(0, snapshot.Length - 1);
 
-        while (true)
+        for (var at = 0; at < snapshot.Length;)
         {
-            var at = rest.IndexOf((byte)'\n');
-            var raw = at < 0 ? rest : rest[..at];
-            lines.Add(Classify(raw.ToArray()));
-
-            if (at < 0)
-            {
-                return lines;
-            }
-
-            rest = rest[(at + 1)..];
+            var end = Array.IndexOf(snapshot, (byte)'\n', at);
+            lines.Add(Classify(snapshot.AsMemory(at, end + 1 - at)));
+            at = end + 1;
         }
+
+        return lines;
     }
 
     /// <summary>Reads what compaction decides by from a line the verifier has already vouched for.</summary>
     /// <remarks>A line whose fields do not parse is kept as it is: the only cost of misreading one is keeping it.</remarks>
-    private static Line Classify(byte[] bytes)
+    private static Line Classify(ReadOnlyMemory<byte> terminated)
     {
-        var line = new Line(bytes, AuditChain.Inspect(bytes));
+        var bytes = terminated[..^1];
+        var line = new Line(terminated, AuditChain.Inspect(bytes.Span));
 
         if (!line.Chained)
         {

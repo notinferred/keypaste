@@ -56,7 +56,6 @@ internal sealed class RevealedValue : Control
     internal static readonly StyledProperty<IRevealSource?> SourceProperty =
         AvaloniaProperty.Register<RevealedValue, IRevealSource?>(nameof(Source));
 
-    /// <summary>The typeface to draw with.</summary>
     internal static readonly StyledProperty<FontFamily> FontFamilyProperty =
         AvaloniaProperty.Register<RevealedValue, FontFamily>(nameof(FontFamily), FontFamily.Default);
 
@@ -64,7 +63,6 @@ internal sealed class RevealedValue : Control
     internal static readonly StyledProperty<double> FontSizeProperty =
         AvaloniaProperty.Register<RevealedValue, double>(nameof(FontSize), 14d);
 
-    /// <summary>The brush to draw with.</summary>
     internal static readonly StyledProperty<IBrush?> ForegroundProperty =
         AvaloniaProperty.Register<RevealedValue, IBrush?>(nameof(Foreground));
 

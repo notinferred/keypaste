@@ -6,7 +6,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// 4.11a: a crash report holds exactly the fields the crash report names, in one order, and <c>tests/vectors/crash-vector.json</c>, which
+/// A crash report holds exactly the fields <c>_fields</c> lists, in one order, and <c>tests/vectors/crash-vector.json</c>, which
 /// api.keypaste.com's route is to accept, is byte for byte what the scrubber writes and reads back.
 /// </summary>
 /// <remarks>

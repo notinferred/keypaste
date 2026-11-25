@@ -21,8 +21,9 @@ namespace Keypaste.App.Clipboard;
 /// — and not the transport. A terminal has no window and shells out to <c>clip.exe</c>,
 /// <c>pbcopy</c> or <c>wl-copy</c>; this app has a window, so it can hand the windowing system a
 /// data object carrying the secret markers, the Windows exclusion formats among them, which a
-/// subprocess cannot express. That closes O-0008 and answers O-0019 for the app and leaves both open
-/// for the CLI, which is a real difference and is written down rather than smoothed over.
+/// subprocess cannot express. So the app keeps copies out of Windows Clipboard History and asks
+/// clipboard managers to skip them, and the CLI does neither: a real difference, written down rather
+/// than smoothed over.
 /// </para>
 /// <para>
 /// Asynchronous because the platform is. It exists as an interface so
@@ -62,7 +63,6 @@ internal interface IAppClipboard
     /// </remarks>
     Task<PasteOutcome> TryPasteIntoAsync(SecretBuffer destination);
 
-    /// <summary>Empties the clipboard.</summary>
     /// <returns>Whether it emptied.</returns>
     Task<bool> TryClearAsync();
 }

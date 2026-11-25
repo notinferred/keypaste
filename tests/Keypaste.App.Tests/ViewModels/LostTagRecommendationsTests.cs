@@ -10,7 +10,7 @@ using Xunit;
 namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
-/// V.11 in the app: a project tag another app dropped while changing the entry is listed under
+/// A project tag another app dropped while changing the entry is listed under
 /// Settings and counted quietly, goes back only after the person has seen what it reaches, and a
 /// dismissal is remembered; a tag removed in keypaste is not listed.
 /// </summary>
@@ -19,7 +19,7 @@ public sealed class LostTagRecommendationsTests : IDisposable
     private const string _oldValue = "sk_live_APP_LOST_TAG_old";
     private const string _newValue = "sk_live_APP_LOST_TAG_new";
 
-    // Strong and used once, so the dropped tag is all the list holds (V.9).
+    // Strong and used once, so no password finding joins the dropped tag on the list.
     private const string _webLogin = "web-login-H3t8Kw6Q";
 
     private static readonly EntryName _billing = new("services", "Billing");

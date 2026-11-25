@@ -1,7 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.VisualTree;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
@@ -69,8 +68,7 @@ public sealed class SetApprovalWindowTests
             var entered = channel.AskAsync(Prompt(), Token).AsTask();
             await PromptedApp.UntilAsync(() => shown.Count == 1 && IsInFront(shown[0]));
             Key(shown[0], PhysicalKey.Enter);
-            await Task.Delay(100, Token);
-            Assert.False(entered.IsCompleted, "Return before the prompt was armed answered it");
+            Assert.False(IsAnswered(shown[0]), "Return before the prompt was armed answered it");
             clock.Advance(PromptViewModel.ArmingDelay);
             await PromptedApp.UntilAsync(() => IsArmed(shown[0]));
             Key(shown[0], PhysicalKey.Enter);
@@ -142,7 +140,4 @@ public sealed class SetApprovalWindowTests
 
         return (window, layout);
     }
-
-    private static List<Button> Buttons(Window window) =>
-        [.. window.GetVisualDescendants().OfType<Button>().Where(button => button.Name is "Deny" or "AllowOnce")];
 }

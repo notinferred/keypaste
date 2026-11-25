@@ -17,7 +17,7 @@ using Xunit;
 namespace Keypaste.App.Tests;
 
 /// <summary>
-/// The commands of the menus and the window's chords (Q.2): each does what its item says, is off where it cannot
+/// The commands of the menus and the window's chords: each does what its item says, is off where it cannot
 /// act, and on macOS the Edit commands act on the focused field themselves, because there the menu takes their chord
 /// before the field sees it.
 /// </summary>
@@ -61,7 +61,7 @@ public sealed class AppCommandsTests : IDisposable
         Assert.Contains(new KeyGesture(Key.K, KeyModifiers.Meta), Find(mac, "Find").Keys);
         Assert.Contains(new KeyGesture(Key.K, KeyModifiers.Control), Find(other, "Find").Keys);
 
-        // Windows reports AltGr as Ctrl+Alt, so no chord there holds Alt (Q.1).
+        // Windows reports AltGr as Ctrl+Alt, so no chord there holds Alt.
         Assert.DoesNotContain(other.All.SelectMany(command => command.Keys), chord => chord.KeyModifiers.HasFlag(KeyModifiers.Alt));
         Assert.Equal(["Lock", "Open vault…"], Headers(mac.Dock));
     }

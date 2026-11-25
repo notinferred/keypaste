@@ -1,6 +1,3 @@
-using Keypaste.App.Clipboard;
-using Keypaste.App.Session;
-using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Tests;
@@ -21,11 +18,11 @@ namespace Keypaste.App.Tests.ViewModels;
 /// <see cref="EntryNameSanitizer"/>.
 /// </para>
 /// <para>
-/// <b>Every case here was red before 4.9.</b> The pane drew <c>Username</c>, <c>Url</c> and
-/// <c>Notes</c> through the name rule, which replaces ten structural characters and every control
-/// character with a space, so <c>https://example.test/path?a=b#c</c> reached the screen as
-/// <c>https: example.test path?a=b#c</c>, a note's line breaks and brackets were flattened, and a
-/// Windows login lost its backslash.
+/// <b>The pane must not draw <c>Username</c>, <c>Url</c> and <c>Notes</c> through the name
+/// rule.</b> That rule replaces ten structural characters and every control character with a space,
+/// so <c>https://example.test/path?a=b#c</c> would reach the screen as
+/// <c>https: example.test path?a=b#c</c>, a note's line breaks and brackets would be flattened, and
+/// a Windows login would lose its backslash.
 /// </para>
 /// </remarks>
 public sealed class FaithfulFieldRenderingTests : IDisposable
@@ -43,9 +40,8 @@ public sealed class FaithfulFieldRenderingTests : IDisposable
     private static readonly string _bidi = ((char)0x202E).ToString();
     private static readonly string _zwsp = ((char)0x200B).ToString();
 
-    // Built from code points rather than written as escapes: the C# lexer turns a unicode escape
-    // for either of these into a real line terminator, even inside a comment, which ends the line
-    // it is written on. Found by doing it.
+    // Built from code points: the C# lexer turns a unicode escape for either into a real line
+    // break, even inside a comment.
     private static readonly string _lineSeparator = ((char)0x2028).ToString();
     private static readonly string _paragraphSeparator = ((char)0x2029).ToString();
 
@@ -81,8 +77,8 @@ public sealed class FaithfulFieldRenderingTests : IDisposable
             GroupPath = "servers",
         });
 
-        // An entry with nothing in these fields at all: the pane used to draw the literal text
-        // "(unnamed)" under the URL heading, because the name rule substitutes a placeholder.
+        // An entry with none of these fields: the name rule's placeholder, "(unnamed)", must not
+        // appear under the URL heading.
         vault.AddEntry(new VaultEntry { Title = "bare", Password = "p", GroupPath = "servers" });
 
         vault.Save();
@@ -156,44 +152,11 @@ public sealed class FaithfulFieldRenderingTests : IDisposable
         Assert.Contains(_zwsp, detail.Url, StringComparison.Ordinal);
     }
 
-    private static EntryDetailViewModel Detail(Context context, string title)
+    private static EntryDetailViewModel Detail(UnlockedScreens context, string title)
     {
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == title);
         return context.Entries.Detail!;
     }
 
-    private Context New() => new(_vaultPath);
-
-    /// <summary>An unlocked session and the entries screen over it, mirroring EntriesViewModelTests.</summary>
-    private sealed class Context : IDisposable
-    {
-        internal Context(string vaultPath)
-        {
-            Session = new AppVaultSession(new ManualClock(AppClock.Start));
-
-            using (var master = TempVault.Secret(_master))
-            {
-                Assert.Equal(UnlockOutcome.Opened, Session.TryUnlock(vaultPath, master.Value));
-            }
-
-            Clipboard = new FakeClipboard();
-            Countdown = new ClipboardCountdown(Clipboard, new ManualClock(AppClock.Start));
-            Entries = new EntriesViewModel(Session, Countdown);
-        }
-
-        internal AppVaultSession Session { get; }
-
-        internal ClipboardCountdown Countdown { get; }
-
-        internal EntriesViewModel Entries { get; }
-
-        internal FakeClipboard Clipboard { get; }
-
-        public void Dispose()
-        {
-            Entries.Dispose();
-            Countdown.Dispose();
-            Session.Dispose();
-        }
-    }
+    private UnlockedScreens New() => new(_vaultPath, _master);
 }

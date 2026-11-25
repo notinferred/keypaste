@@ -7,16 +7,15 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// What a save does when the vault's own name is held by somebody else's transaction
-/// (task F.7).
+/// What a save does when the vault's own name is held by somebody else's transaction.
 /// </summary>
 /// <remarks>
 /// <para>
 /// KeePassLib's Windows save moves a temporary file onto the vault. When Transactional NTFS refuses
 /// that move it falls back to two plain moves — onto the vault's drive, then onto the vault — and
 /// raises <see cref="Win32Exception"/> if either is refused. That type is not
-/// <see cref="IOException"/>, so before F.7 none of the eight attempts ran: the save reported
-/// failure at once, having already left the first hop's file at <c>&lt;vault&gt;.kdbx.tmp</c>.
+/// <see cref="IOException"/>, so a retry that admits only IOException runs none of the eight
+/// attempts: the save reports failure at once, having already left the first hop's file at <c>&lt;vault&gt;.kdbx.tmp</c>.
 /// </para>
 /// <para>
 /// <b>Every test here asserts on the data, not only on the exception type</b>, which is the rule
@@ -52,8 +51,8 @@ public sealed class VaultSaveUnderATransactedNameTests : IDisposable
     private const string _noTransactions =
         "this volume does not support transactions, so KeePassLib's transacted save path is not taken here either.";
 
-    // Task F.7 records the refusal on the Windows 10 floor this project advertises and
-    // leaves it unobserved on Server 2025, so this asks the running machine rather than assuming
+    // The refusal was seen on the Windows 10 floor this project advertises but not on Server
+    // 2025, so this asks the running machine rather than assuming
     // it. A runner that allows the move must skip rather than pass having exercised nothing.
     private const string _noRefusal =
         "this Windows version allows a plain move onto a name a transaction holds, so it does not reproduce F.7.";
@@ -217,7 +216,7 @@ public sealed class VaultSaveUnderATransactedNameTests : IDisposable
         var failure = Assert.Throws<VaultException>(vault.Save);
         var elapsed = Environment.TickCount64 - started;
 
-        // Not merely that it failed: that it failed on the refusal F.7 is about. Anything upstream
+        // Not merely that it failed: that it failed on the fallback move's refusal. Anything upstream
         // of the fallback move reports a different type, and this test would then be passing on a
         // failure it was never arranged to produce.
         var win32 = Assert.IsType<Win32Exception>(failure.InnerException);
@@ -267,7 +266,7 @@ public sealed class VaultSaveUnderATransactedNameTests : IDisposable
     /// </summary>
     /// <remarks>
     /// <c>KeePassInterop.EnterGateIfTransacting</c> restates that rule to leave a save that cannot
-    /// transact out of the gate (F.10b). If upstream ever transacted over a missing file, such a
+    /// transact out of the gate. If upstream ever transacted over a missing file, such a
     /// save would share the temporary directory ungated, so the rule is read from the vendored
     /// constructor on every platform, with an existing file as the control.
     /// </remarks>

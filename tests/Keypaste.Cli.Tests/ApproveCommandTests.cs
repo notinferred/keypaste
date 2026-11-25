@@ -113,7 +113,7 @@ public sealed class ApproveCommandTests : IDisposable
         terminal.AssertExit(CliApp.ExitSuccess, terminal.Run("set", "env/dev/TOKEN", "--vault", _harness.VaultPath));
 
         Assert.Contains("updated env/dev/TOKEN", terminal.Err, StringComparison.Ordinal);
-        Assert.DoesNotContain("Master password: ", terminal.Prompt.PromptsSeen);
+        Assert.DoesNotContain(CliHarness.MasterPasswordPrompt, terminal.Prompt.PromptsSeen);
         Assert.Contains("keypaste: a terminal asks to change this vault.", approver.Text, StringComparison.Ordinal);
         Assert.Contains("  command  keypaste set", approver.Text, StringComparison.Ordinal);
         Assert.Contains("  asked    asked from a terminal; any program you run could have typed it", approver.Text, StringComparison.Ordinal);
@@ -377,7 +377,7 @@ public sealed class ApproveCommandTests : IDisposable
                 }
                 catch (TimeoutException)
                 {
-                    // A test that failed before stopping it leaves it to the process's end.
+                    // A test that failed before stopping the approver leaves its thread to end with the process.
                 }
             }
 

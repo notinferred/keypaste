@@ -12,18 +12,10 @@ namespace Keypaste.App.Session;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>This is what Stage 4.1 is for.</b> <c>keypaste approve</c> says in its own remarks that "there
-/// is no idle auto-lock in this version — closing the terminal is the lock", and that Stage 4.1
-/// owns idle locking. This is that.
-/// </para>
-/// <para>
-/// <b><see cref="Unlocked"/> is shaped for Stage 4.3 and not for this one.</b> It returns
-/// <see langword="null"/> when locked because that is precisely what
+/// <b><see cref="Unlocked"/> is null while locked</b>, the shape
 /// <see cref="Core.Approval.VaultCredentialSource"/> and
-/// <see cref="Core.Approval.IEntryNameLister"/> already take — a <c>Func&lt;Vault?&gt;</c> whose
-/// null means locked. When the app becomes an approver it is
-/// <c>new VaultCredentialSource(() =&gt; session.Unlocked)</c> and nothing here changes. Building
-/// to that signature now costs nothing and is the difference between a seam and a rewrite.
+/// <see cref="Core.Approval.IEntryNameLister"/> take: a <c>Func&lt;Vault?&gt;</c> whose
+/// null means locked.
 /// </para>
 /// <para>
 /// <b>It holds the vault's claim while unlocked</b>, taken before the password is spent, so a vault
@@ -60,8 +52,8 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
     /// The longest idle timeout the settings screen will accept.
     /// </summary>
     /// <remarks>
-    /// There is deliberately no "never". It would be the one setting that quietly turns off the
-    /// feature this stage exists to ship, and a vault left open all night is the threat idle
+    /// There is deliberately no "never". It would be the one setting that quietly turns off idle
+    /// locking, and a vault left open all night is the threat idle
     /// locking answers. Eight hours is long enough to cover a working day without being an
     /// off switch wearing a number.
     /// </remarks>
@@ -78,6 +70,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
     private readonly Lock _claiming = new();
     private readonly Lock _unsavedGate = new();
     private readonly List<EntryName> _unsaved = [];
+    private readonly HashSet<EntryName> _unsavedNames = [];
     private readonly TimeProvider _clock;
     private readonly string _home;
 
@@ -378,6 +371,18 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
         }
     }
 
+    /// <summary>Whether the open vault changed an item since it was opened or last saved, without copying <see cref="Unsaved"/>.</summary>
+    internal bool HasUnsaved
+    {
+        get
+        {
+            lock (_unsavedGate)
+            {
+                return _unsaved.Count > 0;
+            }
+        }
+    }
+
     /// <summary>The open vault's identity, or <see langword="null"/> when locked.</summary>
     internal VaultIdentity? Identity
     {
@@ -501,7 +506,6 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
         }
     }
 
-    /// <summary>Whether a vault is open.</summary>
     internal bool IsUnlocked => Unlocked is not null;
 
     /// <summary>The clock idleness is measured on, for anything else that must expire by it.</summary>
@@ -541,7 +545,6 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
         : value > MaximumIdleTimeout ? MaximumIdleTimeout
         : value;
 
-    /// <summary>Opens a vault.</summary>
     /// <param name="path">The <c>.kdbx</c> file.</param>
     /// <param name="master">
     /// The master password. The caller owns the buffer behind it. Empty is a vault a keyfile alone
@@ -1122,7 +1125,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
             return VaultCreationOutcome.Failed;
         }
 
-        // Same shape and same reason as Open: the vault's ownership transfers to this session, and
+        // The vault's ownership transfers to this session, and
         // every route out of it — Lock, Dispose, and a later unlock replacing it — disposes it.
         // Adopt disposes it itself, and the key with it, if this session is already gone.
 #pragma warning disable CA2000
@@ -1562,8 +1565,8 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
             return new ReloadResult(ReloadOutcome.Locked);
         }
 
-        // Before the swap, so no prompt a
-        // person answers afterwards releases a value from the copy that replaces it.
+        // Before the swap, so no prompt a person answers afterwards releases a value from the copy
+        // that replaces it.
         lifetime?.Withdraw();
         Edited?.Invoke(this, VaultEdit.Everything);
 
@@ -1764,9 +1767,12 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
     {
         lock (_unsavedGate)
         {
-            foreach (var name in edit.Entries.Where(name => !_unsaved.Contains(name)))
+            foreach (var name in edit.Entries)
             {
-                _unsaved.Add(name);
+                if (_unsavedNames.Add(name))
+                {
+                    _unsaved.Add(name);
+                }
             }
         }
 
@@ -1823,6 +1829,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
         lock (_unsavedGate)
         {
             _unsaved.Clear();
+            _unsavedNames.Clear();
         }
     }
 
@@ -1835,7 +1842,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
     /// <para>
     /// <b>A touch past the deadline locks.</b> Input can reach the window before its activation
     /// re-check on a machine waking past the timeout; reviving the session then would undo exactly
-    /// the lock <see cref="Reevaluate"/> exists to deliver (F.13).
+    /// the lock <see cref="Reevaluate"/> exists to deliver.
     /// </para>
     /// </remarks>
     public void Touch()
@@ -1941,7 +1948,7 @@ internal sealed class AppVaultSession : IDisposable, IIdleWatched, IWatchedVault
     /// <param name="work">What to run.</param>
     /// <returns>Completes when <paramref name="work"/> has.</returns>
     /// <remarks>
-    /// Not the pool's: a lock waits for the pool to deliver what agents are owed (F.35), and must not first wait for it to start.
+    /// Not the pool's: a lock waits for the pool to deliver what agents are owed, and must not first wait for it to start.
     /// Not a task's either: an exception ends the process, as one on the UI thread did, so a lock started and not awaited never fails unseen.
     /// </remarks>
     internal static Task OnItsOwnThread(Action work)

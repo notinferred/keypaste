@@ -7,7 +7,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// 9.1e's KeePassXC CSV reader over exports written by hand as KeePassXC's <c>CsvExporter</c> writes them: every row outside the recycle bin lands
+/// The KeePassXC CSV reader over exports written by hand as KeePassXC's <c>CsvExporter</c> writes them: every row outside the recycle bin lands
 /// as an item in its group below the root, with its standard fields, TOTP and times, and every row or part that does not
 /// land is named with why, never by value.
 /// </summary>
@@ -173,14 +173,7 @@ public sealed class KeePassXcCsvReaderTests : IDisposable
         using var source = ExportImport.Open(Write("Passwords.csv", Export()), ExportImport.Readers)!;
         var plan = source.Plan(vault, "KeePassXC");
 
-        List<string?> said = [plan.Into, plan.Refusal];
-        said.AddRange(plan.Rows.SelectMany(row => new[] { row.Item, row.Note, row.ToString() }));
-        said.AddRange(plan.Losses.SelectMany(loss => new[] { loss.Part, loss.Reason, loss.ToString() }));
-        said.AddRange(source.Unread.Select(unread => unread.ToString()));
-        said.AddRange(source.Items.Select(item => item.ToString()));
-        said.AddRange(source.Items.SelectMany(item => item.Omitted).Select(omitted => omitted.ToString()));
-
-        Assert.All(_values, value => Assert.DoesNotContain(said, text => text is not null && text.Contains(value, StringComparison.Ordinal)));
+        ExportLeakCheck.AssertNothingSaidHoldsAValue(source, plan, _values);
     }
 
     /// <summary>An item's parts in one line, its times in UTC, and what the reader omitted by name.</summary>

@@ -270,15 +270,14 @@ internal sealed partial class KeePassInterop
     /// runs 34303291945 and 34403613553; not reproducible here at 32 overlapping savers, which is
     /// why the budget is set from what the runner needed. <b>Do not write down a mechanism this
     /// retry rests on:</b> the previous one — a directory enlisted in a transaction refusing
-    /// operations from outside it — was refuted, and F.6 owns the diagnosis.
+    /// operations from outside it — was refuted, and the cause is still undiagnosed.
     /// </para>
     /// <para>
     /// <b>Waiting is why the vault is re-read between attempts.</b> The thing most likely to be
     /// holding the vault's name is another process saving this same vault, so a retry that simply
     /// outlasts it writes a stale copy over the save it was waiting for — and that revert leaves no
     /// history item, because the entry it discarded never existed in this process's tree. That is
-    /// the loss <see cref="VaultChangedOnDiskException"/> exists to refuse, and until that was fixed the
-    /// only check for it ran once, before the first attempt.
+    /// the loss <see cref="VaultChangedOnDiskException"/> exists to refuse.
     /// </para>
     /// <para>
     /// <b>The bytes are produced once, before the gate, and the disk is asked again before each rename.</b>
@@ -299,7 +298,7 @@ internal sealed partial class KeePassInterop
     /// <b>The retry schedule bounds the sleeps and nothing else.</b> A caller waits for the
     /// changed-on-disk checks, producing the bytes, the gate, every attempt's work and the sleeps; <see cref="SaveTiming"/>
     /// keeps each separately, because <c>SaveAttempts × SaveRetryDelayMilliseconds</c> describes only
-    /// the last of them and a claim about elapsed time needs all of them (F.10a).
+    /// the last of them and a claim about elapsed time needs all of them.
     /// </para>
     /// </remarks>
     /// <exception cref="VaultChangedOnDiskException">
@@ -308,8 +307,8 @@ internal sealed partial class KeePassInterop
     /// <returns>The SHA-256 of the bytes that replaced the vault.</returns>
     /// <param name="clock">Receives this save's timing; the caller publishes it.</param>
     /// <param name="attempts">
-    /// How many times to try. Defaults to the shipped budget; V-F.6 pins it to 1 so the retry
-    /// cannot absorb the contention the fix is supposed to remove.
+    /// How many times to try. Defaults to the shipped budget; a test that measures contention
+    /// passes 1 so a retry cannot absorb what it measures.
     /// </param>
     /// <param name="duringAttempt">Called inside each attempt before it writes; null outside a test.</param>
     /// <param name="beforeReplacing">
@@ -382,9 +381,9 @@ internal sealed partial class KeePassInterop
     /// <remarks>
     /// <para>
     /// <b>The gate is released before the sleep that follows a refusal</b>, so another save in this
-    /// process can finish while this one waits (F.12). That makes the gate wait a wait like the sleep:
+    /// process can finish while this one waits. That makes the gate wait a wait like the sleep:
     /// another save of this vault can commit during either, so the re-read follows the gate, and a
-    /// save that used to queue behind that commit and overwrite it is refused instead.
+    /// save that would otherwise queue behind that commit and overwrite it is refused instead.
     /// </para>
     /// <para>
     /// <b>A stranded temporary is swept before the gate is released, on every way out.</b> Another
@@ -472,7 +471,7 @@ internal sealed partial class KeePassInterop
     /// <para>
     /// <b>Transacted attempts go one at a time in this process.</b> The private directory is the whole
     /// process's, so two transacted attempts would name their temporaries in it together and collide
-    /// exactly as two processes used to, and on every platform they would share
+    /// exactly as two processes sharing one directory would, and on every platform they would share
     /// <c>&lt;vault&gt;.tmp</c> beside one vault. TMP cannot be made per-thread, so those attempts are
     /// serialised instead.
     /// </para>
@@ -480,7 +479,7 @@ internal sealed partial class KeePassInterop
     /// <b>Only an attempt over an existing file is gated.</b> KeePassLib transacts only when the
     /// vault file exists, so a first save, whose temporary beside the vault the vault's claim keeps to one
     /// writer (<see cref="WriteFirstFile"/>), or one whose directory is gone never uses the private directory,
-    /// and queueing it behind other saves' key derivation was F.10's overrun. Gating an
+    /// and queueing it behind other saves would only lengthen its wait. Gating an
     /// attempt that then does not transact is harmless. The residual is a vault file created
     /// between this check and KeePassLib's own, whose attempt transacts ungated
     /// (<c>TheVendoredSaveTransactsOnlyOverAnExistingFile</c> pins the rule this restates).
@@ -511,8 +510,8 @@ internal sealed partial class KeePassInterop
     /// <remarks>
     /// Taken whether or not the vault exists: gating something that does not transact is harmless,
     /// and asking first would be a check a file appearing could outrun. Held across the caller's own
-    /// retry sleeps, unlike F.12's saves, because nothing inside derives a key and releasing it would
-    /// separate keeping a vault from replacing it.
+    /// retry sleeps, unlike a save, which releases it before each sleep, because nothing inside
+    /// derives a key and releasing it would separate keeping a vault from replacing it.
     /// </remarks>
     internal static T WhileNoSaveReplaces<T>(Func<T> act)
     {
@@ -532,7 +531,7 @@ internal sealed partial class KeePassInterop
 
     /// <summary>ERROR_TRANSACTIONAL_CONFLICT.</summary>
     /// <remarks>
-    /// Observed on Windows 10 Pro 19045 by F.7's probe, on a non-transacted move onto the
+    /// Observed on Windows 10 Pro 19045 by a deliberate probe, on a non-transacted move onto the
     /// destination name — which is the second hop of the fallback in
     /// <c>FileTransactionEx.TxfMove</c> exactly. Observed again on <c>windows-2025</c> in ci run
     /// 34602290950, where <c>VaultSaveUnderATransactedNameTests</c> asserted this number rather
@@ -576,12 +575,12 @@ internal sealed partial class KeePassInterop
     /// <remarks>
     /// Each code here is a recorded observation, named with the platform whose probe produced it.
     /// <b>A code seen only in a CI failure gets its own observation rather than joining this
-    /// list</b>: the retry budget grew once on a number nobody had reproduced, and that is still
-    /// carrying it.
+    /// list</b>: the retry budget already grew once on a number nobody had reproduced, and still
+    /// carries it.
     /// </remarks>
     private static bool IsATransientMoveCode(int code) => code switch
     {
-        // Windows 10 Pro 19045.
+        // Windows 10 Pro 19045 and windows-2025.
         _errorTransactionalConflict => true,
         _ => false,
     };

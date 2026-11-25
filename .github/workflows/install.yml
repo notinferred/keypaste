@@ -5,9 +5,8 @@ name: install
 # calls: scripts/verify-install.sh extracts them from between sentinel comments in the document and
 # executes them, so what is tested is the text a stranger reads and not a second copy of it.
 #
-# This is the gate required before an install one-liner may appear on a page at all: "a curl
-# line on a launch page is the single instruction a stranger runs first, and one that 404s is worse
-# than an honest dotnet build."
+# An install one-liner appears on a page only while this passes: it is the first instruction a
+# stranger runs, and one that 404s is worse than an honest dotnet build.
 #
 # The weekly schedule is the part that earns its keep. A release workflow proves the assets existed
 # on the day they were uploaded; only a recurring run notices that one was later deleted, renamed,
@@ -37,7 +36,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # R.0a. The only job that asks dl.keypaste.com whether the releases release-targets.json records are
+  # The only job that asks dl.keypaste.com whether the releases release-targets.json records are
   # still there. It runs here rather than in ci.yml or the release guard because an origin that cannot
   # be reached is not evidence about the definition, and this workflow is already weekly-cron plus
   # dispatch and already network-bound. It tells an unreachable origin from a missing asset with a
@@ -98,9 +97,8 @@ jobs:
       # passed in for the same reason - the script's fallback reads VersionPrefix with msbuild, which
       # would quietly reintroduce the dependency this job exists to disprove.
       #
-      # The expected version comes from release-targets.json, not from docs/install.md. It used to be
-      # scraped out of the page's own URLs, which made this job circular: a page naming the
-      # wrong version would have been checked against the wrong version and passed. The definition
+      # The expected version comes from release-targets.json, not from docs/install.md, so a page
+      # naming the wrong version fails here rather than being checked against itself. The definition
       # records what was actually published, and verify-release-matrix.sh separately holds the
       # page to it - so the two claims are made by two different things.
       - name: Read the version to install
@@ -133,7 +131,7 @@ jobs:
           fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
 
-      # 3.8. Gh is deliberately not logged in: the bundle published beside the release is all it needs.
+      # Gh is deliberately not logged in: the bundle published beside the release is all it needs.
       - name: Verify the release was built and attested by this repository's release workflow
         if: matrix.target == 'linux'
         shell: bash

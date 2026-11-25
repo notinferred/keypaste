@@ -51,8 +51,7 @@ public sealed class AlwaysPromptWindowTests
             window.FindControl<Button>("AlwaysAllow")!.Focus();
             Tap(window, Avalonia.Input.PhysicalKey.Space);
             Key(window, Avalonia.Input.PhysicalKey.Enter);
-            await Task.Delay(100, Token);
-            Assert.False(asking.IsCompleted, "a key before the prompt was armed answered it");
+            Assert.False(IsAnswered(window), "a key before the prompt was armed answered it");
 
             await screen.ArmAsync(window);
             window.FindControl<Button>("AlwaysAllow")!.Focus();

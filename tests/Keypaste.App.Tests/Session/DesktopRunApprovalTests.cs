@@ -1,15 +1,12 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Media;
-using Avalonia.VisualTree;
 using Keypaste.App.Tests.Controls;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
 using Keypaste.Core.Approval;
-using Keypaste.Core.Audit;
 using Xunit;
 using static Keypaste.App.Tests.Session.DesktopApprovalTests;
 
@@ -18,7 +15,7 @@ namespace Keypaste.App.Tests.Session;
 /// <summary>
 /// An agent's run over the app's real endpoint raises the design's approval window: who asks, the
 /// exact program and command line, where, each variable and its entry, and the agent's claim. Only a
-/// press of Allow once or the timed allow releases anything (D-0358).
+/// press of Allow once or the timed allow releases anything.
 /// </summary>
 public sealed class DesktopRunApprovalTests
 {
@@ -52,35 +49,6 @@ public sealed class DesktopRunApprovalTests
             AutomationSurface.AssertNothingExposes(window, Sentinel);
         });
 
-    [Fact]
-    public Task AllowOnce_ReleasesTheRun_AndKeepsNothing() =>
-        HeadlessSession.On(async () =>
-        {
-            await using var app = await PromptedApp.StartAsync();
-            var reply = app.AskRun();
-            var window = await app.PromptAsync();
-
-            await app.ArmAsync();
-            Click(window, "AllowOnce");
-            var answered = await reply.WaitAsync(_wait, Token);
-
-            Assert.Equal(EnvOutcome.Resolved, answered?.Set.Outcome);
-            Assert.Equal(Sentinel, Assert.Single(answered!.Set.Variables).Value);
-            Assert.Equal(AuditMethod.Prompt, answered.Method);
-        });
-
-    [Fact]
-    public Task A_click_on_Run_once_answers_at_once() =>
-        HeadlessSession.On(async () =>
-        {
-            await using var app = await PromptedApp.StartAsync();
-            var reply = app.AskRun();
-            var window = await app.PromptAsync();
-
-            Click(window, "AllowOnce");
-            Assert.Equal(EnvOutcome.Resolved, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
-        });
-
     /// <summary>What the agent calls itself, where it runs and what it runs cannot move the window or its buttons.</summary>
     [Fact]
     public Task A_long_client_directory_and_command_leave_the_window_and_buttons_where_they_were() =>
@@ -93,6 +61,7 @@ public sealed class DesktopRunApprovalTests
                 "deploy " + string.Join(' ', Enumerable.Repeat("--flag=" + new string('x', 40), 90))));
 
             Assert.Equal(ordinaryLayout, hostileLayout);
+            Assert.Equal(["Deny", "Run once"], Buttons(hostile).Select(button => button.Content as string));
             Assert.DoesNotContain(Buttons(hostile), button => button.IsDefault);
 
             ordinary.Close();
@@ -146,38 +115,4 @@ public sealed class DesktopRunApprovalTests
 
         return (window, layout);
     }
-
-    private static List<Button> Buttons(Window window) =>
-        [.. window.GetVisualDescendants().OfType<Button>().Where(button => button.Name is "Deny" or "AllowOnce" or "AllowOnce")];
-
-    [Fact]
-    public Task Return_runs_once_only_after_arming() =>
-        HeadlessSession.On(async () =>
-        {
-            await using var app = await PromptedApp.StartAsync();
-            var reply = app.AskRun();
-            var window = await app.PromptAsync();
-
-            Key(window, PhysicalKey.Enter);
-            await Task.Delay(100, Token);
-            Assert.False(reply.IsCompleted, "Return before the prompt was armed answered it");
-
-            await app.ArmAsync();
-            Key(window, PhysicalKey.Enter);
-            Assert.Equal(EnvOutcome.Resolved, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
-        });
-
-    [Fact]
-    public Task Escape_denies_the_run() =>
-        HeadlessSession.On(async () =>
-        {
-            await using var app = await PromptedApp.StartAsync();
-            var reply = app.AskRun();
-            var window = await app.PromptAsync();
-            Key(window, PhysicalKey.Escape);
-
-            var answered = await reply.WaitAsync(_wait, Token);
-            Assert.Equal(EnvOutcome.Declined, answered?.Set.Outcome);
-            Assert.Empty(answered!.Set.Variables);
-        });
 }

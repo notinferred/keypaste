@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-#
-# verify-run-injection.sh
-#
 # Proves that `keypaste run` actually injects — and that it writes nothing to disk while doing
 # it (SECURITY.md law 4: "Injection is into process environment memory, not into files").
 #
@@ -26,7 +23,7 @@ DIE_PREFIX='verify-run-injection: FAILED - '
 # Windows developer machine `bash` on PATH is usually C:\Windows\System32\bash.exe — the WSL
 # launcher — which starts a Linux session with an environment of its own and discards the one it
 # was given. A gate written against that reports "injection did not happen" on a build where
-# injection works perfectly, which is exactly what it did before this line existed.
+# injection works perfectly.
 child=${BASH:-/bin/bash}
 [ -x "$child" ] || die "cannot locate the bash that is running this script"
 

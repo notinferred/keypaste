@@ -51,10 +51,9 @@ internal sealed class MaskedInput : TemplatedControl
 
     /// <summary>Where the characters go, when the field is bound to one.</summary>
     /// <remarks>
-    /// Bound rather than subscribed, so a field inside a <c>DataTemplate</c> can have one:
-    /// <c>UnlockView</c> reaches its three fields with <c>FindControl</c> and keeps the events
-    /// below, and the four secret fields 4.9 adds bind this instead. <see cref="IRevealSource"/>
-    /// established the shape.
+    /// Bound rather than subscribed, so a field inside a <c>DataTemplate</c> can have one; a field
+    /// its view reaches with <c>FindControl</c>, such as a master password's, uses the events below
+    /// instead.
     /// </remarks>
     internal static readonly StyledProperty<ISecretSink?> SinkProperty =
         AvaloniaProperty.Register<MaskedInput, ISecretSink?>(nameof(Sink));
@@ -77,7 +76,6 @@ internal sealed class MaskedInput : TemplatedControl
     /// <summary>Raised once per character the user typed or pasted.</summary>
     internal event EventHandler<char>? CharacterTyped;
 
-    /// <summary>Raised on backspace.</summary>
     internal event EventHandler? BackspacePressed;
 
     /// <summary>Raised on escape.</summary>
@@ -123,9 +121,8 @@ internal sealed class MaskedInput : TemplatedControl
     /// <summary>The paste this control last started, for a test to await.</summary>
     /// <remarks>
     /// <see cref="OnKeyDown"/> returns <c>void</c>, so the task the sink hands back has to be kept
-    /// somewhere or it is dropped on the floor — which is precisely the defect F.16 records in the
-    /// headless test harness, where an unobserved task made assertions run after nobody was
-    /// watching. A test presses the gesture and awaits this before it asserts anything.
+    /// somewhere or it is dropped, and in the headless test harness an unobserved task lets
+    /// assertions run after nobody is watching. A test presses the gesture and awaits this before it asserts anything.
     /// </remarks>
     internal Task PasteCompleted { get; private set; } = Task.CompletedTask;
 

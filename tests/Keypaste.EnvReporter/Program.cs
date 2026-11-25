@@ -16,10 +16,10 @@ namespace Keypaste.EnvReporter;
 /// a line, so a test sees what a shell made of a copied run command.
 /// </summary>
 /// <remarks>
-/// The app's Run starts it in a terminal in V-E.1b. It reports over a pipe so the test reads what the
+/// The app's Run starts it in a terminal in <c>EnvLaunchThroughAppTests</c>. It reports over a pipe so the test reads what the
 /// child received without the child writing a file, which the same test checks nothing did. It stays
 /// until the test hangs up so the test can hold it while it is certainly running and then wait for
-/// it to exit (F.42).
+/// it to exit.
 /// </remarks>
 internal static class Program
 {

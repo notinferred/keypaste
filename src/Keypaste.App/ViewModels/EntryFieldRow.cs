@@ -86,7 +86,7 @@ internal sealed class EntryFieldRow : ObservableObject, IRevealSource
     /// <summary>Whether the field can be changed from here.</summary>
     internal bool IsWritable => !IsReadOnly;
 
-    /// <summary>Whether Generate is offered: on a protected field keypaste may write (V.12).</summary>
+    /// <summary>Whether Generate is offered: on a protected field keypaste may write.</summary>
     internal bool CanGenerate => !IsReadOnly && IsProtected;
 
     /// <summary>What the row says about the field beside its name.</summary>
@@ -99,7 +99,7 @@ internal sealed class EntryFieldRow : ObservableObject, IRevealSource
 
     internal RelayCommand ReplaceCommand { get; }
 
-    /// <summary>Generate, on a protected field: its replace form with a generated value (V.12).</summary>
+    /// <summary>Generate, on a protected field: its replace form with a generated value.</summary>
     internal RelayCommand GenerateCommand { get; }
 
     /// <summary>Opens the form that gives the field another name, keeping its value and protection.</summary>

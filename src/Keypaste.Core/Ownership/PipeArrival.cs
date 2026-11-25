@@ -5,7 +5,7 @@ using System.Runtime.Versioning;
 namespace Keypaste.Core.Ownership;
 
 /// <summary>Waits for a peer to reach a pipe instance on the calling thread.</summary>
-/// <remarks>.NET completes a wait for a connection on the thread pool, which may have no thread for the arrival (F.100).</remarks>
+/// <remarks>.NET completes a wait for a connection on the thread pool, which may have no thread for the arrival.</remarks>
 [SupportedOSPlatform("windows")]
 internal static class PipeArrival
 {

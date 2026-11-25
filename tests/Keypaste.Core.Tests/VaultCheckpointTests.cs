@@ -69,6 +69,17 @@ public sealed class VaultCheckpointTests : IDisposable
     }
 
     [Fact]
+    public void A_recycled_item_comes_back_where_it_sat_among_its_group()
+    {
+        _vault.AddEntry(new VaultEntry { GroupPath = _github.GroupPath, Title = "gitlab" });
+        _vault.AddEntry(new VaultEntry { GroupPath = _github.GroupPath, Title = "jira" });
+
+        ApplyThenRestore(new RemoveItem("work/gitlab"));
+
+        Assert.Equal(["github", "gitlab", "jira"], _vault.ReadEntries().Select(entry => entry.Title));
+    }
+
+    [Fact]
     public void A_deleted_item_comes_back_without_its_tombstone()
     {
         _vault.SetRecyclesDeletedEntries(false);

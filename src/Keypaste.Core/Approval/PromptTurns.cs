@@ -2,11 +2,10 @@ namespace Keypaste.Core.Approval;
 
 /// <summary>
 /// One prompt in front of the person at a time, and the agents' requests that arrive meanwhile waiting their turn in the
-/// order they came, at most <see cref="ApprovalLimits.MaximumWaiting"/> for each agent (F.80).
+/// order they came, at most <see cref="ApprovalLimits.MaximumWaiting"/> for each agent.
 /// </summary>
 /// <remarks>
-/// A request that does not name an agent never waits: it takes the turn now or is refused as busy, as every request was
-/// before agents could queue. A waiting request leaves the queue the moment it is withdrawn, so a lock, which withdraws
+/// A request that does not name an agent never waits: it takes the turn now or is refused as busy. A waiting request leaves the queue the moment it is withdrawn, so a lock, which withdraws
 /// them all, empties it. A looping agent can hold no more than its bound, and the refusal cooldown still answers its retries
 /// of a request a person refused (THREATS.md T-11). The desktop gives every open vault's gate one queue, so the person
 /// meets one prompt at a time whichever vault asks.

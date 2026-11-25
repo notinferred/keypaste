@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>An item's TOTP reads from the vault as KeePassXC and KeePass 2 keep it, survives keypaste's saves, and its seed stays a protected field (9.2a).</summary>
+/// <summary>An item's TOTP reads from the vault as KeePassXC and KeePass 2 keep it, survives keypaste's saves, and its seed stays a protected field.</summary>
 public sealed class VaultTotpTests : IDisposable
 {
     private const string _master = "correct horse battery staple";

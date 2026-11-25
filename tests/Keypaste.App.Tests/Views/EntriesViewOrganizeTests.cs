@@ -1,10 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.VisualTree;
-using Keypaste.App.Clipboard;
-using Keypaste.App.Session;
-using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.Tests.Rendering;
-using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
 using Keypaste.Core.Tests;
@@ -70,9 +66,8 @@ public sealed class EntriesViewOrganizeTests : IDisposable
         using var context = New();
         var window = Shown(context);
 
-        // The form is the open entry's, so it is in the pane once an entry is. Hidden until asked
-        // for, which is what the panels share with the add form. A collapsed Border keeps its
-        // children in the tree, so this is effective visibility.
+        // The form is in the pane once an entry is open, hidden until asked for. A collapsed Border
+        // keeps its children in the tree, so this checks effective visibility.
         context.Entries.Selected = context.Entries.Rows.Single(row => row.Title == "production");
         window.UpdateLayout();
 
@@ -139,7 +134,7 @@ public sealed class EntriesViewOrganizeTests : IDisposable
         where T : Control =>
         window.GetVisualDescendants().OfType<T>().FirstOrDefault(control => control.Name == name);
 
-    private static Window Shown(Context context)
+    private static Window Shown(UnlockedScreens context)
     {
         var window = new Window { Content = new EntriesView { DataContext = context.Entries } };
         window.Show();
@@ -147,34 +142,5 @@ public sealed class EntriesViewOrganizeTests : IDisposable
         return window;
     }
 
-    private Context New() => new(_vaultPath);
-
-    private sealed class Context : IDisposable
-    {
-        internal Context(string vaultPath)
-        {
-            Session = new AppVaultSession(new ManualClock(AppClock.Start));
-
-            using (var master = TempVault.Secret(Master))
-            {
-                Assert.Equal(UnlockOutcome.Opened, Session.TryUnlock(vaultPath, master.Value));
-            }
-
-            Countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock(AppClock.Start));
-            Entries = new EntriesViewModel(Session, Countdown);
-        }
-
-        internal AppVaultSession Session { get; }
-
-        internal ClipboardCountdown Countdown { get; }
-
-        internal EntriesViewModel Entries { get; }
-
-        public void Dispose()
-        {
-            Entries.Dispose();
-            Countdown.Dispose();
-            Session.Dispose();
-        }
-    }
+    private UnlockedScreens New() => new(_vaultPath, Master);
 }

@@ -6,8 +6,8 @@ namespace Keypaste.App.Tests;
 /// A <c>KEYPASTE_HOME</c> with nothing in it: no vault, no <c>recent.toml</c>.
 /// </summary>
 /// <remarks>
-/// <see cref="TempVault"/> always writes a vault, which is the wrong starting point for the one
-/// thing 4.8 is about — somebody who has just installed the app and owns no vault at all.
+/// <see cref="TempVault"/> always writes a vault, which is the wrong starting point for a first
+/// run: somebody who has just installed the app and owns no vault at all.
 /// </remarks>
 internal sealed class TempHome : IDisposable
 {

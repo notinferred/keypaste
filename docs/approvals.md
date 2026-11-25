@@ -57,7 +57,7 @@ One prompt shows at a time. Up to three requests per agent wait their turn; a fo
 | Key | Answer |
 |---|---|
 | `o` | Allow once and keep nothing. |
-| `a` | Always allow. Confirm with `y`, and keypaste keeps the answer for that agent and that item's field ([agent settings](policy.md#one-agents-own-rules)). Not offered without a label, past 128 kept answers, or in a [protected stage](policy.md#protected-stages). |
+| `a` | Always allow, kept at once for that agent and that item's field ([agent settings](policy.md#one-agents-own-rules)); keypaste then shows the `keypaste clients <agent> --forget <key>` command that undoes it. Not offered without a label, past 128 kept answers, or in a [protected stage](policy.md#protected-stages). |
 | Anything else | No, Enter included. So is the countdown ending. |
 
 An allow counts only after the choices have been on screen for a second, so a key meant for the last prompt cannot answer this one.
@@ -138,7 +138,7 @@ Each line holds its predecessor's hash, so `keypaste log verify` finds an edited
 
 ### How long lines stay
 
-Requests for values, runs, saves and changes keep their own lines. Lookups are folded after 30 days into one `log_summary` line per agent per day. Settings › Keep the agent log for sets how long anything is kept: 90 days, 1 year (default), 2 years or forever.
+Requests for values, runs, saves and changes keep their own lines. Lookups are folded after 30 days into one `log_summary` line per agent per day. Settings › Keep activity for sets how long anything is kept: 90 days, 1 year (default), 2 years or forever. While `app.toml` can't be read, nothing is removed.
 
 <a id="archiving-it"></a>
 

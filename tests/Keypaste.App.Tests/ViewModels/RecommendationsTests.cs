@@ -10,12 +10,12 @@ using Xunit;
 namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
-/// V-C.2 in the app: keys left in notes are listed only under Security, one finding for each item's keys, counted
+/// Keys left in notes are listed only under Security, one finding for each item's keys, counted
 /// quietly, moved together in one revision, remembered when dismissed, and never shown by value.
 /// </summary>
 public sealed class RecommendationsTests : IDisposable
 {
-    // Strong and used once each, so the keys in notes are all the list holds (V.9).
+    // Strong and used once each, so no password finding joins the keys in notes on the list.
     private const string _stripeLogin = "stripe-login-Q7v2Lm9X";
     private const string _plainLogin = "plain-login-W4k8Rz3N";
 

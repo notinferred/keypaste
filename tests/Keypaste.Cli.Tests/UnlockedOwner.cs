@@ -3,7 +3,6 @@ using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.HardwareKeys;
-using Keypaste.Core.Ipc;
 using Keypaste.Core.Launch;
 using Keypaste.Core.Ownership;
 using Keypaste.Core.Tests;
@@ -18,31 +17,24 @@ namespace Keypaste.Cli.Tests;
 internal sealed class UnlockedOwner : IAsyncDisposable
 {
     private readonly Vault _vault;
-    private readonly LaunchPasses _launches = new(TimeProvider.System);
+    private readonly LaunchPasses _launches;
     private readonly ApprovalGate _gate;
     private readonly AuditLog? _audit;
     private readonly string _auditPath;
-    private readonly SessionAuthority _authority;
-    private readonly ApproverListener _listener;
-    private readonly CancellationTokenSource _stop = new();
-    private readonly Task _running;
+    private readonly ServedOwner _served;
 
-    private UnlockedOwner(CliHarness harness, string pipe, string master, ApprovalAnswer answer, HardwareKey? hardwareKey)
+    private UnlockedOwner(CliHarness harness, string pipe, string master, ApprovalAnswer answer, HardwareKey? hardwareKey, string? auditPath, TimeProvider? clock)
     {
+        var releasesOn = clock ?? TimeProvider.System;
         _vault = ClaimedVault.Open(harness.VaultPath, master, null, hardwareKey);
+        _launches = new LaunchPasses(releasesOn);
         Lifetime.Own(_launches);
         Channel = new ScriptedChannel(answer);
         _gate = new ApprovalGate(Channel, TimeProvider.System, ApprovalLimits.Default);
-        _auditPath = KeypasteHome.AuditPath(harness.Directory);
+        _auditPath = auditPath ?? KeypasteHome.AuditPath(harness.Directory);
         _audit = AuditLog.TryOpen(_auditPath, TimeProvider.System, out var audit, out var error)
             ? audit
             : throw new InvalidOperationException(error);
-
-        var handler = new ApproverHandler(
-            new VaultCredentialSource(() => _vault),
-            new VaultEntryNameLister(() => _vault),
-            _gate,
-            IAgentRules.Defaults);
 
         var editor = new SessionEditor(
             _gate,
@@ -52,20 +44,19 @@ internal sealed class UnlockedOwner : IAsyncDisposable
             narrate: null,
             edited: null);
 
-        _authority = new SessionAuthority(
-            VaultIdentity.Of(harness.Directory, harness.VaultPath),
-            () => Lifetime,
-            handler,
-            () => _audit,
-            new SessionEnvironments(
-                _gate,
-                asked => ReferenceEquals(asked, Lifetime) && asked.IsLive ? _vault : null,
-                TimeProvider.System,
-                Launches: _launches),
-            editor: editor);
-
-        _listener = new ApproverListener(pipe, _authority);
-        _running = _listener.RunAsync(_stop.Token);
+        _served = ServedOwner.Serve(
+            new SessionAuthority(
+                VaultIdentity.Of(harness.Directory, harness.VaultPath),
+                () => Lifetime,
+                ServedOwner.VaultHandler(() => _vault, _gate, IAgentRules.Defaults),
+                () => _audit,
+                new SessionEnvironments(
+                    _gate,
+                    asked => ReferenceEquals(asked, Lifetime) && asked.IsLive ? _vault : null,
+                    releasesOn,
+                    Launches: _launches),
+                editor: editor),
+            pipe);
     }
 
     internal ScriptedChannel Channel { get; }
@@ -73,8 +64,12 @@ internal sealed class UnlockedOwner : IAsyncDisposable
     internal SessionLifetime Lifetime { get; } = new();
 
     /// <summary>Holds the harness's vault on <paramref name="pipe"/>; a vault that also needs <paramref name="hardwareKey"/> has it asked by every save the owner makes, as the app's saves do, and the caller disposes it after the owner.</summary>
-    internal static UnlockedOwner Start(CliHarness harness, string pipe, string master, ApprovalAnswer answer, HardwareKey? hardwareKey = null) =>
-        new(harness, pipe, master, answer, hardwareKey);
+    /// <remarks>
+    /// It records in the harness home's log unless <paramref name="auditPath"/> names another, and times its releases and
+    /// passes on <paramref name="clock"/>, the system's by default.
+    /// </remarks>
+    internal static UnlockedOwner Start(CliHarness harness, string pipe, string master, ApprovalAnswer answer, HardwareKey? hardwareKey = null, string? auditPath = null, TimeProvider? clock = null) =>
+        new(harness, pipe, master, answer, hardwareKey, auditPath, clock);
 
     /// <summary>The command the run Terminal starts for a Run in the app sends: Terminal's fixed script around the person's command, the only one the owner issues a pass for.</summary>
     internal static string[] InTerminal(string command) => ["/bin/sh", "-c", TerminalLaunch.RunScript, "keypaste", command];
@@ -85,7 +80,7 @@ internal sealed class UnlockedOwner : IAsyncDisposable
     {
         var preview = EnvResolution.Resolve(_vault, project, profile, keys: null, TimeProvider.System).Preview;
 
-        return _authority.IssueLaunch(new LaunchClaim(project, profile, directory, command, preview), Lifetime.Id)
+        return _served.Authority.IssueLaunch(new LaunchClaim(project, profile, directory, command, preview), Lifetime.Id)
             ?? throw new InvalidOperationException("the owner issued no pass");
     }
 
@@ -123,24 +118,12 @@ internal sealed class UnlockedOwner : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        await _stop.CancelAsync();
-
-        try
-        {
-            await _running;
-        }
-        catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
-        {
-            // Tearing the listener down is how it stops.
-        }
-
-        _listener.Dispose();
+        await _served.DisposeAsync();
         Lifetime.Dispose();
         _gate.Dispose();
         _launches.Dispose();
         _audit?.Dispose();
         _vault.Dispose();
-        _stop.Dispose();
     }
 
     /// <summary>Answers env prompts and terminal edits with a fixed answer and remembers the last of each.</summary>

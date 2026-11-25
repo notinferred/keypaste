@@ -212,7 +212,7 @@ prepare_desktop() {
   prepare keypaste.app.slnx
   prepare tests/Keypaste.Consistency.Tests/Keypaste.Consistency.Tests.csproj
 }
-# Core and Infrastructure also run in the desktop's process, which has ICU and a person's culture, so their tests answer under cultures that differ in casing, numbers and calendar (Q.16).
+# Core and Infrastructure also run in the desktop's process, which has ICU and a person's culture, so their tests answer under cultures that differ in casing, numbers and calendar.
 # .NET reads culture data from ICU on every platform, so Linux's answers stand for Windows' and macOS'.
 test_cultures() {
   local culture

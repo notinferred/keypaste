@@ -39,7 +39,7 @@
 
         <!-- The heading, then whether the log holds and how many records show, the file's path on its tooltip. -->
         <ctl:HeaderRow Spacing="16">
-          <!-- Not the handoff's "stored inside the vault, signed": the log is plaintext machine state, hash-chained. -->
+          <!-- The log is plaintext machine state, hash-chained; it is not stored inside the vault or signed. -->
           <TextBlock Classes="h1" Text="{x:Static res:Strings.Activity}" ToolTip.Tip="{x:Static vm:LogViewModel.Subtitle}" VerticalAlignment="Center" />
 
           <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">

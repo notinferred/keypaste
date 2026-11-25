@@ -1,14 +1,10 @@
 #!/usr/bin/env bash
-#
-# make-compat-fixture.sh
-#
 # Builds the KDBX fixture that scripts/verify-keepassxc-compat.sh checks against a real
 # KeePassXC (SECURITY.md law 14).
 #
-# This drives the SHIPPED keypaste binary. Until Stage 0.3 the fixture came from a throwaway
-# project that called Keypaste.Core directly; driving the CLI instead means the permanent gate
-# now also covers argument parsing, group-path splitting, the non-echoing prompt's
-# redirected-stdin path, init's confirm-twice loop, and add's open-modify-save cycle.
+# This drives the SHIPPED keypaste binary, so the gate also covers argument parsing, group-path
+# splitting, the non-echoing prompt's redirected-stdin path, init's confirm-twice loop, and add's
+# open-modify-save cycle.
 #
 # The binary is invoked DIRECTLY rather than through `dotnet run`, which would put the SDK's
 # stdin forwarding between the pipe and the process under test.

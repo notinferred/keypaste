@@ -1,6 +1,4 @@
-using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
-using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Tests;
@@ -141,7 +139,7 @@ public sealed class EntriesOrganizeTests : IDisposable
     /// <summary>
     /// A duplicate sits beside the item under a new title, with its values and no history, and is
     /// selected; it leaves out the project tags and says so, because a project takes one item for each
-    /// variable (D-0337).
+    /// variable.
     /// </summary>
     [Fact]
     public void A_duplicate_is_selected_beside_the_item_and_names_the_project_tags_it_left_out()
@@ -312,7 +310,7 @@ public sealed class EntriesOrganizeTests : IDisposable
         Assert.Equal("Website", row.Why);
     }
 
-    /// <summary>A tag the query was in labels the row with that tag, which is a label and not a value (D-0485).</summary>
+    /// <summary>A tag the query was in labels the row with that tag, which is a label and not a value.</summary>
     [Fact]
     public void A_row_matched_on_a_tag_names_the_tag()
     {
@@ -422,35 +420,5 @@ public sealed class EntriesOrganizeTests : IDisposable
     private static string Digest(string path) =>
         Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)));
 
-    private Context New() => new(_vaultPath);
-
-    /// <summary>An unlocked session and a screen looking at it.</summary>
-    private sealed class Context : IDisposable
-    {
-        internal Context(string vaultPath)
-        {
-            Session = new AppVaultSession(new ManualClock(AppClock.Start));
-
-            using (var master = TempVault.Secret(Master))
-            {
-                Assert.Equal(UnlockOutcome.Opened, Session.TryUnlock(vaultPath, master.Value));
-            }
-
-            Countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock(AppClock.Start));
-            Entries = new EntriesViewModel(Session, Countdown);
-        }
-
-        internal AppVaultSession Session { get; }
-
-        internal ClipboardCountdown Countdown { get; }
-
-        internal EntriesViewModel Entries { get; }
-
-        public void Dispose()
-        {
-            Entries.Dispose();
-            Countdown.Dispose();
-            Session.Dispose();
-        }
-    }
+    private UnlockedScreens New() => new(_vaultPath, Master);
 }

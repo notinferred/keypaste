@@ -3,7 +3,7 @@ using Keypaste.App.Clipboard;
 namespace Keypaste.App.ViewModels;
 
 /// <summary>
-/// Generate password…, on its own (V.12): a generated password to copy; a field takes one from its own generator.
+/// Generate password…, on its own: a generated password to copy; a field takes one from its own generator.
 /// </summary>
 /// <remarks>
 /// The value lives in a <see cref="SecretField"/>, drawn from the generator straight into its buffer, and leaves it

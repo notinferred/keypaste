@@ -1,8 +1,6 @@
 using System.Text;
 using KeePassLib.Security;
-using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
-using Keypaste.App.Tests.Clipboard;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Internal;
@@ -13,7 +11,7 @@ namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
 /// The item pane's attachments: listed by name and size, each add, replace and remove one revision written through core,
-/// and a copy saved only where nothing is, each refusal said in a sentence and writing nothing (V.8b).
+/// and a copy saved only where nothing is, each refusal said in a sentence and writing nothing.
 /// </summary>
 public sealed class EntryAttachmentsTests : IDisposable
 {
@@ -25,6 +23,7 @@ public sealed class EntryAttachmentsTests : IDisposable
 
     private readonly string _directory = Directory.CreateTempSubdirectory("keypaste-entry-attachments-").FullName;
     private readonly string _vaultPath;
+    private readonly FakeVaultFilePicker _picker = new();
 
     public EntryAttachmentsTests()
     {
@@ -37,7 +36,7 @@ public sealed class EntryAttachmentsTests : IDisposable
     [Fact]
     public void The_pane_lists_each_attachment_by_name_and_size()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, picker: _picker);
 
         var rows = context.Open(_checking).Attachments.Rows;
         Assert.Equal(["statement.txt"], rows.Select(row => row.Name));
@@ -52,15 +51,15 @@ public sealed class EntryAttachmentsTests : IDisposable
     [Fact]
     public async Task Adding_a_file_attaches_it_under_its_own_name_as_one_revision()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, picker: _picker);
         var attachments = context.Open(_checking).Attachments;
         var revisions = Revisions();
         var bytes = Encoding.UTF8.GetBytes("-----BEGIN KEY-----");
-        context.Picker.AttachmentPath = Chosen("deploy-key.pem", bytes);
+        _picker.AttachmentPath = Chosen("deploy-key.pem", bytes);
 
         await attachments.AddCommand.PressAsync();
 
-        Assert.Equal(1, context.Picker.AttachmentCalls);
+        Assert.Equal(1, _picker.AttachmentCalls);
         Assert.Null(context.Entries.Error);
         Assert.Null(attachments.Note);
         Assert.Equal(["deploy-key.pem", "statement.txt"], attachments.Rows.Select(row => row.Name));
@@ -72,7 +71,7 @@ public sealed class EntryAttachmentsTests : IDisposable
     [Fact]
     public async Task A_cancelled_picker_writes_nothing()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, picker: _picker);
         var attachments = context.Open(_checking).Attachments;
         var before = File.ReadAllBytes(_vaultPath);
 
@@ -80,8 +79,8 @@ public sealed class EntryAttachmentsTests : IDisposable
         await attachments.Rows[0].ReplaceCommand.PressAsync();
         await attachments.Rows[0].SaveCommand.PressAsync();
 
-        Assert.Equal(2, context.Picker.AttachmentCalls);
-        Assert.Equal(1, context.Picker.AttachmentDestinationCalls);
+        Assert.Equal(2, _picker.AttachmentCalls);
+        Assert.Equal(1, _picker.AttachmentDestinationCalls);
         Assert.Null(context.Entries.Error);
         Assert.Equal(before, File.ReadAllBytes(_vaultPath));
     }
@@ -89,19 +88,19 @@ public sealed class EntryAttachmentsTests : IDisposable
     [Fact]
     public async Task A_file_over_the_cap_a_name_the_item_has_and_a_file_that_cannot_be_read_write_nothing_and_say_why()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, picker: _picker);
         var attachments = context.Open(_checking).Attachments;
         var before = File.ReadAllBytes(_vaultPath);
 
-        context.Picker.AttachmentPath = Chosen("large.bin", new byte[EntryAttachment.MaximumSize + 1]);
+        _picker.AttachmentPath = Chosen("large.bin", new byte[EntryAttachment.MaximumSize + 1]);
         await attachments.AddCommand.PressAsync();
         Assert.Equal("That file is larger than 5 MiB, the most keypaste attaches.", context.Entries.Error);
 
-        context.Picker.AttachmentPath = Chosen("statement.txt", [1, 2, 3]);
+        _picker.AttachmentPath = Chosen("statement.txt", [1, 2, 3]);
         await attachments.AddCommand.PressAsync();
         Assert.Equal("This item already has an attachment called statement.txt. Replace it instead.", context.Entries.Error);
 
-        context.Picker.AttachmentPath = Path.Combine(_directory, "missing.bin");
+        _picker.AttachmentPath = Path.Combine(_directory, "missing.bin");
         await attachments.AddCommand.PressAsync();
         Assert.Equal("keypaste couldn't read missing.bin. Check that it's still there and that you can open it, then choose it again.", context.Entries.Error);
 
@@ -112,11 +111,11 @@ public sealed class EntryAttachmentsTests : IDisposable
     [Fact]
     public async Task Replacing_keeps_the_name_as_one_revision()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, picker: _picker);
         var attachments = context.Open(_checking).Attachments;
         var revisions = Revisions();
         var bytes = Encoding.UTF8.GetBytes("the new statement");
-        context.Picker.AttachmentPath = Chosen("march.txt", bytes);
+        _picker.AttachmentPath = Chosen("march.txt", bytes);
 
         await attachments.Rows[0].ReplaceCommand.PressAsync();
 
@@ -131,7 +130,7 @@ public sealed class EntryAttachmentsTests : IDisposable
     [Fact]
     public void Removing_asks_first_and_is_one_revision()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, picker: _picker);
         var attachments = context.Open(_checking).Attachments;
         var revisions = Revisions();
         var before = File.ReadAllBytes(_vaultPath);
@@ -161,15 +160,15 @@ public sealed class EntryAttachmentsTests : IDisposable
     [Fact]
     public async Task Saving_writes_a_copy_where_the_person_chose_and_says_it_is_not_encrypted()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, picker: _picker);
         var attachments = context.Open(_checking).Attachments;
         var before = File.ReadAllBytes(_vaultPath);
         var destination = Path.Combine(Directory.CreateDirectory(Path.Combine(_directory, "saved")).FullName, "statement.txt");
-        context.Picker.AttachmentDestination = destination;
+        _picker.AttachmentDestination = destination;
 
         await attachments.Rows[0].SaveCommand.PressAsync();
 
-        Assert.Equal("statement.txt", context.Picker.SuggestedAttachmentName);
+        Assert.Equal("statement.txt", _picker.SuggestedAttachmentName);
         Assert.Null(context.Entries.Error);
         Assert.Equal(_statement, File.ReadAllBytes(destination));
         Assert.Equal(before, File.ReadAllBytes(_vaultPath));
@@ -185,10 +184,10 @@ public sealed class EntryAttachmentsTests : IDisposable
     [Fact]
     public async Task Saving_where_a_file_already_is_replaces_nothing_and_says_to_choose_another_name()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, picker: _picker);
         var attachments = context.Open(_checking).Attachments;
         var occupied = Chosen("statement.txt", Encoding.UTF8.GetBytes("keep me"));
-        context.Picker.AttachmentDestination = occupied;
+        _picker.AttachmentDestination = occupied;
 
         await attachments.Rows[0].SaveCommand.PressAsync();
 
@@ -210,7 +209,7 @@ public sealed class EntryAttachmentsTests : IDisposable
             vault.Save();
         }
 
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, picker: _picker);
         var attachments = context.Open(_checking).Attachments;
 
         attachments.Rows.Single(row => row.Name == "a.bin").RemoveCommand.Press();
@@ -234,7 +233,7 @@ public sealed class EntryAttachmentsTests : IDisposable
         var bytes = Encoding.UTF8.GetBytes("planted");
         ForeignEdit.Apply(_vaultPath, _master, "Loose", new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), entry => entry.Binaries.Set(hostile, new ProtectedBinary(false, bytes)));
 
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, picker: _picker);
         var row = Assert.Single(context.Open(_loose).Attachments.Rows);
         var saved = Directory.CreateDirectory(Path.Combine(_directory, "saved")).FullName;
 
@@ -242,7 +241,7 @@ public sealed class EntryAttachmentsTests : IDisposable
         Assert.Equal(".. .. .ssh txt.exe", row.DisplayName);
         Assert.Equal(".. .. .ssh txt.exe", row.SuggestedFileName);
 
-        context.Picker.AttachmentDestination = Path.Combine(saved, row.SuggestedFileName);
+        _picker.AttachmentDestination = Path.Combine(saved, row.SuggestedFileName);
         await row.SaveCommand.PressAsync();
 
         Assert.Null(context.Entries.Error);
@@ -266,11 +265,11 @@ public sealed class EntryAttachmentsTests : IDisposable
     [Fact]
     public async Task A_lock_while_the_picker_is_open_writes_nothing()
     {
-        using var context = new Context(_vaultPath);
+        using var context = new UnlockedScreens(_vaultPath, _master, picker: _picker);
         var attachments = context.Open(_checking).Attachments;
         var before = File.ReadAllBytes(_vaultPath);
-        context.Picker.AttachmentPath = Chosen("deploy-key.pem", [1, 2, 3]);
-        context.Picker.WhileAttachmentPickerOpen = () =>
+        _picker.AttachmentPath = Chosen("deploy-key.pem", [1, 2, 3]);
+        _picker.WhileAttachmentPickerOpen = () =>
         {
             context.Session.Lock(VaultLockReason.Manual);
             context.Entries.Dispose();
@@ -278,7 +277,7 @@ public sealed class EntryAttachmentsTests : IDisposable
 
         await attachments.AddCommand.PressAsync();
 
-        Assert.Equal(1, context.Picker.AttachmentCalls);
+        Assert.Equal(1, _picker.AttachmentCalls);
         Assert.Equal(before, File.ReadAllBytes(_vaultPath));
         Assert.Empty(attachments.Rows);
     }
@@ -304,42 +303,5 @@ public sealed class EntryAttachmentsTests : IDisposable
     {
         using var vault = ClaimedVault.Open(_vaultPath, _master);
         return vault.ReadHistory(_checking)!.Count;
-    }
-
-    private sealed class Context : IDisposable
-    {
-        internal Context(string vaultPath)
-        {
-            Session = new AppVaultSession(new ManualClock(AppClock.Start));
-
-            using (var master = TempVault.Secret(_master))
-            {
-                Assert.Equal(UnlockOutcome.Opened, Session.TryUnlock(vaultPath, master.Value));
-            }
-
-            Countdown = new ClipboardCountdown(new FakeClipboard(), new ManualClock(AppClock.Start));
-            Entries = new EntriesViewModel(Session, Countdown, picker: Picker);
-        }
-
-        internal AppVaultSession Session { get; }
-
-        internal ClipboardCountdown Countdown { get; }
-
-        internal EntriesViewModel Entries { get; }
-
-        internal FakeVaultFilePicker Picker { get; } = new();
-
-        internal EntryDetailViewModel Open(EntryName name)
-        {
-            Entries.Selected = Entries.Rows.Single(row => row.Title == name.Title && row.GroupPath == name.GroupPath);
-            return Entries.Detail!;
-        }
-
-        public void Dispose()
-        {
-            Entries.Dispose();
-            Countdown.Dispose();
-            Session.Dispose();
-        }
     }
 }

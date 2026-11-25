@@ -52,13 +52,13 @@ internal sealed partial class CrashReportRow : ObservableObject
     /// <summary>The row's words: what failed, or the question its delete asks.</summary>
     internal string Shown => IsConfirming ? Strings.DeleteThisReportItWontBeSent : Title;
 
-    /// <summary>Asks first.</summary>
+    /// <summary>Asks before deleting the report.</summary>
     internal RelayCommand AskDeleteCommand { get; }
 
     /// <summary>Takes the question back.</summary>
     internal RelayCommand CancelDeleteCommand { get; }
 
-    /// <summary>Deletes it unsent.</summary>
+    /// <summary>Deletes the report without sending it.</summary>
     internal RelayCommand DeleteCommand { get; }
 
     private static string TitleOf(CrashReport report)

@@ -108,13 +108,13 @@ internal sealed class SessionHost : IDisposable
         }
     }
 
-    /// <summary>The endpoint being served, or null.</summary>
     /// <summary>Raised, on whichever thread answered it, once a terminal's edit is saved in the vault.</summary>
     internal event EventHandler<EditDone>? TerminalEdited;
 
     /// <summary>Raised, on whichever thread made it, once a browser's pairing is made or removed for this computer.</summary>
     internal event EventHandler? PairingsChanged;
 
+    /// <summary>The endpoint being served, or null.</summary>
     internal string? Endpoint { get; private set; }
 
     /// <summary>Why nothing is being served for an unlocked vault, or null.</summary>
@@ -594,7 +594,7 @@ internal sealed class SessionHost : IDisposable
                         AgentRulesFile.Shared(session.Home)),
                     Audit = audit.Open,
                     AuditPath = auditPath,
-                    KeepLogDays = () => Core.Settings.AppSettings.Load(KeypasteHome.SettingsPath(session.Home)).KeepLogDays,
+                    KeepLogDays = () => Core.Settings.LogRetention.KeptDays(session.Home),
                     LockNow = requestLock,
                     Clock = session.Clock,
 

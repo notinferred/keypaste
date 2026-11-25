@@ -5,7 +5,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// 9.1b's Bitwarden reader over exports built by hand from Bitwarden's export models: every item type lands with its
+/// The Bitwarden reader over exports built by hand from Bitwarden's export models: every item type lands with its
 /// details where the vault keeps them, every part a vault has no place for is named with why, an organization's
 /// collections nest as groups, and an encrypted export is refused, with no value in anything said.
 /// </summary>
@@ -378,18 +378,8 @@ public sealed class BitwardenJsonReaderTests : IDisposable
         using var source = Open("bitwarden_export.json", _personal);
         var plan = source.Plan(_vault, "imported");
 
-        var said = new List<string?> { plan.Into, plan.Refusal };
-        said.AddRange(plan.Rows.SelectMany(row => new[] { row.Item, row.Note, row.ToString() }));
-        said.AddRange(plan.Losses.Select(loss => loss.ToString()));
-        said.AddRange(source.Unread.Select(unread => unread.ToString()));
-        said.AddRange(source.Items.SelectMany(item => item.Omitted).Select(omitted => omitted.ToString()));
-        said.AddRange(source.Items.Select(item => item.ToString()));
-        said.AddRange(source.Items.SelectMany(item => item.Fields).Select(field => field.ToString()));
-        said.AddRange(source.Items.SelectMany(item => item.History).Select(version => version.ToString()));
-        said.AddRange(source.Items.SelectMany(item => item.Passkeys).Select(passkey => passkey.ToString()));
-
         string[] values = [_valueMark, _keePassXcCredentialId, "MIGHAgEA", _keePassXcUserHandle, "KPXC_BITWARDEN", "AQIDBA", "BAMCAQ", "webauthn.io"];
-        Assert.All(values, value => Assert.DoesNotContain(said, text => text is not null && text.Contains(value, StringComparison.Ordinal)));
+        ExportLeakCheck.AssertNothingSaidHoldsAValue(source, plan, values);
     }
 
     private static EntryField Plain(string name) => new(name, false, false);

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds, from this commit, one unpublished desktop candidate per numeric version, for installing over one
-# another (4.7d). Nothing here is signed, attested or published.
+# another. Nothing here is signed, attested or published.
 #
 # Each candidate carries the `upgrade` prerelease suffix, so no real release can be confused with it, and its
 # binary must report the version it was asked for before the package is built.

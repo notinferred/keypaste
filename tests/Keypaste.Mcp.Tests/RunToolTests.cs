@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Globalization;
-using System.Security.Cryptography;
 using System.Text.Json;
 using Keypaste.Core;
 using Keypaste.Core.Activity;
@@ -501,9 +500,7 @@ public sealed class RunToolTests : IDisposable
     {
         private readonly Vault _vault;
         private readonly ApprovalGate _gate;
-        private readonly ApproverListener _listener;
-        private readonly CancellationTokenSource _stop = new();
-        private readonly Task _serving;
+        private readonly ServedOwner _served;
         private readonly SessionLifetime _lifetime = new();
         private readonly ApprovalAnswer _answer;
         private int _asked;
@@ -530,25 +527,17 @@ public sealed class RunToolTests : IDisposable
 
             _gate = new ApprovalGate(this, TimeProvider.System, ApprovalLimits.Default);
 
-            var handler = new ApproverHandler(
-                new VaultCredentialSource(() => _vault),
-                new VaultEntryNameLister(() => _vault),
-                _gate,
-                IAgentRules.Of(rules));
-
             var authority = new SessionAuthority(
                 VaultIdentity.Of(KeypasteHome.Resolve(null), test.VaultPath),
                 () => _lifetime,
-                handler,
+                ServedOwner.VaultHandler(() => _vault, _gate, IAgentRules.Of(rules)),
                 audit: () => Log.Log,
                 new SessionEnvironments(_gate, lifetime => ReferenceEquals(lifetime, _lifetime) ? _vault : null, TimeProvider.System));
 
-            PipeName = "keypaste-run-tool-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
-            _listener = new ApproverListener(PipeName, new Counting(authority, this));
-            _serving = _listener.RunAsync(_stop.Token);
+            _served = ServedOwner.Serve(authority, ServedOwner.NewPipeName("keypaste-run-tool-"), answering: new Counting(authority, this));
         }
 
-        internal string PipeName { get; }
+        internal string PipeName => _served.PipeName;
 
         /// <summary>The owner's own log, in its home.</summary>
         internal OwnerLog Log { get; }
@@ -577,19 +566,7 @@ public sealed class RunToolTests : IDisposable
 
         public async ValueTask DisposeAsync()
         {
-            await _stop.CancelAsync();
-
-            try
-            {
-                await _serving;
-            }
-            catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
-            {
-                // Tearing the listener down is how it stops.
-            }
-
-            _listener.Dispose();
-            _stop.Dispose();
+            await _served.DisposeAsync();
             _lifetime.Dispose();
             _gate.Dispose();
             _vault.Dispose();

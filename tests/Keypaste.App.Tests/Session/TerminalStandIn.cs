@@ -27,7 +27,7 @@ internal sealed record Opening(
 /// <summary>
 /// Terminal as the app meets it on macOS, on a runner whose Terminal a test cannot watch: an assembled
 /// <c>keypaste.app</c> carrying the real launcher and a <c>keypaste</c> that starts the built CLI, and an
-/// <c>open</c> that runs that launcher as a Terminal window does (E.1d).
+/// <c>open</c> that runs that launcher as a Terminal window does.
 /// </summary>
 /// <remarks>
 /// A window is a login <c>sh</c> given the line Terminal types, the launcher's path and then <c>exit</c>,

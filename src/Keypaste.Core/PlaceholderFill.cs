@@ -43,7 +43,7 @@ internal sealed record PlaceholderRefusal(string Placeholder, string Ending)
     internal string Reason => $"holds the KeePass placeholder {Placeholder}, which {Ending}";
 }
 
-/// <summary>The placeholders a value an edit writes plants, as a terminal edit's prompt names them (N.11).</summary>
+/// <summary>The placeholders a value an edit writes plants, as a terminal edit's prompt names them.</summary>
 /// <param name="Fills">Each placeholder that fills in from the item when the value leaves, as shown, in the order first written.</param>
 /// <param name="Refused">The first one that refuses the value wherever it would leave, or null when none does.</param>
 internal sealed record PlantedPlaceholders(IReadOnlyList<string> Fills, PlaceholderRefusal? Refused);

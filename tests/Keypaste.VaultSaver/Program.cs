@@ -9,17 +9,17 @@ namespace Keypaste.VaultSaver;
 /// </summary>
 /// <remarks>
 /// <para>
-/// V-F.6's saver, and the reason it is a process rather than a method. The product redirects its
+/// A process rather than a method, for the concurrent-save tests: the product redirects its
 /// temporary directory once, on its first save, and then relies on <c>TMP</c> staying where it put
 /// it. A test that set <c>TMP</c> in its own process after that had already happened would not
-/// mislead the test so much as undo the fix — <c>TxfPrepare</c> reads <c>TMP</c> at save time, so
-/// the save would go straight back into the contended directory and fail on a build that is
-/// repaired.
+/// mislead the test so much as undo the redirect — <c>TxfPrepare</c> reads <c>TMP</c> at save time,
+/// so the save would go straight back into the contended directory and fail even with the redirect
+/// in place.
 /// </para>
 /// <para>
 /// Launched with <c>TMP</c> already in its environment, this process meets that value on the way
-/// through the same startup path a shipped binary takes: with the fix, the redirect fires on it and
-/// puts the private directory inside it; without, the save names its temporary in it directly. No
+/// through the same startup path a shipped binary takes: with the redirect in place, it fires on it and
+/// puts the private directory inside it; without it, the save names its temporary in it directly. No
 /// test-only setup either way, which is what makes a green run mean something.
 /// </para>
 /// <para>

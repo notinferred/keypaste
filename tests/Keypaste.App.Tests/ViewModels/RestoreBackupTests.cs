@@ -23,7 +23,7 @@ namespace Keypaste.App.Tests.ViewModels;
 /// <remarks>
 /// <para>
 /// <b>Every backup here was made by a save through a screen.</b> A backup planted beside a fixture
-/// would test a reader; what V-V.4b asks for is the journey — change a credential in the app, lock,
+/// would test a reader; what is under test is the journey — change a credential in the app, lock,
 /// restore the copy that change left behind, and read the earlier value in the vault the app then
 /// opens. The damaged backups are real ones, damaged afterwards.
 /// </para>

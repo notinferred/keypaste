@@ -14,8 +14,8 @@ using Xunit;
 namespace Keypaste.App.Tests.Controls;
 
 /// <summary>
-/// D-0099 on the three master-password fields V.1b adds to Settings: the current password, the new
-/// one and its confirmation.
+/// The three master-password fields in Settings, the current password, the new one and its
+/// confirmation, publish only their length to the accessibility bus.
 /// </summary>
 /// <remarks>
 /// Each field is a <see cref="MaskedInput"/>, which inherits the control and not its evidence, so

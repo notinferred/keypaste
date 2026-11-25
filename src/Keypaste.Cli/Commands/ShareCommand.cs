@@ -137,6 +137,7 @@ internal static class ShareCommand
         var service = Service(context, handler, endpoint);
         var print = line.GetValue(_print);
         var copied = false;
+        byte[]? baseline = null;
 
         var exit = VaultSession.OpenHeld(path, line, context, vault =>
         {
@@ -176,6 +177,7 @@ internal static class ShareCommand
             else
             {
                 copied = true;
+                baseline = ClipboardBaseline.Take(context.Clipboard);
             }
 
             Announce(context, outcome.Info!, endpoint, print);
@@ -189,8 +191,7 @@ internal static class ShareCommand
 
         if (copied)
         {
-            context.Clipboard.TryReadHash(out var expected, out _);
-            context.ClipboardClear.ClearAfter(context.Clipboard, expected, TimeSpan.FromSeconds(GetCommand.DefaultTimeoutSeconds), context.Stderr);
+            context.ClipboardClear.ClearAfter(context.Clipboard, baseline, TimeSpan.FromSeconds(GetCommand.DefaultTimeoutSeconds), context.Stderr);
         }
 
         return exit;
@@ -558,14 +559,21 @@ internal static class ShareCommand
             return false;
         }
 
-        ttl = text[^1] switch
+        var unit = text[^1] switch
         {
-            'm' => TimeSpan.FromMinutes(amount),
-            'h' => TimeSpan.FromHours(amount),
-            'd' => TimeSpan.FromDays(amount),
+            'm' => TimeSpan.FromMinutes(1),
+            'h' => TimeSpan.FromHours(1),
+            'd' => TimeSpan.FromDays(1),
             _ => TimeSpan.Zero,
         };
 
+        // Bounded before multiplying, since an amount past TimeSpan's range would throw instead of being refused.
+        if (unit == TimeSpan.Zero || amount > ShareService.MaximumTtl / unit)
+        {
+            return false;
+        }
+
+        ttl = unit * amount;
         return ShareService.IsValidTtl(ttl);
     }
 

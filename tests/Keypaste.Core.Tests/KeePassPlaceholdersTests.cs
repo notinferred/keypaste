@@ -4,7 +4,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// A value's KeePass placeholders fill in from its own item's fields wherever it leaves keypaste, and anything
-/// keypaste cannot fill in refuses the value whole, naming the placeholder and never a value (P.3b1).
+/// keypaste cannot fill in refuses the value whole, naming the placeholder and never a value.
 /// </summary>
 public sealed class KeePassPlaceholdersTests
 {

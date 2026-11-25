@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# R.1a: performs R.1a's acts in the desktop app exercise-desktop-install.sh installed on this runner,
+# Performs the desktop acts in the desktop app exercise-desktop-install.sh installed on this runner,
 # on a disposable vault KeePassXC made, with a real AI tool's registration, a real MCP client and a real child
 # process, and classifies each act from what the app, the vault, the child, the client and the audit log recorded.
 #
@@ -28,7 +28,7 @@
 # An act passes only on its evidence. It is unreached when one of its steps could not be done, a verb this
 # platform's driver does not implement among them, or an act it needs did not pass; a contradiction when its steps
 # completed and the evidence disagrees; and person when only a person can do it on a hosted runner, with the reason.
-# Every act but a pass or a person fails the run; a person's act leaves R.1a's row open for that person.
+# Every act but a pass or a person fails the run; a person's act leaves its row open for that person.
 #
 # Usage:
 #   exercise-desktop-acts.sh <rid> <candidate-file> <install-output-dir> <cli-dir> <output-dir>
@@ -214,6 +214,8 @@ evidence_approve_deny() {
   allowed="$(fact_of "$d" approve-deny allow_sha256)"
   if [ "$(fact_of "$d" approve-deny allow_unfocused)" != 'not enabled' ]; then
     contradict "with focus on another window, however long it waited, Allow once read '$(fact_of "$d" approve-deny allow_unfocused)', not 'not enabled'"
+  elif [ "$(fact_of "$d" approve-deny front_prompt)" != open ] || [ "$(fact_of "$d" approve-deny front_answer)" != none ]; then
+    contradict "the click on Allow once that was to bring the prompt forward answered it: the prompt was $(fact_of "$d" approve-deny front_prompt) after it, and the audit log recorded $(fact_of "$d" approve-deny front_answer)"
   elif [ "$(fact_of "$d" approve-deny allow_activated)" != enabled ]; then
     contradict "after a click brought the prompt forward, Allow once read '$(fact_of "$d" approve-deny allow_activated)', not 'enabled'"
   elif [ "$(fact_of "$d" approve-deny allow_error)" != false ]; then contradict 'the request allowed once came back as an error'
@@ -275,7 +277,7 @@ evidence_timing() {
   save="$(fact_of "$1" field save_ms)"
   low="$(fact_of "$1" field save_ms_low)"
   database="$(fact_of "$1" first-run database)"
-  # R.1a times the libargon2 the package carries, which a vault deriving its key another way never calls.
+  # The acts time the libargon2 the package carries, which a vault deriving its key another way never calls.
   if [[ $database != *'KDF: Argon2'* ]]; then result=unreached; why="the vault does not derive its key with Argon2: $database"
   elif ! measured "$unlock"; then result=unreached; why='no unlock was timed'
   elif ! measured "$save" || ! measured "$low"; then result=unreached; why='no save was timed'
@@ -616,7 +618,7 @@ keepassxc_create() {
   DRIVE_TREE_DIR="$(native "$OUT")"
   export DRIVE_TREE_DIR
   # KeePassXC asks where to save the new database as soon as its window closes, its autosave saving a database that has
-  # no file yet; pressing Save Database as well opened a second Save dialog under Qt 6 (F.68). Windows' Save dialog
+  # no file yet; pressing Save Database as well opened a second Save dialog under Qt 6. Windows' Save dialog
   # shows UI Automation only bare panes, so its file name is typed as a person types it.
   # shellcheck disable=SC2154 # kpxc.sh sets pw.
   if kpxc_drive KeePassXC window 60 && kpxc_drive KeePassXC invoke 'Create Database' \
@@ -796,7 +798,7 @@ keepassxc_left() {
   printf '; it shows: %s' "$(tr '\n' ';' <<< "$titles")"
 }
 
-# macOS: keepassxc-cli makes a database that derives its key with AES-KDF, and R.1a times the libargon2 the package
+# macOS: keepassxc-cli makes a database that derives its key with AES-KDF, and the acts time the libargon2 the package
 # carries, so KeePassXC's own Database Security then changes it to Argon2d, the key derivation KeePassXC gives a new
 # database, as a person can in KeePassXC.
 mac_keepassxc_argon2() {
@@ -1124,7 +1126,7 @@ allow_reading() {
 }
 
 act_approve_deny() {
-  local mark
+  local mark front_click front_prompt=open front_answer
   fact expected_sha256 "$(field_hash "$ENTRY_FIELD" "$FIELD")"
   attempt client mcp_start approve || return 1
   mark="$(lines_in "$AUDIT")"
@@ -1137,8 +1139,17 @@ act_approve_deny() {
   sleep 2
   fact allow_unfocused "$(allow_reading 'not enabled' 0)"
   # A person's click on the allow of a prompt not in front only brings it forward; macOS's accessibility focus moves no key window between one app's windows.
-  attempt prompt-front drive --window "$PROMPT" click id:AllowOnce || { mcp_finish; return 1; }
+  # Linux's and Windows' click bring the window forward before clicking, which a person's click never does.
+  front_click=click
+  case "$PLATFORM" in linux|windows) front_click=raw-click ;; esac
+  attempt prompt-front drive --window "$PROMPT" "$front_click" id:AllowOnce || { mcp_finish; return 1; }
   fact allow_activated "$(allow_reading enabled 15)"
+  drive --window "$PROMPT" window 0 > /dev/null 2>&1 || front_prompt=closed
+  fact front_prompt "$front_prompt"
+  front_answer="$(audit_answer "$mark")"
+  fact front_answer "${front_answer:-none}"
+  # A click that answered the prompt is the evidence's contradiction, not a step that could not be done.
+  if [ "$front_prompt" != open ] || [ -n "$front_answer" ]; then mcp_finish; return 0; fi
   attempt allow drive --window "$PROMPT" invoke id:AllowOnce || { mcp_finish; return 1; }
   attempt allowed replied 60 3 || { mcp_finish; return 1; }
   fact allow_error "$(reply_of 3 '.result.isError // false')"
@@ -1360,6 +1371,8 @@ selftest() {
         '{"act":"connect","fact":"tools","value":"list_entries request_credential"}' \
         '{"act":"approve-deny","fact":"expected_sha256","value":"b2"}' \
         '{"act":"approve-deny","fact":"allow_unfocused","value":"not enabled"}' \
+        '{"act":"approve-deny","fact":"front_prompt","value":"open"}' \
+        '{"act":"approve-deny","fact":"front_answer","value":"none"}' \
         '{"act":"approve-deny","fact":"allow_activated","value":"enabled"}' \
         '{"act":"approve-deny","fact":"allow_error","value":"false"}' \
         '{"act":"approve-deny","fact":"allow_sha256","value":"b2"}' \
@@ -1449,6 +1462,10 @@ selftest() {
   set_fact automatic approve-deny allow_audit granted/automatic
   passing no-arming
   set_fact no-arming approve-deny allow_unfocused enabled
+  passing front-closed
+  set_fact front-closed approve-deny front_prompt closed
+  passing front-granted
+  set_fact front-granted approve-deny front_answer granted/prompt
   passing never-armed
   set_fact never-armed approve-deny allow_activated 'not enabled'
   passing deny-leaks
@@ -1510,6 +1527,8 @@ selftest() {
   expect no-tool connect contradiction 'request_credential'
   expect automatic approve-deny contradiction 'granted/automatic'
   expect no-arming approve-deny contradiction "Allow once read 'enabled'"
+  expect front-closed approve-deny contradiction 'the prompt was closed after it'
+  expect front-granted approve-deny contradiction 'the audit log recorded granted/prompt'
   expect never-armed approve-deny contradiction "Allow once read 'not enabled'"
   expect deny-leaks approve-deny contradiction 'carried a value'
   expect allow-other approve-deny contradiction 'not the field'

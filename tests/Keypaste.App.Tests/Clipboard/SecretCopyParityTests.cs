@@ -19,10 +19,10 @@ using Xunit;
 namespace Keypaste.App.Tests.Clipboard;
 
 /// <summary>
-/// Every surface that holds a secret copies it the same way and loses it the same way (V.10,
-/// D-0300): the current password, an env value and a history revision. Each copy, and the opening
+/// Every surface that holds a secret copies it the same way and loses it the same way:
+/// the current password, an env value and a history revision. Each copy, and the opening
 /// of a web address, fills in the value's KeePass placeholders from its own item, and one keypaste
-/// cannot fill leaves the clipboard as it was (D-0465).
+/// cannot fill leaves the clipboard as it was.
 /// </summary>
 /// <remarks>
 /// <para>

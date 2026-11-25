@@ -2,7 +2,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests;
 
-/// <summary>A profile written as references by one Core operation, never over a vault (F.55).</summary>
+/// <summary>A profile written as references by one Core operation, never over a vault.</summary>
 public sealed class EnvReferenceExportTests : IDisposable
 {
     private const string _master = "correct horse battery staple";

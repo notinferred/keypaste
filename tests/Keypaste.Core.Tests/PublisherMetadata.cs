@@ -8,7 +8,7 @@ namespace Keypaste.Core.Tests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>This reads the built assembly, not <c>Directory.Build.props</c>.</b> The defect F.4b repairs
+/// <b>This reads the built assembly, not <c>Directory.Build.props</c>.</b> The defect this guards against
 /// was invisible in the source property anybody would have looked at: <c>Company</c> was never set,
 /// the SDK filled <c>CompanyName</c> from <c>Authors</c>, and the shipped binary said something the
 /// props file never did. A check that reads the file the value came from cannot catch that.
@@ -22,16 +22,13 @@ namespace Keypaste.Core.Tests;
 /// </remarks>
 internal static class PublisherMetadata
 {
-    /// <summary>The project's own identity.</summary>
     internal const string Project = "keypaste";
 
-    /// <summary>The project's copyright line.</summary>
     internal const string ProjectCopyright = "Copyright (c) 2026 keypaste";
 
     /// <summary>Upstream KeePassLib's holder, from THIRD_PARTY_NOTICES.md.</summary>
     internal const string Upstream = "Dominik Reichl";
 
-    /// <summary>Upstream KeePassLib's copyright line.</summary>
     internal const string UpstreamCopyright = "Copyright (c) 2003-2021 Dominik Reichl";
 
     /// <summary>Asserts that an assembly keypaste publishes is published as keypaste.</summary>

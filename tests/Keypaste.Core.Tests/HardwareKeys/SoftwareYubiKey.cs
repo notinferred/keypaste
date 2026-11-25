@@ -24,7 +24,6 @@ internal sealed class SoftwareYubiKey(byte[] secret, bool variableLength = true)
     /// <summary>The slots programmed with <c>secret</c>.</summary>
     internal IReadOnlyList<int> Slots { get; init; } = [1, 2];
 
-    /// <summary>Whether a key is plugged in.</summary>
     internal bool Connected { get; set; } = true;
 
     /// <summary>Whether the slot waits for a touch before answering.</summary>

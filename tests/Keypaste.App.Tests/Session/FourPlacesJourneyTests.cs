@@ -21,7 +21,7 @@ using static Keypaste.App.Tests.Session.JourneyDriver;
 namespace Keypaste.App.Tests.Session;
 
 /// <summary>
-/// V-N.1a: from the four places, through the app as launch composes it, every act the old
+/// From the four places, through the app as launch composes it, every act the old
 /// sidebar reached is still reached, and the sidebar lists the four places and the projects only.
 /// </summary>
 /// <remarks>

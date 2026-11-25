@@ -20,7 +20,6 @@ internal sealed class OwnerLog : IDisposable
 
     internal AuditLog Log { get; }
 
-    /// <summary>Every line so far.</summary>
     internal List<JsonElement> Lines()
     {
         return [.. Text().Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(Parse)];

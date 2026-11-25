@@ -33,6 +33,8 @@
 #   check <locator> <on|off>       sets a check box or switch; prints '<locator>' is <on|off>
 #   click <locator>                a real pointer click at its centre; prints clicked '<locator>' at <x>,<y>
 #   right-click <locator>          the same with the secondary button; prints right-clicked '<locator>' at <x>,<y>
+#   raw-click <locator>            the same as click, its window not brought forward first; Linux and Windows only;
+#                                  prints clicked '<locator>' at <x>,<y> without bringing its window forward first
 #   focus <locator>                gives it keyboard focus, as a click on a field does; prints focused '<locator>'
 #   set-after <label> <text>       sets the first text field after the label; prints set the field after '<label>'
 #   set-named <locator> <text>     sets the text field; prints set the field named '<locator>'

@@ -97,11 +97,11 @@ internal sealed partial class EntryHistoryViewModel : ObservableObject, IDisposa
 
     /// <summary>
     /// Whether a restore waits for the person to confirm what it does to the projects the item is in, because the
-    /// revision's project tags differ from the item's and a restore puts them back (D-0510).
+    /// revision's project tags differ from the item's and a restore puts them back.
     /// </summary>
     internal bool IsConfirmingRestore => Asking is not null;
 
-    /// <summary>What the waiting restore does to the item's projects, in the sentences a tag change shows (D-0415); names only, never a value.</summary>
+    /// <summary>What the waiting restore does to the item's projects, in the sentences a tag change shows; names only, never a value.</summary>
     internal IReadOnlyList<string> RestoreLines => Asking?.Lines ?? [];
 
     /// <summary>
@@ -114,7 +114,7 @@ internal sealed partial class EntryHistoryViewModel : ObservableObject, IDisposa
     /// </remarks>
     internal bool ShowsEmptyNote => IsOpen && _read && Rows.Count == 0;
 
-    /// <summary>What that says.</summary>
+    /// <summary>What the note says when the entry has no earlier values.</summary>
     internal string EmptyNote =>
         $"No earlier values yet. When you change {_owner.DisplayTitle}, the value it replaces is kept here.";
 
@@ -208,12 +208,12 @@ internal sealed partial class EntryHistoryViewModel : ObservableObject, IDisposa
     }
 
     /// <summary>
-    /// Copies a revision's password with the countdown every other secret copy uses (D-0300).
+    /// Copies a revision's password with the countdown every other secret copy uses.
     /// </summary>
     /// <remarks>
     /// Re-read and re-checked like a reveal, so a list read before an edit elsewhere cannot put a
     /// different revision's password on the clipboard. Its placeholders fill in from that revision's
-    /// own fields, not the item's current ones (D-0465), and only while the revision at its position
+    /// own fields, not the item's current ones, and only while the revision at its position
     /// still holds the password just read, checked under the lock the fields are read under, so an
     /// edit saved between the two reads copies nothing.
     /// </remarks>
@@ -344,7 +344,7 @@ internal sealed partial class EntryHistoryViewModel : ObservableObject, IDisposa
 
     /// <summary>
     /// Restores the revision unless its project tags differ from the item's, which a restore puts back, and the person
-    /// has not confirmed what that does with the item carrying the tags it carries now (D-0415, D-0510).
+    /// has not confirmed what that does with the item carrying the tags it carries now.
     /// </summary>
     private RestoreAttempt TryRestore(Vault vault, EntryRevisionRow row, RestoreQuestion? confirmed)
     {

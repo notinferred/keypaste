@@ -29,8 +29,7 @@ internal enum QuickUnlockOutcome
 
 /// <summary>
 /// The key parts of vaults unlocked with their password, each sealed with AES-256-GCM under the SHA-256 of a key only
-/// the person's Windows Hello or Touch ID releases, and kept in this process's memory alone, by the vault's identity
-/// (D-0550, D-0681).
+/// the person's Windows Hello or Touch ID releases, and kept in this process's memory alone, by the vault's identity.
 /// </summary>
 /// <remarks>
 /// <para>

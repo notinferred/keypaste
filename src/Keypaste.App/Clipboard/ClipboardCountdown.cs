@@ -25,14 +25,14 @@ namespace Keypaste.App.Clipboard;
 /// <para>
 /// <b>This object holds a hash and never a value.</b> The equality guard needs to know whether the
 /// clipboard changed, which a SHA-256 answers. KeePassXC keeps the copied secret in a plain string
-/// for the whole timeout window purely to power the same guard (O-0008); there is no reason to.
+/// for the whole timeout window purely to power the same guard; there is no reason to.
 /// </para>
 /// <para>
 /// <b>One operation at a time, and one point where ownership changes hands.</b> A lock, a quit or
 /// a second copy can arrive while a write is still inside the windowing system, so operations run
 /// through <see cref="Run"/> in order, <see cref="Take"/> ends the countdown synchronously, and a
 /// continuation that finds its epoch superseded gives the clipboard back rather than installing a
-/// secret nothing is counting down (D-0098).
+/// secret nothing is counting down.
 /// </para>
 /// <para>
 /// <b>What it can promise, and what it cannot.</b> It clears at the deadline, on a lock and on an
@@ -77,7 +77,6 @@ internal sealed class ClipboardCountdown : ObservableObject, IDisposable
         ClearNowCommand = new RelayCommand(() => _ = ClearNowAsync(), () => IsCounting);
     }
 
-    /// <summary>Whether a countdown is running.</summary>
     internal bool IsCounting => _timer is not null;
 
     /// <summary>Whether the toast should be on screen.</summary>
@@ -134,7 +133,6 @@ internal sealed class ClipboardCountdown : ObservableObject, IDisposable
     /// <summary>How many copies have reached the clipboard, so a caller can tell whether the one it started did.</summary>
     internal int Landings { get; private set; }
 
-    /// <summary>Clears the clipboard now.</summary>
     internal RelayCommand ClearNowCommand { get; }
 
     /// <summary>Copies a secret and starts the countdown.</summary>

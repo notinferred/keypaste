@@ -5,7 +5,7 @@ using Xunit;
 namespace Keypaste.Processes.Tests;
 
 /// <summary>
-/// Connecting an AI tool from the app (2.6a, G.2, N.3, G.3), across real processes: tests/Keypaste.AppDriver presses the rows of Agents' AI
+/// Connecting an AI tool from the app, across real processes: tests/Keypaste.AppDriver presses the rows of Agents' AI
 /// tools in a home of the test's own, the command tool is tests/Keypaste.FakeMcpClient named <c>claude</c> first on PATH, the file tool is
 /// Cursor, and the bridge each registers is the built keypaste, started as the tool starts it.
 /// </summary>
@@ -63,7 +63,7 @@ public sealed partial class ConnectClientTests
             Assert.Contains("exit=0", status);
             Assert.Contains($"keypaste {home.Keypaste("--version").Trim()}", status);
             Assert.Contains(status, line => Regex.IsMatch(line, @"^  vault     .*vault\.kdbx"));
-            Assert.Contains(status, line => line.Contains("chosen in the app", StringComparison.Ordinal));
+            Assert.Contains(status, line => line.Contains("chosen in the app or with keypaste use", StringComparison.Ordinal));
             Assert.Contains("  held by   the keypaste app, unlocked", status);
             Assert.Contains(status, line => line.StartsWith("  AI tools  Claude Code connected", StringComparison.Ordinal));
             Assert.Contains(status, line => Regex.IsMatch(line, "^(›|>) `keypaste --help` lists every command$"));

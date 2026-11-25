@@ -64,7 +64,7 @@ public sealed class FieldVerbTests : IDisposable
 
         Assert.Equal([new EntryField("STRIPE_SECRET_KEY", true, false)], Fields());
         Assert.Equal(_secret, Value("STRIPE_SECRET_KEY"));
-        Assert.Equal(["Master password: ", "Value for STRIPE_SECRET_KEY: "], _harness.Prompt.PromptsSeen);
+        Assert.Equal([CliHarness.MasterPasswordPrompt, "Value for STRIPE_SECRET_KEY: "], _harness.Prompt.PromptsSeen);
         Assert.Contains("set STRIPE_SECRET_KEY on api/Stripe", _harness.Err, StringComparison.Ordinal);
         Assert.DoesNotContain(_secret, _harness.Err + _harness.Out, StringComparison.Ordinal);
     }
@@ -93,7 +93,7 @@ public sealed class FieldVerbTests : IDisposable
         Assert.Equal("1", Value("A"));
         Assert.Equal("2", Value("B"));
         Assert.Equal("3", Value("C"));
-        Assert.Equal(["Master password: ", "Value for A: ", "Value for B: ", "Value for C: "], _harness.Prompt.PromptsSeen);
+        Assert.Equal([CliHarness.MasterPasswordPrompt, "Value for A: ", "Value for B: ", "Value for C: "], _harness.Prompt.PromptsSeen);
     }
 
     [Fact]
@@ -120,7 +120,7 @@ public sealed class FieldVerbTests : IDisposable
         _harness.AssertExit(CliApp.ExitUsageError, Run("set", "api/Stripe", "--field", "KEY", "--plain"));
 
         Assert.Equal(before, Bytes());
-        Assert.Equal(["Master password: "], _harness.Prompt.PromptsSeen);
+        Assert.Equal([CliHarness.MasterPasswordPrompt], _harness.Prompt.PromptsSeen);
         Assert.Contains("keeps its protection", _harness.Err, StringComparison.Ordinal);
     }
 

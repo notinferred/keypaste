@@ -14,7 +14,7 @@ namespace Keypaste.App.ViewModels;
 /// <param name="Rows">Each item with it.</param>
 internal sealed record PasswordGroup(string Heading, string Reason, IReadOnlyList<PasswordRow> Rows);
 
-/// <summary>Items › Recommendations: keys left in notes (C.2), project tags another app dropped (V.11), weak, reused or expired passwords (V.9), items expiring soon or marked as needing an update, and a key derivation weaker than keypaste's, for review.</summary>
+/// <summary>Security: keys left in notes, project tags another app dropped, weak, reused or expired passwords, items expiring soon or marked as needing an update, and a key derivation weaker than keypaste's, for review.</summary>
 /// <remarks>
 /// <para>
 /// Owned by the shell for one unlock, because the Settings screen is rebuilt on every visit. It is

@@ -1,6 +1,4 @@
 using Keypaste.Core;
-using Keypaste.Core.Audit;
-using Keypaste.Core.Ownership;
 using Keypaste.Core.Tests;
 using Xunit;
 
@@ -8,7 +6,7 @@ namespace Keypaste.Cli.Tests;
 
 /// <summary>
 /// <c>keypaste rotate</c> replaces a password with a generated one, keeps the old one in history,
-/// never prints either, and never saves under a running owner.
+/// and never prints either. A held vault is <c>HeldVaultRefusalTests</c>'s.
 /// </summary>
 public sealed class RotateVerbTests : IDisposable
 {
@@ -86,24 +84,6 @@ public sealed class RotateVerbTests : IDisposable
 
         Assert.Contains("keypaste rotate: .keypaste/tokens/t1 is keypaste's own group", _harness.Err, StringComparison.Ordinal);
         Assert.Empty(_harness.Prompt.PromptsSeen);
-    }
-
-    [Fact]
-    public void Rotate_WhileHeld_IsRefused_BeforeThePassword()
-    {
-        var home = KeypasteHome.Resolve(_harness.Environment[KeypasteHome.EnvironmentVariable]);
-        Assert.True(VaultClaim.TryAcquire(home, _harness.VaultPath, OwnerKind.TerminalAgent, out var claim, out var refusal), refusal);
-        var before = File.ReadAllBytes(_harness.VaultPath);
-
-        using (claim)
-        {
-            _harness.Prompt.Enqueue(_master);
-            _harness.AssertExit(CliApp.ExitInternalError, Rotate("Banking/Chase"));
-        }
-
-        Assert.Contains("Run `keypaste lock` and try again.", _harness.Err, StringComparison.Ordinal);
-        Assert.Empty(_harness.Prompt.PromptsSeen);
-        Assert.Equal(before, File.ReadAllBytes(_harness.VaultPath));
     }
 
     [Fact]

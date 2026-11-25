@@ -1,7 +1,7 @@
 // The terms of use the first-launch screen agrees to and links, the one copy of them. A line starting // is not shown, a line
 // starting ## is a heading, and every other line is a paragraph. The version is the date on the second shown line, and a
 // new date shows that screen once more and stops crash reports until it is agreed to, unless they are switched off.
-// DRAFT pending H-0027: not legal advice and not reviewed. Counsel approves it before 1.0.0, deciding:
+// DRAFT: not legal advice and not reviewed. Counsel approves it before 1.0.0, deciding:
 // whether disclaimers and the liability cap need capital letters to be conspicuous under Florida law; whether to add
 // arbitration and a class-action waiver; whether agreeing before the app opens sits with AGPL-3.0 §10; and whether an LLC
 // should replace the individual as the party.

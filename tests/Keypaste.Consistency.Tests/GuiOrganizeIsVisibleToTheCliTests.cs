@@ -13,8 +13,8 @@ namespace Keypaste.Consistency.Tests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// V-V.5b says in as many words that "a view model asserting over a fixture list does not establish
-/// the move that produced it", and reopening with <c>Vault.Open</c> would not close that either:
+/// A view model asserting over a fixture list does not establish the move that produced it, and
+/// reopening with <c>Vault.Open</c> would not close that either:
 /// core is the shared path, so a round trip through it proves persistence and assumes agreement.
 /// These tests ask the CLI, which is the consumer whose answer changes when an entry is renamed.
 /// </para>

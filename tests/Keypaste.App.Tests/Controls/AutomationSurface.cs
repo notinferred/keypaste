@@ -15,9 +15,8 @@ namespace Keypaste.App.Tests.Controls;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Shared because D-0099 is a claim about every field a secret reaches, and there are seven of them
-/// now: the three master-password fields <see cref="MaskedInputAutomationTests"/> covers and the
-/// four <see cref="SecretFieldAutomationTests"/> added in 4.9. A second copy of this sweep would be
+/// Shared because a masked field publishing only its length is a claim about every field a secret
+/// reaches, and every suite that checks one sweeps it through here. A second copy of this sweep would be
 /// a second thing to weaken, and the differentials it backs would go on passing against it.
 /// </para>
 /// <para>

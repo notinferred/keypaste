@@ -6,7 +6,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// V.9: weak, reused and expired passwords are found in a saved vault by item, never by value, among
+/// Weak, reused and expired passwords are found in a saved vault by item, never by value, among
 /// live items outside keypaste's own groups only.
 /// </summary>
 public sealed class PasswordHealthCheckTests : IDisposable

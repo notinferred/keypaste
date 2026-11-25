@@ -7,7 +7,7 @@ namespace Keypaste.Core.Tests;
 /// <summary>
 /// An item's TOTP reads as KeePassXC 2.7 reads it, from its older <c>TOTP Settings</c> and <c>TOTP Seed</c>, its
 /// <c>otp</c> URI or KeeOTP's form, or KeePass 2's <c>TimeOtp-*</c> fields, computes RFC 6238's codes, and refuses
-/// what it cannot compute as KeePassXC does, naming a field and never a value (9.2a).
+/// what it cannot compute as KeePassXC does, naming a field and never a value.
 /// </summary>
 public sealed class TotpSpecTests
 {

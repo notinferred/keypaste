@@ -11,7 +11,7 @@ namespace Keypaste.Cli.Tests;
 
 /// <summary>
 /// <c>run</c>, <c>env export</c> and <c>env diff</c> on a project whose variables are tagged entries'
-/// fields (C.1b), beside an untagged <c>env/&lt;project&gt;/OLD_KEY</c> as 0.3.0 wrote a variable, which
+/// fields, beside an untagged <c>env/&lt;project&gt;/OLD_KEY</c> as 0.3.0 wrote a variable, which
 /// is no variable. Against KeePassXC by <c>Keypaste.Core.Tests.KeePassXC.ProjectsTests</c>.
 /// </summary>
 public sealed class TaggedProjectRunTests : IDisposable
@@ -86,7 +86,7 @@ public sealed class TaggedProjectRunTests : IDisposable
     {
         { "two-entries", ["STRIPE_SECRET_KEY is on more than one item (services/Database, services/Stripe)"] },
         { "expired", ["DATABASE_URL expired 2020-01-02 03:04:05Z (services/Database)"] },
-        { "placeholder", ["DATABASE_URL holds the KeePass placeholder {TOTP}, which keypaste does not fill in (services/Database)"] },
+        { "placeholder", [$"DATABASE_URL {new PlaceholderRefusal("{TOTP}", "keypaste does not fill in").Reason} (services/Database)"] },
     };
 
     [Theory]

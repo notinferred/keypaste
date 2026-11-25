@@ -9,10 +9,9 @@ namespace Keypaste.Core.Tests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// This rule had no test of its own while it lived inside the CLI's blocking strategy — it was
-/// reached only through <c>keypaste get</c>, whose tests are about exit codes and output. It is now
-/// on the path of two front ends, and CONTRIBUTING.md makes a test of it mandatory rather than
-/// tidy.
+/// The rule is on the path of two front ends, and CONTRIBUTING.md requires tests for the secret
+/// path, so it is tested here rather than only through <c>keypaste get</c>, whose tests are about
+/// exit codes and output.
 /// </para>
 /// <para>
 /// The case worth staring at is <see cref="A_read_back_that_failed_clears_anyway"/>. It is the

@@ -83,7 +83,7 @@ internal sealed partial class App : Application, IDisposable
             Styles.Insert(0, ReadingDirection.RightToLeftWindows());
         }
 
-        // macOS reads the app menu once, as the platform starts and before Launch, so it is made here and filled there (Q.2).
+        // macOS reads the app menu once, as the platform starts and before Launch, so it is made here and filled there.
         if (OperatingSystem.IsMacOS())
         {
             _appMenu = new NativeMenu();
@@ -157,19 +157,19 @@ internal sealed partial class App : Application, IDisposable
                 vaults.Turns,
                 () => vaults.KeysBesides(session),
                 vaults.Pairings),
-            // While locked, the app that holds its home tells the person once that an agent asked for a vault it would open.
-            session => Claim is null ? null : new LockedNotice(
-                session,
-                OpenWindow,
-                TimeProvider.System,
-                reason => Console.Error.WriteLine($"keypaste: an agent asking for a locked vault cannot reach this app: {reason}"),
-                Unexpected,
-                _notifications),
             preferences);
 #pragma warning restore CA2000
         _session = _vaults.InView.Session;
         _authority = _vaults.InView.Authority;
-        _lockedNotice = _vaults.InView.Notice;
+
+        // While a vault is locked, the app that holds its home tells the person once that an agent asked for it.
+        _lockedNotice = Claim is null ? null : new LockedNotice(
+            _vaults,
+            OpenWindow,
+            TimeProvider.System,
+            reason => Console.Error.WriteLine($"keypaste: an agent asking for a locked vault cannot reach this app: {reason}"),
+            Unexpected,
+            _notifications);
         _vaults.Locked += OnLocked;
 
         // A page's list asks to bring keypaste forward: the window, a locked vault's unlock, or New login in the site's vault.
@@ -196,7 +196,7 @@ internal sealed partial class App : Application, IDisposable
         _shortcuts = new Shortcuts(_window, _commands);
         _minimize = Watch(_window, _preferences, _session, () => _unlock?.CancelPendingRestore(), _vaults.LockAll);
 
-        // The menus (Q.2): the menu bar and the Dock's on macOS, the titlebar's menu button elsewhere.
+        // The menus: the menu bar and the Dock's on macOS, the titlebar's menu button elsewhere.
         if (_commands.Mac)
         {
             NativeMenu.SetMenu(_window, AppMenu.Bar(_commands));
@@ -255,7 +255,7 @@ internal sealed partial class App : Application, IDisposable
 
         DockIcon?.Invoke(desktop.MainWindow is not null);
 
-        // A prompt window still open must not keep the vault served once the main window closes (F.21).
+        // A prompt window still open must not keep the vault served once the main window closes.
         desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
         desktop.ShutdownRequested += OnShutdownRequested;
     }
@@ -272,7 +272,7 @@ internal sealed partial class App : Application, IDisposable
     /// <summary>The menu bar or tray icon <see cref="Launch"/> composed.</summary>
     internal AppTray? Tray => _tray;
 
-    /// <summary>What tells the person an agent found the app locked; none unless <see cref="Claim"/> is held, or after quitting.</summary>
+    /// <summary>What tells the person an agent found a vault locked; none unless <see cref="Claim"/> is held, or after quitting.</summary>
     internal LockedNotice? LockedNotice => _lockedNotice;
 
     /// <summary>The system's notifications; this platform's unless a test gives others.</summary>
@@ -625,10 +625,9 @@ internal sealed partial class App : Application, IDisposable
     /// <returns>The watch, which the application owns for its lifetime.</returns>
     /// <exception cref="ArgumentNullException">A required argument is null.</exception>
     /// <remarks>
-    /// <c>internal</c> for the same reason <see cref="Compose"/> is: the defect F.2b repairs was
-    /// that composition never introduced the saved setting to any behaviour at all, so a test has
-    /// to run this method rather than a hand-built equivalent, which would have passed against the
-    /// broken app throughout. The setting is passed as a function rather than a value, so
+    /// <c>internal</c> for the same reason <see cref="Compose"/> is: a saved setting that composition
+    /// never wires to any behaviour is the failure to catch, so a test has to run this method rather
+    /// than a hand-built equivalent, which would pass against an app that never armed it. The setting is passed as a function rather than a value, so
     /// a change in Settings is in force at the next minimize rather than at the next launch.
     /// </remarks>
     internal static MinimizeLock Watch(

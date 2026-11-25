@@ -194,9 +194,9 @@ public sealed class ApproverListenerTests
     /// <remarks>
     /// The inverse of <see cref="AGarbageFrame_CostsThatConnectionAndNoOther"/>. There, ending the
     /// connection is the right answer to a peer's nonsense. Here nobody did anything wrong — the
-    /// person simply has a thousand entries — and until the reply was bounded the write threw,
-    /// <see cref="ApproverListener"/> swallowed it, and the agent was told only that
-    /// something had gone wrong.
+    /// person simply has a thousand entries — and an unbounded reply would make the write throw,
+    /// <see cref="ApproverListener"/> swallow it, and the agent hear only that something had gone
+    /// wrong.
     /// </remarks>
     [Fact]
     public async Task AHugeListing_IsAnsweredAndTheConnectionSurvives()
@@ -216,7 +216,7 @@ public sealed class ApproverListenerTests
     }
 
     /// <summary>
-    /// ...and it does not cost the connection its grants.
+    /// A vault with more names than one frame can carry does not cost the connection its grants.
     /// </summary>
     /// <remarks>
     /// Asserted separately because it fails for a different reason and it is the harm a person would
@@ -242,7 +242,7 @@ public sealed class ApproverListenerTests
     /// <remarks>
     /// A full frame waits on the reader wherever the pipe holds less than a frame, as Windows' and macOS's do.
     /// A bound on every delivery cut it after a second under load, and the bridge's reconnect then asked a
-    /// person again for what they had just approved (F.49).
+    /// person again for what they had just approved.
     /// </remarks>
     [Fact]
     public async Task AHugeListing_ReadSlowly_IsDeliveredAndTheConnectionSurvives()
@@ -322,7 +322,7 @@ public sealed class ApproverListenerTests
     }
 
     /// <summary>
-    /// ...and it does not cost the connection its grants.
+    /// A release too large to send does not cost the connection its grants.
     /// </summary>
     /// <remarks>
     /// Asserted separately, for the reason
@@ -528,6 +528,51 @@ public sealed class ApproverListenerTests
         Assert.Null(await client.ListAsync(new NamesRequest([]), Token));
     }
 
+    /// <summary>
+    /// A save its agent gives up on is withdrawn like a credential request, so the bridge reads the owner's reply, which says
+    /// the owner recorded it, rather than recording a second line of its own (THREATS.md T-6).
+    /// </summary>
+    [Fact]
+    public async Task AWithdrawnSave_IsStillAnswered_WithWhetherTheOwnerRecordedIt()
+    {
+        var handler = new RecordingHandler { HoldRequests = true };
+        await using var host = Host.Start(handler);
+
+        await using var client = await ConnectAsync(host.PipeName);
+        using var givingUp = CancellationTokenSource.CreateLinkedTokenSource(Token);
+        var request = new SaveRequest { Item = "work/github", Field = "API_TOKEN", Reason = "rotate", Exposure = ["**"] };
+        var waiting = client.SaveAsync(request, givingUp.Token).AsTask();
+        await handler.Asking.Task.WaitAsync(_connectTimeout, Token);
+
+        await givingUp.CancelAsync();
+        var reply = await waiting.WaitAsync(_connectTimeout, Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Cancelled, true), (reply.Decision, reply.Method, reply.Recorded));
+        Assert.True(handler.Withdrawn.Task.IsCompleted);
+    }
+
+    /// <summary>An item change its agent gives up on is withdrawn the same way, and its reply read.</summary>
+    [Fact]
+    public async Task AWithdrawnItemChange_IsStillAnswered_WithWhetherTheOwnerRecordedIt()
+    {
+        var handler = new RecordingHandler { HoldRequests = true };
+        await using var host = Host.Start(handler);
+
+        await using var client = await ConnectAsync(host.PipeName);
+        using var givingUp = CancellationTokenSource.CreateLinkedTokenSource(Token);
+        var request = new ItemChangeRequest { Entry = "work/github", Change = "move_to_recycle_bin", Reason = "retired", Exposure = ["**"] };
+        var waiting = client.ChangeItemAsync(request, givingUp.Token).AsTask();
+        await handler.Asking.Task.WaitAsync(_connectTimeout, Token);
+
+        await givingUp.CancelAsync();
+        var reply = await waiting.WaitAsync(_connectTimeout, Token);
+
+        Assert.NotNull(reply);
+        Assert.Equal((AuditDecision.Denied, AuditMethod.Cancelled, true), (reply.Decision, reply.Method, reply.Recorded));
+        Assert.True(handler.Withdrawn.Task.IsCompleted);
+    }
+
     /// <summary>A request its caller gave up on before it was written never reaches the owner, so nothing there records it.</summary>
     [Fact]
     public async Task ARequestCancelledBeforeItIsWritten_IsNeverSent()
@@ -703,16 +748,7 @@ public sealed class ApproverListenerTests
 
             if (HoldRequests)
             {
-                Asking.TrySetResult();
-
-                try
-                {
-                    await Task.Delay(Timeout.Infinite, cancellationToken);
-                }
-                catch (OperationCanceledException)
-                {
-                    Withdrawn.TrySetResult();
-                }
+                await HoldUntilWithdrawnAsync(cancellationToken);
 
                 return new CredentialReply
                 {
@@ -732,6 +768,22 @@ public sealed class ApproverListenerTests
             };
         }
 
+        /// <summary>Waits until withdrawn, as a save in front of a person does, and says this owner recorded it.</summary>
+        public async ValueTask<SaveReply> SaveAsync(SaveRequest request, string connectionId, CancellationToken cancellationToken)
+        {
+            await HoldUntilWithdrawnAsync(cancellationToken);
+
+            return new SaveReply(AuditDecision.Denied, AuditMethod.Cancelled, "withdrawn") { Recorded = true };
+        }
+
+        /// <summary>Waits until withdrawn, as an item change in front of a person does, and says this owner recorded it.</summary>
+        public async ValueTask<ItemChangeReply> ChangeItemAsync(ItemChangeRequest request, string connectionId, CancellationToken cancellationToken)
+        {
+            await HoldUntilWithdrawnAsync(cancellationToken);
+
+            return new ItemChangeReply(AuditDecision.Denied, AuditMethod.Cancelled, "withdrawn") { Recorded = true };
+        }
+
         public ValueTask<EnvReply> ReleaseEnvAsync(EnvRequest request, string connectionId, CancellationToken cancellationToken)
         {
             Envs.Add(request);
@@ -744,6 +796,20 @@ public sealed class ApproverListenerTests
         {
             Disconnections.Add(connectionId);
             Gone.TrySetResult();
+        }
+
+        private async Task HoldUntilWithdrawnAsync(CancellationToken cancellationToken)
+        {
+            Asking.TrySetResult();
+
+            try
+            {
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                Withdrawn.TrySetResult();
+            }
         }
     }
 }

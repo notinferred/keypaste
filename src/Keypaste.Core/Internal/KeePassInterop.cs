@@ -38,7 +38,7 @@ internal sealed partial class KeePassInterop : IDisposable
     /// <summary>The keyfile a vault opened from <see cref="VaultKeyParts"/> was first opened with, which its key no longer names.</summary>
     private string? _partsKeyfilePath;
 
-    // KdfPool fills its static list without synchronization; the runtime runs this once and holds concurrent first callers until it returns (F.11).
+    // KdfPool fills its static list without synchronization; the runtime runs this once and holds concurrent first callers until it returns.
     // Nothing reaches KeePassLib's native Argon2 before this has handed it keypaste's library.
     static KeePassInterop()
     {

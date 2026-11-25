@@ -20,7 +20,7 @@ using Xunit;
 namespace Keypaste.App.Tests.Views;
 
 /// <summary>
-/// Each row's context menu (Q.3) opens from a right-click and from Shift+F10 or the menu key, offers the row's
+/// Each row's context menu opens from a right-click and from Shift+F10 or the menu key, offers the row's
 /// commands from the menus, and runs them on that row.
 /// </summary>
 public sealed class ContextMenuTests
@@ -177,6 +177,9 @@ public sealed class ContextMenuTests
         Assert.Equal(["Open item", "Move to fields", "Move to stage…", "-", "Dismiss", "Review again"], Headers(menu));
         Assert.False(Item(menu, "Review again").IsEffectivelyEnabled);
         Choose(menu, "Dismiss");
+
+        // The first dismissal saves the vault's dismissal key, and that save checks again off the UI thread and redraws every row.
+        await recommendations.Checking.ConfigureAwait(true);
         RenderedShell.Drain();
 
         var dismissed = recommendations.Rows.Single();

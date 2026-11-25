@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Drives release-completion.sh over V-R.0b's three refusals, against a fake origin.
+# Drives release-completion.sh over its three refusals, against a fake origin.
 #
 # Same shape as verify-release-destination.sh: the real script, a fake fetcher on PATH, no
-# credential and no network. The three cases are the ones R.0b names, and each fails for a reason
+# credential and no network. The three cases each fail for a reason
 # the other two do not reach:
 #
 #   - an interrupted upload      one asset is not being served at all
@@ -185,7 +185,7 @@ expect_refusal "omitted-target-in-the-record" "a record of an incomplete release
 # ---------------------------------------------------------------------------
 echo "== fixtures: the desktop component's own record, in the same prefix"
 
-# The definition as 3.6b will leave it. Until then the app offers no package, so its record would be
+# The definition as signing will leave it. Until then the app offers no package, so its record would be
 # empty and there would be nothing to serve; these cases describe the release that will happen.
 APPDEF="$WORK/publishable-app.json"
 jq '.components.app.signing.policy = "authenticode"

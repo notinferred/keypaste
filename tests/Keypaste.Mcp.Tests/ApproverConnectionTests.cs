@@ -9,14 +9,16 @@ namespace Keypaste.Mcp.Tests;
 /// </summary>
 /// <remarks>
 /// The concurrency refusal is asserted through a real MCP connection in
-/// <see cref="ConcurrentRequestsTests"/>, because that is where task V-F.3b says the evidence has
-/// to come from. What is left here is the pair of properties an MCP client cannot reach from the
+/// <see cref="ConcurrentRequestsTests"/>, because only a real client shows what the bridge does
+/// with a second call. What is left here is the pair of properties an MCP client cannot reach from the
 /// far end: the SDK does not carry a client's cancellation through to the server's token, so
 /// cancellation and disconnection have to be driven at this seam or not at all.
 /// </remarks>
 public sealed class ApproverConnectionTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
+
+    private const string _followUpEntry = "env/dev/FOLLOW_UP";
 
     private static readonly TimeSpan _promptly = TimeSpan.FromSeconds(10);
 
@@ -32,12 +34,31 @@ public sealed class ApproverConnectionTests
     };
 
     /// <summary>
+    /// Sends a second request on the same connection and waits for its answer, so anything the first exchange still had
+    /// in flight has reached the approver ahead of it.
+    /// </summary>
+    private static async Task FollowUpAsync(ApproverConnection connection)
+    {
+        var (reply, outcome) = await connection.RequestAsync(Request(_followUpEntry), Token).AsTask().WaitAsync(_promptly, Token);
+
+        Assert.Equal(ApproverOutcome.Answered, outcome);
+        Assert.Equal(FakeApprover.Sentinel, reply?.Value);
+    }
+
+    /// <summary>The first request reached the approver once, and the follow-up is the only request after it.</summary>
+    private static void AssertOnlyTheFollowUpCameAfter(FakeApprover approver)
+    {
+        // The approver keeps what it received in no order, so the entries are compared sorted.
+        Assert.Equal([_followUpEntry, "env/dev/STRIPE_KEY"], approver.Received.Select(request => request.Entry).Order(StringComparer.Ordinal));
+    }
+
+    /// <summary>
     /// A caller that gave up must not have its request sent a second time.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// A property guard rather than a reproduction, and worth saying which. Before F.3b a cancelled
-    /// exchange fell into the reconnect-and-retry path meant for an approver that had been
+    /// A property guard rather than a reproduction, and worth saying which. A cancelled exchange
+    /// once fell into the reconnect-and-retry path meant for an approver that had been
     /// restarted — and what stopped the re-send was only that reconnecting observed the same
     /// cancelled token and failed. Nothing named that, so a later change passing
     /// <c>CancellationToken.None</c> to the reconnect would have quietly turned an abandoned
@@ -76,12 +97,9 @@ public sealed class ApproverConnectionTests
         Assert.Null(reply.Value);
 
         approver.Held.TrySetResult();
+        await FollowUpAsync(connection);
 
-        // Proving a negative, so it is given time to happen rather than checked instantly. A
-        // re-send would arrive on the heels of the release above.
-        await Task.Delay(TimeSpan.FromMilliseconds(500), Token);
-
-        Assert.Single(approver.Received);
+        AssertOnlyTheFollowUpCameAfter(approver);
     }
 
     /// <summary>
@@ -102,11 +120,12 @@ public sealed class ApproverConnectionTests
         Assert.Null(reply);
         Assert.Equal(ApproverOutcome.Failed, outcome);
 
-        // Proving a negative, so it is given time to happen rather than checked instantly.
-        await Task.Delay(TimeSpan.FromMilliseconds(500), Token);
+        await FollowUpAsync(connection);
 
-        Assert.Single(approver.Received);
-        Assert.Equal(1, approver.Attaches);
+        AssertOnlyTheFollowUpCameAfter(approver);
+
+        // The follow-up's own attach is the second: a retry would have attached in between.
+        Assert.Equal(2, approver.Attaches);
     }
 
     /// <summary>
@@ -131,9 +150,9 @@ public sealed class ApproverConnectionTests
         Assert.Null(reply.Value);
 
         approver.Held.TrySetResult();
-        await Task.Delay(TimeSpan.FromMilliseconds(500), Token);
+        await FollowUpAsync(connection);
 
-        Assert.Single(approver.Received);
+        AssertOnlyTheFollowUpCameAfter(approver);
     }
 
     /// <summary>

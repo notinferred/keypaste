@@ -21,8 +21,8 @@ namespace Keypaste.Mcp.Tests;
 /// </para>
 /// <para>
 /// <c>notes</c> is a releasable field and a KDBX note has no length limit, so an entry somebody
-/// pasted a certificate or a private key into is an ordinary entry rather than an attack. Until
-/// F.3d, approving a request for one cost the connection, revoked the grants scoped to it, put a
+/// pasted a certificate or a private key into is an ordinary entry rather than an attack. Before a
+/// release too large to send was refused as undeliverable, approving a request for one cost the connection, revoked the grants scoped to it, put a
 /// second prompt in front of the same person and was written to the audit log as
 /// <c>denied</c>/<c>failed</c> — "the approver could not be asked" — about a request somebody had
 /// answered.
@@ -46,10 +46,7 @@ public sealed class LargeCredentialTests : IAsyncLifetime
     private Vault? _vault;
     private OwnerLog? _log;
     private readonly ScriptedHuman _human = new();
-    private ApprovalGate? _gate;
-    private ApproverListener? _listener;
-    private CancellationTokenSource? _stop;
-    private Task? _serving;
+    private RealOwner? _owner;
 
     private string PipeName { get; } =
         "keypaste-huge-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
@@ -77,48 +74,19 @@ public sealed class LargeCredentialTests : IAsyncLifetime
         // What an agent is answered from is the vault as saved.
         _vault.Save();
 
-        _gate = new ApprovalGate(_human, TimeProvider.System, ApprovalLimits.Default);
         _log = new OwnerLog(Path.Combine(_directory, "home"));
-
-        _stop = new CancellationTokenSource();
-        _listener = new ApproverListener(
-            PipeName,
-            TestSession.Over(
-                _vault,
-                new ApproverHandler(
-                    new VaultCredentialSource(() => _vault),
-                    new VaultEntryNameLister(() => _vault),
-                    _gate,
-                    TestSession.Settings()),
-                _log.Log));
-
-        _serving = _listener.RunAsync(_stop.Token);
+        _owner = RealOwner.Start(_vault, _human, _log.Log, pipeName: PipeName);
 
         return ValueTask.CompletedTask;
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (_stop is not null)
+        if (_owner is not null)
         {
-            await _stop.CancelAsync();
+            await _owner.DisposeAsync();
         }
 
-        if (_serving is not null)
-        {
-            try
-            {
-                await _serving;
-            }
-            catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
-            {
-                // Tearing the listener down is how it stops.
-            }
-        }
-
-        _listener?.Dispose();
-        _stop?.Dispose();
-        _gate?.Dispose();
         _vault?.Dispose();
         _log?.Dispose();
 

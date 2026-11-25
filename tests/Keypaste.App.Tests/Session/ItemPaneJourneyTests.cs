@@ -22,7 +22,7 @@ using Xunit;
 namespace Keypaste.App.Tests.Session;
 
 /// <summary>
-/// The item pane as a password manager's (V-N.5), through the app as launch composes it: a web
+/// The item pane as a password manager's, through the app as launch composes it: a web
 /// address opens through the launcher and copies, another scheme opens nothing and says why, the
 /// reference and identifier wait under "…", and the Agent access card shows only once agents can
 /// see the item.

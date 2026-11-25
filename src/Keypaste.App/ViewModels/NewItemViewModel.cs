@@ -247,7 +247,7 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
         RemoveFieldCommand = new RelayCommand<NewItemField>(RemoveField);
         ChooseTemplateCommand = new RelayCommand<ItemTemplate>(ChooseTemplate, _ => IsChoosingTemplate);
 
-        // A new item starts with a generated password in its field, where it can be copied before Save (V.12).
+        // A new item starts with a generated password in its field, where it can be copied before Save.
         Password.GeneratedValueReplaced += (_, _) => SetProperty(ref _generatePassword, false, nameof(GeneratePassword));
         Generator.PropertyChanged += (_, _) =>
         {

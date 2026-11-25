@@ -10,7 +10,7 @@ namespace Keypaste.Core.Clients;
 
 /// <summary>The AppImage keypaste runs from on Linux, and the link a client is registered through instead of it.</summary>
 /// <param name="Image">The AppImage file.</param>
-/// <param name="Link">G.5's <c>~/.local/bin/keypaste</c>, which starts <paramref name="Image"/> with <c>cli</c>.</param>
+/// <param name="Link">The terminal link <c>~/.local/bin/keypaste</c>, which starts <paramref name="Image"/> with <c>cli</c>.</param>
 public sealed record McpAppImage(string Image, ICliLink Link)
 {
     /// <summary>The AppImage this process runs from, or null when it does not run from one.</summary>
@@ -46,7 +46,7 @@ public sealed record McpBridgeTarget(McpServerCommand Server, McpBridgeLink? Lin
 /// <remarks>
 /// <para>
 /// Windows and macOS install keypaste at a fixed path. Inside a Linux AppImage, whose mount moves on every launch and
-/// whose file an upgrade replaces, a client is registered through G.5's <c>~/.local/bin/keypaste</c>, which a newer image
+/// whose file an upgrade replaces, a client is registered through the terminal link <c>~/.local/bin/keypaste</c>, which a newer image
 /// re-points when it starts.
 /// </para>
 /// <para>
@@ -273,7 +273,7 @@ public static class McpServerLocator
     internal static bool IsTransient(string canonical, McpClientPlatform platform) =>
         platform == McpClientPlatform.MacOS && (canonical.StartsWith(_volumes, StringComparison.Ordinal) || MacCliLink.IsTranslocated(canonical));
 
-    // A macOS path reached through a link, G.5's /usr/local/bin/keypaste among them, is registered as the bundle it names.
+    // A macOS path reached through a link, the terminal link /usr/local/bin/keypaste among them, is registered as the bundle it names.
     private static bool TryStable(string path, McpClientPlatform platform, [NotNullWhen(true)] out McpBridgeTarget? target, out string error)
     {
         var stable = platform == McpClientPlatform.MacOS ? PathIdentity.Canonical(path) : Path.GetFullPath(path);

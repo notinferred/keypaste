@@ -330,9 +330,8 @@ internal static class EnvPullCommand
         {
             if (!context.Prompt.IsInteractive)
             {
-                // Unlike `rm`, where the deletion is the command, here the import already
-                // succeeded and this is an optional epilogue. Failing the whole run over a
-                // cleanup question would be wrong, and deleting silently would be worse.
+                // The import already succeeded, so a cleanup question neither fails the run nor
+                // deletes silently.
                 context.Stderr.WriteLine(
                     $"note: '{sourcePath}' was left in place; pass --delete-source to remove it.");
                 return CliApp.ExitSuccess;
@@ -428,7 +427,7 @@ internal static class EnvPullCommand
 
     /// <summary>
     /// Something else removed the file. <c>File.Delete</c> does not complain about a path that is
-    /// not there, so the old code reported a deletion it had not performed.
+    /// not there, so without this check a deletion that never happened would be reported.
     /// </summary>
     private static int AlreadyGone(string sourcePath, CliContext context)
     {

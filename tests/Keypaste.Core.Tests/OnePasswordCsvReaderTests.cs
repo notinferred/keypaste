@@ -5,7 +5,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// 9.1d2's 1Password CSV reader over exports written by hand: every row of 1Password 8's export and of earlier versions'
+/// The 1Password CSV reader over exports written by hand: every row of 1Password 8's export and of earlier versions'
 /// common fields lands as an item with its web address, TOTP, tags, favorite and archived marks, and every row or part
 /// that does not land is named with why, never by value.
 /// </summary>
@@ -157,14 +157,7 @@ public sealed class OnePasswordCsvReaderTests : IDisposable
         using var source = ExportImport.Open(Write("1PasswordExport.csv", Export()), ExportImport.Readers)!;
         var plan = source.Plan(vault, "1Password");
 
-        List<string?> said = [plan.Into, plan.Refusal];
-        said.AddRange(plan.Rows.SelectMany(row => new[] { row.Item, row.Note, row.ToString() }));
-        said.AddRange(plan.Losses.SelectMany(loss => new[] { loss.Part, loss.Reason, loss.ToString() }));
-        said.AddRange(source.Unread.Select(unread => unread.ToString()));
-        said.AddRange(source.Items.Select(item => item.ToString()));
-        said.AddRange(source.Items.SelectMany(item => item.Omitted).Select(omitted => omitted.ToString()));
-
-        Assert.All(_values, value => Assert.DoesNotContain(said, text => text is not null && text.Contains(value, StringComparison.Ordinal)));
+        ExportLeakCheck.AssertNothingSaidHoldsAValue(source, plan, _values);
     }
 
     /// <summary>An item's parts in one line, and what the reader omitted by name.</summary>

@@ -63,7 +63,7 @@ public sealed class StatusTests : IDisposable
         var vault = Pieces("vault");
         Assert.Equal(2, vault.Count);
         AssertShows(_harness.VaultPath, vault[0]);
-        Assert.Equal("chosen in the app", vault[1]);
+        Assert.Equal("chosen in the app or with keypaste use", vault[1]);
         Assert.Equal("nothing holds it unlocked", Said("held by"));
         Assert.Equal("Cursor connected", Said("AI tools"));
         Assert.Equal("› open the keypaste app, or run `keypaste approve`", Step());
@@ -188,7 +188,7 @@ public sealed class StatusTests : IDisposable
     }
 
     /// <summary>
-    /// The founder's rule, as for doctor: it asks for nothing, starts no process, not even the keypaste a tool registers
+    /// Read-only, as doctor is: it asks for nothing, starts no process, not even the keypaste a tool registers
     /// that doctor would ask its version, and every byte under the harness is as it was.
     /// </summary>
     [Fact]

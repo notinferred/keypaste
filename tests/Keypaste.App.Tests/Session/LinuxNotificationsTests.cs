@@ -8,7 +8,7 @@ namespace Keypaste.App.Tests.Session;
 
 /// <summary>
 /// keypaste's notifications over a real message bus, a private <c>dbus-daemon</c> with a stand-in for the desktop's
-/// notification server on it, reading what actually crosses the bus (Q.14).
+/// notification server on it, reading what actually crosses the bus.
 /// </summary>
 public sealed class LinuxNotificationsTests
 {
@@ -69,8 +69,15 @@ public sealed class LinuxNotificationsTests
         Assert.Equal(2, notified.Urgency);
         Assert.Equal(ApprovalLimits.Default.Window.TotalMilliseconds, notified.Expiry);
 
-        server.Invoke(notified.Id + 1);
-        await Task.Delay(200, Token);
+        // The bus delivers presses in order, so once a press of this second notice arrives every press sent before it has been heard.
+        using var laterPressed = new SemaphoreSlim(0);
+        var later = await notifications.PostAsync(SystemNotice.VaultLocked, () => laterPressed.Release()).WaitAsync(_wait, Token);
+        Assert.NotNull(later);
+        var laterId = server.Notified[^1].Id;
+
+        server.Invoke(laterId + 1);
+        server.Invoke(laterId);
+        Assert.True(await laterPressed.WaitAsync(_wait, Token), "a press of the second notice never reached keypaste");
         Assert.Equal(0, pressed.CurrentCount);
 
         server.Invoke(notified.Id);
@@ -83,8 +90,10 @@ public sealed class LinuxNotificationsTests
         await Until(() => server.Closed.Contains(notified.Id));
 
         server.Invoke(notified.Id);
-        await Task.Delay(200, Token);
+        server.Invoke(laterId);
+        Assert.True(await laterPressed.WaitAsync(_wait, Token), "a press of the second notice never reached keypaste");
         Assert.Equal(0, pressed.CurrentCount);
+        later.Remove();
     }
 
     [Fact]

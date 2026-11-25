@@ -36,7 +36,7 @@ public sealed class LockedAppEndpoint : IDisposable
     private LockedAppEndpoint(string name, Action asked, Action<string> unreachable)
     {
         Name = name;
-        // A bridge hangs up as soon as it connects, so one that lands before the app waits again is still a knock (F.66).
+        // A bridge hangs up as soon as it connects, so one that lands before the app waits again is still a knock.
         _listener = new KnockListener(name, (pipe, stop) => HearAsync(pipe, asked, stop), unreachable, () => Heard(asked));
     }
 
@@ -85,7 +85,7 @@ public sealed class LockedAppEndpoint : IDisposable
     /// <exception cref="ArgumentException"><paramref name="name"/> is null or empty.</exception>
     /// <remarks>
     /// Connecting is given 200 ms, and the bridge hangs up as soon as it has connected. The connection is made on a thread of its own, never the pool, for the reason
-    /// <see cref="Ipc.ApproverClient.TryConnectAsync"/> gives (F.9). The pipe is opened at the identification
+    /// <see cref="Ipc.ApproverClient.TryConnectAsync"/> gives. The pipe is opened at the identification
     /// level, so whoever made it cannot act as this user.
     /// </remarks>
     public static Task<bool> TellAsync(string name, CancellationToken cancellationToken)
@@ -120,7 +120,7 @@ public sealed class LockedAppEndpoint : IDisposable
         {
             pipe.Connect(_connectBound);
         }
-        // InvalidOperationException: on Windows the listener hung up before the runtime's check of who made the pipe, so that is not known (F.70).
+        // InvalidOperationException: on Windows the listener hung up before the runtime's check of who made the pipe, so that is not known.
         catch (Exception ex) when (ex is TimeoutException or IOException or UnauthorizedAccessException or SocketException or InvalidOperationException)
         {
             return false;

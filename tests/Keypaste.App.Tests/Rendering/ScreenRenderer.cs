@@ -38,7 +38,7 @@ namespace Keypaste.App.Tests.Rendering;
 /// </code>
 /// (PowerShell: <c>$env:KEYPASTE_SCREENS_OUT="$env:TEMP\screens"</c> first.) It writes every screen
 /// four times, into <c>dark</c>, <c>light</c>, <c>high-contrast-dark</c> and <c>high-contrast-light</c>
-/// folders, with the system set to each and no theme chosen, as the app starts (N.7), and fails a frame holding more than one accent element. Dark and light
+/// folders, with the system set to each and no theme chosen, as the app starts, and fails a frame holding more than one accent element. Dark and light
 /// are also drawn at 150% and 200%, into <c>zoom-150</c> and <c>zoom-200</c>, where the 200% folders add <c>s-</c> frames on small screens. Add a
 /// screen by adding a <see cref="Save"/> call: <see cref="Every_screen_keeps_every_control_within_reach"/>, which needs no folder, walks each frame at each zoom.
 /// </summary>
@@ -430,7 +430,7 @@ public sealed class ScreenRenderer
         WindowInput.Drain();
     }
 
-    /// <summary>What Q.17 drew: Settings' theme where it is offered, Learn more, toasts under the titlebar, the tight widths, the Items icon and the prompt without focus.</summary>
+    /// <summary>Settings' theme where it is offered, Learn more, toasts under the titlebar, the tight widths, the Items icon and the prompt without focus.</summary>
     private static void DrawPolish(DemoVault demo, string output)
     {
         using var session = new AppVaultSession(new ManualClock(AppClock.Start));
@@ -1231,7 +1231,7 @@ public sealed class ScreenRenderer
         Save(window, output, "20d-secrets-rename-field");
         entries.Detail.CancelRenameFieldCommand.Press();
 
-        // V.12: Generate on the saved password opens Edit fields with one, and Generate password… stands on its own.
+        // Generate on the saved password opens Edit fields with one, and Generate password… stands on its own.
         entries.Detail.GeneratePasswordCommand.Press();
         Save(window, output, "20b-secrets-edit-generated");
         entries.Detail.CancelCommand.Press();
@@ -1248,7 +1248,6 @@ public sealed class ScreenRenderer
         Save(window, output, "13c-secrets-generate-words");
         shell.CloseGeneratorCommand.Press();
 
-        // A filter that matches nothing.
         shell.Search = "no-such-secret";
         Save(window, output, "23-secrets-no-match");
         shell.Search = string.Empty;
@@ -2222,8 +2221,7 @@ public sealed class ScreenRenderer
         return server;
     }
 
-    /// <summary>The Sharing screen as it opens, with statuses not yet asked for; then checked with the form filled; then once the server answers that it takes no shares.</summary>
-    /// <summary>Settings › Advanced's share links, then Share… from an item, filled in and then refused by the server.</summary>
+    /// <summary>Settings › Advanced's share links unchecked, checking, checked and with a revoke asked for, then Share… from an item, filled in, creating and refused by the server.</summary>
     private static void DrawSharing(Window window, string output, ShellViewModel shell, SharingViewModel sharing, FakeShareServer shares, string name)
     {
         var opened = DateTime.UtcNow;

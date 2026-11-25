@@ -56,8 +56,7 @@ selftest() {
   if ( fetch "$url" "${pin^^}" "$work/malformed" ) 2>/dev/null; then die "selftest: a malformed pin was accepted"; fi
 
   # A destination whose path holds backslashes, which is every Windows destination. Reading the
-  # digest from the named file made coreutils escape it, and the pinned bytes were refused
-  # (upgrade-desktop run 35260785520).
+  # digest from the named file made coreutils escape it, and the pinned bytes were refused.
   printf 'pinned tool bytes\n' > "$work/tool"
   local backslashed
   if command -v cygpath >/dev/null 2>&1; then backslashed="$(cygpath -w "$work")\\accepted-windows"

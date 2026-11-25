@@ -11,7 +11,7 @@ namespace Keypaste.App.Tests.ViewModels;
 
 /// <summary>
 /// Choosing a keyfile on the unlock screen: to open a vault that needs one, to create one that will,
-/// and the keyfile the recent list remembers for next time (V.1b).
+/// and the keyfile the recent list remembers for next time.
 /// </summary>
 /// <remarks>
 /// The keyfile vaults here are made by <see cref="VaultCreation"/> or by the library's own writer,

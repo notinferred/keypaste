@@ -393,7 +393,7 @@ public sealed class DoctorVerbTests : IDisposable
     }
 
     /// <summary>
-    /// The founder's rule for doctor: it starts no AI tool and asks for nothing, and every byte under the harness, the
+    /// Doctor is read-only: it starts no AI tool and asks for nothing, and every byte under the harness, the
     /// settings files, the AI tools' files and Claude Code's sign-in among them, is as it was.
     /// </summary>
     [Fact]

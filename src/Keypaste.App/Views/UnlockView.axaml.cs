@@ -74,8 +74,6 @@ internal sealed partial class UnlockView : UserControl
     {
         OnDragLeave(sender, e);
 
-        // A real filesystem path — the thing an HTML5 DataTransfer could never have given, and the
-        // reason "drag a .kdbx" is achievable here at all.
         if (FileDragData.SinglePath(e.DataTransfer) is { } path && Model?.TakeDrop(path) == true)
         {
             _form.FocusForm();

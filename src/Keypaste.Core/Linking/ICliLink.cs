@@ -44,7 +44,7 @@ public enum CliLinkRefusal
     /// <summary>Something is already at the backup path, which a replacement never overwrites.</summary>
     BackupExists = 1,
 
-    /// <summary>macOS runs this copy from a temporary location that is gone once it quits.</summary>
+    /// <summary>This copy runs from the disk image or from a temporary copy macOS made, which is gone once it is ejected or quits.</summary>
     Translocated = 2,
 
     /// <summary>The program's path cannot be written into the link safely.</summary>
@@ -58,7 +58,7 @@ public enum CliLinkRefusal
 /// <param name="BackupPath">Where a replacement keeps what was there.</param>
 /// <param name="BackupExists">Whether anything, a dangling symbolic link included, is at <paramref name="BackupPath"/>.</param>
 /// <param name="DirectoryOnPath">Whether the link's directory is on this session's <c>PATH</c>.</param>
-/// <param name="Translocated">Whether macOS runs this copy from a temporary location.</param>
+/// <param name="Translocated">Whether this copy runs from the disk image or from a temporary copy macOS made.</param>
 /// <param name="EarlierCopy">Another <c>keypaste</c> a terminal may run instead, in a folder that can come before the link's on <c>PATH</c>; otherwise null.</param>
 public sealed record CliLinkStatus(
     CliLinkState State,

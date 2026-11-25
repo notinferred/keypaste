@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
 
-/// <summary>A picker allows nothing until an item is picked, however long it has been up, and offers Always allow only for a picked item that has one (F.76).</summary>
+/// <summary>A picker allows nothing until an item is picked, however long it has been up, and offers Always allow only for a picked item that has one.</summary>
 public sealed class ItemPickViewModelTests
 {
     private static ApprovalPrompt Picker() =>
@@ -85,7 +85,7 @@ public sealed class ItemPickViewModelTests
         picker.IsInFront = true;
         picker.Picked = picker.Rows[1];
 
-        picker.AllowOnceCommand.Execute(null);
+        picker.AllowOnceCommand.Press();
         picker.Picked = picker.Rows[0];
 
         Assert.Equal(ApprovalAnswer.ApprovedOnce, await picker.Answer);

@@ -35,8 +35,8 @@ internal readonly record struct TextStyle(Typeface Typeface, double Size, double
 /// </para>
 /// <para>
 /// The reference is cropped to its ink, so what is matched is the glyphs and their spacing. A
-/// score of 1 is the same picture; <see cref="Threshold"/> was set from the scores measured in 4.6's
-/// record, where a drawn value scores near 1 and dots, or another value of the same length drawn in
+/// score of 1 is the same picture; <see cref="Threshold"/> was set from measured scores: a drawn
+/// value scores near 1, and dots, or another value of the same length drawn in
 /// the same cell, score far below it.
 /// </para>
 /// </remarks>

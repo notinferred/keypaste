@@ -34,13 +34,13 @@ public sealed class AgentRulesViewModelTests : IDisposable
     {
         using var model = new AgentRulesViewModel(_authority);
 
-        model.ChooseCommand.Execute(Choice(model, FieldCategory.Password, CategoryRule.Allow));
+        model.ChooseCommand.Press(Choice(model, FieldCategory.Password, CategoryRule.Allow));
 
         Assert.True(model.IsConfirming);
         Assert.Equal("Every agent will receive every password value without asking.", model.ConfirmText);
         Assert.Equal(CategoryRule.Ask, Held(FieldCategory.Password));
 
-        model.ConfirmGrantCommand.Execute(null);
+        model.ConfirmGrantCommand.Press();
 
         Assert.False(model.IsConfirming);
         Assert.Equal(CategoryRule.Allow, Held(FieldCategory.Password));
@@ -52,8 +52,8 @@ public sealed class AgentRulesViewModelTests : IDisposable
     {
         using var model = new AgentRulesViewModel(_authority);
 
-        model.ChooseCommand.Execute(Choice(model, FieldCategory.Notes, CategoryRule.Allow));
-        model.CancelGrantCommand.Execute(null);
+        model.ChooseCommand.Press(Choice(model, FieldCategory.Notes, CategoryRule.Allow));
+        model.CancelGrantCommand.Press();
 
         Assert.False(model.IsConfirming);
         Assert.Equal(CategoryRule.Ask, Held(FieldCategory.Notes));
@@ -64,7 +64,7 @@ public sealed class AgentRulesViewModelTests : IDisposable
     {
         using var model = new AgentRulesViewModel(_authority);
 
-        model.ChooseCommand.Execute(Choice(model, FieldCategory.Attachment, CategoryRule.Block));
+        model.ChooseCommand.Press(Choice(model, FieldCategory.Attachment, CategoryRule.Block));
         model.ShowsUsername = false;
 
         Assert.False(model.IsConfirming);
@@ -88,7 +88,7 @@ public sealed class AgentRulesViewModelTests : IDisposable
         Assert.False(model.ShowsUsername);
         Assert.False(Rules().ShowsUsername);
 
-        model.ConfirmGrantCommand.Execute(null);
+        model.ConfirmGrantCommand.Press();
 
         Assert.False(model.IsConfirming);
         Assert.True(model.ShowsUsername);
@@ -102,7 +102,7 @@ public sealed class AgentRulesViewModelTests : IDisposable
         model.ShowsUsername = false;
 
         model.ShowsUsername = true;
-        model.CancelGrantCommand.Execute(null);
+        model.CancelGrantCommand.Press();
 
         Assert.False(model.IsConfirming);
         Assert.False(model.ShowsUsername);
@@ -125,7 +125,7 @@ public sealed class AgentRulesViewModelTests : IDisposable
         Assert.False(model.ShowsLinkedHosts);
         Assert.False(Rules().ShowsLinkedHosts);
 
-        model.ConfirmGrantCommand.Execute(null);
+        model.ConfirmGrantCommand.Press();
 
         Assert.True(model.ShowsLinkedHosts);
         Assert.True(Rules().ShowsLinkedHosts);
@@ -144,7 +144,7 @@ public sealed class AgentRulesViewModelTests : IDisposable
         using var model = new AgentRulesViewModel(_authority);
 
         model.ShowsLinkedHosts = true;
-        model.CancelGrantCommand.Execute(null);
+        model.CancelGrantCommand.Press();
 
         Assert.False(model.IsConfirming);
         Assert.False(model.ShowsLinkedHosts);

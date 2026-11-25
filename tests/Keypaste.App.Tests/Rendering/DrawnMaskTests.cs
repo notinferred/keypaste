@@ -6,7 +6,7 @@ using Xunit;
 namespace Keypaste.App.Tests.Rendering;
 
 /// <summary>
-/// Every masked field, typed into through the window and read from the frames Skia drew (4.6).
+/// Every masked field, typed into through the window and read from the frames Skia drew.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -17,18 +17,18 @@ namespace Keypaste.App.Tests.Rendering;
 /// last step of each field makes it draw the characters to show the search would have seen them.
 /// </para>
 /// <para>
-/// The automation half is D-0099 made over the whole window rather than the field: two values of
+/// The automation half is the length-only differential made over the whole window rather than the field: two values of
 /// one length sharing no character leave the same surface, and neither is on it.
 /// </para>
 /// </remarks>
 public sealed class DrawnMaskTests
 {
-    // The first character is the whole one-character value, so no path or label may hold it (F.17).
+    // The first character is the whole one-character value, so no path or label may hold it.
     private const string _pool = "¤ZXJ#%&@WVKq";
     private const string _alpha = "QZXJ#%&@WVKq";
     private const string _beta = "0123456789ab";
 
-    // The fixture directory whose Q the vault-name tooltip showed in probe run 36033202756 (F.17).
+    // A fixture directory whose name holds Q, which the vault-name tooltip showed while Q was the one-character value.
     private const string _recordedFixture = "keypaste-drawn-v7uQny";
 
     public static TheoryData<string> UnlockFields => ["Password", "BackupPassword", "NewPassword", "ConfirmPassword"];
@@ -202,7 +202,6 @@ public sealed class DrawnMaskTests
         }
     }
 
-    /// <summary>The template's text block that draws the mask.</summary>
     // Through the sink where there is one: Escape would also cancel the form the field stands in.
     private static void Clear(Window window, MaskedInput field)
     {
@@ -216,6 +215,7 @@ public sealed class DrawnMaskTests
         }
     }
 
+    /// <summary>The template's text block that draws the mask.</summary>
     private static TextBlock Display(MaskedInput field) => DrawnText.Showing(field, field.Display);
 
     private static string Secret(int length) =>

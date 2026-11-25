@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Links the keypaste a built keypaste.app carries at /usr/local/bin/keypaste, as Settings does, and holds a new
-# terminal to running it from there (G.5).
+# terminal to running it from there.
 #
 # A runner has nobody to type an administrator's password, so the link is made with sudo exactly as the
 # dialog's fixed program makes it; MacCliLinkTests cover that program and how the paths reach it. The shell is

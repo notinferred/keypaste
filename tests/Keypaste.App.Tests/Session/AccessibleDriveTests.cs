@@ -10,7 +10,7 @@ using Xunit;
 namespace Keypaste.App.Tests.Session;
 
 /// <summary>
-/// The acts the installed-app exercise drives from outside the process (F.25), found by accessible
+/// The acts the installed-app exercise drives from outside the process, found by accessible
 /// name and done through the automation tree UI Automation and AT-SPI read, never by calling a command.
 /// </summary>
 /// <remarks>

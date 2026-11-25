@@ -27,6 +27,19 @@ public sealed class SidebarAddTests
     });
 
     [Fact]
+    public Task New_spans_the_sidebar_as_tall_as_the_search() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell("keypaste-sidebar-new-width-");
+        shell.Show<EntriesViewModel>(DestinationKind.Entries);
+        shell.Frame();
+        var add = shell.Named<Button>("SidebarNew");
+        var room = add.GetVisualAncestors().OfType<DockPanel>().First().Bounds.Width;
+
+        Assert.Equal(room, add.Bounds.Width, 0.5);
+        Assert.Equal(shell.Named<TextBox>("ListSearch").Bounds.Height, add.Bounds.Height, 0.5);
+    });
+
+    [Fact]
     public Task A_press_on_the_accounts_heading_chooses_nothing() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-sidebar-heading-press-", secondVault: "acme");

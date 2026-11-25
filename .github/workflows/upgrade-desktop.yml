@@ -1,17 +1,17 @@
 name: upgrade-desktop
 run-name: ${{ inputs.rehearsal && 'upgrade-desktop rehearsal (not release evidence)' || format('upgrade-desktop with CLI/MCP {0}', inputs.cli_version) }}
 
-# 4.7d, 4.7e2: builds three unpublished desktop candidates from one commit at distinct numeric versions, then on a
+# Builds three unpublished desktop candidates from one commit at distinct numeric versions, then on a
 # fresh runner installs the lowest, fills a real vault and ~/.keypaste through the published CLI/MCP, upgrades,
 # interrupts an upgrade, refuses a downgrade and uninstalls, checking the user's data after every transition.
-# After each one a new terminal must run the keypaste the installed app carries (G.5): on Windows through the
+# After each one a new terminal must run the keypaste the installed app carries: on Windows through the
 # user PATH entry the MSI keeps once and removes on uninstall, on Linux through the link the lower app's
 # Settings made, which a start of the higher image re-points, one handed to the running lower app included,
 # and on macOS through the /usr/local/bin link, which names the bundle's fixed path that an upgrade replaces.
 #
 # Distinct numeric versions because an MSI ProductVersion and a bundle version are numeric and two candidates of
 # one version cannot be ordered. Nothing here is attested, published or notarized, and only the macOS bundles are
-# signed: these candidates exist only to be installed over one another. Public downloads and their upgrade evidence are 4.7c.
+# signed: these candidates exist only to be installed over one another.
 #
 # A rehearsal makes the data with a CLI/MCP the build job publishes from this run's own commit instead of a
 # published release. It is never release evidence; a candidate is tagged only after its rehearsal passes.
@@ -266,7 +266,7 @@ jobs:
           name: ${{ inputs.rehearsal && 'upgrade-desktop-rehearsal' || 'upgrade-desktop' }}-${{ matrix.rid }}
           path: upgrade-desktop/
           # A run that fails in setup has no records to upload, and losing the run over that would
-          # take the failing log with it (run 35260785520).
+          # take the failing log with it.
           if-no-files-found: warn
           retention-days: 30
 

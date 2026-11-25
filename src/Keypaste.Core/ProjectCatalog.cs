@@ -74,7 +74,7 @@ public sealed class ProjectCatalog
 
     /// <summary>
     /// Each project tag that puts an entry of an open vault in an environment, once each and in ordinal order, as
-    /// <see cref="Read"/> counts membership but read from the entries' tags alone, so no value is read.
+    /// <see cref="Read(Vault)"/> counts membership but read from the entries' tags alone, so no value is read.
     /// </summary>
     /// <param name="vault">The vault.</param>
     /// <returns>Tags such as <c>env:billing</c> and <c>env:billing:prod</c>.</returns>
@@ -102,9 +102,16 @@ public sealed class ProjectCatalog
     {
         ArgumentNullException.ThrowIfNull(vault);
 
+        return Read(vault.ReadEnvSnapshot());
+    }
+
+    /// <summary>Reads the projects one read of a vault holds.</summary>
+    /// <param name="snapshot">The vault's entries, tags and group paths, read together.</param>
+    /// <returns>Its projects and the tags it ignored.</returns>
+    internal static ProjectCatalog Read(EnvSnapshot snapshot)
+    {
         Dictionary<string, Dictionary<string, List<EntryName>>> tagged = new(StringComparer.Ordinal);
         List<ProjectTagProblem> problems = [];
-        var snapshot = vault.ReadEnvSnapshot();
 
         foreach (var entry in snapshot.Entries)
         {

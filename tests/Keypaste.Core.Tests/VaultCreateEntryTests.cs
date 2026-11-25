@@ -120,7 +120,7 @@ public sealed class VaultCreateEntryTests : IDisposable
         Assert.Null(vault.Find(_openAi));
     }
 
-    /// <summary>The CLI's create applies the name rules the app's does, and still makes the groups a typed path names (F.55).</summary>
+    /// <summary>The CLI's create applies the name rules the app's does, and still makes the groups a typed path names.</summary>
     [Theory]
     [InlineData("Work", "Stripe", "is already in that group")]
     [InlineData("Work", " OpenAI", "cannot begin or end with whitespace")]

@@ -4,7 +4,7 @@ using Xunit;
 namespace Keypaste.Processes.Tests;
 
 /// <summary>
-/// Agents shows what the app's session holds and History what agents asked for (4.3b, N.3), when the asking is a built keypaste mcp in
+/// Agents shows what the app's session holds and History what agents asked for, when the asking is a built keypaste mcp in
 /// another process: tests/Keypaste.AppDriver's <c>activity</c> prints what the screens' own view models read from the authority and the log.
 /// </summary>
 /// <remarks>How the rows, the prompt and the settings behave is App.Tests' <c>AgentActivityViewModelTests</c> and <c>DesktopApprovalTests</c>.</remarks>

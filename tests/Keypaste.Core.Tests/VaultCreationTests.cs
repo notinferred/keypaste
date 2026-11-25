@@ -12,7 +12,7 @@ namespace Keypaste.Core.Tests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// These were <c>keypaste init</c>'s alone until 4.8 gave the desktop a Create button. They live
+/// The desktop's Create button and <c>keypaste init</c> share these rules. They live
 /// here, rather than duplicated there, because the one that matters most is destructive: a second
 /// implementation of "refuse an occupied path" is a second chance to overwrite an encrypted vault
 /// nothing can read back (the one-core rule in docs/ARCHITECTURE.md).

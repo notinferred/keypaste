@@ -4,7 +4,7 @@ using Keypaste.Core.Recommendations;
 
 namespace Keypaste.App.ViewModels;
 
-/// <summary>The keys left in one item's notes, as Items › Recommendations lists them: one finding moved together, item and keys, never a value.</summary>
+/// <summary>The keys left in one item's notes, as Security lists them: one finding moved together, item and keys, never a value.</summary>
 internal sealed partial class RecommendationRow : ObservableObject, IRecommendationRow
 {
     private readonly RecommendationsViewModel _owner;

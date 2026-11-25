@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-#
-# verify-keepassxc-compat.sh
-#
 # PERMANENT COMPATIBILITY GATE — SECURITY.md law 14:
 #   "Every release opens every earlier release's vaults, and KeePassXC 2.7 or later opens what
 #    keypaste writes."

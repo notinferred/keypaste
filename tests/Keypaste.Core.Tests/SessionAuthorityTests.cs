@@ -1,5 +1,4 @@
 using System.IO.Pipes;
-using System.Security.Cryptography;
 using System.Text;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
@@ -46,7 +45,7 @@ public sealed class SessionAuthorityTests : IDisposable
     [Fact]
     public async Task AnAttachedListing_IsAnsweredFromTheVaultAndNamesTheSession()
     {
-        await using var owner = Owner.Start(this);
+        await using var owner = StartOwner();
         await using var client = await ConnectAsync(owner.PipeName);
 
         var attached = await client.AttachAsync(new AttachRequest(VaultPath), Token);
@@ -66,7 +65,7 @@ public sealed class SessionAuthorityTests : IDisposable
     public async Task AnAttachedRequest_IsDecidedAndNamesTheSession()
     {
         _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-        await using var owner = Owner.Start(this);
+        await using var owner = StartOwner();
         await using var client = await ConnectAsync(owner.PipeName);
 
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
@@ -82,7 +81,7 @@ public sealed class SessionAuthorityTests : IDisposable
     public async Task ARequestFromAConnectionThatNeverAttached_IsRefusedUnasked()
     {
         _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-        await using var owner = Owner.Start(this);
+        await using var owner = StartOwner();
         await using var client = await ConnectAsync(owner.PipeName);
 
         var reply = await client.RequestAsync(Request("session-one"), Token);
@@ -102,7 +101,7 @@ public sealed class SessionAuthorityTests : IDisposable
     [Fact]
     public async Task AnAttachmentNamingAnotherVault_IsRefused()
     {
-        await using var owner = Owner.Start(this);
+        await using var owner = StartOwner();
         await using var client = await ConnectAsync(owner.PipeName);
 
         var elsewhere = Path.Combine(_directory, "other.kdbx");
@@ -121,7 +120,7 @@ public sealed class SessionAuthorityTests : IDisposable
     public async Task ARequestNamingAnotherVaultThanItsAttachment_IsRefused()
     {
         _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-        await using var owner = Owner.Start(this);
+        await using var owner = StartOwner();
         await using var client = await ConnectAsync(owner.PipeName);
 
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
@@ -136,7 +135,7 @@ public sealed class SessionAuthorityTests : IDisposable
     public async Task ARequestFromASessionThatEnded_IsRefusedAfterTheVaultIsUnlockedAgain()
     {
         _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-        await using var owner = Owner.Start(this);
+        await using var owner = StartOwner();
         await using var client = await ConnectAsync(owner.PipeName);
 
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
@@ -158,7 +157,7 @@ public sealed class SessionAuthorityTests : IDisposable
     public async Task ARequestPresentingTheNewSessionOnAnOldAttachment_IsRefused()
     {
         _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-        await using var owner = Owner.Start(this);
+        await using var owner = StartOwner();
         await using var client = await ConnectAsync(owner.PipeName);
 
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
@@ -175,7 +174,7 @@ public sealed class SessionAuthorityTests : IDisposable
     public async Task ALockedOwner_RefusesAttachmentAndEveryRequest()
     {
         _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-        await using var owner = Owner.Start(this);
+        await using var owner = StartOwner();
         await using var client = await ConnectAsync(owner.PipeName);
 
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
@@ -195,7 +194,7 @@ public sealed class SessionAuthorityTests : IDisposable
     [Fact]
     public async Task AnotherSpellingOfTheVault_AttachesToIt()
     {
-        await using var owner = Owner.Start(this);
+        await using var owner = StartOwner();
         await using var client = await ConnectAsync(owner.PipeName);
 
         var respelled = Path.Combine(_directory, ".", "vault.kdbx");
@@ -220,7 +219,7 @@ public sealed class SessionAuthorityTests : IDisposable
             _lifetime = null;
         }
 
-        await using var owner = Owner.Start(this);
+        await using var owner = StartOwner();
         await using var client = await ConnectAsync(owner.PipeName);
 
         var vault = refusal == AuditMethod.NoSession ? Path.Combine(_directory, "other.kdbx") : VaultPath;
@@ -235,7 +234,7 @@ public sealed class SessionAuthorityTests : IDisposable
     public async Task TheAuthorityLists_TheRequestWaitingAndThenItsGrant_AndNothingOnceTheLifetimeEnds()
     {
         _fixture.Channel.Hold = true;
-        await using var owner = Owner.Start(this);
+        await using var owner = StartOwner();
         await using var client = await ConnectAsync(owner.PipeName);
 
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
@@ -265,7 +264,7 @@ public sealed class SessionAuthorityTests : IDisposable
     public async Task ARequestWaitingForAPerson_IsWithdrawnAndDeniedAsLockedWhenTheLifetimeEnds()
     {
         _fixture.Channel.Hold = true;
-        await using var owner = Owner.Start(this);
+        await using var owner = StartOwner();
         await using var client = await ConnectAsync(owner.PipeName);
 
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
@@ -291,7 +290,7 @@ public sealed class SessionAuthorityTests : IDisposable
         _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         var lifetime = _lifetime!;
         _fixture.Source.During = lifetime.End;
-        await using var owner = Owner.Start(this);
+        await using var owner = StartOwner();
         await using var client = await ConnectAsync(owner.PipeName);
 
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
@@ -310,7 +309,7 @@ public sealed class SessionAuthorityTests : IDisposable
     {
         _fixture.Channel.Hold = true;
         var lifetime = _lifetime!;
-        await using var owner = Owner.Start(this);
+        await using var owner = StartOwner();
         await using var client = await ConnectAsync(owner.PipeName);
 
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
@@ -337,7 +336,7 @@ public sealed class SessionAuthorityTests : IDisposable
         _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         var lifetime = _lifetime!;
         _fixture.Source.During = lifetime.Withdraw;
-        await using var owner = Owner.Start(this);
+        await using var owner = StartOwner();
         await using var client = await ConnectAsync(owner.PipeName);
 
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
@@ -357,7 +356,7 @@ public sealed class SessionAuthorityTests : IDisposable
         using var policed = new ApproverFixture();
         policed.Rules.Rules = AgentRules.Defaults.Allowing(FieldCategory.Password, confirmed: true);
         policed.Source.During = _lifetime!.End;
-        await using var owner = Owner.Start(this, policed.Handler);
+        await using var owner = StartOwner(policed.Handler);
         await using var client = await ConnectAsync(owner.PipeName);
 
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
@@ -374,7 +373,7 @@ public sealed class SessionAuthorityTests : IDisposable
     public async Task AListingRacingTheLock_IsRefused()
     {
         _fixture.Source.During = _lifetime!.End;
-        await using var owner = Owner.Start(this);
+        await using var owner = StartOwner();
         await using var client = await ConnectAsync(owner.PipeName);
 
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
@@ -390,7 +389,7 @@ public sealed class SessionAuthorityTests : IDisposable
     {
         _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         using var vault = SavedVault("v1");
-        await using var owner = Owner.Start(this, Over(vault));
+        await using var owner = StartOwner(Over(vault));
         await using var client = await ConnectAsync(owner.PipeName);
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
 
@@ -425,7 +424,7 @@ public sealed class SessionAuthorityTests : IDisposable
     {
         _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
         using var vault = SavedVault("v1");
-        await using var owner = Owner.Start(this, Over(vault));
+        await using var owner = StartOwner(Over(vault));
         await using var client = await ConnectAsync(owner.PipeName);
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
 
@@ -452,7 +451,7 @@ public sealed class SessionAuthorityTests : IDisposable
         using var vault = SavedVault("v1");
         using var policed = new ApproverFixture();
         policed.Rules.Rules = AgentRules.Defaults.Allowing(FieldCategory.Password, confirmed: true);
-        await using var owner = Owner.Start(this, Over(vault, policed));
+        await using var owner = StartOwner(Over(vault, policed));
         await using var client = await ConnectAsync(owner.PipeName);
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
         var request = Request("session-one");
@@ -490,7 +489,7 @@ public sealed class SessionAuthorityTests : IDisposable
         string argument, string entry, string field, string reason)
     {
         _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-        await using var owner = Owner.Start(this);
+        await using var owner = StartOwner();
         await using var client = await ConnectAsync(owner.PipeName);
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
 
@@ -513,7 +512,7 @@ public sealed class SessionAuthorityTests : IDisposable
     public async Task AnUnexposedEntry_IsRefusedByTheOwner_ByPathAndByHandle_Unasked(bool byHandle)
     {
         _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-        await using var owner = Owner.Start(this);
+        await using var owner = StartOwner();
         await using var client = await ConnectAsync(owner.PipeName);
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
 
@@ -537,7 +536,7 @@ public sealed class SessionAuthorityTests : IDisposable
     public async Task AMalformedRequest_EndsTheConnectionUnanswered_AndAsksNobody(string shape)
     {
         _fixture.Channel.Answer = ApprovalAnswer.ApprovedOnce;
-        await using var owner = Owner.Start(this);
+        await using var owner = StartOwner();
 
         var wellFormed = Encoding.UTF8.GetString(ApproverProtocol.Encode(Request("session-one")));
         var frame = shape switch
@@ -566,7 +565,7 @@ public sealed class SessionAuthorityTests : IDisposable
         vault.AddEntry(new VaultEntry { GroupPath = prod.GroupPath, Title = prod.Title, Password = "prod-sentinel" });
         Assert.True(vault.AddTag(prod, "env:acme:prod"));
         vault.Save();
-        await using var owner = Owner.Start(this, Over(vault));
+        await using var owner = StartOwner(Over(vault));
         await using var client = await ConnectAsync(owner.PipeName);
         await client.AttachAsync(new AttachRequest(VaultPath), Token);
 
@@ -655,51 +654,10 @@ public sealed class SessionAuthorityTests : IDisposable
     }
 
     /// <summary>An owner of the test's vault on its own pipe, whose session the test changes.</summary>
-    private sealed class Owner : IAsyncDisposable
-    {
-        private readonly CancellationTokenSource _stop = new();
-        private readonly ApproverListener _listener;
-        private readonly Task _running;
-
-        private Owner(string pipeName, ApproverListener listener, SessionAuthority authority)
-        {
-            PipeName = pipeName;
-            Authority = authority;
-            _listener = listener;
-            _running = listener.RunAsync(_stop.Token);
-        }
-
-        internal string PipeName { get; }
-
-        internal SessionAuthority Authority { get; }
-
-        internal static Owner Start(SessionAuthorityTests test, ApproverHandler? handler = null)
-        {
-            var name = "keypaste-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
-            var authority = new SessionAuthority(
-                VaultIdentity.Of(test._directory, test.VaultPath),
-                () => test._lifetime,
-                handler ?? test._fixture.Handler,
-                audit: () => test._log.Log);
-
-            return new Owner(name, new ApproverListener(name, authority), authority);
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            await _stop.CancelAsync();
-
-            try
-            {
-                await _running;
-            }
-            catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
-            {
-                // Tearing the listener down is how it stops.
-            }
-
-            _listener.Dispose();
-            _stop.Dispose();
-        }
-    }
+    private ServedOwner StartOwner(ApproverHandler? handler = null) =>
+        ServedOwner.Serve(new SessionAuthority(
+            VaultIdentity.Of(_directory, VaultPath),
+            () => _lifetime,
+            handler ?? _fixture.Handler,
+            audit: () => _log.Log));
 }

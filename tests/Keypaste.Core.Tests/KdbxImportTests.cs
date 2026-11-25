@@ -128,7 +128,7 @@ public sealed class KdbxImportTests : IDisposable
         using (var vault = ClaimedVault.Open(source, SourcePassword))
         {
             vault.AddEntry(new VaultEntry { Title = "User", GroupPath = "Team", Password = first });
-            vault.UpdateEntry(new VaultEntry { Title = "User", GroupPath = "Team", Password = first + second, Notes = outside });
+            vault.UpdateEntry(new VaultEntry { Title = "User", GroupPath = "Team", Password = "{" + first + " {" + second, Notes = outside });
             vault.Save();
         }
 
@@ -144,7 +144,7 @@ public sealed class KdbxImportTests : IDisposable
         var copied = Facts(targetPath, TargetPassword, new EntryName("moved/Team", "Shared")).Uuid;
         var user = Facts(targetPath, TargetPassword, new EntryName("moved/Team", "User"));
         Assert.NotEqual(shared, copied);
-        Assert.Equal($"{{REF:P@I:{copied}}}{{ref:u@i:{copied}}}", user.Strings["Password"]);
+        Assert.Equal($"{{{{REF:P@I:{copied}}} {{{{ref:u@i:{copied}}}", user.Strings["Password"]);
         Assert.Equal(outside, user.Strings["Notes"]);
         Assert.Equal([$"{{REF:P@I:{copied}}}"], user.HistoryPasswords);
     }
@@ -243,6 +243,24 @@ public sealed class KdbxImportTests : IDisposable
         var result = opened.ApplyTo(target, plan);
 
         Assert.Equal(1, result.DuplicateTitles);
+    }
+
+    [Fact]
+    public void ATitleRepeatedInTheFileAndTakenInTheVault_CountsEachCopyAndEachRepeat()
+    {
+        var source = Source("src.kdbx", vault =>
+        {
+            vault.AddEntry(new VaultEntry { Title = "gmail", GroupPath = "Work", Password = "theirs" });
+            vault.AddEntry(new VaultEntry { Title = "gmail", GroupPath = "Work", Password = "theirs too" });
+        });
+        using var target = Target();
+        target.AddEntry(new VaultEntry { Title = "gmail", GroupPath = "x/Work", Password = "mine" });
+
+        using var opened = KdbxImport.Open(source, SourcePassword, null);
+
+        var problem = Assert.Single(opened.Check(target, opened.DefaultPlan(target, "x")));
+        Assert.False(problem.Blocks);
+        Assert.Equal("3 titles in x/Work name another item too; all are kept", problem.Message);
     }
 
     [Fact]

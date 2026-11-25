@@ -4,7 +4,7 @@ using Xunit;
 namespace Keypaste.Processes.Tests;
 
 /// <summary>
-/// The desktop owns the vault it unlocks (U.1), across real processes: the built keypaste and keypaste mcp, and tests/Keypaste.AppDriver
+/// The desktop owns the vault it unlocks, across real processes: the built keypaste and keypaste mcp, and tests/Keypaste.AppDriver
 /// serving the vault as the app does.
 /// </summary>
 /// <remarks>A stale session and an unattached bridge are <c>SessionAuthorityTests</c>' in Core.Tests, over a real pipe in one process.</remarks>

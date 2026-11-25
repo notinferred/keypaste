@@ -6,7 +6,7 @@ using Xunit;
 namespace Keypaste.Processes.Tests;
 
 /// <summary>
-/// A lock is one transition across real processes (U.2): a request a real keypaste mcp has waiting at the owner is answered as a vault-locked
+/// A lock is one transition across real processes: a request a real keypaste mcp has waiting at the owner is answered as a vault-locked
 /// denial of the session it reached, whether the app locks, quits or keypaste approve is stopped.
 /// </summary>
 /// <remarks>Idle and an expired sleep take the same transition over a real pipe with a manual clock, in App.Tests' <c>LockBoundaryTests</c>.</remarks>

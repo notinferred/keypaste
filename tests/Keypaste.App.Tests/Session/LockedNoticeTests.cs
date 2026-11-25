@@ -72,12 +72,12 @@ public sealed class LockedNoticeTests
     {
         using var home = new TempHome();
         using var vault = new TempVault();
-        using var session = new AppVaultSession(TimeProvider.System, home: home.Path);
-        using var locked = await Task.Run(() => new LockedNotice(session, () => { }, TimeProvider.System, _ => { }), Token);
+        using var vaults = Vaults(TimeProvider.System, home);
+        using var locked = await Task.Run(() => new LockedNotice(vaults, () => { }, TimeProvider.System, _ => { }), Token);
 
         await HeadlessSession.On(async () =>
         {
-            using var screen = new UnlockViewModel(session, home.Path, new FakeVaultFilePicker(), () => { });
+            using var screen = new UnlockViewModel(vaults.InView.Session, home.Path, new FakeVaultFilePicker(), () => { });
             Assert.True(screen.Offer(vault.Path_));
             locked.Watch(screen);
 
@@ -273,6 +273,89 @@ public sealed class LockedNoticeTests
             Assert.False(await TellNamedAsync(home, before), "the notice still listened for the vault chosen before");
         });
     }
+
+    [Fact]
+    public Task A_vault_locked_alone_beside_an_open_one_is_listened_for_and_its_Open_keypaste_only_shows_the_window() =>
+        WithOneLockedAlone(async (app, notices, personal, acme, _) =>
+        {
+            var notice = notices[0];
+            var screen = Screen(app);
+            Assert.False(await TellAsync(personal), "the app answered for the vault still open");
+            Assert.False(app.Main!.IsVisible, "a bridge showed the main window");
+
+            await Until(() => notice.FindControl<Button>("Open")!.IsEffectivelyEnabled);
+            Click(notice, "Open");
+
+            await Until(() => app.Main.IsVisible);
+            Assert.True(app.Authority!.Session.IsUnlocked, "Open keypaste locked the vault in view");
+            Assert.NotEqual(acme, screen.SelectedPath);
+            app.Main.Close();
+        });
+
+    [Fact]
+    public Task Another_vault_opening_takes_the_notice_down_and_a_later_ask_tells_again() =>
+        WithOneLockedAlone(async (app, notices, _, acme, second) =>
+        {
+            var notice = notices[0];
+
+            Unlock(second.Session, acme);
+            await Until(() => !notice.IsVisible);
+            Assert.Null(app.LockedNotice!.Showing);
+
+            app.Vaults!.LockAlone(second);
+
+            await TellUntilHeardAsync(acme);
+            var again = await NoticeAsync(notices, count: 2);
+            Assert.Equal("acme is locked", Text(again, "HeadText"));
+            again.Close();
+        });
+
+    [Fact]
+    public Task Every_vault_locking_after_a_notice_was_closed_lets_the_next_ask_tell_again() =>
+        WithOneLockedAlone(async (app, notices, personal, _, _) =>
+        {
+            notices[0].Close();
+            await Until(() => app.LockedNotice!.Showing is null);
+
+            app.Vaults!.LockAll(VaultLockReason.Manual);
+
+            await TellUntilHeardAsync(personal);
+            var again = await NoticeAsync(notices, count: 2);
+            Assert.Equal("test is locked", Text(again, "HeadText"));
+            Assert.False(app.Main!.IsVisible);
+            again.Close();
+        });
+
+    [Fact]
+    public Task Once_every_vault_locks_a_vault_the_unlock_screen_does_not_show_is_still_listened_for() =>
+        HeadlessSession.On(async () =>
+        {
+            using var home = new TempHome();
+            using var personal = new TempVault();
+            using var acme = new TempVault();
+            using var claim = Claim(home);
+            using var lifetime = new ClassicDesktopStyleApplicationLifetime();
+            Attach(lifetime);
+            using var app = new App { Preferences = Tray(home), Claim = claim, Notifications = new NoSystemNotifications() };
+            app.Launch(lifetime, background: true);
+            lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
+            var notices = Notices(app);
+            Unlock(app, personal.Path_);
+            Unlock(app.Vaults!.Add(acme.Path_).Session, acme.Path_);
+            WindowInput.Drain();
+
+            var unlocked = Screen(app);
+            app.Vaults.LockAll(VaultLockReason.Manual);
+            await Until(() => !ReferenceEquals(Screen(app), unlocked));
+            Assert.True(Screen(app).Offer(personal.Path_));
+
+            await TellUntilHeardAsync(acme.Path_);
+            var notice = await NoticeAsync(notices);
+            Assert.True(await TellAsync(personal.Path_), "the app stopped listening for the vault its unlock screen shows");
+            await SettleAsync();
+            Assert.Single(notices);
+            notice.Close();
+        });
 
     [Fact]
     public Task Unlocking_takes_a_notice_still_up_down() =>
@@ -478,6 +561,43 @@ public sealed class LockedNoticeTests
             await test(app, lifetime, system, vault.Path_, notices);
         });
 
+    /// <summary>An app with two vaults open, the second, named acme, locked alone and its notice put up by an agent asking for it.</summary>
+    private static Task WithOneLockedAlone(Func<App, List<Window>, string, string, OpenVault, Task> test) =>
+        HeadlessSession.On(async () =>
+        {
+            using var home = new TempHome();
+            using var personal = new TempVault();
+            using var other = new TempVault();
+            var acme = Path.Combine(other.Home, "acme.kdbx");
+
+            using (var created = ClaimedVault.Create(acme, TempVault.Password))
+            {
+                created.Save();
+            }
+
+            using var claim = Claim(home);
+            using var lifetime = new ClassicDesktopStyleApplicationLifetime();
+            Attach(lifetime);
+            using var app = new App { Preferences = Tray(home), Claim = claim, Notifications = new NoSystemNotifications() };
+            app.Launch(lifetime, background: true);
+            lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
+            var notices = Notices(app);
+            Unlock(app, personal.Path_);
+            var second = app.Vaults!.Add(acme);
+            Unlock(second.Session, acme);
+            WindowInput.Drain();
+            Assert.False(await TellAsync(acme), "the app answered for a vault that is open");
+
+            app.Vaults.LockAlone(second);
+
+            await TellUntilHeardAsync(acme);
+            Assert.Equal("acme is locked", Text(await NoticeAsync(notices), "HeadText"));
+
+            await test(app, notices, personal.Path_, acme, second);
+            app.Vaults.LockAll(VaultLockReason.Manual);
+            WindowInput.Drain();
+        });
+
     /// <summary>A notice built on a home of its own and a manual clock, its unlock screen showing one vault and another chosen, with a third to choose.</summary>
     private static Task WithChoice(Func<string, string, FileSystemWatcher>? watch, Func<LockedNotice, TempHome, string, string, ManualClock, Task> test) =>
         HeadlessSession.On(async () =>
@@ -490,9 +610,9 @@ public sealed class LockedNoticeTests
             File.Copy(shown.Path_, after);
             Assert.Equal(ChooseOutcome.Chosen, ChosenVault.Choose(home.Path, before, onlyIfNone: false));
             var clock = new ManualClock();
-            using var session = new AppVaultSession(clock, home: home.Path);
-            using var locked = new LockedNotice(session, () => { }, clock, _ => { }, watch: watch);
-            using var screen = new UnlockViewModel(session, home.Path, new FakeVaultFilePicker(), () => { });
+            using var vaults = Vaults(clock, home);
+            using var locked = new LockedNotice(vaults, () => { }, clock, _ => { }, watch: watch);
+            using var screen = new UnlockViewModel(vaults.InView.Session, home.Path, new FakeVaultFilePicker(), () => { });
             Assert.True(screen.Offer(shown.Path_));
             locked.Watch(screen);
 
@@ -546,10 +666,24 @@ public sealed class LockedNoticeTests
     private static UnlockViewModel Screen(App app) =>
         Assert.IsType<UnlockViewModel>(Assert.IsType<UnlockView>(app.Main!.FindControl<ContentControl>("Root")!.Content).DataContext);
 
-    private static void Unlock(App app, string vault)
+    private static void Unlock(App app, string vault) => Unlock(app.Authority!.Session, vault);
+
+    private static void Unlock(AppVaultSession session, string vault)
     {
         using var master = TempVault.Secret(TempVault.Password);
-        Assert.Equal(UnlockOutcome.Opened, app.Authority!.Session.TryUnlock(vault, master.Value));
+        Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(vault, master.Value));
+    }
+
+    /// <summary>The open vaults of one locked session on <paramref name="home"/>, which no prompt answers, for a notice built without the app.</summary>
+    private static OpenVaults Vaults(TimeProvider clock, TempHome home)
+    {
+        // The open vaults own every session and authority made here.
+#pragma warning disable CA2000
+        return new OpenVaults(
+            new AppVaultSession(clock, home: home.Path),
+            () => new AppVaultSession(clock, home: home.Path),
+            (vaults, session) => new AppAuthority(session, approverOverride: null, () => new NobodyToAsk(), turns: vaults.Turns, otherKeys: () => vaults.KeysBesides(session), pairings: vaults.Pairings));
+#pragma warning restore CA2000
     }
 
     private static async Task SettleAsync()

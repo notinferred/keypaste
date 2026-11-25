@@ -239,7 +239,7 @@ public sealed class EnvPullTests
 
     /// <summary>
     /// The size is refused before the file is read: a file past what one read can hold fails a
-    /// whole-file read with an I/O error, so only a reader that asks first says it is too large (F.55).
+    /// whole-file read with an I/O error, so only a reader that asks first says it is too large.
     /// </summary>
     [Fact]
     public void Pull_OfAnOversizedFile_IsRefusedBeforeItIsRead()
@@ -298,13 +298,9 @@ public sealed class EnvPullTests
     }
 
     /// <summary>
-    /// PowerShell 5.1 writes UTF-16 from <c>&gt;</c> and <c>Set-Content</c>, so this is not an
-    /// exotic file — it is what a Windows user's redirect produces.
-    /// </summary>
-    /// <summary>
     /// The seconds a person spends answering a prompt are seconds their editor can save in, and
-    /// keypaste offered to delete the file at the end of them without ever looking again
-    /// (task F.1c). Each of these plants the second writer at a different prompt.
+    /// keypaste must look again before offering to delete the file at the end of them.
+    /// Each of these plants the second writer at a different prompt.
     /// </summary>
     /// <remarks>
     /// The refusal comes before the deletion question rather than after it, so nobody is asked
@@ -359,8 +355,7 @@ public sealed class EnvPullTests
     }
 
     /// <summary>
-    /// `File.Delete` does not throw for a file that is not there, so the old code reported a
-    /// deletion it had not performed.
+    /// `File.Delete` does not throw for a file that is not there, so its returning is no proof keypaste deleted anything.
     /// </summary>
     [Fact]
     public void Pull_WhenSomethingElseRemovedTheSource_SaysSo_RatherThanClaimingItDeletedIt()

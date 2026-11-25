@@ -8,8 +8,8 @@ namespace Keypaste.Core.Tests;
 /// <summary>
 /// Only a released set reaches a launcher, its values go into the child's environment over the
 /// parent's and nowhere else, and the terminal the app opens takes the command as an argument
-/// rather than as script text (E.1b); on macOS Terminal is opened on the bundle's launcher
-/// with nothing of the run in its arguments (E.1d).
+/// rather than as script text; on macOS Terminal is opened on the bundle's launcher
+/// with nothing of the run in its arguments.
 /// </summary>
 public sealed class EnvLaunchTests : IDisposable
 {

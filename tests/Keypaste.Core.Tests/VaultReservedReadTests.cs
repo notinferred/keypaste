@@ -4,7 +4,7 @@ namespace Keypaste.Core.Tests;
 
 /// <summary>
 /// keypaste's own groups are left out of every whole-vault read unless a caller asks for them, so no
-/// front end has to filter them (F.55).
+/// front end has to filter them.
 /// </summary>
 public sealed class VaultReservedReadTests : IDisposable
 {

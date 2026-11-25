@@ -189,14 +189,6 @@ internal sealed class McpHarness : IAsyncDisposable
         var channels = HarnessChannels.Open();
         _owned.Add(channels);
 
-        var serverOptions = new McpServerOptions
-        {
-            ServerInfo = new Implementation { Name = "keypaste", Version = CoreInfo.Version },
-            ServerInstructions = ToolText.ServerInstructions,
-            Capabilities = new ServerCapabilities { Tools = new ToolsCapability() },
-            ToolCollection = [],
-        };
-
         var first = options.Vaults.Count > 0 ? options.Vaults[0] : null;
         List<VaultRoute> routes = [new VaultRoute(first, _approver, new ApproverEntryNameSource(_approver, options, first))];
 
@@ -217,24 +209,9 @@ internal sealed class McpHarness : IAsyncDisposable
             ? new BridgeVaults([routes[0] with { Names = Source }], _inputEnded.Token)
             : _vaults;
 #pragma warning restore CA2000
-        serverOptions.ToolCollection.Add(new ListEntryNamesTool(listing, options, _audit));
-        serverOptions.ToolCollection.Add(new FindAccessTool(_vaults, options, _audit));
-        serverOptions.ToolCollection.Add(new RequestCredentialTool(options, _vaults, _audit));
-        serverOptions.ToolCollection.Add(new RequestCredentialTool(options, _vaults, _audit, attachments: true));
-        serverOptions.ToolCollection.Add(new RequestLinkedSetTool(options, _vaults, _audit));
-        serverOptions.ToolCollection.Add(new SaveValueTool(options, _vaults, _audit));
-        serverOptions.ToolCollection.Add(new RequestItemChangeTool(options, _vaults, _audit));
 
-        if (_vaults.Several)
-        {
-            serverOptions.ServerInstructions += ToolText.VaultsInstructions;
-        }
-
-        if (options.AllowRun)
-        {
-            serverOptions.ToolCollection.Add(new RunTool(options, _vaults, _audit));
-            serverOptions.ServerInstructions += ToolText.RunInstructions;
-        }
+        // The bridge's own tools and instructions, without its adopting orphans: after each run that kills every child the process still has, and this one has children that are not runs.
+        var serverOptions = BridgeEntry.McpOptionsFor(options, _vaults, _audit, listing);
 
         _tools = serverOptions.ToolCollection;
         _transcript = new TeeStream(channels.ServerWrites);
@@ -344,7 +321,7 @@ internal sealed class McpHarness : IAsyncDisposable
 }
 
 /// <summary>
-/// Stands in for the unlocked vault Stage 2.2 will provide, and counts its callers.
+/// Stands in for the vault's entry names, and counts its callers.
 /// </summary>
 /// <remarks>
 /// The call count is what makes "the locked path never touched the vault" directly assertable

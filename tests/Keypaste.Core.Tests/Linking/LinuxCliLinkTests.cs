@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Keypaste.Core.Tests.Linking;
 
-/// <summary>The Linux link starts this copy with every argument unchanged, and replaces only what keypaste wrote unless the person confirms (G.5).</summary>
+/// <summary>The Linux link starts this copy with every argument unchanged, and replaces only what keypaste wrote unless the person confirms.</summary>
 [UnsupportedOSPlatform("windows")]
 [Collection(nameof(ExecutesWhatItWrote))]
 public sealed class LinuxCliLinkTests : IDisposable

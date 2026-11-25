@@ -27,6 +27,7 @@ public sealed class LoginLookupTests
     [InlineData("https://bob.github.io/", "https://alice.github.io")]
     [InlineData("https://bucket.s3.amazonaws.com/", "https://amazonaws.com")]
     [InlineData("https://github.com/", "https://github.io")]
+    [InlineData("https://alice.github.io/", "https://github.io")]
     public void An_item_does_not_match_another_site_a_sibling_or_its_parent(string page, string item) =>
         Assert.False(Lookup(page).Matches(item));
 

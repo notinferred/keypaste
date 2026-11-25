@@ -11,7 +11,7 @@ using Xunit;
 namespace Keypaste.App.Tests.Session;
 
 /// <summary>
-/// 4.10a's and 4.10b's quick unlock in the session (D-0550 to D-0553, D-0681 to D-0683): a password unlock keeps the
+/// Quick unlock in the session: a password unlock keeps the
 /// key's parts sealed in memory under Windows Hello or Touch ID, a lock the person made or idleness leaves them and any
 /// other lock drops them and forgets their key, and a resume takes the vault's claim, asks for the key and opens the
 /// file as an unlock does.

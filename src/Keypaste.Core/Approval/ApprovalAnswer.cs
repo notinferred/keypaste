@@ -28,7 +28,7 @@ public enum ApprovalAnswer
 
     /// <summary>
     /// Another request was in front of a human and this one could not wait its turn: its agent already had
-    /// <see cref="ApprovalLimits.MaximumWaiting"/> waiting, or it names no agent and so never waits (F.80).
+    /// <see cref="ApprovalLimits.MaximumWaiting"/> waiting, or it names no agent and so never waits.
     /// </summary>
     Busy = 5,
 

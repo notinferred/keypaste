@@ -64,9 +64,10 @@ internal static class ApproveCommand
         "approve",
         "approve agents' requests in this terminal\n\n"
             + "unlocks your vault and waits. when an AI agent asks keypaste mcp for a credential, the request appears here "
-            + "and nothing is released until you say yes; Ctrl+C locks the vault again. each agent's settings, kept in "
-            + "the vault, decide what it can see and how it is asked, and every release is recorded; `keypaste clients` "
-            + "shows and changes them. your master password is typed here, never in a window an agent caused to appear.",
+            + "and nothing is released until you say yes; Ctrl+C locks the vault again. each agent's settings for this vault, "
+            + "kept on this computer and sealed with the vault's key, decide what it can see and how it is asked, and every "
+            + "release is recorded; `keypaste clients` shows and changes them. your master password is typed here, never in "
+            + "a window an agent caused to appear.",
         Execute)
     {
         CliOptions.Vault, CliOptions.Keyfile, CliOptions.Approver, _timeout,
@@ -171,7 +172,7 @@ internal static class ApproveCommand
                 Rules = rules,
                 Audit = () => audit,
                 AuditPath = audit.Path,
-                KeepLogDays = () => AppSettings.Load(KeypasteHome.SettingsPath(context.Environment.Get(KeypasteHome.EnvironmentVariable))).KeepLogDays,
+                KeepLogDays = () => LogRetention.KeptDays(context.Environment.Get(KeypasteHome.EnvironmentVariable)),
 
                 // `keypaste lock` ends the lifetime and stops the listener, the same way a signal does.
                 LockNow = () => Stop(lifetime, stop),
@@ -202,7 +203,7 @@ internal static class ApproveCommand
             using var watch = new VaultFileWatch(held);
 
             // A signal ends the lifetime and then stops the listener, rather than ending the
-            // process, so a waiting request is answered as locked, the vault is disposed and the
+            // process, so a waiting request is answered as locked, the vault is disposed and
             // nothing is abandoned mid-flight.
             var signals = LockOnSignals(lifetime, stop);
 

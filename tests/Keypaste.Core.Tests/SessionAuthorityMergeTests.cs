@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text;
 using KeePassLib;
 using KeePassLib.Keys;
@@ -14,7 +13,7 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// The owner merging another program's save, over a real pipe to a real vault (1.4b2): agents refused from the
+/// The owner merging another program's save, over a real pipe to a real vault: agents refused from the
 /// other program's save until the merged copy is saved, every grant ended and every request waiting on a person withdrawn as
 /// merged, the next request answered from the merged copy and asked again, and one line naming items and never a value.
 /// </summary>
@@ -266,29 +265,21 @@ public sealed class SessionAuthorityMergeTests : IDisposable
     /// <summary>The owner's server for this unlock, listening on a pipe of its own, its vault the test's open copy.</summary>
     private sealed class Owner : IAsyncDisposable
     {
-        private readonly CancellationTokenSource _stop = new();
-        private readonly SessionServer _server;
-        private readonly Task _running;
-        private readonly string _pipeName;
+        private readonly ServedOwner _served;
         private readonly string _vault;
 
-        private Owner(string pipeName, SessionServer server, string vault)
+        private Owner(ServedOwner served, string vault)
         {
-            _pipeName = pipeName;
-            _server = server;
+            _served = served;
             _vault = vault;
-            _running = server.RunAsync(_stop.Token);
         }
 
-        internal SessionAuthority Authority => _server.Authority;
+        internal SessionAuthority Authority => _served.Authority;
 
         internal static Owner Start(SessionAuthorityMergeTests test)
         {
-            var name = "keypaste-tests-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
-
             return new Owner(
-                name,
-                SessionServer.Listen(name, new SessionServerOptions
+                ServedOwner.Listen(new SessionServerOptions
                 {
                     Vault = VaultIdentity.Of(test._directory, test.VaultPath),
                     Lifetime = test._lifetime,
@@ -303,27 +294,12 @@ public sealed class SessionAuthorityMergeTests : IDisposable
 
         internal async Task<ApproverClient> AttachAsync()
         {
-            var client = await ApproverClient.TryConnectAsync(_pipeName, _wait, Token);
+            var client = await ApproverClient.TryConnectAsync(_served.PipeName, _wait, Token);
             Assert.NotNull(client);
             Assert.True((await client.AttachAsync(new AttachRequest(_vault), Token))?.Attached);
             return client;
         }
 
-        public async ValueTask DisposeAsync()
-        {
-            await _stop.CancelAsync();
-
-            try
-            {
-                await _running;
-            }
-            catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
-            {
-                // Tearing the listener down is how it stops.
-            }
-
-            _server.Dispose();
-            _stop.Dispose();
-        }
+        public ValueTask DisposeAsync() => _served.DisposeAsync();
     }
 }

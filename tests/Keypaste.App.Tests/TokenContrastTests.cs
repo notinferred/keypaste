@@ -8,7 +8,7 @@ using Xunit;
 namespace Keypaste.App.Tests;
 
 /// <summary>
-/// Enabled text keeps 4.5:1, and focus rings, control edges and status marks 3:1, on the grounds they sit on, in each palette (Q.8).
+/// Enabled text keeps 4.5:1, and focus rings, control edges and status marks 3:1, on the grounds they sit on, in each palette.
 /// </summary>
 public sealed class TokenContrastTests
 {
@@ -74,7 +74,7 @@ public sealed class TokenContrastTests
         .. _controlEdges.Select(edge => (edge.PointerOver, _raisedAtMost, _edge)),
     ];
 
-    /// <summary>Decorative lines around cards, tables, dividers, chips and read-only values, which WCAG 1.4.11 exempts and the Delight principle keeps quiet.</summary>
+    /// <summary>Decorative lines around cards, tables, dividers, chips and read-only values, which WCAG 1.4.11 exempts and the design keeps quiet so they do not compete with content.</summary>
     private static readonly (string Token, string[] Grounds)[] _decorative =
     [
         ("KpBorderSubtle", _raisedAtMost),

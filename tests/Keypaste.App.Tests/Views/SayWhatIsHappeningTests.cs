@@ -304,6 +304,8 @@ public sealed class SayWhatIsHappeningTests
 
     private static void AssertWaiting(Window window, string label)
     {
+        // A control shown since the last layout pass has no template, so no label or icon, until a pass applies it, and a drain may run none.
+        window.UpdateLayout();
         Assert.Contains(label, window.GetVisualDescendants().OfType<TextBlock>().Where(block => block.IsEffectivelyVisible).Select(block => block.Text));
         Assert.Contains(window.GetVisualDescendants().OfType<KpIcon>(), mark => mark.IsEffectivelyVisible && mark.Classes.Contains("spinning"));
     }

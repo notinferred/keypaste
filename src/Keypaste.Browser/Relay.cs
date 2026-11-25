@@ -38,6 +38,9 @@ internal sealed class Relay : IAsyncDisposable
     private const int _longestNewLoginUrl = 2048;
 
     private static readonly TimeSpan _connectTimeout = TimeSpan.FromMilliseconds(500);
+
+    // The extension gives a status check 500 ms in all, however many vaults are locked; an owner that is up keeps a listener waiting, so it answers at once.
+    private static readonly TimeSpan _statusConnectTimeout = TimeSpan.FromMilliseconds(50);
     private static readonly TimeSpan _answerBound = TimeSpan.FromSeconds((2 * ApprovalLimits.MaximumWindowSeconds) + 15);
     private static readonly JsonDocumentOptions _strict = new() { AllowDuplicateProperties = false };
 
@@ -250,7 +253,7 @@ internal sealed class Relay : IAsyncDisposable
     /// </summary>
     private async Task<byte[]> DatabaseHashAsync(byte[] replyNonce, bool knock, CancellationToken stop)
     {
-        if (await AttachAsync(knock, stop).ConfigureAwait(false) is null)
+        if (await AttachAsync(knock, _statusConnectTimeout, stop).ConfigureAwait(false) is null)
         {
             return Error(GetDatabaseHash, ExtensionError.DatabaseNotOpened);
         }
@@ -282,7 +285,7 @@ internal sealed class Relay : IAsyncDisposable
             return Error(Associate, ExtensionError.AssociationFailed);
         }
 
-        if (await AttachAsync(knock, stop).ConfigureAwait(false) is not { } session)
+        if (await AttachAsync(knock, _connectTimeout, stop).ConfigureAwait(false) is not { } session)
         {
             return Error(Associate, ExtensionError.DatabaseNotOpened);
         }
@@ -311,7 +314,7 @@ internal sealed class Relay : IAsyncDisposable
             return Error(TestAssociate, ExtensionError.AssociationFailed);
         }
 
-        if (await AttachAsync(knock, stop).ConfigureAwait(false) is not { } session)
+        if (await AttachAsync(knock, _statusConnectTimeout, stop).ConfigureAwait(false) is not { } session)
         {
             return Error(TestAssociate, ExtensionError.DatabaseNotOpened);
         }
@@ -432,7 +435,7 @@ internal sealed class Relay : IAsyncDisposable
             return Error(OpenKeypaste, ExtensionError.AssociationFailed);
         }
 
-        if (await AttachAsync(knock: true, stop).ConfigureAwait(false) is not { } session || session != paired.Session)
+        if (await AttachAsync(knock: true, _connectTimeout, stop).ConfigureAwait(false) is not { } session || session != paired.Session)
         {
             return Error(OpenKeypaste, ExtensionError.DatabaseNotOpened);
         }
@@ -464,7 +467,7 @@ internal sealed class Relay : IAsyncDisposable
             return (null, Error(action, ExtensionError.NoUrlProvided));
         }
 
-        if (await AttachAsync(knock, stop).ConfigureAwait(false) is not { } session)
+        if (await AttachAsync(knock, _connectTimeout, stop).ConfigureAwait(false) is not { } session)
         {
             return (null, Error(action, ExtensionError.DatabaseNotOpened));
         }
@@ -481,7 +484,7 @@ internal sealed class Relay : IAsyncDisposable
     /// <summary>Locks as <c>keypaste lock</c> does, asking nobody; the link's end then tells the extension it is locked.</summary>
     private async Task<byte[]> LockAsync(byte[] replyNonce, CancellationToken stop)
     {
-        if (await AttachAsync(knock: false, stop).ConfigureAwait(false) is not { } session)
+        if (await AttachAsync(knock: false, _connectTimeout, stop).ConfigureAwait(false) is not { } session)
         {
             return Error(LockDatabase, ExtensionError.DatabaseNotOpened);
         }
@@ -500,9 +503,9 @@ internal sealed class Relay : IAsyncDisposable
     /// <summary>
     /// Attaches as a browser's attachment to a session holding one of the vaults, connecting when need be, and returns it; or,
     /// with nothing holding any of them unlocked, knocks on the locked app's pipe when the extension asked to unlock and
-    /// returns null.
+    /// returns null. Each vault's pipe is waited on for at most <paramref name="connectTimeout"/>.
     /// </summary>
-    private async Task<string?> AttachAsync(bool knock, CancellationToken stop)
+    private async Task<string?> AttachAsync(bool knock, TimeSpan connectTimeout, CancellationToken stop)
     {
         if (_link is { IsSpent: true })
         {
@@ -513,7 +516,7 @@ internal sealed class Relay : IAsyncDisposable
         // on another that is unlocked.
         foreach (var vault in _options.Vaults.OrderBy(vault => vault == _reached ? 0 : 1))
         {
-            if (await AttachThroughAsync(vault, stop).ConfigureAwait(false) is { } session)
+            if (await AttachThroughAsync(vault, connectTimeout, stop).ConfigureAwait(false) is { } session)
             {
                 return session;
             }
@@ -536,7 +539,7 @@ internal sealed class Relay : IAsyncDisposable
     }
 
     /// <summary>Attaches to the session holding <paramref name="vault"/>, connecting when need be, or returns null when its owner does not.</summary>
-    private async Task<string?> AttachThroughAsync(RelayVault vault, CancellationToken stop)
+    private async Task<string?> AttachThroughAsync(RelayVault vault, TimeSpan connectTimeout, CancellationToken stop)
     {
         if (_link is not null && vault != _reached)
         {
@@ -547,7 +550,7 @@ internal sealed class Relay : IAsyncDisposable
 
         for (var attempt = 0; attempt < 2; attempt++)
         {
-            _link ??= await BrowserLink.TryConnectAsync(vault.PipeName, _connectTimeout, stop).ConfigureAwait(false);
+            _link ??= await BrowserLink.TryConnectAsync(vault.PipeName, connectTimeout, stop).ConfigureAwait(false);
 
             if (_link is null)
             {
@@ -666,7 +669,7 @@ internal sealed class Relay : IAsyncDisposable
 
     /// <summary>
     /// A page's list as KeePassXC lists logins, each with its username, title and UUID, an empty password and, while several vaults
-    /// are open, its vault; then the open vaults that are locked, the page's site and why every fill there is asked, if it is.
+    /// are open, its vault; then the open vaults that are locked, the page's site and the warning the list shows before a pick, if there is one.
     /// </summary>
     private static void WriteNames(Utf8JsonWriter writer, BrowserListReply reply, string pairing)
     {

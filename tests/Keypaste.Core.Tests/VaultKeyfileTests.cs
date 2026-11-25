@@ -37,7 +37,7 @@ public sealed class VaultKeyfileTests : IDisposable
 
     private string Path(string name) => System.IO.Path.Combine(_directory, name);
 
-    /// <summary>A KeePass XML keyfile, the form keypaste will itself write in V.1a2.</summary>
+    /// <summary>A KeePass XML keyfile, the form keypaste itself writes.</summary>
     private string XmlKeyfile(string name = "key.keyx")
     {
         var path = Path(name);
@@ -232,7 +232,7 @@ public sealed class VaultKeyfileTests : IDisposable
     }
 
     /// <summary>
-    /// The regression for the whole of V.1a1's key handling.
+    /// The regression for keypaste's keyfile key handling as a whole.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -244,8 +244,8 @@ public sealed class VaultKeyfileTests : IDisposable
     /// <para>
     /// <b>The fixture must not come from keypaste.</b> A vault written through <c>BuildKey</c> and
     /// read back through <c>BuildKey</c> agrees with itself whatever <c>BuildKey</c> does, so a
-    /// test built that way passes with the guard removed and proves nothing — which is exactly what
-    /// the first version of this test did. <see cref="PasswordlessVault"/> therefore builds the
+    /// test built that way passes with the guard removed and proves nothing.
+    /// <see cref="PasswordlessVault"/> therefore builds the
     /// composite key with the vendored library directly, the way KeePassXC does.
     /// </para>
     /// </remarks>
@@ -370,8 +370,7 @@ public sealed class VaultKeyfileTests : IDisposable
     /// A vault protected by a password and a keyfile.
     /// </summary>
     /// <remarks>
-    /// Written through <c>Vault.CreateWith</c>, the internal seam V.1a2 will build its
-    /// <c>keypaste access</c> verb on. There is no public way to attach a keyfile yet, and a test
+    /// Written through <c>Vault.CreateWith</c>, keypaste's own writer, because a test
     /// that reached around the writer to make its own fixture would be testing its own fixture.
     /// </remarks>
     private string CreateWith(string name, string password, string keyfile)

@@ -12,7 +12,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- hold draws the app's own prompt window on a headless display and clicks it (4.4). -->
+    <!-- hold draws the app's own prompt window on a headless display and clicks it. -->
     <PackageReference Include="Avalonia.Headless" />
   </ItemGroup>
 

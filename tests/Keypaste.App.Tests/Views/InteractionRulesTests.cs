@@ -10,7 +10,7 @@ using Xunit;
 
 namespace Keypaste.App.Tests.Views;
 
-/// <summary>The design system's interaction rules as the screens now keep them (Q.19 stage 3): a field's label and error, a wait, the amber, and the menus.</summary>
+/// <summary>The design system's interaction rules as the screens keep them: a field's label and error, a wait, the amber, and the menus.</summary>
 public sealed partial class InteractionRulesTests
 {
     private const string _github = "github";
