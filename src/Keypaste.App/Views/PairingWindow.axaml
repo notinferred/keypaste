@@ -69,7 +69,7 @@
         <Button Name="Deny" Classes="claim keyed" Content="Deny" Tag="esc"
                 IsCancel="True" Command="{Binding DenyCommand}" />
         <Button Name="Allow" Classes="claim primary" Content="Pair"
-                Command="{Binding AllowCommand}" />
+                Command="{Binding AllowOnceCommand}" />
       </StackPanel>
       <ProgressBar Name="TimeBar" Classes="claim-time" Value="{Binding TimeLeft}" AutomationProperties.Name="{Binding DeniesIn}" />
     </StackPanel>

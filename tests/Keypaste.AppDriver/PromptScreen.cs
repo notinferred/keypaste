@@ -88,8 +88,8 @@ internal sealed class PromptScreen : IDisposable
                         });
                         var armedBy = DateTime.UtcNow + _armingWait;
 
-                        // A person reads the prompt before allowing it, which is armed a moment after it appears.
-                        while (!allow.IsEffectivelyEnabled)
+                        // An allow can be clicked once the prompt has been in front a moment, and a picker's once an item is picked.
+                        while (!allow.IsEffectivelyEnabled || window is PromptWindow { HasBeenInFront: false })
                         {
                             if (DateTime.UtcNow > armedBy)
                             {
@@ -114,7 +114,7 @@ internal sealed class PromptScreen : IDisposable
 
     /// <summary>
     /// Waits until the prompt on screen is armed, then presses Show the prompt on Agents through
-    /// <paramref name="press"/> on this display's thread, and says whether the prompt is then armed and which
+    /// <paramref name="press"/> on this display's thread, and says whether the prompt is then armed for keys and which
     /// of its buttons holds focus: <c>prompt raised armed=false focus=Deny</c> is what a bring-forward must do.
     /// </summary>
     internal Task<string> RaiseAsync(Action press) =>
@@ -122,15 +122,14 @@ internal sealed class PromptScreen : IDisposable
             async () =>
             {
                 var window = _open ?? throw new DriverException("no prompt is on screen");
-                var allow = new[] { "AllowOnce", "Allow" }.Select(window.FindControl<Button>).FirstOrDefault(button => button is { IsVisible: true })
-                    ?? throw new DriverException("the prompt has no allow button");
+                var prompt = window.DataContext as PromptViewModel ?? throw new DriverException("the window on screen is not a prompt");
                 var armedBy = DateTime.UtcNow + _armingWait;
 
-                while (!allow.IsEffectivelyEnabled)
+                while (!prompt.IsArmed)
                 {
                     if (DateTime.UtcNow > armedBy)
                     {
-                        throw new DriverException($"{allow.Name} never became pressable");
+                        throw new DriverException("the prompt never armed");
                     }
 
                     await Task.Delay(50).ConfigureAwait(true);
@@ -139,7 +138,7 @@ internal sealed class PromptScreen : IDisposable
                 press();
                 Dispatcher.UIThread.RunJobs();
                 var focus = new[] { "Deny", "AllowOnce", "AlwaysAllow", "Allow" }.FirstOrDefault(name => window.FindControl<Button>(name)?.IsFocused == true) ?? "elsewhere";
-                return $"prompt raised armed={(allow.IsEffectivelyEnabled ? "true" : "false")} focus={focus}";
+                return $"prompt raised armed={(prompt.IsArmed ? "true" : "false")} focus={focus}";
             });
 
     private void OnShown(object? sender, Window window)

@@ -48,12 +48,11 @@ public sealed partial class BrowserPairingTests
         Assert.Equal("Pair only if Chrome shows the same code.", Text(window, "CheckText"));
         Assert.Equal("keypaste's extension from the Chrome Web Store (kabnajpeogcbndlfgibmhiichfkgpdla)", Text(window, "IdentityText"));
         Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
-        Assert.False(window.FindControl<Button>("Allow")!.IsEffectivelyEnabled);
+        Assert.True(window.FindControl<Button>("Allow")!.IsEffectivelyEnabled);
         Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(), button => button.IsDefault);
         Assert.False(string.IsNullOrEmpty(window.FindControl<TextBox>("NameBox")!.Text));
 
         window.FindControl<TextBox>("NameBox")!.Text = "work laptop";
-        await app.ArmAsync("Allow");
         Click(window, "Allow");
 
         var reply = await pairing.WaitAsync(_wait, Token);
@@ -207,7 +206,7 @@ public sealed partial class BrowserPairingTests
         var window = Assert.IsType<FillWindow>(await app.PromptAsync(2));
 
         Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
-        Assert.False(window.FindControl<Button>("Allow")!.IsEffectivelyEnabled);
+        Assert.True(window.FindControl<Button>("Allow")!.IsEffectivelyEnabled);
         Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(), button => button.IsDefault);
         var title = window.FindControl<TextBlock>("TitleText")!;
         Assert.Equal("Fill on github.com?", title.Inlines!.OfType<Avalonia.Controls.Documents.Run>().Aggregate(string.Empty, (text, run) => text + run.Text).Replace("\u200b", string.Empty, StringComparison.Ordinal));
@@ -215,7 +214,6 @@ public sealed partial class BrowserPairingTests
         Assert.Equal("https://github.com:443", window.FindControl<TextBlock>("OriginText")!.Text);
         Assert.DoesNotContain(window.GetVisualDescendants().OfType<TextBlock>(), text => (text.Text ?? string.Empty).Contains("s3cret", StringComparison.Ordinal));
 
-        await app.ArmAsync("Allow");
         Click(window, "Allow");
 
         var reply = await filling.WaitAsync(_wait, Token);
@@ -236,7 +234,7 @@ public sealed partial class BrowserPairingTests
 
         var filling = link.ReleaseAsync(Release(app, "https://github.com/login", item), Token).AsTask();
         var window = Assert.IsType<FillWindow>(await app.PromptAsync(2));
-        await app.ArmAsync("Allow");
+        await app.ArmAsync();
         Click(window, "Allow");
         Assert.Single((await filling.WaitAsync(_wait, Token))!.Logins);
         await PromptedApp.WithdrawnAsync(window);
@@ -287,7 +285,7 @@ public sealed partial class BrowserPairingTests
         var pairing = link.PairAsync(Pair(app), Token).AsTask();
         var window = await app.PromptAsync(app.Windows.Count + 1);
         window.FindControl<TextBox>("NameBox")!.Text = name;
-        await app.ArmAsync("Allow");
+        await app.ArmAsync();
         Click(window, "Allow");
         Assert.Equal(name, (await pairing.WaitAsync(_wait, Token))?.Pairing);
         await PromptedApp.WithdrawnAsync(window);

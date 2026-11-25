@@ -20,7 +20,7 @@
 #   project-run    the item tagged into a project, whose Run starts a child that receives the field   field
 #   edit-rerun     the value replaced, and the next Run's child receives the new one                  project-run
 #   connect        Agents' Connect registers Claude Code pinned to this vault; that command answers   first-run
-#   approve-deny   Allow disarmed without focus, its request allowed once, a second one denied            connect, field
+#   approve-deny   Allow off without focus, a click only focusing it, its request allowed once, one denied connect, field
 #   restore        a revision, an item from Trash and a backup restored                               field
 #   change-access  the master password changed in Settings: the old one refused, the new one unlocks  first-run
 #   lock-refused   Lock, and a request after it refused as the locked app's no-approver      connect
@@ -213,9 +213,9 @@ evidence_approve_deny() {
   expected="$(fact_of "$d" approve-deny expected_sha256)"
   allowed="$(fact_of "$d" approve-deny allow_sha256)"
   if [ "$(fact_of "$d" approve-deny allow_unfocused)" != 'not enabled' ]; then
-    contradict "with focus on another window, past the arming delay, Allow once read '$(fact_of "$d" approve-deny allow_unfocused)', not 'not enabled'"
+    contradict "with focus on another window, however long it waited, Allow once read '$(fact_of "$d" approve-deny allow_unfocused)', not 'not enabled'"
   elif [ "$(fact_of "$d" approve-deny allow_activated)" != enabled ]; then
-    contradict "after activation and its second, Allow once read '$(fact_of "$d" approve-deny allow_activated)', not 'enabled'"
+    contradict "after a click brought the prompt forward, Allow once read '$(fact_of "$d" approve-deny allow_activated)', not 'enabled'"
   elif [ "$(fact_of "$d" approve-deny allow_error)" != false ]; then contradict 'the request allowed once came back as an error'
   elif [ "$allowed" != "$expected" ]; then contradict "the client received a value whose SHA-256 is ${allowed:-none}, not the field's $expected"
   elif [ "$(fact_of "$d" approve-deny allow_audit)" != granted/prompt ]; then
@@ -224,7 +224,7 @@ evidence_approve_deny() {
   elif [ "$(fact_of "$d" approve-deny deny_value)" != none ]; then contradict 'the denied request carried a value'
   elif [ "$(fact_of "$d" approve-deny deny_audit)" != denied/prompt ]; then
     contradict "the audit log records the denied request as $(fact_of "$d" approve-deny deny_audit), not denied/prompt"
-  else pass "Allow once read not enabled without focus and enabled after activation and its second, then released the field's value to the client, and Deny released nothing, each read back from the client's reply and the audit log"
+  else pass "Allow once read not enabled without focus and enabled once a click brought the prompt forward, then released the field's value to the client, and Deny released nothing, each read back from the client's reply and the audit log"
   fi
 }
 
@@ -1131,12 +1131,12 @@ act_approve_deny() {
   mcp_request 3 'R.1a: a request a person allows once'
   attempt prompt drive --window "$PROMPT" window 60 || { mcp_finish; return 1; }
   screenshot approve-prompt "$PROMPT"
-  # A real click on the app's main window takes focus with no second app; the wait passes the arming delay, which a prompt without focus must not count.
+  # A real click on the app's main window takes focus with no second app; however long the prompt waits without focus, no allow can be pressed.
   attempt main-front drive click id:RailNav || { mcp_finish; return 1; }
   allow_reading 'not enabled' 15 > /dev/null
   sleep 2
   fact allow_unfocused "$(allow_reading 'not enabled' 0)"
-  # A person's click on the disarmed allow activates it, and it arms a second later; macOS's accessibility focus moves no key window between one app's windows.
+  # A person's click on the allow of a prompt not in front only brings it forward; macOS's accessibility focus moves no key window between one app's windows.
   attempt prompt-front drive --window "$PROMPT" click id:AllowOnce || { mcp_finish; return 1; }
   fact allow_activated "$(allow_reading enabled 15)"
   attempt allow drive --window "$PROMPT" invoke id:AllowOnce || { mcp_finish; return 1; }

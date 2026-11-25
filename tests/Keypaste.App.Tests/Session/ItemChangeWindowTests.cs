@@ -12,7 +12,7 @@ namespace Keypaste.App.Tests.Session;
 
 /// <summary>
 /// An agent's change to an item in the app's own prompt window (T-57): the agent, the item and the change in keypaste's words,
-/// focus on Deny, Allow armed a second after the prompt is up, and Deny changing nothing.
+/// focus on Deny, Allow answering a click as soon as the prompt is up, and Deny changing nothing.
 /// </summary>
 public sealed class ItemChangeWindowTests
 {
@@ -24,7 +24,7 @@ public sealed class ItemChangeWindowTests
         ItemChangePrompt.For("Claude Code", "claude-code", new EntryName("cloud", "aws-prod"), new ItemChange(kind, new DateOnly(2026, 12, 1)), "the key is due for rotation");
 
     [Fact]
-    public Task Allow_is_armed_a_second_after_the_prompt_is_up_and_Deny_changes_nothing() =>
+    public Task A_click_on_Allow_answers_at_once_and_Deny_changes_nothing() =>
         HeadlessSession.On(async () =>
         {
             var clock = new ManualClock(AppClock.Start);
@@ -33,17 +33,13 @@ public sealed class ItemChangeWindowTests
             channel.Shown += (_, window) => shown.Add(window);
 
             var allowing = channel.AskAsync(Prompt(ItemChangeKind.MarkExpired), Token).AsTask();
-            await PromptedApp.UntilAsync(() => shown.Count == 1);
+            await PromptedApp.UntilAsync(() => shown.Count == 1 && IsInFront(shown[0]));
             var window = Assert.IsType<ItemChangeWindow>(shown[0]);
             DrawnFrame.Capture(window);
 
             Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
             Assert.Equal("Mark cloud/aws-prod as expired on 2026-12-01", Text(window, "ChangeText"));
             Assert.Equal("Claude Code", Text(window, "ClientText"));
-            Assert.False(window.FindControl<Button>("Allow")!.IsEffectivelyEnabled);
-
-            clock.Advance(Keypaste.App.ViewModels.PromptViewModel.ArmingDelay);
-            await PromptedApp.UntilAsync(() => window.FindControl<Button>("Allow")!.IsEffectivelyEnabled);
             Click(window, "Allow");
 
             Assert.Equal(ApprovalAnswer.ApprovedOnce, await allowing.WaitAsync(_wait, Token));

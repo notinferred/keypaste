@@ -160,7 +160,7 @@ public sealed class FourPlacesJourneyTests
             var reply = client.RequestAsync(Request(vault, session), Token).AsTask();
             await Until(() => lifetime.Windows.Any(window => window is ApprovalWindow { IsVisible: true }));
             var prompt = lifetime.Windows.OfType<ApprovalWindow>().Single(window => window.IsVisible);
-            await Until(() => prompt.FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled);
+            await Until(() => prompt.FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled && prompt.HasBeenInFront);
             DesktopApprovalTests.Click(prompt, "AllowOnce");
             var answered = await reply.WaitAsync(Wait, Token);
             Assert.Equal(AuditDecision.Granted, answered!.Decision);

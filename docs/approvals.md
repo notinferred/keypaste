@@ -66,10 +66,10 @@ An allow counts only after the choices have been on screen for a second, so a ke
 
 ### In the desktop app
 
-A card opens over whatever you are doing, such as "Give claude-code STRIPE_SECRET_KEY?", with the item, its vault and the agent's own words. It offers Deny, Allow once and, for a labelled agent, Always allow, which asks once to confirm. Protected stages, commands and linked sets offer no Always allow. To block a kind of value, use the agent's page in Agents.
+A card opens over whatever you are doing, such as "Give claude-code STRIPE_SECRET_KEY?", with the item, its vault and the agent's own words. It offers Deny, Allow once and, for a labelled agent, Always allow, which keeps that answer at once. Protected stages, commands and linked sets offer no Always allow. To block a kind of value, use the agent's page in Agents.
 
 - **Verified** means keypaste checked with the system that the asker is keypaste's own `keypaste`, started by the tool the label names. Otherwise it says **Not verified**. Verified changes no rule ([THREATS](../THREATS.md) T-3).
-- Focus starts on Deny, and the allows arm a second after the card gains focus.
+- Focus starts on Deny. A click on an allow works once the card has had focus for 0.3 seconds; Return and Space wait a second.
 - Deny, Escape, closing the card, the timer, a lock or quitting each refuse.
 - Agents lists waiting requests under Waiting for you; you answer only in the card.
 

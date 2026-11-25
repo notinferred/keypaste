@@ -35,9 +35,9 @@ public sealed class SetApprovalWindowTests
     public Task The_window_shows_every_field_and_offers_Deny_and_Allow_once_alone() =>
         HeadlessSession.On(async () =>
         {
-            var (channel, shown) = Channel(out var clock);
+            var (channel, shown) = Channel(out _);
             var asking = channel.AskAsync(Prompt(), Token).AsTask();
-            await PromptedApp.UntilAsync(() => shown.Count == 1);
+            await PromptedApp.UntilAsync(() => shown.Count == 1 && IsInFront(shown[0]));
             var window = Assert.IsType<SetApprovalWindow>(shown[0]);
             DrawnFrame.Capture(window);
 
@@ -55,12 +55,6 @@ public sealed class SetApprovalWindowTests
             Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
 
             Click(window, "AllowOnce");
-            await Task.Delay(100, Token);
-            Assert.False(asking.IsCompleted, "a click before the prompt was armed answered it");
-
-            clock.Advance(PromptViewModel.ArmingDelay);
-            await PromptedApp.UntilAsync(() => window.FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled);
-            Click(window, "AllowOnce");
 
             Assert.Equal(ApprovalAnswer.ApprovedOnce, await asking.WaitAsync(_wait, Token));
             await PromptedApp.WithdrawnAsync(window);
@@ -73,12 +67,12 @@ public sealed class SetApprovalWindowTests
             var (channel, shown) = Channel(out var clock);
 
             var entered = channel.AskAsync(Prompt(), Token).AsTask();
-            await PromptedApp.UntilAsync(() => shown.Count == 1);
+            await PromptedApp.UntilAsync(() => shown.Count == 1 && IsInFront(shown[0]));
             Key(shown[0], PhysicalKey.Enter);
             await Task.Delay(100, Token);
             Assert.False(entered.IsCompleted, "Return before the prompt was armed answered it");
             clock.Advance(PromptViewModel.ArmingDelay);
-            await PromptedApp.UntilAsync(() => shown[0].FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled);
+            await PromptedApp.UntilAsync(() => IsArmed(shown[0]));
             Key(shown[0], PhysicalKey.Enter);
             Assert.Equal(ApprovalAnswer.ApprovedOnce, await entered.WaitAsync(_wait, Token));
 
@@ -101,7 +95,7 @@ public sealed class SetApprovalWindowTests
             using var withdraw = CancellationTokenSource.CreateLinkedTokenSource(Token);
 
             var asking = channel.AskAsync(Prompt(), withdraw.Token).AsTask();
-            await PromptedApp.UntilAsync(() => shown.Count == 1);
+            await PromptedApp.UntilAsync(() => shown.Count == 1 && IsInFront(shown[0]));
             await withdraw.CancelAsync();
 
             Assert.Equal(ApprovalAnswer.Denied, await asking.WaitAsync(_wait, Token));

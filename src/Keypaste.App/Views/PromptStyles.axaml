@@ -181,7 +181,7 @@
   </Style>
 
   <!-- The time left to answer: a bar along the card's bottom edge that drains, quiet, since the card's one accent is its answer.
-       While the allows arm it is fainter, so the wait shows there and the buttons keep their look. -->
+       While a key cannot yet press an allow it is fainter, so the wait shows there and the buttons keep their look. -->
   <Style Selector="ProgressBar.claim-time">
     <Setter Property="MinHeight" Value="3" />
     <Setter Property="Height" Value="3" />
@@ -356,8 +356,8 @@
     <Setter Property="Foreground" Value="{DynamicResource KpTextDisabled}" />
     <Setter Property="Opacity" Value="1" />
   </Style>
-  <!-- While arming, the buttons keep the look they will have: the time bar shows the wait. An allow that waits for more than
-       arming, as a picker's does for a pick, is greyed as any disabled button is. -->
+  <!-- While arming, an allow waiting only for the window to come in front keeps the look it will have. An allow that waits for
+       more, as a picker's does for a pick, is greyed as any disabled button is. -->
   <Style Selector="Border.claim.arming Button.claim:disabled /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource ButtonBackground}" />
     <Setter Property="BorderBrush" Value="{DynamicResource ButtonBorderBrush}" />

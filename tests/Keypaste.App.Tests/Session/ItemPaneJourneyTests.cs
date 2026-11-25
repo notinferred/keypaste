@@ -121,7 +121,7 @@ public sealed class ItemPaneJourneyTests
                 var reply = quiet.RequestAsync(Request(vault, session), Token).AsTask();
                 await Until(() => lifetime.Windows.Any(window => window is ApprovalWindow { IsVisible: true }));
                 var prompt = lifetime.Windows.OfType<ApprovalWindow>().Single(window => window.IsVisible);
-                await Until(() => prompt.FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled);
+                await Until(() => prompt.FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled && prompt.HasBeenInFront);
                 DesktopApprovalTests.Click(prompt, "AllowOnce");
                 Assert.Equal(AuditDecision.Granted, (await reply.WaitAsync(_wait, Token))!.Decision);
             }

@@ -45,7 +45,7 @@ public enum AuditMethod
     /// <summary>A person was shown this specific request and answered it (SECURITY.md law 2).</summary>
     Prompt = 5,
 
-    /// <summary>Released without asking by an Always allow row a person confirmed, never a person's
+    /// <summary>Released without asking by an Always allow row a person chose, never a person's
     /// approval of this request. It records the reason given for <em>this</em> request, the one nobody read.</summary>
     AlwaysAllowed = 6,
 

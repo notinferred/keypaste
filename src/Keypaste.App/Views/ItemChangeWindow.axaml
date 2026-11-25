@@ -79,11 +79,10 @@
       <Border Classes="claim-rule" />
 
       <StackPanel Classes="claim-foot">
-        <Button Name="Deny" Classes="claim keyed" Content="Deny" Tag="esc"
-                IsVisible="{Binding IsChoosing}" Command="{Binding DenyCommand}" />
+        <Button Name="Deny" Classes="claim keyed" Content="Deny" Tag="esc" Command="{Binding DenyCommand}" />
         <Button Name="Allow" Classes="claim keyed" Classes.primary="{Binding !DeletesForGood}" Classes.danger="{Binding DeletesForGood}"
                 Content="{Binding AllowLabel}" Tag="{Binding AllowKey}"
-                IsVisible="{Binding IsChoosing}" Command="{Binding AllowOnceCommand}" />
+                Command="{Binding AllowOnceCommand}" />
       </StackPanel>
       <ProgressBar Name="TimeBar" Classes="claim-time" Value="{Binding TimeLeft}" AutomationProperties.Name="{Binding DeniesIn}" />
     </StackPanel>

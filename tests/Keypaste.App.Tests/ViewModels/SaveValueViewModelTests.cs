@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
 
-/// <summary>A save prompt saves nothing until a value is entered, it has armed, and a replace is confirmed; Cancel saves nothing (F.79).</summary>
+/// <summary>A save prompt saves nothing until a value is entered and a replace is confirmed; Cancel saves nothing (F.79).</summary>
 public sealed class SaveValueViewModelTests
 {
     private readonly FakeClipboard _clipboard = new();
@@ -16,11 +16,10 @@ public sealed class SaveValueViewModelTests
         SavePrompt.For("Claude Code", "claude-code", "work/stripe", "STRIPE_KEY", "the new key") with { Replaces = replaces };
 
     [Fact]
-    public async Task Save_needs_a_value_and_the_arming_and_gives_back_what_was_entered()
+    public async Task Save_needs_a_value_and_gives_back_what_was_entered()
     {
-        using var prompt = new SaveValueViewModel(Prompt(replaces: false), _clipboard, _clock);
+        using var prompt = new SaveValueViewModel(Prompt(replaces: false), _clipboard, _clock) { IsInFront = true };
 
-        prompt.Arm();
         Assert.False(prompt.AllowOnceCommand.CanExecute(null));
 
         foreach (var key in "sk_new")
@@ -38,8 +37,7 @@ public sealed class SaveValueViewModelTests
     [Fact]
     public void A_replace_saves_only_once_the_person_confirms_it()
     {
-        using var prompt = new SaveValueViewModel(Prompt(replaces: true), _clipboard, _clock);
-        prompt.Arm();
+        using var prompt = new SaveValueViewModel(Prompt(replaces: true), _clipboard, _clock) { IsInFront = true };
         prompt.GenerateCommand.Execute(null);
 
         Assert.True(prompt.Value.HasValue);

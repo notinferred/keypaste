@@ -449,30 +449,80 @@ public sealed class DesktopApprovalTests
             Assert.Empty(app.Windows);
         });
 
+    /// <summary>A click on Allow once in a prompt already in front answers at once: the arming second holds back keys alone.</summary>
     [Fact]
-    public Task Approve_is_not_armed_until_the_prompt_has_been_up_for_a_second() =>
+    public Task A_click_on_Allow_once_in_a_prompt_in_front_answers_at_once() =>
         HeadlessSession.On(async () =>
         {
             await using var app = await PromptedApp.StartAsync();
             var reply = app.Ask();
             var window = await app.PromptAsync();
 
-            Click(window, "AllowOnce");
-            app.Clock.Advance(PromptViewModel.ArmingDelay - TimeSpan.FromMilliseconds(1));
-            WindowInput.Drain();
-            Click(window, "AllowOnce");
-            await Task.Delay(200, Token);
-            Assert.False(reply.IsCompleted, "a click before the prompt was armed answered it");
-
-            await app.ArmAsync();
+            Assert.True(IsInFront(window));
+            AssertDisarmed(window);
             Click(window, "AllowOnce");
 
             Assert.Equal(AuditDecision.Granted, (await reply.WaitAsync(_wait, Token))!.Decision);
         });
 
     /// <summary>
-    /// Show the prompt on Agents raises the waiting prompt with focus on Deny and every allow disarmed, so a click aimed
-    /// at the button cannot land on an allow; they arm again a second later, and nothing moves (T-2, T-11).
+    /// A click on Allow once in a prompt behind another window only brings the prompt forward, focused on Deny: its allows
+    /// cannot be pressed, by a click or a screen reader's invoke, until the window is in front, and then a click answers (T-11).
+    /// </summary>
+    [Fact]
+    public Task A_click_on_Allow_once_in_a_prompt_not_in_front_brings_it_forward_and_answers_nothing() =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            var reply = app.Ask();
+            var window = await app.PromptAsync();
+            WindowInput.Deactivate(window);
+            WindowInput.Drain();
+
+            Assert.False(IsInFront(window));
+            Assert.False(window.FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled);
+            Click(window, "AllowOnce");
+            await Task.Delay(100, Token);
+
+            Assert.False(reply.IsCompleted, "a click on a prompt not in front answered it");
+            Assert.True(window.IsActive);
+            Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
+
+            await PromptedApp.UntilAsync(() => IsInFront(window));
+            Click(window, "AllowOnce");
+            Assert.Equal(AuditDecision.Granted, (await reply.WaitAsync(_wait, Token))!.Decision);
+        });
+
+    /// <summary>
+    /// A platform delivers the press that activates a window with the activation or just after it, as macOS does with a first
+    /// click and Windows with a click on a window behind; a click presses an allow only once the window has had focus a moment.
+    /// </summary>
+    [Fact]
+    public Task A_press_delivered_with_the_activation_answers_nothing() =>
+        HeadlessSession.On(async () =>
+        {
+            await using var app = await PromptedApp.StartAsync();
+            var reply = app.Ask();
+            var window = await app.PromptAsync();
+            WindowInput.Deactivate(window);
+            WindowInput.Drain();
+            var allow = window.FindControl<Button>("AllowOnce")!;
+            var centre = allow.TranslatePoint(new Point(allow.Bounds.Width / 2, allow.Bounds.Height / 2), window)!.Value;
+
+            window.Activate();
+            window.MouseDown(centre, MouseButton.Left);
+            window.MouseUp(centre, MouseButton.Left);
+            WindowInput.Drain();
+            await Task.Delay(100, Token);
+
+            Assert.False(reply.IsCompleted, "a press that came with the activation answered the prompt");
+            Click(window, "Deny");
+            await reply.WaitAsync(_wait, Token);
+        });
+
+    /// <summary>
+    /// Show the prompt on Agents raises the waiting prompt with focus on Deny and its keys disarmed, so a keystroke meant for
+    /// another window cannot press an allow; they arm again a second later, and nothing moves (T-2, T-11).
     /// </summary>
     [Fact]
     public Task Bringing_the_prompt_forward_disarms_it_focuses_Deny_and_arms_it_a_second_later() =>
@@ -488,27 +538,27 @@ public sealed class DesktopApprovalTests
             Assert.True(app.Authority.ShowPrompt());
             WindowInput.Drain();
 
-            Assert.All(new[] { "AllowOnce" }, name => Assert.False(window.FindControl<Button>(name)!.IsEffectivelyEnabled, $"{name} stayed armed"));
+            AssertDisarmed(window);
             Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
             Assert.Equal(places, Places(window));
 
-            Click(window, "AllowOnce");
+            Key(window, PhysicalKey.Enter);
             app.Clock.Advance(PromptViewModel.ArmingDelay - TimeSpan.FromMilliseconds(1));
-            WindowInput.Drain();
-            Click(window, "AllowOnce");
             await Task.Delay(200, Token);
-            Assert.False(reply.IsCompleted, "a click within a second of bringing the prompt forward answered it");
+            WindowInput.Drain();
+            Key(window, PhysicalKey.Enter);
+            Assert.False(reply.IsCompleted, "Return within a second of bringing the prompt forward answered it");
 
             app.Clock.Advance(TimeSpan.FromMilliseconds(1));
-            await PromptedApp.UntilAsync(() => window.FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled);
-            Click(window, "AllowOnce");
+            await PromptedApp.UntilAsync(() => IsArmed(window));
+            Key(window, PhysicalKey.Enter);
 
             Assert.Equal(AuditDecision.Granted, (await reply.WaitAsync(_wait, Token))!.Decision);
         });
 
     /// <summary>
-    /// A prompt another window takes focus from is drawn inactive and disarmed, however long it waits, and nothing moves; a click that brings it
-    /// back lands on Deny's side of the second, and the allows arm only a second after the activation (T-2, T-11).
+    /// A prompt another window takes focus from is drawn inactive and its keys disarmed, however long it waits, and nothing moves; once it is
+    /// activated again, Return presses nothing until a second after the activation (T-2, T-11).
     /// </summary>
     [Fact]
     public Task A_prompt_without_focus_stays_disarmed_until_a_second_after_it_is_activated() =>
@@ -531,8 +581,6 @@ public sealed class DesktopApprovalTests
             await Task.Delay(100, Token);
             WindowInput.Drain();
             AssertDisarmed(window);
-            Click(window, "AllowOnce");
-            Assert.False(reply.IsCompleted, "a click on a prompt without focus answered it");
 
             window.Activate();
             WindowInput.Drain();
@@ -540,18 +588,19 @@ public sealed class DesktopApprovalTests
             Assert.DoesNotContain("inactive", window.Classes);
             Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
             AssertDisarmed(window);
-            Click(window, "AllowOnce");
+            Key(window, PhysicalKey.Enter);
 
             app.Clock.Advance(PromptViewModel.ArmingDelay - TimeSpan.FromMilliseconds(1));
             await Task.Delay(100, Token);
             WindowInput.Drain();
             AssertDisarmed(window);
-            Assert.False(reply.IsCompleted, "a click within a second of activating the prompt answered it");
+            Key(window, PhysicalKey.Enter);
+            Assert.False(reply.IsCompleted, "Return within a second of activating the prompt answered it");
 
             app.Clock.Advance(TimeSpan.FromMilliseconds(1));
-            await PromptedApp.UntilAsync(() => window.FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled);
+            await PromptedApp.UntilAsync(() => IsArmed(window));
             Assert.Equal(places, Places(window));
-            Click(window, "AllowOnce");
+            Key(window, PhysicalKey.Enter);
 
             Assert.Equal(AuditDecision.Granted, (await reply.WaitAsync(_wait, Token))!.Decision);
         });
@@ -584,7 +633,7 @@ public sealed class DesktopApprovalTests
             AssertDisarmed(window);
 
             app.Clock.Advance(PromptViewModel.ArmingDelay / 2);
-            await PromptedApp.UntilAsync(() => window.FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled);
+            await PromptedApp.UntilAsync(() => IsArmed(window));
         });
 
     /// <summary>Deny needs no focus and no second, so a prompt without focus can always be refused, and Show the prompt still brings one forward from there.</summary>
@@ -639,9 +688,9 @@ public sealed class DesktopApprovalTests
             }
         });
 
-    /// <summary>A window manager takes the pointer for a move, and a quick click's release can arrive before it does, so the next press on an armed allow would be its.</summary>
+    /// <summary>A window manager takes the pointer for a move, and a quick click's release can arrive before it does, so the next press on an allow would be its.</summary>
     [Fact]
-    public Task A_press_starts_a_move_on_the_card_and_on_no_button_disabled_or_not() =>
+    public Task A_press_starts_a_move_on_the_card_and_on_no_button() =>
         HeadlessSession.On(async () =>
         {
             await using var app = await PromptedApp.StartAsync();
@@ -650,28 +699,23 @@ public sealed class DesktopApprovalTests
             var moves = 0;
             window.StartMove = _ => moves++;
 
-            AssertDisarmed(window);
-            foreach (var name in new[] { "AllowOnce" })
-            {
-                Click(window, name);
-            }
-
-            Assert.Equal(0, moves);
-            Assert.False(reply.IsCompleted, "a press on a disarmed allow answered the prompt");
-
             var card = window.FindControl<TextBlock>("FieldText")!;
             WindowInput.Press(window, card);
             WindowInput.Release(window, card);
             Assert.Equal(1, moves);
 
-            await app.ArmAsync();
             Click(window, "AllowOnce");
             Assert.Equal(1, moves);
             Assert.Equal(AuditDecision.Granted, (await reply.WaitAsync(_wait, Token))!.Decision);
         });
 
-    private static void AssertDisarmed(Window window) =>
-        Assert.All(new[] { "AllowOnce" }, name => Assert.False(window.FindControl<Button>(name)!.IsEffectivelyEnabled, $"{name} is armed"));
+    /// <summary>Whether a key can press the prompt's allows.</summary>
+    internal static bool IsArmed(Window window) => ((PromptViewModel)window.DataContext!).IsArmed;
+
+    /// <summary>Whether the prompt's window has had focus long enough for a click to press its allows.</summary>
+    internal static bool IsInFront(Window window) => ((PromptWindow)window).HasBeenInFront;
+
+    private static void AssertDisarmed(Window window) => Assert.False(IsArmed(window), "the prompt is armed");
 
     /// <summary>A prompt brought forward before its first second is up is armed a second after the bring-forward, not by the first showing's wait.</summary>
     [Fact]
@@ -691,10 +735,10 @@ public sealed class DesktopApprovalTests
             await Task.Delay(200, Token);
             WindowInput.Drain();
 
-            Assert.False(window.FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled, "the first showing's wait armed the prompt within a second of bringing it forward");
+            Assert.False(IsArmed(window), "the first showing's wait armed the prompt within a second of bringing it forward");
 
             app.Clock.Advance(half);
-            await PromptedApp.UntilAsync(() => window.FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled);
+            await PromptedApp.UntilAsync(() => IsArmed(window));
             Click(window, "Deny");
             await reply.WaitAsync(_wait, Token);
         });
@@ -879,25 +923,27 @@ public sealed class DesktopApprovalTests
             AutomationSurface.AssertNothingExposes(third, ApiKeySentinel);
         });
 
-    [Theory]
-    [InlineData("AllowOnce")]
-    public Task BothAllowButtons_ArmOnlyAfterTheDelay(string button) =>
+    /// <summary>Return, and Space on a focused Allow once, press nothing until the prompt has been up a second; after it, Return allows once.</summary>
+    [Fact]
+    public Task A_key_allows_only_after_the_arming_second() =>
         HeadlessSession.On(async () =>
         {
             await using var app = await PromptedApp.StartAsync();
             var reply = app.Ask();
             var window = await app.PromptAsync();
 
-            Assert.False(window.FindControl<Button>(button)!.IsEffectivelyEnabled);
-            Click(window, button);
+            Key(window, PhysicalKey.Enter);
+            window.FindControl<Button>("AllowOnce")!.Focus();
+            Tap(window, PhysicalKey.Space);
             app.Clock.Advance(PromptViewModel.ArmingDelay - TimeSpan.FromMilliseconds(1));
-            WindowInput.Drain();
-            Click(window, button);
             await Task.Delay(200, Token);
-            Assert.False(reply.IsCompleted, "a click before the prompt was armed answered it");
+            WindowInput.Drain();
+            Key(window, PhysicalKey.Enter);
+            Tap(window, PhysicalKey.Space);
+            Assert.False(reply.IsCompleted, "a key within the arming second answered the prompt");
 
             await app.ArmAsync();
-            Click(window, button);
+            Key(window, PhysicalKey.Enter);
 
             Assert.Equal(AuditDecision.Granted, (await reply.WaitAsync(_wait, Token))!.Decision);
         });
@@ -967,8 +1013,18 @@ public sealed class DesktopApprovalTests
         WindowInput.Drain();
     }
 
+    /// <summary>A key pressed and released, as Space presses a focused button on its release.</summary>
+    internal static void Tap(Window window, PhysicalKey key)
+    {
+        window.KeyPressQwerty(key, RawInputModifiers.None);
+        window.KeyReleaseQwerty(key, RawInputModifiers.None);
+        WindowInput.Drain();
+    }
+
+    /// <summary>A click, after the work already queued, as a person's click never lands in the same moment as what came before it.</summary>
     internal static void Click(Window window, string name)
     {
+        WindowInput.Drain();
         var button = window.FindControl<Button>(name)!;
         WindowInput.Press(window, button);
         WindowInput.Release(window, button);
@@ -1207,23 +1263,22 @@ public sealed class DesktopApprovalTests
             Session = SessionId,
         };
 
-        /// <summary>Waits for the prompt a request raised to be on screen and drawn.</summary>
+        /// <summary>Waits for the prompt a request raised to be on screen, in front long enough to take a click, and drawn.</summary>
         /// <param name="count">How many prompts this app has raised once that one is up.</param>
         internal async Task<Window> PromptAsync(int count = 1)
         {
-            await Until(() => Windows.Count >= count);
+            await Until(() => Windows.Count >= count && (IsInFront(Windows[^1]) || !Windows[^1].IsVisible));
             var window = Windows[^1];
             DrawnFrame.Capture(window);
             return window;
         }
 
-        /// <summary>Lets the arming delay pass, as a person reading the prompt does, and waits for the prompt to arm.</summary>
-        /// <param name="allow">The allow button that arms: Allow once on a request's prompt, Allow on a change's.</param>
+        /// <summary>Lets the arming delay pass, as a person reading the prompt does, and waits for its keys to arm.</summary>
         /// <remarks>The delay's continuation runs on the thread pool, so the arming is posted some time after the clock moves.</remarks>
-        internal async Task ArmAsync(string allow = "AllowOnce")
+        internal async Task ArmAsync()
         {
             Clock.Advance(PromptViewModel.ArmingDelay);
-            await Until(() => Windows[^1].FindControl<Button>(allow)!.IsEffectivelyEnabled);
+            await Until(() => IsArmed(Windows[^1]));
         }
 
         internal static async Task WithdrawnAsync(Window window) => await Until(() => !window.IsVisible);

@@ -16,7 +16,7 @@ namespace Keypaste.App.Session;
 /// <para>
 /// The gate owns the deadline, the cooldown and one prompt at a time; this only puts the prompt on
 /// screen, counts down the gate's window on it and reports the answer. Anything but a press of an
-/// allow, or a confirmed Always allow where the prompt offers it, is a denial: Deny, Escape, closing the window,
+/// allow, Always allow among them where the prompt offers it, is a denial: Deny, Escape, closing the window,
 /// and every withdrawal, whether the gate's window ran out, the bridge hung up or the vault locked.
 /// </para>
 /// <para>
@@ -170,7 +170,7 @@ internal sealed class WindowApprovalChannel(
     internal bool IsAsking => Volatile.Read(ref _screen.Queued) > 0 || _screen.Showing is { Request.IsAnswered: false };
 
     /// <summary>
-    /// Brings the prompt on screen forward with focus on Deny and its allows disarmed, arming them again
+    /// Brings the prompt on screen forward with focus on Deny and no key pressing its allows, arming them again
     /// <see cref="PromptViewModel.ArmingDelay"/> later. Called on the UI thread, for the person's
     /// press of Show the prompt on Agents or in the notification, and nothing else.
     /// </summary>
@@ -256,7 +256,6 @@ internal sealed class WindowApprovalChannel(
                     _ = ArmAsync(request, shown, cancellationToken);
                 };
                 shown.Deactivated += (_, _) => request.Disarm();
-                request.Disarmed += (_, _) => _ = ArmAsync(request, shown, cancellationToken);
                 _screen.Showing = new Showing(request, shown, cancellationToken);
                 Shown?.Invoke(this, shown);
                 _ = ArmAsync(request, shown, cancellationToken);

@@ -1682,16 +1682,6 @@ public sealed class ScreenRenderer
             "work laptop");
         DrawWindow(new ApprovalWindow(new ApprovalViewModel(asked)), output, "91e-approval");
 
-        var confirming = new ApprovalViewModel(StripeTestKey()) { Vault = _promptVault };
-        var confirm = new ApprovalWindow(confirming);
-        confirming.Tick(TimeSpan.FromSeconds(28));
-        confirming.Arm();
-        confirming.AlwaysAllowCommand.Execute(null);
-        confirming.Arm();
-        confirm.Show();
-        Save(confirm, output, "91a-approval-confirm-always");
-        confirm.Close();
-
         var save = SavePrompt.For("claude-code", "claude-code", "Acme/OpenAI", "OPENAI_API_KEY", "I rotated the eval key. Please store the new one for the eval runs.") with { Identity = _verified };
         using (var saving = new SaveValueViewModel(save, Keypaste.App.Clipboard.NoClipboard.Instance, new ManualClock(AppClock.Start)) { Vault = _promptVault })
         {

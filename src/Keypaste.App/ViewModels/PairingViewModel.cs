@@ -4,8 +4,8 @@ namespace Keypaste.App.ViewModels;
 
 /// <summary>A browser's request to pair, in front of the person with the code its extension shows, allowed once under a name they may change.</summary>
 /// <remarks>
-/// Pair is armed after the prompt has been up a moment, as every allow is, and only while the name is one a new pairing can
-/// take. The build is what the browser named when it started keypaste, which any program can name, so the window asks the
+/// Pair can be pressed only while the name is one a new pairing can take, and a key presses it only once the prompt is armed,
+/// as with every allow. The build is what the browser named when it started keypaste, which any program can name, so the window asks the
 /// person to pair only when the code matches the one their browser shows, and its requester line says Not verified. Return pairs nothing.
 /// </remarks>
 internal sealed class PairingViewModel : PromptViewModel
@@ -24,13 +24,7 @@ internal sealed class PairingViewModel : PromptViewModel
         Code = prompt.Code;
         Title = $"Pair {prompt.Identity.Browser} with keypaste?";
         Check = $"Pair only if {prompt.Identity.Browser} shows the same code.";
-        AllowCommand = new RelayCommand(() => Decide(ApprovalAnswer.ApprovedOnce), () => IsArmed && !IsAnswered && NameProblem is null);
     }
-
-    /// <summary>Pairs the browser under <see cref="Name"/>.</summary>
-    internal RelayCommand AllowCommand { get; }
-
-    protected override void OnAllowsChanged() => AllowCommand.NotifyCanExecuteChanged();
 
     /// <summary>The question: <c>Pair Chrome with keypaste?</c>.</summary>
     internal string Title { get; }

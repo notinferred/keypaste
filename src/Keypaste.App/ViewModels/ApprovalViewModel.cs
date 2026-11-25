@@ -85,9 +85,6 @@ internal sealed class ApprovalViewModel : PromptViewModel
     internal static string TruncationText(ApprovalPrompt prompt) =>
         prompt.ReasonWasTruncated ? "Cut short: the full text is hashed in the audit log." : string.Empty;
 
-    /// <summary>The question's first words: Give, or Always give while confirming.</summary>
-    internal string Verb => IsConfirming ? "Always give " : "Give ";
-
     /// <summary>The item as the card names it: its title and its vault.</summary>
     internal string Item => InVault(_itemTitle);
 
@@ -139,7 +136,4 @@ internal sealed class ApprovalViewModel : PromptViewModel
 
     /// <summary>That the reason shown is shorter than the one sent, or nothing.</summary>
     internal string Truncation { get; }
-
-    /// <inheritdoc/>
-    protected override void OnAllowsChanged() => OnPropertyChanged(nameof(Verb));
 }

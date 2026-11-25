@@ -29,6 +29,7 @@ public sealed class ItemPickViewModelTests
     {
         var picker = new ItemPickViewModel(Picker());
         picker.Arm();
+        picker.IsInFront = true;
 
         Assert.Null(picker.Picked);
         Assert.Null(picker.PickedIndex);
@@ -81,6 +82,7 @@ public sealed class ItemPickViewModelTests
     {
         var picker = new ItemPickViewModel(Picker());
         picker.Arm();
+        picker.IsInFront = true;
         picker.Picked = picker.Rows[1];
 
         picker.AllowOnceCommand.Execute(null);

@@ -83,7 +83,7 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Threat.** The model writes `request_credential`'s free-text `reason` to persuade the person, redraw the prompt or shape the record of why a value was asked for.
 
-**Mitigation.** A reason over 2000 characters is refused, and the prompt strips control, newline and bidi characters, shows at most 400, and labels the rest as the agent's words in a fixed box. Deny has focus, and Allow or Return works only a second after the prompt gained focus, so a stray keystroke answers nothing. The audit line keeps a 200-character sanitized excerpt, the length and a SHA-256 of the raw text.
+**Mitigation.** A reason over 2000 characters is refused, and the prompt strips control, newline and bidi characters, shows at most 400, and labels the rest as the agent's words in a fixed box. Deny has focus; Return or Space on an allow works only a second after the prompt gained focus, so a stray keystroke answers nothing, and a click on an allow counts only once the prompt has had focus for 0.3 seconds. The audit line keeps a 200-character sanitized excerpt, the length and a SHA-256 of the raw text.
 
 **Limit.** A sanitized reason can still persuade, and nothing judges whether it is honest. Sanitizing does not detect sensitive text an agent put in its arguments.
 
@@ -123,11 +123,11 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Threat.** A retrying or malicious client floods the person with prompts, or a click aimed elsewhere lands on Allow, so approval stops being a deliberate act.
 
-**Mitigation.** One prompt shows at a time across every open vault; at most three wait per agent, and the rest are refused as `BUSY`. A refusal starts a 60-second cooldown for each field it covered, a prompt expires after 45 seconds, and the desktop's Allow works only a second after the prompt has focus. Linked sets, saves and item changes share the slot and cooldown.
+**Mitigation.** One prompt shows at a time across every open vault; at most three wait per agent, and the rest are refused as `BUSY`. A refusal starts a 60-second cooldown for each field it covered, a prompt expires after 45 seconds, and on the desktop a click on an allow counts only once the prompt has had focus for 0.3 seconds: a click on a prompt without focus, or one as it appears, only brings it forward. Keys wait a second after it gains focus. Linked sets, saves and item changes share the slot and cooldown.
 
 **Limit.** There is no cap across different items: twenty items can mean twenty prompts. The pause is Block, or turning an agent's run off ([approvals](docs/approvals.md#when-you-say-no)). With several vaults open, a prompt names its vault in its window title, not yet on the card.
 
-**Status.** `v0.3.0` for one prompt at a time, `BUSY` and the cooldown; the per-agent queue and desktop arming unreleased.
+**Status.** `v0.3.0` for one prompt at a time, `BUSY` and the cooldown; the per-agent queue and the desktop's focus rule and key arming unreleased.
 
 ### T-53 — What two entries of one name did is recorded under the name they share
 
@@ -143,7 +143,7 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Threat.** An agent uses `request_save` to have a value saved where it names, so the vault holds a credential the person would not keep, or a working value is replaced.
 
-**Mitigation.** The person enters the value and saves with Save, armed after a second, or with `y` at `keypaste approve`, and a replace needs confirmation. The agent learns only whether and where it was saved, and the line never holds the value. A place outside the bridge's view is refused unasked (T-4).
+**Mitigation.** The person enters the value and saves with Save, a click once the prompt has had focus for 0.3 seconds or Return after a second, or with `y` at `keypaste approve`, and a replace needs confirmation. The agent learns only whether and where it was saved, and the line never holds the value. A place outside the bridge's view is refused unasked (T-4).
 
 **Limit.** A persuaded person has stored the value, and the agent's later request for it meets its category's setting. A crash between the line and the save records a value the vault does not hold.
 

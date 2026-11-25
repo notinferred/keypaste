@@ -143,18 +143,13 @@ public sealed class DesktopEnvApprovalTests
         });
 
     [Fact]
-    public Task Approve_is_not_armed_until_the_prompt_has_been_up_for_a_second() =>
+    public Task A_click_on_Allow_once_answers_at_once() =>
         HeadlessSession.On(async () =>
         {
             await using var app = await PromptedApp.StartAsync();
             var reply = app.AskEnv();
             var window = await app.PromptAsync();
 
-            Click(window, "AllowOnce");
-            await Task.Delay(200, Token);
-            Assert.False(reply.IsCompleted, "a click before the prompt was armed answered it");
-
-            await app.ArmAsync();
             Click(window, "AllowOnce");
             Assert.Equal(EnvOutcome.Resolved, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
         });

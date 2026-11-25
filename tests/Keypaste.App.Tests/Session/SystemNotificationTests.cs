@@ -120,16 +120,16 @@ public sealed class SystemNotificationTests
             system.Posts[0].Pressed();
             WindowInput.Drain();
 
-            Assert.False(window.FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled, "the notification left the prompt armed");
+            Assert.False(IsArmed(window), "the notification left the prompt armed");
             Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
             Assert.True(window.IsVisible);
-            Click(window, "AllowOnce");
+            Key(window, Avalonia.Input.PhysicalKey.Enter);
             await Task.Delay(200, Token);
-            Assert.False(reply.IsCompleted, "a press of the notification or within its second answered the request");
+            Assert.False(reply.IsCompleted, "a press of the notification or Return within its second answered the request");
 
             app.Clock.Advance(PromptViewModel.ArmingDelay);
-            await PromptedApp.UntilAsync(() => window.FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled);
-            Click(window, "AllowOnce");
+            await PromptedApp.UntilAsync(() => IsArmed(window));
+            Key(window, Avalonia.Input.PhysicalKey.Enter);
             Assert.Equal(AuditDecision.Granted, (await reply.WaitAsync(_wait, Token))!.Decision);
         });
 
@@ -157,7 +157,7 @@ public sealed class SystemNotificationTests
 
             system.Posts[0].Pressed();
             WindowInput.Drain();
-            Assert.True(prompt.FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled, "a press left over from an ended request disarmed the next prompt");
+            Assert.True(IsArmed(prompt), "a press left over from an ended request disarmed the next prompt");
 
             Click(prompt, "Deny");
             await next.WaitAsync(_wait, Token);
@@ -203,14 +203,13 @@ public sealed class SystemNotificationTests
             var prompt = await app.PromptAsync(count: 2);
             await PromptedApp.UntilAsync(() => system.Posts.Count == 2);
             await app.ArmAsync();
-            var allow = prompt.FindControl<Button>("AllowOnce")!;
 
             system.Posts[0].Pressed();
             WindowInput.Drain();
-            Assert.True(allow.IsEffectivelyEnabled, "a press left over from the last session disarmed this session's prompt");
+            Assert.True(IsArmed(prompt), "a press left over from the last session disarmed this session's prompt");
 
             system.Posts[1].Pressed();
-            await PromptedApp.UntilAsync(() => !allow.IsEffectivelyEnabled);
+            await PromptedApp.UntilAsync(() => !IsArmed(prompt));
 
             Click(prompt, "Deny");
             Assert.Equal(AuditDecision.Denied, (await next.WaitAsync(_wait, Token))!.Decision);

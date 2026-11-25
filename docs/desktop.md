@@ -147,7 +147,7 @@ When an agent asks, the app shows who is asking, the item and the agent's own wo
 | Allow once | Releases this one value |
 | Always allow | For an agent whose bridge has a label: keeps allowing that field to that agent |
 
-The allows arm a second after the prompt has focus. [Approvals](approvals.md) owns the prompt, what each answer keeps and the log.
+A click on an allow works once the prompt has focus; Return and Space wait a second. [Approvals](approvals.md) owns the prompt, what each answer keeps and the log.
 
 ## Set up agents
 

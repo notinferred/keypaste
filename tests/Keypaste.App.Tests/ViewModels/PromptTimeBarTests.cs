@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
 
-/// <summary>A prompt's time bar is full and named with the whole time from its first tick, drains to empty, and shows the arming wait only while an allow waits for nothing else.</summary>
+/// <summary>A prompt's time bar is full and named with the whole time from its first tick, drains to empty, and shows the second a key waits to press an allow only while that allow waits for nothing else.</summary>
 public sealed class PromptTimeBarTests
 {
     private static ApprovalPrompt Request() =>

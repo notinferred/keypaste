@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Windows.Input;
 using Keypaste.Core.Approval;
 
 namespace Keypaste.App.ViewModels;
@@ -11,25 +12,24 @@ namespace Keypaste.App.ViewModels;
 /// approves nothing.
 /// </para>
 /// <para>
-/// Every allow is armed only after the prompt has been up for <see cref="ArmingDelay"/>: the window
-/// can appear under a pointer that was about to click something else, and that click is not an
-/// approval. Bringing the prompt forward from Agents disarms it for another
-/// <see cref="ArmingDelay"/>, and a wait begun before that arms nothing, and so does a click
-/// that brings it back from another window. Denying needs no delay.
+/// An allow answers only while the prompt's window has focus, and the window takes a click on one only once it has had
+/// focus a moment, so the click that brings it forward, or one on a window still appearing, only brings it forward. A
+/// click on an allow in front answers at once. A key reaches an allow only once the prompt is armed as well, which is
+/// <see cref="ArmingDelay"/> after it is shown, brought forward from Agents or given focus back: a keystroke typed for
+/// another window lands on the prompt as it appears, and that keystroke is not an approval. A wait begun before the
+/// latest of those arms nothing. Denying needs no focus and no delay.
 /// </para>
 /// <para>
-/// Where a prompt offers it, Always allow answers nothing by itself: it turns the prompt to a question confirming what
-/// keypaste will remember, whose confirm button arms a further <see cref="ArmingDelay"/> later, and Cancel returns to the
-/// choices. Deny answers at every step but that one, where Cancel is the way back.
+/// Where a prompt offers it, Always allow answers at once, as Allow once does, and keypaste remembers it.
 /// </para>
 /// <para>
-/// A claim card answers Return with its primary, Allow once or the confirmation, only once that is armed, and Escape with
-/// Deny or, while confirming, Cancel. A destructive primary takes no Return.
+/// A claim card answers Return with its primary, Allow once, only once the prompt is armed, and Escape with Deny. A
+/// destructive primary takes no Return.
 /// </para>
 /// </remarks>
 internal abstract partial class PromptViewModel : ObservableObject
 {
-    /// <summary>How long the prompt is shown before either allow button can be pressed.</summary>
+    /// <summary>How long the prompt is shown, and in focus, before a key can press an allow.</summary>
     internal static readonly TimeSpan ArmingDelay = TimeSpan.FromSeconds(1);
 
     private readonly TaskCompletionSource<ApprovalAnswer> _answer = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -45,13 +45,9 @@ internal abstract partial class PromptViewModel : ObservableObject
     protected PromptViewModel(RequesterIdentity? requester)
     {
         Requester = requester;
-        AllowOnceCommand = new RelayCommand(() => Decide(ApprovalAnswer.ApprovedOnce), () => IsArmed && CanAllow && !IsAnswered && Confirming is null);
+        AllowOnceCommand = new RelayCommand(() => Decide(ApprovalAnswer.ApprovedOnce), () => IsInFront && CanAllow && !IsAnswered);
         DenyCommand = new RelayCommand(() => Decide(ApprovalAnswer.Denied), () => !IsAnswered);
-        AlwaysAllowCommand = new RelayCommand(
-            () => Confirm(ApprovalAnswer.AlwaysAllowed),
-            () => IsArmed && CanAllow && OffersAlways && !IsAnswered && Confirming is null);
-        ConfirmAlwaysCommand = new RelayCommand(() => Decide(Confirming!.Value), () => IsArmed && Confirming is not null && !IsAnswered);
-        BackCommand = new RelayCommand(() => Confirming = null, () => Confirming is not null && !IsAnswered);
+        AlwaysAllowCommand = new RelayCommand(() => Decide(ApprovalAnswer.AlwaysAllowed), () => IsInFront && CanAllow && OffersAlways && !IsAnswered);
     }
 
     /// <summary>Who is asking, as Core checked it with the system, or null for a prompt with no requester line.</summary>
@@ -84,77 +80,37 @@ internal abstract partial class PromptViewModel : ObservableObject
     /// <summary>The program on the connection and its parent, for Details, or that it was not read.</summary>
     internal string Process => Requester?.Process ?? "not read";
 
-    /// <summary>Whether Return answers with the primary: a claim card's allow or confirmation, never a destructive one.</summary>
+    /// <summary>Whether Return answers with the primary: a claim card's allow, never a destructive one.</summary>
     internal virtual bool AnswersReturn => Requester is not null;
 
-    /// <summary>Return: presses the primary, Allow once or the confirmation, when it is armed; anything else does nothing. Called on the UI thread.</summary>
+    /// <summary>Return: presses Allow once when the prompt is armed and it can be pressed; anything else does nothing. Called on the UI thread.</summary>
     internal void Return()
     {
-        var primary = Confirming is null ? AllowOnceCommand : ConfirmAlwaysCommand;
-
-        if (AnswersReturn && primary.CanExecute(null))
+        if (AnswersReturn && IsArmed && AllowOnceCommand.CanExecute(null))
         {
-            primary.Execute(null);
+            AllowOnceCommand.Execute(null);
         }
     }
 
-    /// <summary>Escape: Cancel while confirming an always, otherwise Deny. Called on the UI thread.</summary>
-    internal void Escape()
-    {
-        if (Confirming is null)
-        {
-            DenyCommand.Execute(null);
-        }
-        else
-        {
-            BackCommand.Execute(null);
-        }
-    }
+    /// <summary>Escape: Deny. Called on the UI thread.</summary>
+    internal void Escape() => DenyCommand.Execute(null);
+
+    /// <summary>Whether <paramref name="command"/> allows, so that a key reaches it only once the prompt is armed.</summary>
+    internal bool IsAllow(ICommand? command) => command is not null && (command == AllowOnceCommand || command == AlwaysAllowCommand);
 
     /// <summary>An item as a card names it: its title, and the vault it is in when one is named.</summary>
     protected string InVault(string title) => Vault is { } vault ? $"{title} \u00b7 {vault}" : title;
-
-    /// <summary>Raised when a step of the prompt disarmed its allows, so whatever shows the prompt arms them again <see cref="ArmingDelay"/> later.</summary>
-    internal event EventHandler? Disarmed;
 
     /// <summary>Allows this request and keeps nothing.</summary>
     internal RelayCommand AllowOnceCommand { get; }
 
     internal RelayCommand DenyCommand { get; }
 
-    /// <summary>Asks the person to confirm that this agent always gets what this request asks for.</summary>
+    /// <summary>Allows this request, and this agent always gets what it asks for from now on.</summary>
     internal RelayCommand AlwaysAllowCommand { get; }
-
-    /// <summary>Answers with the always the person is confirming.</summary>
-    internal RelayCommand ConfirmAlwaysCommand { get; }
-
-    /// <summary>Returns from the confirmation to the choices.</summary>
-    internal RelayCommand BackCommand { get; }
 
     /// <summary>Whether the prompt offers Always allow.</summary>
     internal virtual bool OffersAlways => false;
-
-    /// <summary>The always the person is confirming, or null while the prompt shows its choices.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsConfirming), nameof(IsChoosing), nameof(ShowsAlwaysAllow), nameof(ConfirmText))]
-    internal partial ApprovalAnswer? Confirming { get; private set; }
-
-    partial void OnConfirmingChanged(ApprovalAnswer? value) => Refresh();
-
-    /// <summary>Whether the prompt asks the person to confirm an always.</summary>
-    internal bool IsConfirming => Confirming is not null;
-
-    /// <summary>Whether the prompt shows its choices.</summary>
-    internal bool IsChoosing => Confirming is null;
-
-    /// <summary>Whether Always allow is on the prompt now.</summary>
-    internal bool ShowsAlwaysAllow => IsChoosing && OffersAlways;
-
-    /// <summary>What the card says under the question confirming Always allow, or nothing while it shows its choices.</summary>
-    internal string ConfirmText => Confirming is null ? string.Empty : AlwaysKept;
-
-    /// <summary>What Always allow keeps, said under its confirmation.</summary>
-    internal string AlwaysKept => $"keypaste won't ask again for this key. Change it in Agents \u203a {Agent}.";
 
     /// <summary>What pointing at Always allow says.</summary>
     internal virtual string AlwaysTip => string.Empty;
@@ -172,7 +128,7 @@ internal abstract partial class PromptViewModel : ObservableObject
 
     private double _answerSeconds;
 
-    /// <summary>Whether an allow waits only for the prompt to arm, which the time bar shows rather than the buttons.</summary>
+    /// <summary>Whether a key on an allow waits only for the prompt to arm, which the time bar shows.</summary>
     internal bool IsArming => !IsArmed && CanAllow && !IsAnswered;
 
     /// <summary>The person's answer, or a denial for every way the prompt went away without one.</summary>
@@ -180,20 +136,25 @@ internal abstract partial class PromptViewModel : ObservableObject
 
     internal bool IsAnswered => _answer.Task.IsCompleted;
 
-    /// <summary>Whether the prompt has been up long enough for an allow to be pressed.</summary>
+    /// <summary>Whether the prompt's window has focus, without which no allow can be pressed or invoked; set by the window.</summary>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AllowOnceCommand))]
-    protected partial bool IsArmed { get; private set; }
+    internal partial bool IsInFront { get; set; }
 
-    partial void OnIsArmedChanged(bool value) => Refresh();
+    partial void OnIsInFrontChanged(bool value) => Refresh();
+
+    /// <summary>Whether the prompt has been up and in focus long enough for a key to press an allow.</summary>
+    [ObservableProperty]
+    internal partial bool IsArmed { get; private set; }
+
+    partial void OnIsArmedChanged(bool value) => OnPropertyChanged(nameof(IsArming));
 
     /// <summary>Which wait to arm the prompt is current; <see cref="Disarm"/> begins another.</summary>
     internal int Arming => _arming;
 
-    /// <summary>Lets the allow buttons be pressed now.</summary>
+    /// <summary>Lets a key press an allow now.</summary>
     internal void Arm() => Arm(_arming);
 
-    /// <summary>Lets the allow buttons be pressed, unless the prompt was disarmed after the wait for <paramref name="arming"/> began. Called on the UI thread.</summary>
+    /// <summary>Lets a key press an allow, unless the prompt was disarmed after the wait for <paramref name="arming"/> began. Called on the UI thread.</summary>
     /// <param name="arming">The <see cref="Arming"/> read when the wait began.</param>
     internal void Arm(int arming)
     {
@@ -224,7 +185,7 @@ internal abstract partial class PromptViewModel : ObservableObject
         _ => string.Create(CultureInfo.InvariantCulture, $"{seconds} seconds"),
     };
 
-    /// <summary>Lets no allow be pressed until a wait begun now arms it. Called on the UI thread.</summary>
+    /// <summary>Lets no key press an allow until a wait begun now arms it. Called on the UI thread.</summary>
     internal void Disarm()
     {
         _arming++;
@@ -277,22 +238,12 @@ internal abstract partial class PromptViewModel : ObservableObject
         }
     }
 
-    /// <summary>Turns the prompt to the question confirming an always, its confirm button disarmed.</summary>
-    private void Confirm(ApprovalAnswer always)
-    {
-        Disarm();
-        Confirming = always;
-        Disarmed?.Invoke(this, EventArgs.Empty);
-    }
-
     /// <summary>Asks every command again whether it can be pressed.</summary>
     protected void Refresh()
     {
         AllowOnceCommand.NotifyCanExecuteChanged();
         DenyCommand.NotifyCanExecuteChanged();
         AlwaysAllowCommand.NotifyCanExecuteChanged();
-        ConfirmAlwaysCommand.NotifyCanExecuteChanged();
-        BackCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(IsArming));
         OnAllowsChanged();
     }

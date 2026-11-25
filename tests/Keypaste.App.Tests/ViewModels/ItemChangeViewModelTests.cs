@@ -5,24 +5,30 @@ using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
 
-/// <summary>An agent's change to an item is allowed only once the prompt has armed, never always, and Deny changes nothing (T-57).</summary>
+/// <summary>An agent's change to an item is allowed only while its window is in front, by a click, or by Return once the prompt has armed; never always, and Deny changes nothing (T-57).</summary>
 public sealed class ItemChangeViewModelTests
 {
     private static ItemChangePrompt Prompt(ItemChangeKind kind) =>
         ItemChangePrompt.For("Claude Code", "claude-code", new EntryName("work", "github"), new ItemChange(kind, null), "the key was revoked");
 
     [Fact]
-    public async Task Allow_needs_the_arming_and_offers_no_always()
+    public async Task Allow_needs_the_window_in_front_Return_needs_the_arming_too_and_no_always_is_offered()
     {
         var prompt = new ItemChangeViewModel(Prompt(ItemChangeKind.MoveToTrash));
 
         Assert.False(prompt.AllowOnceCommand.CanExecute(null));
+        prompt.IsInFront = true;
+        Assert.True(prompt.AllowOnceCommand.CanExecute(null));
+        Assert.False(prompt.AlwaysAllowCommand.CanExecute(null));
         Assert.False(prompt.OffersAlways);
         Assert.Equal(("Move work/github to Trash", "Allow"), (prompt.Change, prompt.AllowLabel));
         Assert.Equal(("Let Claude Code move github to Trash?", "github"), (prompt.Question, prompt.Item));
 
+        prompt.Return();
+        Assert.False(prompt.IsAnswered);
+
         prompt.Arm();
-        prompt.AllowOnceCommand.Execute(null);
+        prompt.Return();
 
         Assert.Equal(ApprovalAnswer.ApprovedOnce, await prompt.Answer);
     }

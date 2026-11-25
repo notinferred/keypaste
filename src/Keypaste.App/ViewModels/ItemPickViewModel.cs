@@ -84,9 +84,6 @@ internal sealed partial class ItemPickViewModel : PromptViewModel
         ? "Always allow: not offered, because an item here is protected and asked about every time."
         : ApprovalViewModel.NoAlwaysText(_offersAlways, _agent);
 
-    /// <summary>The question's first words: Give, or Always give while confirming.</summary>
-    internal string Verb => IsConfirming ? "Always give " : "Give ";
-
     /// <summary>The field the agent asked for.</summary>
     internal string Field { get; }
 
@@ -113,9 +110,6 @@ internal sealed partial class ItemPickViewModel : PromptViewModel
 
     /// <summary>The tool the request came through.</summary>
     internal string Tool { get; } = "keypaste.request_credential";
-
-    /// <inheritdoc/>
-    protected override void OnAllowsChanged() => OnPropertyChanged(nameof(Verb));
 
     /// <summary>Where the row picked as the person answered is among the candidates, or null; safe from any thread.</summary>
     internal int? PickedIndex => Volatile.Read(ref _picked) is >= 0 and var index ? index : null;

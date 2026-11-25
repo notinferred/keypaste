@@ -30,7 +30,7 @@ namespace Keypaste.Cli.Approval;
 /// the question off the screen. It is printed last, under a line saying who wrote it, and it is
 /// never interpolated into anything that gets parsed. The default is no: <c>o</c> allows once, and
 /// every other answer, Enter and silence included, is a denial. Where the prompt offers it,
-/// <c>a</c> asks to confirm an Always allow with <c>y</c>, and any other answer to that is a denial too. Blocking is
+/// <c>a</c> allows and always allows from then on, saying what keypaste keeps. Blocking is
 /// set on the agent's page in the app, never at a prompt.
 /// </para>
 /// </remarks>
@@ -456,11 +456,10 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
                 _console.WriteLine(string.Join(
                     Environment.NewLine,
                     string.Empty,
-                    $"  Always give {always.Agent} {always.What} without asking you?",
+                    $"  From now on keypaste gives {always.Agent} {always.What} without asking you.",
                     "  Remove it on the agent's page in the keypaste app to be asked again."));
-                var confirmed = await ChooseAsync(_confirmChoices, () => Confirmation(Remaining(started), "always allow"), cancellationToken).ConfigureAwait(false) == 'y';
 
-                return Said(confirmed ? ApprovalAnswer.AlwaysAllowed : ApprovalAnswer.Denied);
+                return Said(ApprovalAnswer.AlwaysAllowed);
             }
         }
         catch (Exception unanswered) when (IsUnanswerable(unanswered))
@@ -488,7 +487,7 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
 
     /// <summary>What a prompt's Always allow keeps, for the agent its bridge names, or null when it offers none.</summary>
     /// <param name="Agent">The agent's name.</param>
-    /// <param name="What">What the agent would always get, as the confirmation names it.</param>
+    /// <param name="What">What the agent always gets, as the line after <c>a</c> names it.</param>
     private sealed record Always(string Agent, string What)
     {
         internal static Always? Of(ApprovalPrompt prompt, string what) =>

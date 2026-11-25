@@ -16,8 +16,8 @@ namespace Keypaste.App.Tests.Session;
 
 /// <summary>
 /// A terminal's edit is allowed in the app's own prompt window (D-0464): the command, the item and what
-/// changes, never a value, where it came from said as a claim; Deny focused, Allow armed after a moment,
-/// and every way but Allow a refusal (THREATS.md T-2).
+/// changes, never a value, where it came from said as a claim; Deny focused, Allow answering a click at once and a key
+/// only after a moment, and every way but Allow a refusal (THREATS.md T-2).
 /// </summary>
 public sealed class TerminalEditWindowTests
 {
@@ -38,7 +38,7 @@ public sealed class TerminalEditWindowTests
             Assert.Equal("Any program you run could have sent this. Allow only a change you made.", Text(window, "WarningText"));
             Assert.Equal(["Replaces the password of work/github with the password the terminal sent; the old one stays in its history."], Changes(window));
             Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
-            Assert.False(window.FindControl<Button>("Allow")!.IsEffectivelyEnabled);
+            Assert.False(IsArmed(window));
             Assert.DoesNotContain(Buttons(window), button => button.IsDefault);
 
             Click(window, "Deny");
@@ -62,7 +62,7 @@ public sealed class TerminalEditWindowTests
             Assert.Contains("danger", allow.Classes);
             Assert.DoesNotContain("primary", allow.Classes);
             Assert.True(deny.IsFocused);
-            Assert.False(allow.IsEffectivelyEnabled);
+            Assert.True(allow.IsEffectivelyEnabled);
             Assert.True(deny.TranslatePoint(default, window)!.Value.X < allow.TranslatePoint(default, window)!.Value.X);
             window.Close();
 
@@ -96,18 +96,13 @@ public sealed class TerminalEditWindowTests
         });
 
     [Fact]
-    public Task Allow_AllowsOnlyOnceTheWindowHasBeenUpAMoment() =>
+    public Task A_click_on_Allow_allows_the_edit_at_once() =>
         HeadlessSession.On(async () =>
         {
             var screen = new Screen();
             var asking = screen.Ask(Prompt("work/github", ["Removes work/github for good: this vault has no recycle bin."]));
             var window = await screen.ShownAsync();
 
-            Click(window, "Allow");
-            await Task.Delay(200, Token);
-            Assert.False(asking.IsCompleted, "a click before the window was armed allowed the edit");
-
-            await screen.ArmAsync(window);
             Click(window, "Allow");
 
             Assert.Equal(ApprovalAnswer.ApprovedOnce, await asking.WaitAsync(_wait, Token));
@@ -216,7 +211,7 @@ public sealed class TerminalEditWindowTests
 
         internal async Task<Window> ShownAsync()
         {
-            await PromptedApp.UntilAsync(() => _windows.Count > 0);
+            await PromptedApp.UntilAsync(() => _windows.Count > 0 && IsInFront(_windows[^1]));
             DrawnFrame.Capture(_windows[^1]);
             return _windows[^1];
         }
@@ -224,7 +219,7 @@ public sealed class TerminalEditWindowTests
         internal async Task ArmAsync(Window window)
         {
             Clock.Advance(PromptViewModel.ArmingDelay);
-            await PromptedApp.UntilAsync(() => window.FindControl<Button>("Allow")!.IsEffectivelyEnabled);
+            await PromptedApp.UntilAsync(() => IsArmed(window));
         }
     }
 }

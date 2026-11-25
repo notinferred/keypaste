@@ -23,7 +23,7 @@
   <!-- A claim card where more than one item answers to the agent's name: the question, the agent's words, then the items for
        the person to pick one, and nothing is picked for them. The list is as tall as its items up to its most and scrolls past
        that; the agent's words keep a fixed height and scroll (THREATS.md T-2). Return presses Allow once only once an item is
-       picked and the card is armed; Escape denies, or cancels the confirmation. -->
+       picked and the card is armed; Escape denies. -->
 
   <Border Classes="claim" Classes.arming="{Binding IsArming}">
     <StackPanel>
@@ -33,7 +33,7 @@
 
         <StackPanel Spacing="4">
           <TextBlock Name="TitleText" Classes="claim-title size-15">
-            <Run Text="{Binding Verb}" /><Run Text="{Binding Agent}" /><Run Text="{Binding Asked}" /><Run Classes="claim-name size-15" Text="{Binding Key}" /><Run Text="?" />
+            <Run Text="Give " /><Run Text="{Binding Agent}" /><Run Text="{Binding Asked}" /><Run Classes="claim-name size-15" Text="{Binding Key}" /><Run Text="?" />
           </TextBlock>
           <StackPanel Orientation="Horizontal" Spacing="6" Height="20">
             <ctl:KpIcon Classes="claim-muted" Icon="key" Size="14" VerticalAlignment="Center" />
@@ -41,7 +41,7 @@
           </StackPanel>
         </StackPanel>
 
-        <StackPanel Spacing="12" IsVisible="{Binding IsChoosing}">
+        <StackPanel Spacing="12">
           <StackPanel Spacing="4">
             <TextBlock Name="SaysText" Classes="claim-label size-11" Text="{Binding SaysLabel}" Background="Transparent" ToolTip.Tip="{Binding QuoteNote}" />
             <Border Classes="claim-quote">
@@ -110,23 +110,15 @@
               </Grid>
             </StackPanel>
         </StackPanel>
-
-        <TextBlock Name="ConfirmText" Classes="claim-line size-13" Text="{Binding ConfirmText}" IsVisible="{Binding IsConfirming}" />
       </StackPanel>
 
       <Border Classes="claim-rule" />
 
       <StackPanel Classes="claim-foot">
-        <Button Name="Deny" Classes="claim keyed" Content="Deny" Tag="esc"
-                IsVisible="{Binding IsChoosing}" Command="{Binding DenyCommand}" />
-        <Button Name="Back" Classes="claim keyed" Content="Cancel" Tag="esc"
-                IsVisible="{Binding IsConfirming}" Command="{Binding BackCommand}" />
+        <Button Name="Deny" Classes="claim keyed" Content="Deny" Tag="esc" Command="{Binding DenyCommand}" />
         <Button Name="AlwaysAllow" Classes="claim" Content="Always allow" ToolTip.Tip="{Binding AlwaysTip}"
-                IsVisible="{Binding ShowsAlwaysAllow}" Command="{Binding AlwaysAllowCommand}" />
-        <Button Name="AllowOnce" Classes="claim keyed primary" Content="Allow once" Tag="&#x21A9;"
-                IsVisible="{Binding IsChoosing}" Command="{Binding AllowOnceCommand}" />
-        <Button Name="ConfirmAlways" Classes="claim keyed primary" Content="Always allow" Tag="&#x21A9;"
-                IsVisible="{Binding IsConfirming}" Command="{Binding ConfirmAlwaysCommand}" />
+                IsVisible="{Binding OffersAlways}" Command="{Binding AlwaysAllowCommand}" />
+        <Button Name="AllowOnce" Classes="claim keyed primary" Content="Allow once" Tag="&#x21A9;" Command="{Binding AllowOnceCommand}" />
       </StackPanel>
       <ProgressBar Name="TimeBar" Classes="claim-time" Value="{Binding TimeLeft}" AutomationProperties.Name="{Binding DeniesIn}" />
     </StackPanel>

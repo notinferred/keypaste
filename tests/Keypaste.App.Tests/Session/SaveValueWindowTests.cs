@@ -12,7 +12,7 @@ namespace Keypaste.App.Tests.Session;
 
 /// <summary>
 /// An agent's request to save a value in the app's own prompt window (F.79): focus on Cancel, no value entered for the
-/// person, Save armed a second after a value is entered, and the value handed back only on Save.
+/// person, Save pressable as soon as a value is entered, and the value handed back only on Save.
 /// </summary>
 public sealed class SaveValueWindowTests
 {
@@ -32,7 +32,7 @@ public sealed class SaveValueWindowTests
             channel.Shown += (_, window) => shown.Add(window);
 
             var saving = channel.AskToSaveAsync(Prompt(), Token).AsTask();
-            await PromptedApp.UntilAsync(() => shown.Count == 1);
+            await PromptedApp.UntilAsync(() => shown.Count == 1 && IsInFront(shown[0]));
             var window = Assert.IsType<SaveValueWindow>(shown[0]);
             DrawnFrame.Capture(window);
             var prompt = (SaveValueViewModel)window.DataContext!;
@@ -46,8 +46,8 @@ public sealed class SaveValueWindowTests
                 prompt.Value.Type(key);
             }
 
-            clock.Advance(PromptViewModel.ArmingDelay);
-            await PromptedApp.UntilAsync(() => window.FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled);
+            WindowInput.Drain();
+            Assert.True(window.FindControl<Button>("AllowOnce")!.IsEffectivelyEnabled);
             Click(window, "AllowOnce");
 
             Assert.Equal(new SaveAnswer(ApprovalAnswer.ApprovedOnce, "sk_live_new"), await saving.WaitAsync(_wait, Token));

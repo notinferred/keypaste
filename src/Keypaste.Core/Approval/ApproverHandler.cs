@@ -381,7 +381,7 @@ public sealed partial class ApproverHandler
     /// <summary>The agent a request's answers are remembered for: its bridge's label when it names one, otherwise null, which Settings alone decides.</summary>
     private static string? Named(CredentialRequest request) => AgentNames.IsNamed(request.ClientLabel) ? request.ClientLabel : null;
 
-    /// <summary>Remembers a person's confirmed always as this owner changes the rules.</summary>
+    /// <summary>Remembers a person's Always allow as this owner changes the rules.</summary>
     /// <returns>Null once it holds, otherwise why it does not.</returns>
     private string? Remember(Func<AgentRules, AgentRules> change)
     {

@@ -12,7 +12,7 @@ namespace Keypaste.Cli.Tests;
 /// <remarks>
 /// This is the display half of THREATS.md T-2. The reason arrives already sanitized and capped, so
 /// what is under test here is that the channel does not undo that — and that the default is no:
-/// <c>o</c> allows once, <c>a</c> asks to always allow when that is offered, and everything
+/// <c>o</c> allows once, <c>a</c> always allows in one step where that is offered, and everything
 /// else denies.
 /// </remarks>
 public sealed class TerminalApprovalChannelTests
@@ -142,11 +142,10 @@ public sealed class TerminalApprovalChannelTests
         Assert.DoesNotContain("keypaste: denied.", rig.Stderr.ToString(), StringComparison.Ordinal);
     }
 
-    /// <summary>Every later question a prompt asks, a confirmation, a pick or a value to save, is no channel too once input ends.</summary>
+    /// <summary>Every later question a prompt asks, a pick or a value to save, is no channel too once input ends.</summary>
     [Fact]
     public async Task EndOfInput_AtAnyLaterQuestion_IsNoChannel()
     {
-        Assert.Equal(ApprovalAnswer.NoChannel, await Build("a").Channel.AskAsync(Offering(), Token));
         Assert.Equal(new ItemPick(ApprovalAnswer.NoChannel, 0), await Build("1").Channel.AskToPickAsync(Picker(), Token));
         Assert.Equal(new SaveAnswer(ApprovalAnswer.NoChannel, null), await Build("t").Channel.AskToSaveAsync(SavePromptFor(), Token));
         Assert.Equal(new SaveAnswer(ApprovalAnswer.NoChannel, null), await Build("t", "sk_typed_value").Channel.AskToSaveAsync(SavePromptFor(), Token));
@@ -453,21 +452,19 @@ public sealed class TerminalApprovalChannelTests
     private static ApprovalPrompt Offering() =>
         ApprovalPrompt.For("Claude Code", new EntryName("env/dev", "STRIPE_KEY"), "password", "deploy billing", "claude-code") with { OffersAlways = true };
 
-    /// <summary>An always holds only once the person confirms it with <c>y</c>; anything else is a refusal that keeps nothing (F.78b).</summary>
-    [Theory]
-    [InlineData("a", "y", ApprovalAnswer.AlwaysAllowed, "keypaste: allowed, and always from now on.")]
-    [InlineData("a", "", ApprovalAnswer.Denied, "keypaste: denied. Nothing was released.")]
-    [InlineData("a", "o", ApprovalAnswer.Denied, "keypaste: denied. Nothing was released.")]
-    [InlineData("a", "n", ApprovalAnswer.Denied, "keypaste: denied. Nothing was released.")]
-    public async Task An_offered_always_is_confirmed_with_y_or_refused(string choice, string confirmation, ApprovalAnswer expected, string said)
+    /// <summary>An offered always takes effect on <c>a</c> alone, asks nothing more, and says what keypaste keeps and where to undo it.</summary>
+    [Fact]
+    public async Task An_offered_always_takes_effect_on_a_alone()
     {
-        var rig = Build(choice, confirmation);
+        var rig = Build("a");
 
-        Assert.Equal(expected, await rig.Channel.AskAsync(Offering(), Token));
-        Assert.Contains("[d] deny  [o] once  [a] always  ", rig.Prompt.PromptsSeen[0], StringComparison.Ordinal);
+        Assert.Equal(ApprovalAnswer.AlwaysAllowed, await rig.Channel.AskAsync(Offering(), Token));
+        Assert.Contains("[d] deny  [o] once  [a] always  ", Assert.Single(rig.Prompt.PromptsSeen), StringComparison.Ordinal);
         Assert.DoesNotContain("block", rig.Prompt.PromptsSeen[0], StringComparison.Ordinal);
-        Assert.Contains(said, rig.Stderr.ToString(), StringComparison.Ordinal);
-        Assert.Contains("Always give claude-code this item's password without asking you?", rig.Stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains("  From now on keypaste gives claude-code this item's password without asking you.", rig.Stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains("  Remove it on the agent's page in the keypaste app to be asked again.", rig.Stderr.ToString(), StringComparison.Ordinal);
+        Assert.Contains("keypaste: allowed, and always from now on.", rig.Stderr.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("[y]", rig.Stderr.ToString(), StringComparison.Ordinal);
     }
 
     /// <summary>Blocking is set on the agent's page in the app: <c>b</c> at a prompt is a refusal like any other key.</summary>
@@ -483,11 +480,12 @@ public sealed class TerminalApprovalChannelTests
     [Fact]
     public async Task A_picker_offers_Always_allow_alone_for_the_item_picked()
     {
-        var rig = Build("2", "a", "y");
+        var rig = Build("2", "a");
 
         var pick = await rig.Channel.AskToPickAsync(Picker() with { Label = "claude-code", OffersAlways = true }, Token);
 
         Assert.Equal(new ItemPick(ApprovalAnswer.AlwaysAllowed, 1), pick);
+        Assert.Equal(2, rig.Prompt.PromptsSeen.Count);
         Assert.Contains("[a] always  ", rig.Prompt.PromptsSeen[1], StringComparison.Ordinal);
         Assert.DoesNotContain("[b]", rig.Prompt.PromptsSeen[1], StringComparison.Ordinal);
     }

@@ -70,19 +70,13 @@ public sealed class DesktopRunApprovalTests
         });
 
     [Fact]
-    public Task BothAllowButtons_ArmAfterTheDelay() =>
+    public Task A_click_on_Run_once_answers_at_once() =>
         HeadlessSession.On(async () =>
         {
             await using var app = await PromptedApp.StartAsync();
             var reply = app.AskRun();
             var window = await app.PromptAsync();
 
-            Click(window, "AllowOnce");
-            Click(window, "AllowOnce");
-            await Task.Delay(200, Token);
-            Assert.False(reply.IsCompleted, "a click before the prompt was armed answered it");
-
-            await app.ArmAsync();
             Click(window, "AllowOnce");
             Assert.Equal(EnvOutcome.Resolved, (await reply.WaitAsync(_wait, Token))?.Set.Outcome);
         });

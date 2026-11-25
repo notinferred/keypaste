@@ -11,7 +11,7 @@ public sealed record KnownAgent(string Name, bool Run);
 /// <param name="Rule">Its rule for that agent.</param>
 public sealed record AgentCategoryRule(string Agent, FieldCategory Category, CategoryRule Rule);
 
-/// <summary>A person's Always allow or Always block for one agent and one item's field, kept once they confirmed it.</summary>
+/// <summary>A person's Always allow or Always block for one agent and one item's field, kept once they chose it.</summary>
 /// <param name="Agent">The agent's name.</param>
 /// <param name="Item">The item's UUID as hex.</param>
 /// <param name="Field">What a request names within the item: the field, or <c>attachment:</c> and the attachment's name.</param>
@@ -298,10 +298,10 @@ public sealed record AgentRules
     public static string AllowConfirmation(string agent, FieldCategory category) =>
         $"{agent} will receive every {FieldCategories.One(category)} value without asking.";
 
-    /// <summary>These rules remembering a person's Always allow or Always block, once they confirmed it, in place of any earlier one for that agent and field.</summary>
+    /// <summary>These rules remembering a person's Always allow or Always block, once they chose it, in place of any earlier one for that agent and field.</summary>
     /// <param name="answer">The answer, its rule Allow or Block.</param>
-    /// <param name="confirmed">Whether the person confirmed it; without that nothing changes.</param>
-    /// <returns>The new rules, or these when it was not confirmed.</returns>
+    /// <param name="confirmed">Whether the person chose it themselves; without that nothing changes.</param>
+    /// <returns>The new rules, or these when the person did not choose it.</returns>
     /// <exception cref="ArgumentException">The answer names no agent, item or field, or its rule is Ask.</exception>
     /// <exception cref="InvalidOperationException">Nothing more can be remembered (<see cref="HasRoom"/>).</exception>
     public AgentRules Remembering(RememberedAnswer answer, bool confirmed)
@@ -324,10 +324,10 @@ public sealed record AgentRules
         return this with { Answers = [.. kept, answer with { Item = answer.Item.ToLowerInvariant() }] };
     }
 
-    /// <summary>These rules remembering a person's pick, once they confirmed it, in place of any earlier one for that agent, name and field.</summary>
+    /// <summary>These rules remembering a person's pick, once they chose Always allow for it, in place of any earlier one for that agent, name and field.</summary>
     /// <param name="pick">The pick.</param>
-    /// <param name="confirmed">Whether the person confirmed it; without that nothing changes.</param>
-    /// <returns>The new rules, or these when it was not confirmed.</returns>
+    /// <param name="confirmed">Whether the person chose it themselves; without that nothing changes.</param>
+    /// <returns>The new rules, or these when the person did not choose it.</returns>
     /// <exception cref="ArgumentException">The pick names no agent, name, field or item.</exception>
     /// <exception cref="InvalidOperationException">Nothing more can be remembered (<see cref="HasRoom"/>).</exception>
     public AgentRules Remembering(RememberedPick pick, bool confirmed)

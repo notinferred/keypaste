@@ -44,6 +44,6 @@ public enum ApprovalAnswer
     /// <summary>A human allowed this one request and nothing after it.</summary>
     ApprovedOnce = 8,
 
-    /// <summary>A human allowed this request and confirmed that this agent always gets this item's field, or the item they picked, without asking.</summary>
+    /// <summary>A human allowed this request with Always allow: this agent gets this item's field, or the item they picked, without asking from now on.</summary>
     AlwaysAllowed = 9,
 }
