@@ -69,6 +69,27 @@ public sealed class LogRowTests
         Assert.Equal("Asks again before filling", unallow.Action);
     }
 
+    /// <summary>
+    /// The browser's line is the person's, in the browser its pairing names, and its detail names the extension and the
+    /// pairing, never an agent; a page's list of logins is a lookup and a fill is not.
+    /// </summary>
+    [Fact]
+    public void A_browser_line_reads_as_you_in_your_browser_and_only_a_pages_list_is_a_lookup()
+    {
+        var browser = Entry("browser", "granted", "prompt") with { Client = "Chrome on studio", Label = "Chrome on studio", Name = "kabnajpeogcbndlfgibmhiichfkgpdla" };
+        var fill = Row(browser with { Field = "fill", Entry = "web/GitHub" });
+        var lookup = Row(browser with { Field = "list", Method = "exposure", Reason = "listed 2 login(s) by name, no password, on https://github.com" });
+        var unnamed = Row(browser with { Field = "pair", Decision = "denied", Label = string.Empty, Client = string.Empty });
+        var removed = Row(browser with { Field = "remove", Method = "removed" });
+
+        Assert.Equal(("you, in Chrome on studio", true, true, false), (fill.Actor, fill.ByYou, fill.ByBrowser, fill.IsLookup));
+        Assert.Equal(("Listed logins by name", true, true), (lookup.Action, lookup.ByBrowser, lookup.IsLookup));
+        Assert.Equal("you, in your browser", unnamed.Actor);
+        Assert.Equal((LogRow.You, true, false), (removed.Actor, removed.ByYou, removed.ByBrowser));
+        Assert.Contains("extension kabnajpeogcbndlfgibmhiichfkgpdla, pairing Chrome on studio", fill.Detail, StringComparison.Ordinal);
+        Assert.DoesNotContain("agent", fill.Detail, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void A_refusal_is_denied_in_danger()
     {

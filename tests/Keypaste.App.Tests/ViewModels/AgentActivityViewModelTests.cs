@@ -4,6 +4,7 @@ using Keypaste.Core;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Browser;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Tests;
 using Xunit;
@@ -338,6 +339,43 @@ public sealed class AgentActivityViewModelTests
                 .. model.Waiting.Select(row => $"{row.Who} {row.What} {row.Left}"),
             ]);
 
+    /// <summary>
+    /// The person's browser is no agent: its lookups and fills in this vault, read as they are appended, make no row and move
+    /// no agent's last request, while the agent's request beside them does.
+    /// </summary>
+    [Fact]
+    public async Task The_browsers_lines_make_no_agent_row_and_no_agents_last_request()
+    {
+        await using var app = await App.StartAsync();
+        using var model = app.Model();
+        var vault = app.Authority.Session.Identity!.Key;
+
+        app.Clock.Advance(TimeSpan.FromMinutes(5));
+        app.Write(
+            RequestRecords.Browser(BrowserIdentity.ChromeWebStore, "Chrome on studio", BrowserAct.List, AuditDecision.Granted, AuditMethod.Exposure, "listed 1 login(s) by name, no password, on https://github.com", app.Session, vault),
+            RequestRecords.BrowserFill(BrowserIdentity.ChromeWebStore, "Chrome on studio", new EntryName(string.Empty, "example"), "https://github.com", AuditDecision.Granted, AuditMethod.Prompt, "filled", app.Session, vault));
+        app.Clock.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.DoesNotContain(model.Rows, row => row.Key.Contains("Chrome", StringComparison.Ordinal) || row.Title.Contains("Chrome", StringComparison.Ordinal));
+
+        app.Clock.Advance(TimeSpan.FromMinutes(5));
+        app.Write(new AuditRecord
+        {
+            Tool = AuditTools.Credential,
+            Client = new AuditClient("claude-code", null, "ci-probe"),
+            Args = AuditArgs.ForCredentialRequest("example", "password", "deploy"),
+            Decision = AuditDecision.Granted,
+            Method = AuditMethod.Prompt,
+            Reason = "a person approved this request",
+            Session = app.Session,
+            Vault = vault,
+        });
+        app.Clock.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(app.Clock.GetUtcNow().AddSeconds(-1), Row(model, "ci-probe").LastSeen);
+        Assert.DoesNotContain(model.Rows, row => row.Title.Contains("Chrome", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task A_lock_empties_the_list_because_the_authority_holds_nothing()
     {
@@ -470,6 +508,20 @@ public sealed class AgentActivityViewModelTests
                     Session = Session,
                 },
                 Token).AsTask();
+
+        /// <summary>Appends the records given, in order, on the app's clock.</summary>
+        internal void Write(params AuditRecord[] records)
+        {
+            Assert.True(AuditLog.TryOpen(KeypasteHome.AuditPath(Fixture.Home), Clock, out var log, out var error), error);
+
+            using (log)
+            {
+                foreach (var record in records)
+                {
+                    Assert.True(log.TryAppend(record, out var failure), failure);
+                }
+            }
+        }
 
         /// <summary>Appends a prompted grant naming <paramref name="session"/>, as the bridge writes one.</summary>
         internal void Audit(string entry, string session)

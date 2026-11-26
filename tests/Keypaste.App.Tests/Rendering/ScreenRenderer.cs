@@ -2032,6 +2032,12 @@ public sealed class ScreenRenderer
         log.Filter = log.Filters.Single(option => option.Filter == LogFilter.You);
         Save(window, output, "04-settings-activity-log-you");
 
+        log.Filter = log.Filters.Single(option => option.Filter == LogFilter.Browser);
+        Save(window, output, "04-settings-activity-log-browser");
+        log.ShowLookups = true;
+        Save(window, output, "04-settings-activity-log-browser-lookups");
+        log.ShowLookups = false;
+
         log.Filter = log.Filters[0];
         log.VerifyCommand.Press();
         Save(window, output, "04-settings-activity-log-verify");
@@ -2760,6 +2766,11 @@ public sealed class ScreenRenderer
                     Reason = "approved once",
                     Entries = ["env/acme-api/OPENAI_API_KEY_FOR_EMBEDDINGS", "env/acme-api/JWT_SIGNING_KEY", "env/acme-api/SENTRY_DSN"],
                 });
+
+                // The person in their browser: a page's lookup, which the screen hides until asked, and the fill it led to.
+                var chrome = Core.Browser.BrowserIdentity.ChromeWebStore;
+                Write(TimeSpan.FromMinutes(6), RequestRecords.Browser(chrome, "Chrome on studio", BrowserAct.List, AuditDecision.Granted, AuditMethod.Exposure, "listed 1 login(s) by name, no password, on https://linear.app", null, null));
+                Write(TimeSpan.FromSeconds(4), RequestRecords.BrowserFill(chrome, "Chrome on studio", new EntryName("Work", "linear"), "https://linear.app", AuditDecision.Granted, AuditMethod.Picked, "you picked it in the page", null, null));
             }
         }
 

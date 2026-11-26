@@ -61,14 +61,26 @@
           </StackPanel>
         </ctl:HeaderRow>
 
-        <Border Classes="segmented" Name="Filter" HorizontalAlignment="Left" IsVisible="{Binding HasTable}">
-          <StackPanel Orientation="Horizontal">
-            <RadioButton Classes="segment" GroupName="LogFilter" Content="{x:Static res:Strings.All}" IsChecked="{Binding ShowAll}" />
-            <RadioButton Classes="segment" GroupName="LogFilter" Content="{x:Static res:Strings.Agents}" IsChecked="{Binding ShowAgents}" />
-            <RadioButton Classes="segment" GroupName="LogFilter" Content="{x:Static res:Strings.You}" IsChecked="{Binding ShowYou}" />
-            <RadioButton Classes="segment" GroupName="LogFilter" Content="{x:Static res:Strings.Denied}" IsChecked="{Binding ShowDenied}" />
-          </StackPanel>
-        </Border>
+        <!-- Who acted, then whether the browser's lookups are listed; they wrap below the filter where the content is narrow. -->
+        <WrapPanel Orientation="Horizontal" IsVisible="{Binding HasTable}">
+          <Border Classes="segmented" Name="Filter" Margin="0,0,16,8">
+            <StackPanel Orientation="Horizontal">
+              <RadioButton Classes="segment" GroupName="LogFilter" Content="{x:Static res:Strings.All}" IsChecked="{Binding ShowAll}" />
+              <RadioButton Classes="segment" GroupName="LogFilter" Content="{x:Static res:Strings.Agents}" IsChecked="{Binding ShowAgents}" />
+              <RadioButton Classes="segment" GroupName="LogFilter" Content="{x:Static res:Strings.YourBrowser}" IsChecked="{Binding ShowBrowser}" />
+              <RadioButton Classes="segment" GroupName="LogFilter" Content="{x:Static res:Strings.You}" IsChecked="{Binding ShowYou}" />
+              <RadioButton Classes="segment" GroupName="LogFilter" Content="{x:Static res:Strings.Denied}" IsChecked="{Binding ShowDenied}" />
+            </StackPanel>
+          </Border>
+          <CheckBox Name="ShowLookups"
+                    Margin="0,0,0,8"
+                    VerticalAlignment="Center"
+                    Content="{x:Static res:Strings.ShowBrowserLookups}"
+                    ToolTip.Tip="{x:Static res:Strings.ShowBrowserLookupsHelp}"
+                    AutomationProperties.HelpText="{x:Static res:Strings.ShowBrowserLookupsHelp}"
+                    IsVisible="{Binding OffersLookups}"
+                    IsChecked="{Binding ShowLookups}" />
+        </WrapPanel>
 
         <!-- One sentence about a file that is unreadable or unchecked; an edited one says so in the status. A log never written to is the empty state below. -->
         <Border Classes="card filled"
@@ -223,8 +235,10 @@
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource KpTextMuted}" />
 
+                            <!-- A browser's actor carries its pairing's name, longer than the column; the tooltip holds it whole. -->
                             <TextBlock Grid.Column="1"
                                        Text="{Binding Actor}"
+                                       ToolTip.Tip="{Binding Actor}"
                                        Classes="size-13"
                                        FontWeight="Medium"
                                        TextTrimming="CharacterEllipsis"

@@ -118,8 +118,14 @@ internal sealed record LogRow
     /// <summary>Whether this release was served under a reason no person read (THREATS.md T-12).</summary>
     internal bool ReasonUnread => Source.ReasonUnread;
 
-    /// <summary>Whether the person did this themselves, rather than an agent or a token asking.</summary>
+    /// <summary>Whether the person did this themselves, in keypaste or in their browser, rather than an agent or a token asking.</summary>
     internal bool ByYou { get; private init; }
+
+    /// <summary>Whether the person's paired browser made the request, through keypaste's extension.</summary>
+    internal bool ByBrowser => Source.ByBrowser;
+
+    /// <summary>Whether this is the browser asking which logins match a page, which releases no password.</summary>
+    internal bool IsLookup => Source.IsBrowserLookup;
 
     internal bool Denied => !Source.Granted;
 
@@ -131,8 +137,8 @@ internal sealed record LogRow
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(clock);
 
-        var byYou = Is(entry.Method, "share-created") || Is(entry.Method, "share-revoked") || Is(entry.Tool, "token bundle")
-            || (Is(entry.Tool, "browser") && Is(entry.Method, "removed"));
+        // Every browser line is the person's: in their browser, or a pairing they removed in keypaste.
+        var byYou = Is(entry.Tool, AuditTools.Browser) || Is(entry.Method, "share-created") || Is(entry.Method, "share-revoked") || Is(entry.Tool, "token bundle");
         var (secrets, where) = Place(entry);
         var (result, tone) = Outcome(entry);
         var local = entry.At is { } at ? TimeZoneInfo.ConvertTime(at, clock.LocalTimeZone) : (DateTimeOffset?)null;
@@ -148,7 +154,7 @@ internal sealed record LogRow
             Time = local is { } shown ? PersonTime.ClockWithSeconds(shown) : _none,
             Date = local?.Date,
             When = local?.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) ?? entry.Timestamp,
-            Actor = byYou ? You : ActorOf(entry),
+            Actor = entry.ByBrowser ? InBrowser(entry) : byYou ? You : ActorOf(entry),
             Action = ActionOf(entry),
             Secrets = secrets,
             Where = Last(where),
@@ -162,14 +168,11 @@ internal sealed record LogRow
         };
     }
 
+    /// <summary>The person in their browser, named by the pairing a browser's line carries as its label: <c>you, in Chrome on studio</c>.</summary>
+    private static string InBrowser(AuditEntry entry) => entry.Label.Length > 0 ? $"{You}, in {entry.Label}" : $"{You}, in your browser";
+
     private static string ActorOf(AuditEntry entry)
     {
-        // A browser's line names the build as its client and the pairing as its label.
-        if (Is(entry.Tool, "browser"))
-        {
-            return entry.Label.Length > 0 ? entry.Label : "keypaste's extension";
-        }
-
         if (Is(entry.Method, "token"))
         {
             return TokenAuditReason.TryName(entry.Reason, out var name) ? name : "token";
@@ -331,9 +334,10 @@ internal sealed record LogRow
             lines.Add(string.Join(", ", entry.Entries));
         }
 
+        // A browser's line names the extension's build as its client and the pairing as its label.
         if (entry.Name.Length > 0 && entry.Label.Length > 0)
         {
-            lines.Add($"agent {entry.Name}, label {entry.Label}");
+            lines.Add(Is(entry.Tool, AuditTools.Browser) ? $"extension {entry.Name}, pairing {entry.Label}" : $"agent {entry.Name}, label {entry.Label}");
         }
 
         return lines.Count == 0 ? null : string.Join(Environment.NewLine, lines);

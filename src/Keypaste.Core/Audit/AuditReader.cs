@@ -97,6 +97,17 @@ public sealed record AuditEntry
 
     /// <summary>Whether this is the record sealing a compacted log rather than a request, which no listing shows.</summary>
     public bool IsCompaction => string.Equals(Method, AuditCompaction.Method, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Whether the person's paired browser made this request through keypaste's extension, rather than an agent: a pairing,
+    /// a pairing's check, a page's lookup or a fill. A pairing the person removed in keypaste itself is not the browser's.
+    /// </summary>
+    /// <remarks>Only the vault's owner writes the browser's lines, under a tool name no bridge can give its own.</remarks>
+    public bool ByBrowser => string.Equals(Tool, AuditTools.Browser, StringComparison.Ordinal)
+        && !string.Equals(Method, AuditLog.Wire(AuditMethod.Removed), StringComparison.Ordinal);
+
+    /// <summary>Whether this is the browser asking which logins match a page, which lists them by name and releases no password.</summary>
+    public bool IsBrowserLookup => ByBrowser && string.Equals(Field, RequestRecords.BrowserListField, StringComparison.Ordinal);
 }
 
 /// <summary>Where an incremental read of the log stopped.</summary>

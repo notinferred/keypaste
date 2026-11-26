@@ -82,6 +82,9 @@ public enum BrowserAct
 /// </remarks>
 public static class RequestRecords
 {
+    /// <summary>The field a browser's line names for a page's list of its logins by name.</summary>
+    internal const string BrowserListField = "list";
+
     /// <summary>The client a <c>keypaste run --session</c> request is recorded under.</summary>
     public const string SessionRunner = "keypaste run --session";
 
@@ -614,7 +617,7 @@ public static class RequestRecords
                     BrowserAct.Check => "check",
                     BrowserAct.Remove => "remove",
                     BrowserAct.Fill => "fill",
-                    BrowserAct.List => "list",
+                    BrowserAct.List => BrowserListField,
                     _ => "pair",
                 },
             },

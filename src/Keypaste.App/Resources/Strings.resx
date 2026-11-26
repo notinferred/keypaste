@@ -462,6 +462,9 @@
   <data name="WhereValueGoes" xml:space="preserve"><value>Where {0} goes</value></data>
   <data name="Words" xml:space="preserve"><value>Words</value></data>
   <data name="You" xml:space="preserve"><value>You</value></data>
+  <data name="YourBrowser" xml:space="preserve"><value>Your browser</value></data>
+  <data name="ShowBrowserLookups" xml:space="preserve"><value>Show browser lookups</value></data>
+  <data name="ShowBrowserLookupsHelp" xml:space="preserve"><value>Lists each time your browser asked which logins match a page. A lookup names logins and releases no password.</value></data>
   <data name="YubiKey" xml:space="preserve"><value>YubiKey</value></data>
   <data name="Zoom" xml:space="preserve"><value>Zoom</value></data>
   <data name="ZoomIn" xml:space="preserve"><value>Zoom in</value></data>

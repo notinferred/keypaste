@@ -111,7 +111,7 @@ When nothing holds the vault unlocked, every request is denied and the agent is 
 
 ## The audit log
 
-The approver appends one JSON line to `~/.keypaste/audit.jsonl` for every call it answers. The bridge writes one only for a call it refused itself or that no approver answered. `KEYPASTE_HOME` moves the folder; a bridge's `--audit-log` moves only its own lines. In the app the log is Activity, in Agents.
+The approver appends one JSON line to `~/.keypaste/audit.jsonl` for every call it answers. The bridge writes one only for a call it refused itself or that no approver answered. `KEYPASTE_HOME` moves the folder; a bridge's `--audit-log` moves only its own lines. In the app the log is Activity, in Agents, which lists your browser's requests as yours and hides its lookups until you show them; the file keeps every line.
 
 A call whose line cannot be written is refused. A line never holds a value, but item names and reasons are logged, so treat the log as sensitive. On Windows it inherits its folder's permissions, so keep `KEYPASTE_HOME` in a folder only you can read.
 

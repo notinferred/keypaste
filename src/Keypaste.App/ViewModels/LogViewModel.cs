@@ -12,10 +12,13 @@ internal enum LogFilter
 {
     All,
 
-    /// <summary>What agents and tokens asked for, and what came of it, approvals included.</summary>
+    /// <summary>What agents and tokens asked for, and what came of it, approvals included; never the person's browser.</summary>
     Agents,
 
-    /// <summary>What the person did themselves: shares, revoked links, bundles.</summary>
+    /// <summary>What the person's paired browser asked for through keypaste's extension: pairings, fills and lookups.</summary>
+    Browser,
+
+    /// <summary>What the person did themselves: in their browser, shares, revoked links, bundles.</summary>
     You,
 
     /// <summary>Every refusal, whoever or whatever refused.</summary>
@@ -45,6 +48,11 @@ internal sealed record LogFilterOption(LogFilter Filter, string Words);
 /// two times tie, so its day sections hold; the filters narrow it.
 /// </para>
 /// <para>
+/// <b>The browser's lookups wait to be asked for.</b> A page's list of its logins by name releases no password and comes on
+/// every page with a login form, so it would bury what agents asked for. Show browser lookups brings them back, the status
+/// counts them while they are hidden, and a lookup the chain cannot vouch for is never hidden.
+/// </para>
+/// <para>
 /// <b>The chain is checked on every load.</b> A row the chain cannot vouch for is marked, or a record somebody
 /// inserted would read exactly like one keypaste wrote. The verdict waits to be asked for, and its limits behind Learn more.
 /// </para>
@@ -69,6 +77,9 @@ internal sealed partial class LogViewModel : ObservableObject
     private bool _verdictShown;
     private bool _limitsShown;
     private LogFilterOption _filter;
+    private bool _showLookups;
+    private bool _hidesLookups;
+    private bool _offersLookups;
 
     /// <param name="home">keypaste's home, whose <c>audit.jsonl</c> is read.</param>
     /// <param name="clock">The clock times are shown against.</param>
@@ -102,6 +113,7 @@ internal sealed partial class LogViewModel : ObservableObject
     [
         new(LogFilter.All, string.Empty),
         new(LogFilter.Agents, "agent and token requests only"),
+        new(LogFilter.Browser, "your browser only"),
         new(LogFilter.You, "your own actions only"),
         new(LogFilter.Denied, "refused calls only"),
     ];
@@ -116,6 +128,7 @@ internal sealed partial class LogViewModel : ObservableObject
                 OnPropertyChanged(nameof(ShowAll));
                 OnPropertyChanged(nameof(ShowYou));
                 OnPropertyChanged(nameof(ShowAgents));
+                OnPropertyChanged(nameof(ShowBrowser));
                 OnPropertyChanged(nameof(ShowDenied));
                 Apply();
             }
@@ -137,6 +150,13 @@ internal sealed partial class LogViewModel : ObservableObject
     }
 
     /// <inheritdoc cref="ShowAll"/>
+    internal bool ShowBrowser
+    {
+        get => _filter.Filter == LogFilter.Browser;
+        set => Choose(value, LogFilter.Browser);
+    }
+
+    /// <inheritdoc cref="ShowAll"/>
     internal bool ShowYou
     {
         get => _filter.Filter == LogFilter.You;
@@ -149,6 +169,22 @@ internal sealed partial class LogViewModel : ObservableObject
         get => _filter.Filter == LogFilter.Denied;
         set => Choose(value, LogFilter.Denied);
     }
+
+    /// <summary>Whether the browser's lookups are listed; off each time the screen opens.</summary>
+    internal bool ShowLookups
+    {
+        get => _showLookups;
+        set
+        {
+            if (SetProperty(ref _showLookups, value))
+            {
+                Apply();
+            }
+        }
+    }
+
+    /// <summary>Whether the filter keeps a browser lookup that may be hidden, so Show browser lookups would change the table.</summary>
+    internal bool OffersLookups => _offersLookups;
 
     /// <summary>The line opened to its detail, or null.</summary>
     [ObservableProperty]
@@ -164,11 +200,15 @@ internal sealed partial class LogViewModel : ObservableObject
 
     internal bool FilterEmpty => HasTable && _rows.Count == 0;
 
-    /// <summary>Whether a filter hides every line, so widening it would show some.</summary>
-    internal bool OffersShowAll => FilterEmpty && _filter.Filter != LogFilter.All;
+    /// <summary>Whether a filter, or hiding the browser's lookups, hides every line, so widening it would show some.</summary>
+    internal bool OffersShowAll => FilterEmpty && (_filter.Filter != LogFilter.All || _hidesLookups);
 
     [RelayCommand]
-    private void ShowWholeLog() => ShowAll = true;
+    private void ShowWholeLog()
+    {
+        ShowAll = true;
+        ShowLookups = true;
+    }
 
     /// <summary>Whether the log holds and how many records the table shows of how many the file holds, under which filter; empty with no table.</summary>
     internal string Status => _status;
@@ -349,13 +389,21 @@ internal sealed partial class LogViewModel : ObservableObject
         Func<LogRow, bool> keep = _filter.Filter switch
         {
             LogFilter.Agents => row => !row.ByYou,
+            LogFilter.Browser => row => row.ByBrowser,
             LogFilter.You => row => row.ByYou,
             LogFilter.Denied => row => row.Denied,
             _ => _ => true,
         };
 
-        _rows = Divide([.. _all.Where(keep)]);
-        var tally = Tally(_rows.Count, _history.Total, _filter.Words);
+        // A lookup the chain cannot vouch for is never hidden, or a line written into the log could pass as one unseen.
+        static bool Hideable(LogRow row) => row.IsLookup && row.Verified;
+
+        var kept = _all.Where(keep).ToList();
+        _offersLookups = kept.Any(Hideable);
+        _rows = Divide(_showLookups ? kept : [.. kept.Where(row => !Hideable(row))]);
+        _hidesLookups = _rows.Count < kept.Count;
+        var words = string.Join(" · ", new[] { _filter.Words, _hidesLookups ? "browser lookups hidden" : string.Empty }.Where(part => part.Length > 0));
+        var tally = Tally(_rows.Count, _history.Total, words);
         _status = _history.Kind switch
         {
             AuditReadKind.Intact => $"Log intact · {tally}",
@@ -365,6 +413,7 @@ internal sealed partial class LogViewModel : ObservableObject
         };
 
         OnPropertyChanged(nameof(Rows));
+        OnPropertyChanged(nameof(OffersLookups));
         OnPropertyChanged(nameof(Status));
         OnPropertyChanged(nameof(HasRows));
         OnPropertyChanged(nameof(FilterEmpty));

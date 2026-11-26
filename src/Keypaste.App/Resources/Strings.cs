@@ -617,6 +617,8 @@ public static class Strings
     public static string SharedNameActivity => Manager.GetString("SharedNameActivity", CultureInfo.CurrentUICulture)!;
     public static string SharedNameNothingTells => Manager.GetString("SharedNameNothingTells", CultureInfo.CurrentUICulture)!;
     public static string ShowAll => Manager.GetString("ShowAll", CultureInfo.CurrentUICulture)!;
+    public static string ShowBrowserLookups => Manager.GetString("ShowBrowserLookups", CultureInfo.CurrentUICulture)!;
+    public static string ShowBrowserLookupsHelp => Manager.GetString("ShowBrowserLookupsHelp", CultureInfo.CurrentUICulture)!;
     public static string ShowEachKey => Manager.GetString("ShowEachKey", CultureInfo.CurrentUICulture)!;
     public static string ShowEachKeyInValue => Manager.GetString("ShowEachKeyInValue", CultureInfo.CurrentUICulture)!;
     public static string ShowHistory => Manager.GetString("ShowHistory", CultureInfo.CurrentUICulture)!;
@@ -747,6 +749,7 @@ public static class Strings
     public static string Words => Manager.GetString("Words", CultureInfo.CurrentUICulture)!;
     public static string Yes => Manager.GetString("Yes", CultureInfo.CurrentUICulture)!;
     public static string You => Manager.GetString("You", CultureInfo.CurrentUICulture)!;
+    public static string YourBrowser => Manager.GetString("YourBrowser", CultureInfo.CurrentUICulture)!;
     public static string YourHardwareKeyAsksForATouchWhenItSaves => Manager.GetString("YourHardwareKeyAsksForATouchWhenItSaves", CultureInfo.CurrentUICulture)!;
     public static string YubiKey => Manager.GetString("YubiKey", CultureInfo.CurrentUICulture)!;
     public static string YubiKeyLabel => Manager.GetString("YubiKeyLabel", CultureInfo.CurrentUICulture)!;

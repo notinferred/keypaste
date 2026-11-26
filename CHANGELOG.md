@@ -4,6 +4,8 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## 1.0.0
 
+Agents › Activity says who acted on each line: an agent by its name, or you, in the browser you paired, for its pairings and fills. A new filter, Your browser, lists the browser's lines alone, and Agents no longer includes them. The browser's lookups, which list a page's logins by name and release no password, are hidden until you choose Show browser lookups, and the line above the table counts what is hidden; the audit log itself still records every lookup, and `keypaste log` shows them all.
+
 New's menu in the sidebar shows its choices again; it had opened empty. An item's notes can be selected, and copying a selection clears it from the clipboard after the countdown, as Copy password does. The Agents screen's list starts level with Items' instead of lower.
 
 The app's title band is thinner, New spans the sidebar, the item list shows its count beside its title with the search under it, and a new sidebar place, Other, lists identities, SSH keys and Wi-Fi networks.

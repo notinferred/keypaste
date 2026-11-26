@@ -1,5 +1,8 @@
+using Keypaste.App.Resources;
 using Keypaste.App.ViewModels;
+using Keypaste.Core;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Browser;
 using Xunit;
 
 namespace Keypaste.App.Tests.ViewModels;
@@ -336,6 +339,115 @@ public sealed class LogViewModelTests : IDisposable
         Assert.False(model.FilterEmpty);
     }
 
+    /// <summary>
+    /// The browser's requests are the person's, in their browser: Your browser keeps them alone, You keeps them with the
+    /// person's shares, and Agents never holds one, so an agent's requests are never mixed with the person's autofill.
+    /// </summary>
+    [Fact]
+    public void Your_browser_keeps_the_browsers_requests_and_agents_never_holds_one()
+    {
+        _home.Write(
+            Bridge(AuditDecision.Granted, AuditMethod.Prompt, "env/acme-api/dev/DATABASE_URL"),
+            BrowserFill(AuditMethod.Prompt),
+            BrowserFill(AuditMethod.Picked),
+            new AuditRecord
+            {
+                Tool = "share",
+                Client = new AuditClient("keypaste share", "1.0.0", null),
+                Args = new AuditArgs { Entry = "Work/github", Field = "password" },
+                Decision = AuditDecision.Granted,
+                Method = AuditMethod.ShareCreated,
+                Reason = "share abc: 1 view, expires 2026-07-29T09:12:44Z, to maya@acme.dev",
+            });
+
+        var model = new LogViewModel(_home.Home);
+
+        model.ShowBrowser = true;
+        Assert.Equal(["you, in Chrome on studio", "you, in Chrome on studio"], model.Rows.Select(row => row.Actor));
+        Assert.Equal(["You picked it in the page", Strings.AllowedOnce], model.Rows.Select(row => row.Result));
+        Assert.Equal("Log intact · 2 of 4 records · your browser only", model.Status);
+
+        model.ShowAgents = true;
+        Assert.Equal("DATABASE_URL", Assert.Single(model.Rows).Secrets);
+
+        model.ShowYou = true;
+        Assert.Equal(3, model.Rows.Count);
+        Assert.DoesNotContain(model.Rows, row => row.Actor == "claude-code");
+    }
+
+    /// <summary>
+    /// A page's lookup is hidden when the screen opens, and the status counts it; Show browser lookups lists it again under
+    /// every filter that holds it, is offered only where one is, and a fill is never hidden.
+    /// </summary>
+    [Fact]
+    public void The_browsers_lookups_are_hidden_until_asked_for_and_the_status_says_so()
+    {
+        _home.Write(
+            BrowserLookup("listed 2 login(s) by name, no password, on https://github.com"),
+            BrowserFill(AuditMethod.Prompt),
+            BrowserLookup("listed 1 login(s) by name, no password, on https://linear.app"),
+            Bridge(AuditDecision.Granted, AuditMethod.Prompt, "env/acme-api/dev/DATABASE_URL"));
+
+        var model = new LogViewModel(_home.Home);
+
+        Assert.True(model.OffersLookups);
+        Assert.False(model.ShowLookups);
+        Assert.DoesNotContain(model.Rows, row => row.IsLookup);
+        Assert.Equal(["DATABASE_URL", "GitHub · fill"], model.Rows.Select(row => row.Secrets));
+        Assert.Equal("Log intact · 2 of 4 records · browser lookups hidden", model.Status);
+
+        model.ShowBrowser = true;
+        Assert.Equal("Filled a login", Assert.Single(model.Rows).Action);
+        Assert.Equal("Log intact · 1 of 4 records · your browser only · browser lookups hidden", model.Status);
+
+        model.ShowLookups = true;
+        Assert.Equal(["Listed logins by name", "Filled a login", "Listed logins by name"], model.Rows.Select(row => row.Action));
+        Assert.Equal("Log intact · 3 of 4 records · your browser only", model.Status);
+
+        model.ShowAll = true;
+        Assert.Equal(4, model.Rows.Count);
+        Assert.Equal("Log intact · 4 records", model.Status);
+
+        model.ShowAgents = true;
+        model.ShowLookups = false;
+        Assert.Equal("Log intact · 1 of 4 records · agent and token requests only", model.Status);
+        Assert.False(model.OffersLookups);
+    }
+
+    /// <summary>A log of nothing but lookups offers Show all, which lists every line, the lookups included.</summary>
+    [Fact]
+    public void A_log_of_lookups_alone_offers_show_all_and_show_all_lists_them()
+    {
+        _home.Write(BrowserLookup("listed 2 login(s) by name, no password, on https://github.com"));
+
+        var model = new LogViewModel(_home.Home);
+
+        Assert.True(model.FilterEmpty);
+        Assert.True(model.OffersShowAll);
+
+        model.ShowWholeLogCommand.Execute(null);
+
+        Assert.True(model.ShowLookups);
+        Assert.True(Assert.Single(model.Rows).IsLookup);
+        Assert.False(model.OffersShowAll);
+    }
+
+    /// <summary>A lookup the chain cannot vouch for is never hidden, or a line somebody wrote into the log could pass as one unseen.</summary>
+    [Fact]
+    public void An_edited_lookup_is_listed_while_lookups_are_hidden()
+    {
+        _home.Write(
+            BrowserLookup(TempAuditHome.Reason),
+            BrowserLookup("listed 1 login(s) by name, no password, on https://linear.app"));
+        _home.Alter();
+
+        var model = new LogViewModel(_home.Home);
+
+        var shown = Assert.Single(model.Rows);
+        Assert.True(shown.IsLookup);
+        Assert.True(shown.Edited);
+    }
+
     /// <summary>A filter that keeps nothing says so in the table rather than drawing an empty one.</summary>
     [Fact]
     public void A_filter_that_keeps_nothing_says_so()
@@ -384,6 +496,12 @@ public sealed class LogViewModelTests : IDisposable
         Method = method,
         Reason = TempAuditHome.Reason,
     };
+
+    private static AuditRecord BrowserFill(AuditMethod method) =>
+        RequestRecords.BrowserFill(BrowserIdentity.ChromeWebStore, "Chrome on studio", new EntryName("Work", "GitHub"), "https://github.com", AuditDecision.Granted, method, "filled", "session-one", _vault);
+
+    private static AuditRecord BrowserLookup(string reason) =>
+        RequestRecords.Browser(BrowserIdentity.ChromeWebStore, "Chrome on studio", BrowserAct.List, AuditDecision.Granted, AuditMethod.Exposure, reason, "session-one", _vault);
 
     /// <summary>A fresh copy each time, since the screen zeroes the key it was handed once it has checked.</summary>
     private static AuditCheckpointKey Key(byte[] key, string vault) => new([.. key], vault);
