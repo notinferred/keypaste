@@ -4,6 +4,7 @@ using Keypaste.Core.Activity;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Browser;
 using Keypaste.Core.Clients;
 using Keypaste.Core.Ownership;
 using Xunit;
@@ -14,6 +15,8 @@ namespace Keypaste.Core.Tests;
 public sealed class AuditCompactionTests : IDisposable
 {
     private const string _vault = "0123456789abcdef";
+    private const string _chrome = "Chrome on studio";
+    private const string _firefox = "Firefox on laptop";
 
     private static readonly DateTimeOffset _today = new(2026, 11, 15, 12, 0, 0, TimeSpan.Zero);
 
@@ -59,6 +62,72 @@ public sealed class AuditCompactionTests : IDisposable
         Assert.Equal(before.Length, report.CompactedFrom);
         Assert.Empty(report.Findings);
         Assert.Equal(0, report.UnsignedRecords);
+    }
+
+    /// <summary>
+    /// The browser's lookups of a page's logins fold as an agent's do, into one line per pairing per day that reads as the
+    /// person's; its fills and pairings keep their bytes, and an agent of the pairing's name and label keeps its own line.
+    /// </summary>
+    [Fact]
+    public void Browser_lookups_older_than_30_days_fold_into_one_line_per_pairing_per_day_and_fills_keep_their_bytes()
+    {
+        var impostor = Lookup(BrowserIdentity.ChromeWebStore.Id, AuditTools.List, granted: true) with { Client = new AuditClient(BrowserIdentity.ChromeWebStore.Id, null, _chrome) };
+        Write(
+            _today.AddDays(-40),
+            BrowserLookup(_chrome, granted: true),
+            BrowserFill(_chrome),
+            BrowserLookup(_chrome, granted: false),
+            BrowserLookup(_firefox, granted: true),
+            RequestRecords.Browser(BrowserIdentity.ChromeWebStore, _chrome, BrowserAct.Pair, AuditDecision.Granted, AuditMethod.Prompt, "a person allowed it", "session", _vault),
+            impostor);
+        Write(_today.AddDays(-39), BrowserLookup(_chrome, granted: true));
+        Write(_today.AddDays(-29), BrowserLookup(_chrome, granted: true), BrowserFill(_chrome));
+        Write(_today, Release("claude-code"));
+        var before = Lines();
+
+        var result = Compact();
+
+        Assert.Equal((AuditCompactionOutcome.Compacted, 5, 0), (result.Outcome, result.Folded, result.Removed));
+        var after = Lines();
+        var kept = before.Where(line => !IsOldLookup(line) && !(IsBrowserLookup(line) && IsOld(line)));
+        Assert.Equal(kept, after.Where(line => !line.Contains("\"tool\":\"log_", StringComparison.Ordinal)));
+        Assert.Equal(3, after.Count(line => !line.Contains("\"tool\":\"log_", StringComparison.Ordinal) && line.Contains("\"tool\":\"browser\"", StringComparison.Ordinal) && !IsBrowserLookup(line)));
+
+        Assert.True(AuditReader.TryRead(LogPath, out var entries, out var unreadable, out _));
+        Assert.Equal(0, unreadable);
+        var summaries = entries.Where(entry => entry.Summary is not null).ToList();
+        Assert.Equal([_chrome, _firefox, _chrome, _chrome], summaries.Select(entry => entry.Client));
+        Assert.Equal(["2026-10-06", "2026-10-06", "2026-10-06", "2026-10-07"], summaries.Select(entry => entry.Summary!.Day));
+        Assert.Equal([true, true, false, true], summaries.Select(entry => entry.ByBrowser));
+        Assert.Equal([true, true, false, true], summaries.Select(entry => entry.IsBrowserLookup));
+        Assert.Equal(
+            [new AuditFoldCount(AuditTools.Browser, AuditDecision.Denied, 1), new AuditFoldCount(AuditTools.Browser, AuditDecision.Granted, 1)],
+            summaries[0].Summary!.Counts);
+        Assert.Equal("2 lookups on 2026-10-06: 1 refused", AuditText.Folded(summaries[0]));
+        Assert.Equal("1 lookup on 2026-10-07", AuditText.Folded(summaries[3]));
+        Assert.Equal(BrowserIdentity.ChromeWebStore.Id, summaries[0].Name);
+        Assert.Equal(2, entries.Count(entry => entry.ByBrowser && entry.Field == "fill"));
+
+        var report = AuditChainVerifier.Verify(LogPath, checkpoints: _key);
+        Assert.Equal((AuditChainVerdict.Intact, AuditCompactionCheck.Verified), (report.Verdict, report.Compaction));
+        Assert.Empty(report.Findings);
+        Assert.Equal(0, report.UnsignedRecords);
+    }
+
+    /// <summary>A log whose browser lookup was edited does not verify, so nothing in it is folded and the edited line stays as it is.</summary>
+    [Fact]
+    public void An_edited_browser_lookup_is_not_folded()
+    {
+        Write(_today.AddDays(-40), BrowserLookup(_chrome, granted: true), BrowserLookup(_chrome, granted: true));
+        Write(_today, Release("claude-code"));
+        var lines = Lines();
+        lines[0] = lines[0].Replace("github.com", "gitlab.com", StringComparison.Ordinal);
+        File.WriteAllText(LogPath, string.Join('\n', lines) + "\n");
+        var edited = File.ReadAllBytes(LogPath);
+
+        Assert.Equal(AuditCompactionOutcome.Refused, Compact().Outcome);
+        Assert.Equal(edited, File.ReadAllBytes(LogPath));
+        Assert.Contains("gitlab.com", Lines()[0], StringComparison.Ordinal);
     }
 
     [Fact]
@@ -389,7 +458,7 @@ public sealed class AuditCompactionTests : IDisposable
 
     private static bool IsOldLookup(string line) =>
         (line.Contains("\"tool\":\"list_entry_names\"", StringComparison.Ordinal) || line.Contains("\"tool\":\"find_access\"", StringComparison.Ordinal))
-        && string.CompareOrdinal(line[13..23], "2026-10-16") < 0;
+        && IsOld(line);
 
     /// <summary>The line with its hash recomputed, as anyone can without the vault.</summary>
     private static string Resealed(string line)
@@ -397,6 +466,17 @@ public sealed class AuditCompactionTests : IDisposable
         var committed = line[..^AuditChain.ChainSuffixBytes];
         return committed + ",\"hash\":\"" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(committed))) + "\"}";
     }
+
+    private static bool IsOld(string line) => string.CompareOrdinal(line[13..23], "2026-10-16") < 0;
+
+    private static bool IsBrowserLookup(string line) =>
+        line.Contains("\"tool\":\"browser\"", StringComparison.Ordinal) && line.Contains("\"field\":\"list\"", StringComparison.Ordinal);
+
+    private static AuditRecord BrowserLookup(string pairing, bool granted) =>
+        RequestRecords.Browser(BrowserIdentity.ChromeWebStore, pairing, BrowserAct.List, granted ? AuditDecision.Granted : AuditDecision.Denied, granted ? AuditMethod.Exposure : AuditMethod.OutOfScope, "listed 2 login(s) by name, no password, on https://github.com", "session", _vault);
+
+    private static AuditRecord BrowserFill(string pairing) =>
+        RequestRecords.BrowserFill(BrowserIdentity.ChromeWebStore, pairing, new EntryName("Work", "GitHub"), "https://github.com", AuditDecision.Granted, AuditMethod.Picked, "filled", "session", _vault);
 
     private static AuditRecord Lookup(string agent, string tool, bool granted) => new()
     {

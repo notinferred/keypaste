@@ -7,7 +7,7 @@ namespace Keypaste.Core.Audit;
 /// <summary>How long the vault's owner keeps the audit log, as the person set it.</summary>
 public static class AuditRetention
 {
-    /// <summary>How long a lookup keeps its own line before it is folded into its agent's summary of the day.</summary>
+    /// <summary>How long a lookup keeps its own line before it is folded into its agent's or its browser pairing's summary of the day.</summary>
     public const int FoldAfterDays = 30;
 
     /// <summary>The shortest period the log may be kept for.</summary>
@@ -52,13 +52,13 @@ public sealed record AuditCompactionResult(AuditCompactionOutcome Outcome, int F
 }
 
 /// <summary>
-/// Folds an agent's old lookups into one summary line per agent per UTC day, removes whole days older than the period
-/// the log is kept for, and seals what it kept under the vault's checkpoint key (SECURITY.md law 3).
+/// Folds old lookups into one summary line per agent, or per browser pairing, per UTC day, removes whole days older than
+/// the period the log is kept for, and seals what it kept under the vault's checkpoint key (SECURITY.md law 3).
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Kept lines keep their bytes.</b> A value release, a refusal, a run, a save, a change, a checkpoint and every line
-/// that is not a lookup is copied byte for byte, so its own hash still recomputes to the hash it was written with. What
+/// <b>Kept lines keep their bytes.</b> A value release, a refusal, a run, a save, a change, a browser's fill, a checkpoint
+/// and every line that is not a lookup is copied byte for byte, so its own hash still recomputes to the hash it was written with. What
 /// removing lines breaks is the links between them, and the seal answers for exactly that: the new file's first line,
 /// the compaction record, carries the previous file's line count and last hash, a digest of every chained line it kept
 /// or wrote, and an HMAC over those under the vault's key. <see cref="AuditChainVerifier"/> walks the sealed lines to
@@ -306,6 +306,8 @@ public static class AuditCompaction
 
         internal string Tool { get; init; } = string.Empty;
 
+        internal string? Field { get; init; }
+
         internal AuditDecision Decision { get; init; }
 
         internal string? Name { get; init; }
@@ -361,8 +363,7 @@ public static class AuditCompaction
 
         bool Sealing(Line line) => line.Chained && string.Equals(line.Tool, AuditTools.Compaction, StringComparison.Ordinal);
         bool Removed(Line line) => line.Chained && !Sealing(line) && line.Day is { } day && day < removeBefore;
-        bool Folded(Line line) => line.Chained && !Removed(line) && line.Day is { } day && day < foldBefore
-            && line.Tool is AuditTools.List or AuditTools.Find;
+        bool Folded(Line line) => line.Chained && !Removed(line) && line.Day is { } day && day < foldBefore && IsLookup(line);
 
         var removed = lines.Where(Removed).ToList();
         var folded = lines.Where(Folded).ToList();
@@ -372,7 +373,8 @@ public static class AuditCompaction
             return new Planned(new AuditCompactionResult(AuditCompactionOutcome.Unchanged, 0, 0, string.Empty), null);
         }
 
-        var groups = folded.GroupBy(line => (line.Label, line.Name, line.Vault, line.Day)).ToDictionary(group => group.Last(), group => group.ToList());
+        // The browser's tool is in the key, so a pairing and an agent of the same name and label never share a summary.
+        var groups = folded.GroupBy(line => (line.Label, line.Name, line.Vault, line.Day, ByBrowser: IsBrowserLookup(line))).ToDictionary(group => group.Last(), group => group.ToList());
 
         // Kept lines stay slices of the snapshot and the new file is assembled once, so only the two are ever held whole.
         var body = new List<ReadOnlyMemory<byte>>();
@@ -472,6 +474,13 @@ public static class AuditCompaction
         return new Planned(new AuditCompactionResult(AuditCompactionOutcome.Compacted, folded.Count, removed.Count, string.Empty), contents);
     }
 
+    /// <summary>An agent's listing or search, or the browser asking which logins match a page; never a fill or a pairing.</summary>
+    private static bool IsLookup(Line line) => line.Tool is AuditTools.List or AuditTools.Find || IsBrowserLookup(line);
+
+    private static bool IsBrowserLookup(Line line) =>
+        string.Equals(line.Tool, AuditTools.Browser, StringComparison.Ordinal)
+        && string.Equals(line.Field, RequestRecords.BrowserListField, StringComparison.Ordinal);
+
     private static AuditRecord Removal(IReadOnlyList<Line> removed)
     {
         using var digest = new Digest();
@@ -564,6 +573,7 @@ public static class AuditCompaction
                     ? DateOnly.FromDateTime(at)
                     : null,
                 Tool = tool,
+                Field = Text(root.TryGetProperty("args", out var args) ? args : default, "field"),
                 Decision = string.Equals(Text(root, "decision"), "granted", StringComparison.Ordinal) ? AuditDecision.Granted : AuditDecision.Denied,
                 Name = Text(client, "name"),
                 Label = Text(client, "label"),

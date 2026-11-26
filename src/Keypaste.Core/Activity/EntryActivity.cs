@@ -108,9 +108,11 @@ public sealed class EntryActivity
 
         foreach (var entry in audit)
         {
-            // A terminal's edit, an agent's item change and a merge name items but release nothing, so none is a use.
+            // A terminal's edit, an agent's item change and a merge name items but release nothing, so none is a use;
+            // the person's browser fills are the person's own, which Activity lists under Your browser.
             if (!entry.Granted
                 || entry.At is not { } at
+                || entry.ByBrowser
                 || string.Equals(entry.Tool, AuditTools.Edit, StringComparison.Ordinal)
                 || string.Equals(entry.Tool, AuditTools.ItemChange, StringComparison.Ordinal)
                 || string.Equals(entry.Tool, AuditTools.Merge, StringComparison.Ordinal)

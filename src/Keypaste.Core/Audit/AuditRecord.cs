@@ -170,7 +170,7 @@ public enum AuditMethod
     /// <remarks>Released nothing and was asked of nobody; <c>keypaste log</c> and Activity do not list it.</remarks>
     Checkpoint = 36,
 
-    /// <summary>One agent's lookups of one UTC day, folded into one line by the vault's owner once they were 30 days old.</summary>
+    /// <summary>One agent's or one browser pairing's lookups of one UTC day, folded into one line by the vault's owner once they were 30 days old.</summary>
     Folded = 37,
 
     /// <summary>Whole UTC days older than the period the person keeps the log for, removed by the vault's owner.</summary>
@@ -186,12 +186,12 @@ public enum AuditMethod
 }
 
 /// <summary>How many lookups of one tool with one decision a summary line folds.</summary>
-/// <param name="Tool">The tool, <see cref="AuditTools.List"/> or <see cref="AuditTools.Find"/>.</param>
+/// <param name="Tool">The tool, <see cref="AuditTools.List"/> or <see cref="AuditTools.Find"/>, or <see cref="AuditTools.Browser"/> for a page's lookup.</param>
 /// <param name="Decision">Whether they named anything.</param>
 /// <param name="Count">How many lines.</param>
 public sealed record AuditFoldCount(string Tool, AuditDecision Decision, int Count);
 
-/// <summary>One agent's lookups on one UTC day, folded into one line.</summary>
+/// <summary>One agent's or one browser pairing's lookups on one UTC day, folded into one line.</summary>
 /// <param name="Day">The UTC day, <c>yyyy-MM-dd</c>.</param>
 /// <param name="First">The first folded line's timestamp.</param>
 /// <param name="Last">The last folded line's timestamp.</param>

@@ -256,4 +256,22 @@ public sealed class LogRowTests
         Assert.Equal(("Looked up, in one line for the day", "4 lookups on 2026-06-01: 4 listings, 4 refused", "Summary", LogTone.Muted), (summary.Action, summary.Secrets, summary.Result, summary.Tone));
         Assert.Equal(("keypaste", "Removed older days", "120 requests from 2025-01-01 to 2025-07-27 removed", "Removed"), (removal.Actor, removal.Action, removal.Secrets, removal.Result));
     }
+
+    /// <summary>A day of the browser's lookups folded into one line reads as the person's, in that browser, in the words an agent's day reads in.</summary>
+    [Fact]
+    public void A_folded_browser_day_reads_as_you_in_that_browser()
+    {
+        var row = Row(Entry(AuditTools.Summary, "granted", "folded") with
+        {
+            Client = "Chrome on studio",
+            Label = "Chrome on studio",
+            Name = "kabnajpeogcbndlfgibmhiichfkgpdla",
+            Summary = new AuditSummary("2026-06-01", "2026-06-01T09:00:00.000Z", "2026-06-01T17:00:00.000Z", [new AuditFoldCount(AuditTools.Browser, AuditDecision.Granted, 14)], new string('a', 64)),
+        });
+
+        Assert.Equal("you, in Chrome on studio · 14 lookups on 2026-06-01", $"{row.Actor} · {row.Subject}");
+        Assert.Equal(("Looked up, in one line for the day", "Summary", LogTone.Muted), (row.Action, row.Result, row.Tone));
+        Assert.Equal((true, true, true), (row.ByYou, row.ByBrowser, row.IsLookup));
+        Assert.Contains("extension kabnajpeogcbndlfgibmhiichfkgpdla, pairing Chrome on studio", row.Detail, StringComparison.Ordinal);
+    }
 }

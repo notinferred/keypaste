@@ -654,7 +654,7 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Mitigation.** Only a trusted click on keypaste's key icon lists logins, in a list the page can neither read nor restyle. A pick counts only on a list that has been visible, topmost and unobscured for half a second. The pick is the person's answer, and the fill is logged with the page's origin as `picked`.
 
-**Limit.** keypaste sees only the extension's word, not the page or the click. A process holding a pairing's key lists any site's login names and receives any of them by claiming a pick.
+**Limit.** keypaste sees only the extension's word, not the page or the click. A process holding a pairing's key lists any site's login names and receives any of them by claiming a pick. keypaste attributes a browser pairing's lines to the person, so when an AI agent drives the person's browser, its fills are logged as the person's.
 
 **Status.** Unreleased.
 

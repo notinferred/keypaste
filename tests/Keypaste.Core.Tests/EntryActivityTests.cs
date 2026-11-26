@@ -35,6 +35,24 @@ public sealed class EntryActivityTests
     private static EntryActivity Build(IReadOnlyList<AuditEntry>? audit = null, ApproverActivity? live = null, IReadOnlyList<ReleaseSeen>? session = null) =>
         EntryActivity.Build(audit ?? [], _vault, live ?? ApproverActivity.None, session ?? [], _now);
 
+    /// <summary>A login the person's browser filled is the person's own act, so the Agent access card counts the agent alone and the fill moves no last use.</summary>
+    [Fact]
+    public void A_browser_fill_is_no_agents_access()
+    {
+        var fill = Line("personal/github", 5) with { Tool = AuditTools.Browser, Field = "fill", Method = "picked", Label = "Chrome on studio", Client = "Chrome on studio", Item = "00112233445566778899aabbccddeeff" };
+        var github = _github with { Uuid = fill.Item };
+
+        var onlyFilled = Build([fill]);
+        Assert.Empty(onlyFilled.Access(github).Clients);
+        Assert.Empty(onlyFilled.Access(github, byItem: true).Clients);
+        Assert.Equal(new EntryUse(EntryUseState.Idle, null), onlyFilled.Use(github));
+        Assert.False(onlyFilled.AgentsCanSee(github, []));
+
+        var both = Build([Line("personal/github", 60, label: "cursor"), fill]);
+        var client = Assert.Single(both.Access(github).Clients);
+        Assert.Equal(("cursor", _now.AddMinutes(-60), 1), (client.Client, client.LastAt, client.Releases));
+    }
+
     [Fact]
     public void Each_item_of_a_waiting_linked_set_and_the_item_a_waiting_save_names_are_in_use()
     {

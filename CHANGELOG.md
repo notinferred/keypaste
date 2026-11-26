@@ -4,7 +4,7 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 ## 1.0.0
 
-Agents › Activity says who acted on each line: an agent by its name, or you, in the browser you paired, for its pairings and fills. A new filter, Your browser, lists the browser's lines alone, and Agents no longer includes them. The browser's lookups, which list a page's logins by name and release no password, are hidden until you choose Show browser lookups, and the line above the table counts what is hidden; the audit log itself still records every lookup, and `keypaste log` shows them all.
+Agents › Activity says who acted on each line: an agent by its name, or you, in the browser you paired, for its pairings and fills. A new filter, Your browser, lists the browser's lines alone, and Agents no longer includes them. The browser's lookups, which list a page's logins by name and release no password, are hidden until you choose Show browser lookups, and the line above the table counts what is hidden; the audit log itself still records every lookup, and `keypaste log` shows them all. An item's Agent access card counts only what agents received, not the logins your browser filled, which Activity lists under Your browser.
 
 New's menu in the sidebar shows its choices again; it had opened empty. An item's notes can be selected, and copying a selection clears it from the clipboard after the countdown, as Copy password does. The Agents screen's list starts level with Items' instead of lower.
 
@@ -108,7 +108,7 @@ Recommendations now lists an item whose KeePass expiry date is within Settings �
 
 An agent can ask with `request_item_change` to move an item it sees whole to Trash, mark it expired with KeePass's own expiry date, or delete for good an item it created itself through a `request_save` you approved; each is asked every time in the app or at `keypaste approve`, Deny or Allow, and made only once you allow it. It can add or remove the item's `needs-update` tag without asking. Every change is recorded in the agent log before the vault is saved, and one that cannot be recorded is not made.
 
-The app and `keypaste approve` fold an agent's lookups older than 30 days into one audit line per agent per day and remove whole days older than Settings › Keep the agent log for (a year by default, never under 30 days), sealing what stays with the vault's checkpoint key; every other line keeps its bytes, and `keypaste log verify` checks the seal.
+The app and `keypaste approve` fold an agent's or your browser's lookups older than 30 days into one audit line per agent or browser pairing per day and remove whole days older than Settings › Keep the agent log for (a year by default, never under 30 days), sealing what stays with the vault's checkpoint key; every other line keeps its bytes, and `keypaste log verify` checks the seal.
 
 An agent can ask with `request_linked_set` for up to four fields of one item and the items `find_access` links to it, such as a database's host, username and password, in one prompt that you allow once or deny; a set is always asked about, a blocked field refuses it whole, and each released field is its own audit line.
 

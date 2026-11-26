@@ -42,7 +42,7 @@ public static class AuditTools
     /// <summary>An agent's linked set: one line per field released, or one for the set refused.</summary>
     public const string Set = "request_linked_set";
 
-    /// <summary>One agent's lookups of one UTC day, folded by the vault's owner.</summary>
+    /// <summary>One agent's or one browser pairing's lookups of one UTC day, folded by the vault's owner.</summary>
     public const string Summary = "log_summary";
 
     /// <summary>Whole days the vault's owner removed from the log.</summary>

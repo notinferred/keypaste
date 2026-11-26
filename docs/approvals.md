@@ -138,7 +138,7 @@ Each line holds its predecessor's hash, so `keypaste log verify` finds an edited
 
 ### How long lines stay
 
-Requests for values, runs, saves and changes keep their own lines. Lookups are folded after 30 days into one `log_summary` line per agent per day. Settings › Keep activity for sets how long anything is kept: 90 days, 1 year (default), 2 years or forever. While `app.toml` can't be read, nothing is removed.
+Requests for values, runs, saves and changes, and your browser's fills, keep their own lines. An agent's lookups and your browser's are folded after 30 days into one `log_summary` line per agent or browser pairing per day. Settings › Keep activity for sets how long anything is kept: 90 days, 1 year (default), 2 years or forever. While `app.toml` can't be read, nothing is removed.
 
 <a id="archiving-it"></a>
 

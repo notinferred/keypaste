@@ -83,7 +83,7 @@ public sealed record AuditEntry
     /// <summary>Whether this record was granted.</summary>
     public bool Granted => string.Equals(Decision, "granted", StringComparison.Ordinal);
 
-    /// <summary>On a summary line, one agent's lookups of one UTC day the vault's owner folded into it; otherwise null.</summary>
+    /// <summary>On a summary line, one agent's or one browser pairing's lookups of one UTC day the vault's owner folded into it; otherwise null.</summary>
     public AuditSummary? Summary { get; init; }
 
     /// <summary>On a removal line, the whole days the vault's owner removed; otherwise null.</summary>
@@ -100,14 +100,25 @@ public sealed record AuditEntry
 
     /// <summary>
     /// Whether the person's paired browser made this request through keypaste's extension, rather than an agent: a pairing,
-    /// a pairing's check, a page's lookup or a fill. A pairing the person removed in keypaste itself is not the browser's.
+    /// a pairing's check, a page's lookup, a fill, or a day of its lookups folded into one line. A pairing the person
+    /// removed in keypaste itself is not the browser's.
     /// </summary>
-    /// <remarks>Only the vault's owner writes the browser's lines, under a tool name no bridge can give its own.</remarks>
-    public bool ByBrowser => string.Equals(Tool, AuditTools.Browser, StringComparison.Ordinal)
-        && !string.Equals(Method, AuditLog.Wire(AuditMethod.Removed), StringComparison.Ordinal);
+    /// <remarks>Only the vault's owner writes the browser's lines and its summaries, under tool names no bridge can give its own.</remarks>
+    public bool ByBrowser => IsBrowserSummary
+        || (string.Equals(Tool, AuditTools.Browser, StringComparison.Ordinal)
+            && !string.Equals(Method, AuditLog.Wire(AuditMethod.Removed), StringComparison.Ordinal));
 
-    /// <summary>Whether this is the browser asking which logins match a page, which lists them by name and releases no password.</summary>
-    public bool IsBrowserLookup => ByBrowser && string.Equals(Field, RequestRecords.BrowserListField, StringComparison.Ordinal);
+    /// <summary>
+    /// Whether this is the browser asking which logins match a page, which lists them by name and releases no password, or
+    /// a day of those lookups folded into one line.
+    /// </summary>
+    public bool IsBrowserLookup => IsBrowserSummary
+        || (ByBrowser && string.Equals(Field, RequestRecords.BrowserListField, StringComparison.Ordinal));
+
+    /// <summary>Whether this is a summary line that folds the browser's lookups alone.</summary>
+    private bool IsBrowserSummary => string.Equals(Tool, AuditTools.Summary, StringComparison.Ordinal)
+        && Summary is { Counts.Count: > 0 } summary
+        && summary.Counts.All(count => string.Equals(count.Tool, AuditTools.Browser, StringComparison.Ordinal));
 }
 
 /// <summary>Where an incremental read of the log stopped.</summary>

@@ -137,8 +137,8 @@ internal sealed record LogRow
         ArgumentNullException.ThrowIfNull(entry);
         ArgumentNullException.ThrowIfNull(clock);
 
-        // Every browser line is the person's: in their browser, or a pairing they removed in keypaste.
-        var byYou = Is(entry.Tool, AuditTools.Browser) || Is(entry.Method, "share-created") || Is(entry.Method, "share-revoked") || Is(entry.Tool, "token bundle");
+        // Every browser line is the person's: in their browser, a day of its lookups folded, or a pairing they removed in keypaste.
+        var byYou = entry.ByBrowser || Is(entry.Tool, AuditTools.Browser) || Is(entry.Method, "share-created") || Is(entry.Method, "share-revoked") || Is(entry.Tool, "token bundle");
         var (secrets, where) = Place(entry);
         var (result, tone) = Outcome(entry);
         var local = entry.At is { } at ? TimeZoneInfo.ConvertTime(at, clock.LocalTimeZone) : (DateTimeOffset?)null;
@@ -337,7 +337,7 @@ internal sealed record LogRow
         // A browser's line names the extension's build as its client and the pairing as its label.
         if (entry.Name.Length > 0 && entry.Label.Length > 0)
         {
-            lines.Add(Is(entry.Tool, AuditTools.Browser) ? $"extension {entry.Name}, pairing {entry.Label}" : $"agent {entry.Name}, label {entry.Label}");
+            lines.Add(entry.ByBrowser || Is(entry.Tool, AuditTools.Browser) ? $"extension {entry.Name}, pairing {entry.Label}" : $"agent {entry.Name}, label {entry.Label}");
         }
 
         return lines.Count == 0 ? null : string.Join(Environment.NewLine, lines);

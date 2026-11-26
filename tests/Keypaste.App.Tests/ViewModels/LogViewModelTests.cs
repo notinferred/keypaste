@@ -414,6 +414,36 @@ public sealed class LogViewModelTests : IDisposable
         Assert.False(model.OffersLookups);
     }
 
+    /// <summary>A day of the browser's lookups folded into one line is the browser's and a lookup: under Your browser, and hidden until asked for.</summary>
+    [Fact]
+    public void A_folded_browser_day_is_under_your_browser_and_hidden_with_the_lookups()
+    {
+        _home.Write(
+            new AuditRecord
+            {
+                Tool = AuditTools.Summary,
+                Client = new AuditClient(BrowserIdentity.ChromeWebStore.Id, null, "Chrome on studio"),
+                Decision = AuditDecision.Granted,
+                Method = AuditMethod.Folded,
+                Reason = "the vault's owner folded 14 lookups of one day into this line",
+                Vault = _vault,
+                Summary = new AuditSummary("2026-06-01", "2026-06-01T09:00:00.000Z", "2026-06-01T17:00:00.000Z", [new AuditFoldCount(AuditTools.Browser, AuditDecision.Granted, 14)], new string('a', 64)),
+            },
+            BrowserFill(AuditMethod.Picked));
+
+        var model = new LogViewModel(_home.Home);
+        model.ShowBrowser = true;
+
+        Assert.Equal("Filled a login", Assert.Single(model.Rows).Action);
+
+        model.ShowLookups = true;
+        var folded = model.Rows.Single(row => row.Source.Summary is not null);
+        Assert.Equal(("you, in Chrome on studio", "14 lookups on 2026-06-01"), (folded.Actor, folded.Subject));
+
+        model.ShowAgents = true;
+        Assert.Empty(model.Rows);
+    }
+
     /// <summary>A log of nothing but lookups offers Show all, which lists every line, the lookups included.</summary>
     [Fact]
     public void A_log_of_lookups_alone_offers_show_all_and_show_all_lists_them()

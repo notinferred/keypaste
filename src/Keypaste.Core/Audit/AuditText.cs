@@ -159,7 +159,9 @@ public static class AuditText
                 parts.Add(Invariant($"{refused} refused"));
             }
 
-            return $"{Count(entry.Requests, "lookup")} on {summary.Day}: {string.Join(", ", parts)}";
+            // A browser's day has one kind of lookup, a page's logins listed, so only its refusals need naming.
+            var day = $"{Count(entry.Requests, "lookup")} on {summary.Day}";
+            return parts.Count == 0 ? day : $"{day}: {string.Join(", ", parts)}";
         }
 
         return entry.Removal is { } removal
