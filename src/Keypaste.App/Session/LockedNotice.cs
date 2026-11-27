@@ -349,9 +349,9 @@ internal sealed class LockedNotice : IDisposable
         _open();
 
         // The press is the person's own act, so a vault Windows Hello or Touch ID can reopen asks for it at once.
-        if (AllLocked && _screen is { OffersQuickUnlock: true } offered && offered.ResumeCommand.CanExecute(null))
+        if (AllLocked)
         {
-            offered.ResumeCommand.Execute(null);
+            _screen?.AskQuickUnlockAtOnce();
         }
     }
 

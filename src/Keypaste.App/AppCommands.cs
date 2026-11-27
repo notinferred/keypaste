@@ -296,7 +296,8 @@ internal sealed class AppCommands
             new AppCommand(Strings.ReportAProblem, [], () => host.OpenWeb is not null, () => host.OpenWeb?.Invoke(new Uri(ProblemAddress))),
         ]);
 
-        var copyUsername = Routed(Strings.CopyUsername, Pane, detail => detail.CopyUsernameCommand);
+        // Neither chord means anything to a text field, and neither holds Alt, which Windows reads as AltGr.
+        var copyUsername = Routed(Strings.CopyUsername, Pane, detail => detail.CopyUsernameCommand) with { Keys = Chord(Key.C, KeyModifiers.Shift) };
         var copyPassword = Routed(Strings.CopyPassword, Pane, detail => detail.CopyPasswordCommand);
         var copyUrl = Routed(Strings.CopyUrl, Pane, detail => detail.CopyUrlCommand);
         var copyReference = Routed(Strings.CopyReference, Pane, detail => detail.CopyReferenceCommand);
@@ -317,7 +318,7 @@ internal sealed class AppCommands
         var share = Routed(Strings.Share, Unmodal, shell => shell.ShareCommand, _ => Pane()?.Name);
         var restore = Routed(Strings.Restore, Trash, trash => trash.RestoreCommand);
         var purge = Routed(Strings.DeleteForGood, Trash, trash => trash.PurgeCommand);
-        var copyTotp = Routed(Strings.CopyTheTOTPCode, () => PaneOutOfEdit()?.Totp, totp => totp.CopyCommand);
+        var copyTotp = Routed(Strings.CopyTheTOTPCode, () => PaneOutOfEdit()?.Totp, totp => totp.CopyCommand) with { Keys = Chord(Key.T) };
         var copyRevision = Routed(Strings.CopyThisRevisionsPassword, () => PaneOutOfEdit()?.History.Selected, revision => revision.CopyPasswordCommand);
         var restoreRevision = Routed(Strings.RestoreThisRevision, PaneOutOfEdit, detail => detail.History.RestoreCommand);
         var emptyTrash = Routed(Strings.EmptyTrash, Trash, trash => trash.EmptyCommand);
@@ -476,6 +477,11 @@ internal sealed class AppCommands
 
     private bool InField() => Focus() is TextBox or MaskedInput;
 
+    // The search with nothing selected has nothing of its own to copy, so Copy there copies the chosen item's password, as outside a field.
+    private bool SearchHoldsNoSelection() => Focus() is TextBox { Name: EntriesView.SearchName } search && search.SelectionStart == search.SelectionEnd;
+
+    private TextBox? TextToCopy() => SearchHoldsNoSelection() ? null : Text();
+
     // The import, share, discard, handed-file and YubiKey-touch dialogs are modal: nothing may move focus or the page out from under them.
     private ShellViewModel? Unmodal() =>
         _host.Shell() is { HasImport: false, HasShare: false, HasDiscardPrompt: false, HasGeneratorDialog: false, HasSheet: false, HasHandedPrompt: false, IsWaitingForTouch: false } shell ? shell : null;
@@ -596,12 +602,12 @@ internal sealed class AppCommands
 
     // A TextBox copies its selection even behind a password character unless CanCopy is asked first.
     private bool CanCopy(bool text) =>
-        Focus() is TextBox field ? text && field.CanCopy
-        : !InField() && Pane() is { } detail && detail.CopyPasswordCommand.CanExecute(null);
+        TextToCopy() is { } field ? text && field.CanCopy
+        : (!InField() || SearchHoldsNoSelection()) && Pane() is { } detail && detail.CopyPasswordCommand.CanExecute(null);
 
     private void Copy()
     {
-        if (Text() is { } field)
+        if (TextToCopy() is { } field)
         {
             field.Copy();
         }

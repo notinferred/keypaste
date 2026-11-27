@@ -6,6 +6,10 @@ Published versions are available at `https://dl.keypaste.com/v<version>/` with c
 
 Agents › Activity says who acted on each line: an agent by its name, or you, in the browser you paired, for its pairings and fills. A new filter, Your browser, lists the browser's lines alone, and Agents no longer includes them. The browser's lookups, which list a page's logins by name and release no password, are hidden until you choose Show browser lookups, and the line above the table counts what is hidden; the audit log itself still records every lookup, and `keypaste log` shows them all. An item's Agent access card counts only what agents received, not the logins your browser filled, which Activity lists under Your browser.
 
+You can copy from keypaste without the mouse. In the item list's search, Down and Up choose through the matches and Return chooses the first, with the keyboard still in the search, and Ctrl+C, or ⌘C on a Mac, copies the chosen item's password unless you have selected some of the search's text. A search that hides the chosen item now chooses its first match instead of closing it. Shift+Ctrl+C, or ⇧⌘C, copies the chosen item's username and Ctrl+T, or ⌘T, its one-time code; both are in the Item menu, and each is off when the item has none.
+
+Bringing keypaste forward yourself, from the Dock, the menu bar or tray icon, or your browser's Unlock…, now asks Touch ID or Windows Hello at once for a vault they can reopen, as pressing the notification already did; if you cancel, Unlock with Touch ID or Windows Hello stays on the screen. Where the unlock screen offers it alone, that button has the keyboard and answers Return. An agent's request never asks.
+
 New's menu in the sidebar shows its choices again; it had opened empty. An item's notes can be selected, and copying a selection clears it from the clipboard after the countdown, as Copy password does. The Agents screen's list starts level with Items' instead of lower.
 
 The app's title band is thinner, New spans the sidebar, the item list shows its count beside its title with the search under it, and a new sidebar place, Other, lists identities, SSH keys and Wi-Fi networks.

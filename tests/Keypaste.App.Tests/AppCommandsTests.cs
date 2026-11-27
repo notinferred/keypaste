@@ -60,6 +60,10 @@ public sealed class AppCommandsTests : IDisposable
         Assert.Equal(new KeyGesture(Key.F11), Find(other, "Enter full screen").Shown);
         Assert.Contains(new KeyGesture(Key.K, KeyModifiers.Meta), Find(mac, "Find").Keys);
         Assert.Contains(new KeyGesture(Key.K, KeyModifiers.Control), Find(other, "Find").Keys);
+        Assert.Equal(new KeyGesture(Key.C, KeyModifiers.Meta | KeyModifiers.Shift), Find(mac, "Copy username").Shown);
+        Assert.Equal(new KeyGesture(Key.C, KeyModifiers.Control | KeyModifiers.Shift), Find(other, "Copy username").Shown);
+        Assert.Equal(new KeyGesture(Key.T, KeyModifiers.Meta), Find(mac, "Copy the one-time code").Shown);
+        Assert.Equal(new KeyGesture(Key.T, KeyModifiers.Control), Find(other, "Copy the one-time code").Shown);
 
         // Windows reports AltGr as Ctrl+Alt, so no chord there holds Alt.
         Assert.DoesNotContain(other.All.SelectMany(command => command.Keys), chord => chord.KeyModifiers.HasFlag(KeyModifiers.Alt));

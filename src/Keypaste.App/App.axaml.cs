@@ -219,7 +219,7 @@ internal sealed partial class App : Application, IDisposable
             _unlock?.TakeHanded(handed);
         }
 
-        _tray = new AppTray(OpenWindow, () => _ = _vaults?.LockAllAsync(VaultLockReason.Manual), () => _vaults?.Unlocked.Count > 0, Quit);
+        _tray = new AppTray(OpenWindowAtPersonsAct, () => _ = _vaults?.LockAllAsync(VaultLockReason.Manual), () => _vaults?.Unlocked.Count > 0, Quit);
         _tray.Show(_preferences.StaysInTray);
         _preferences.Changed += OnPreferencesChanged;
         _window.Closing += OnMainWindowClosing;
@@ -346,6 +346,24 @@ internal sealed partial class App : Application, IDisposable
         _window.Activate();
     }
 
+    /// <summary>
+    /// Shows the window at an act of the person's own, a Dock click or the menu bar's or tray's Open, and where every vault is locked
+    /// asks Windows Hello or Touch ID at once for a vault they can reopen.
+    /// </summary>
+    internal void OpenWindowAtPersonsAct()
+    {
+        OpenWindow();
+        AskQuickUnlockAtOnce();
+    }
+
+    private void AskQuickUnlockAtOnce()
+    {
+        if (_shell is null && Crashes is not { AsksTerms: true })
+        {
+            _unlock?.AskQuickUnlockAtOnce();
+        }
+    }
+
     /// <summary>Shows the window on Agents with one agent's settings open, as the Always allow notice asks.</summary>
     /// <param name="agent">The agent's name.</param>
     internal void OpenAgentSettings(string agent)
@@ -382,7 +400,7 @@ internal sealed partial class App : Application, IDisposable
     {
         if (e.Kind == ActivationKind.Reopen)
         {
-            OpenWindow();
+            OpenWindowAtPersonsAct();
         }
         else if (e is FileActivatedEventArgs { Files: [var file, ..] } && file.TryGetLocalPath() is { } path)
         {
@@ -1014,7 +1032,9 @@ internal sealed partial class App : Application, IDisposable
         }
         else if (what == Core.Ipc.BrowserShow.Unlock && _vaults?.Named(vault) is { } named && _vaults.PathOf(named.Session) is { } path)
         {
+            // Unlock… is the person's press in their paired browser.
             _unlock?.TakeHanded(path);
+            AskQuickUnlockAtOnce();
         }
     }
 

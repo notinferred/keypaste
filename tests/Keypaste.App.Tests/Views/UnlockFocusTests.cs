@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
 using Keypaste.App.Session;
+using Keypaste.App.Tests.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core.Tests;
@@ -154,6 +155,72 @@ public sealed class UnlockFocusTests
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
 
         Assert.True(Password(window).IsFocused);
+    });
+
+    [Fact]
+    public Task Where_quick_unlock_stands_alone_its_button_has_the_keyboard_and_Return_presses_it() => HeadlessSession.On(async () =>
+    {
+        using var fixture = new TempVault();
+        fixture.RememberSelf();
+        var keys = new FakeQuickUnlockKeys(MachineQuickUnlock.TouchIdName);
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home, quickUnlock: keys);
+
+        using (var first = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => { }))
+        {
+            foreach (var c in TempVault.Password)
+            {
+                first.Type(c);
+            }
+
+            await first.UnlockAsync();
+        }
+
+        session.Lock(VaultLockReason.Manual);
+        var landed = 0;
+        using var model = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => landed++, lockedBy: VaultLockReason.Manual);
+        var window = Show(model);
+        var quickUnlock = window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "QuickUnlock");
+
+        Assert.True(model.ShowsQuickUnlockAlone);
+        Assert.True(quickUnlock.IsFocused, "the quick unlock should have the keyboard where it stands alone");
+        Assert.True(quickUnlock.IsDefault);
+        Assert.False(window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "Unlock").IsDefault);
+
+        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
+        window.KeyReleaseQwerty(PhysicalKey.Enter, RawInputModifiers.None);
+
+        Assert.True(SpinWait.SpinUntil(() => { Avalonia.Threading.Dispatcher.UIThread.RunJobs(); return landed == 1; }, TimeSpan.FromSeconds(10)), "Return did not press the quick unlock");
+        Assert.Equal(2, keys.Asked);
+        Assert.True(session.IsUnlocked);
+    });
+
+    [Fact]
+    public Task Use_master_password_moves_the_keyboard_to_the_password() => HeadlessSession.On(async () =>
+    {
+        using var fixture = new TempVault();
+        fixture.RememberSelf();
+        var keys = new FakeQuickUnlockKeys();
+        using var session = new AppVaultSession(new ManualClock(AppClock.Start), home: fixture.Home, quickUnlock: keys);
+
+        using (var first = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => { }))
+        {
+            foreach (var c in TempVault.Password)
+            {
+                first.Type(c);
+            }
+
+            await first.UnlockAsync();
+        }
+
+        session.Lock(VaultLockReason.Manual);
+        using var model = new UnlockViewModel(session, fixture.Home, new FakeVaultFilePicker(), () => { }, lockedBy: VaultLockReason.Manual);
+        var window = Show(model);
+
+        model.UsePasswordCommand.Press();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        Assert.True(Password(window).IsFocused);
+        Assert.True(window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "Unlock").IsDefault);
     });
 
     private static MaskedInput Field(Window window, string name) =>

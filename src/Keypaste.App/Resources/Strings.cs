@@ -153,7 +153,6 @@ public static class Strings
     public static string CopyPassword => Manager.GetString("CopyPassword", CultureInfo.CurrentUICulture)!;
     public static string CopyReference => Manager.GetString("CopyReference", CultureInfo.CurrentUICulture)!;
     public static string CopySetupPrompt => Manager.GetString("CopySetupPrompt", CultureInfo.CurrentUICulture)!;
-    public static string CopyTheCodeTheClipboardClearsItself => Manager.GetString("CopyTheCodeTheClipboardClearsItself", CultureInfo.CurrentUICulture)!;
     public static string CopyTheCommand => Manager.GetString("CopyTheCommand", CultureInfo.CurrentUICulture)!;
     public static string CopyTheConfiguration => Manager.GetString("CopyTheConfiguration", CultureInfo.CurrentUICulture)!;
     public static string CopyThePassword => Manager.GetString("CopyThePassword", CultureInfo.CurrentUICulture)!;

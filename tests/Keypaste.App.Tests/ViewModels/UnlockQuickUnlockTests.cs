@@ -134,7 +134,7 @@ public sealed class UnlockQuickUnlockTests : IDisposable
     }
 
     [Fact]
-    public async Task A_cancelled_Windows_Hello_says_nothing_and_is_offered_again()
+    public async Task A_cancelled_Windows_Hello_says_nothing_and_its_button_stays_alone()
     {
         await UnlockAndLockAsync(VaultLockReason.Manual);
         using var model = Screen(VaultLockReason.Manual);
@@ -145,7 +145,27 @@ public sealed class UnlockQuickUnlockTests : IDisposable
         Assert.Equal(0, _landed);
         Assert.False(model.HasMessage);
         Assert.True(model.OffersQuickUnlock);
+        Assert.True(model.ShowsQuickUnlockAlone);
         Assert.False(_session.IsUnlocked);
+    }
+
+    [Fact]
+    public async Task Asking_at_once_asks_only_where_the_screen_offers_quick_unlock_alone()
+    {
+        await UnlockAndLockAsync(VaultLockReason.Manual);
+
+        using (var chosePassword = Screen(VaultLockReason.Manual))
+        {
+            chosePassword.UsePasswordCommand.Press();
+            chosePassword.AskQuickUnlockAtOnce();
+            Assert.Equal(1, _hello.Asked);
+        }
+
+        using var model = Screen(VaultLockReason.Manual);
+        model.AskQuickUnlockAtOnce();
+
+        Assert.True(SpinWait.SpinUntil(() => _session.IsUnlocked, TimeSpan.FromSeconds(10)), "asking at once opened nothing");
+        Assert.Equal(2, _hello.Asked);
     }
 
     [Fact]

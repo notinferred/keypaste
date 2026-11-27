@@ -42,7 +42,7 @@ Drag a `.kdbx` onto the window, choose Open a vault…, or pick it from the rece
 
 - **Key file.** Choose it with Key file… under Unlock.
 - **YubiKey.** Choose YubiKey… (slot 2 by default), programmed for HMAC-SHA1 challenge-response, and touch the key when asked. Every save asks again. The CLI reaches such a vault only through the app while the app holds it. No physical YubiKey has been tested.
-- **Windows Hello and Touch ID.** After an idle lock or a lock you made, Unlock with Windows Hello, or Unlock with Touch ID on a Mac, reopens the vault. Quitting, `keypaste lock`, a changed password or key file, and on a Mac an added or removed fingerprint need the master password. Pressing the notification that an agent asked for a locked vault asks Windows Hello or Touch ID at once where they can reopen it, unless another vault is unlocked.
+- **Windows Hello and Touch ID.** After an idle lock or a lock you made, Unlock with Windows Hello, or Unlock with Touch ID on a Mac, reopens the vault. Quitting, `keypaste lock`, a changed password or key file, and on a Mac an added or removed fingerprint need the master password. Bringing keypaste forward yourself, from the Dock, the menu bar or tray icon, your browser's Unlock… or the notification that an agent asked for a locked vault, asks Windows Hello or Touch ID at once where they can reopen it, unless another vault is unlocked. If you cancel it, the button stays. An agent's request alone never asks.
 
 One vault has one approver at a time: while `keypaste approve` holds it in a terminal, the app cannot, and the other way round.
 
@@ -73,9 +73,11 @@ A vault is one flat list of items, organized by tags. The app shows no groups, a
 
 Find searches titles, group paths, usernames, websites and tags. Passwords, notes and protected fields are never searched. A row never shows a secret value.
 
+While you type, `Down` and `Up` choose through the matches and `Return` chooses the first, with the keyboard still in the search. A search that hides the chosen item chooses its first match instead. In the search, `Ctrl/Cmd+C` copies the chosen item's password unless you have selected some of the search's text.
+
 ### Copy and reveal
 
-Select an item, then press a field's row to copy it; `Ctrl/Cmd+C` copies the password. A password stays hidden until you press Reveal, and hides again when you press Hide, leave the item or the window, and on lock.
+Select an item, then press a field's row to copy it; `Ctrl/Cmd+C` copies the password, `Shift+Ctrl/Cmd+C` the username and `Ctrl/Cmd+T` the one-time code. A password stays hidden until you press Reveal, and hides again when you press Hide, leave the item or the window, and on lock.
 
 A copied secret clears after twenty seconds, and sooner on lock or quit. Each copy asks clipboard managers not to keep it. Nothing clears it if the app is killed, and keypaste cannot make a clipboard manager honour the request ([THREATS](../THREATS.md) T-19).
 
@@ -234,7 +236,10 @@ Every command is also in the menus.
 | `Ctrl/Cmd+1` … `4` | Items, Agents, Security, Settings |
 | `Ctrl/Cmd+F`, `Ctrl/Cmd+K` | Search |
 | `Ctrl/Cmd+N` | New item |
-| `Ctrl/Cmd+C` | Outside a text field, copy the chosen item's password |
+| `Ctrl/Cmd+C` | Outside a text field, or in the search with none of its text selected, copy the chosen item's password |
+| `Shift+Ctrl/Cmd+C` | Copy the chosen item's username |
+| `Ctrl/Cmd+T` | Copy the chosen item's one-time code |
+| `Down`, `Up`, `Return` in the search | Choose the next or previous match, or the first |
 | `Ctrl/Cmd+O` | Open a vault |
 | `Ctrl/Cmd+L` | Lock |
 | `Ctrl/Cmd+W` | Close the window, which locks |

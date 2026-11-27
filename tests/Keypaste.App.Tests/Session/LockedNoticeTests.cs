@@ -489,6 +489,45 @@ public sealed class LockedNoticeTests
         });
 
     [Fact]
+    public Task Opening_keypaste_from_the_tray_asks_quick_unlock_at_once_and_an_agents_request_alone_does_not() =>
+        HeadlessSession.On(async () =>
+        {
+            using var system = new FakeNotifications { Answers = SystemAnswer.Accepts };
+            using var home = new TempHome();
+            using var vault = new TempVault();
+            using var claim = Claim(home);
+            using var lifetime = new ClassicDesktopStyleApplicationLifetime();
+            Attach(lifetime);
+            var keys = new FakeQuickUnlockKeys(MachineQuickUnlock.TouchIdName);
+            using var app = new App { Preferences = Tray(home), Claim = claim, Notifications = system, QuickUnlockKeys = () => keys };
+            app.Launch(lifetime, background: true);
+            lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
+            Assert.True(Screen(app).Offer(vault.Path_));
+
+            Unlock(app, vault.Path_);
+            Assert.Equal(QuickUnlockOutcome.Done, app.Authority!.Session.KeepForQuickUnlock());
+            WindowInput.Drain();
+            var unlocked = Screen(app);
+            app.Authority.Session.Lock(VaultLockReason.Manual);
+            await Until(() => !ReferenceEquals(Screen(app), unlocked));
+            Assert.True(Screen(app).Offer(vault.Path_));
+            Assert.True(Screen(app).ShowsQuickUnlockAlone);
+
+            Assert.True(await TellAsync(vault.Path_));
+            await Until(() => system.Posts.Count == 1);
+            await SettleAsync();
+            Assert.Equal(1, keys.Asked);
+            Assert.False(app.Authority.Session.IsUnlocked);
+
+            app.Tray!.Menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == AppTray.OpenHeader).Command!.Press();
+
+            await Until(() => app.Authority.Session.IsUnlocked);
+            Assert.Equal(2, keys.Asked);
+            Assert.True(app.Main!.IsVisible);
+            app.Main.Close();
+        });
+
+    [Fact]
     public Task Unlocking_removes_the_notification_and_its_late_press_after_another_lock_opens_nothing() =>
         WithNotifications(SystemAnswer.Accepts, async (app, _, system, vault, _) =>
         {

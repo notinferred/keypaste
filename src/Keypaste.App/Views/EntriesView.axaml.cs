@@ -20,6 +20,9 @@ namespace Keypaste.App.Views;
 /// </remarks>
 internal sealed partial class EntriesView : UserControl
 {
+    /// <summary>The name of the list's search field, which Copy reads as outside a field while it has nothing selected.</summary>
+    internal const string SearchName = "ListSearch";
+
     private readonly ListDetail _split;
     private readonly ListBox _rows;
     private EntriesViewModel? _entries;
@@ -38,6 +41,42 @@ internal sealed partial class EntriesView : UserControl
         _rows = this.FindControl<ListBox>("Rows")!;
         _rows.ContainerPrepared += OnRowPrepared;
         _rows.AddHandler(KeyDownEvent, OnRowsKeyDown, RoutingStrategies.Tunnel);
+
+        this.FindControl<TextBox>(SearchName)!.AddHandler(KeyDownEvent, OnSearchKeyDown, RoutingStrategies.Tunnel);
+    }
+
+    /// <summary>
+    /// The arrows choose through the matches while the keyboard stays in the search, and Return chooses the first, as in Spotlight.
+    /// Where the detail would replace the list, only Return chooses, since a choice there hides the search.
+    /// </summary>
+    private void OnSearchKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.KeyModifiers != KeyModifiers.None || _entries is null)
+        {
+            return;
+        }
+
+        switch (e.Key)
+        {
+            case Key.Down or Key.Up when !_split.ListStandsAlone:
+                _entries.MoveChoice(e.Key == Key.Down ? 1 : -1);
+                ShowChosenRow();
+                e.Handled = true;
+                break;
+            case Key.Enter:
+                _entries.ChooseFirstMatch();
+                ShowChosenRow();
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private void ShowChosenRow()
+    {
+        if (_entries?.Selected is { } chosen && _rows.Items.IndexOf(chosen) is >= 0 and var index)
+        {
+            _rows.ScrollIntoView(index);
+        }
     }
 
     /// <summary>The keyboard goes with the pane it was in: from the list to the open item's Back, but not to a form that takes it itself, and from the detail back to the row it came from.</summary>

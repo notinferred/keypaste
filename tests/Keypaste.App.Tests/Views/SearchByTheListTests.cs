@@ -129,7 +129,7 @@ public sealed class SearchByTheListTests
     });
 
     [Fact]
-    public Task A_search_that_hides_the_selected_item_clears_the_pane() => HeadlessSession.On(() =>
+    public Task A_search_that_hides_the_chosen_item_chooses_its_first_match_and_one_with_none_clears_the_pane() => HeadlessSession.On(() =>
     {
         using var shell = new RenderedShell("keypaste-search-hides-", Seed);
         var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
@@ -141,11 +141,57 @@ public sealed class SearchByTheListTests
         Assert.Equal("box", entries.Selected?.Title);
 
         shell.Shell.Search = "spare";
+        Assert.Equal("spare", entries.Selected?.Title);
+        Assert.Equal("spare", entries.Detail?.Title);
+
+        shell.Shell.Search = "nothing-matches";
         Assert.Null(entries.Detail);
         Assert.Null(entries.Selected);
 
         shell.Shell.Search = string.Empty;
         Assert.Null(entries.Detail);
+    });
+
+    [Fact]
+    public Task Down_Up_and_Return_in_the_search_choose_through_the_matches_with_the_keyboard_kept_there() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell("keypaste-search-arrows-", vault =>
+        {
+            vault.AddEntry(new VaultEntry { Title = "box", Username = "ops", GroupPath = "servers" });
+            vault.AddEntry(new VaultEntry { Title = "crate", Username = "ops", GroupPath = "servers" });
+        });
+        var entries = shell.Show<EntriesViewModel>(DestinationKind.Entries);
+        var search = shell.Named<TextBox>("ListSearch");
+
+        void Press(PhysicalKey key)
+        {
+            shell.Window.KeyPressQwerty(key, RawInputModifiers.None);
+            shell.Window.KeyReleaseQwerty(key, RawInputModifiers.None);
+            RenderedShell.Drain();
+        }
+
+        Find(shell);
+        WindowInput.Type(shell.Window, "ops");
+        RenderedShell.Drain();
+        Assert.Null(entries.Selected);
+
+        Press(PhysicalKey.Enter);
+        Assert.Equal(entries.Rows[0], entries.Selected);
+        Assert.True(search.IsFocused, "Return took the keyboard out of the search");
+
+        Press(PhysicalKey.ArrowDown);
+        Assert.Equal(entries.Rows[1], entries.Selected);
+        Press(PhysicalKey.ArrowDown);
+        Assert.Equal(entries.Rows[1], entries.Selected);
+        Press(PhysicalKey.ArrowUp);
+        Assert.Equal(entries.Rows[0], entries.Selected);
+        Assert.Equal(entries.Selected?.Title, entries.Detail?.Title);
+        Assert.True(search.IsFocused, "the arrows took the keyboard out of the search");
+
+        Press(PhysicalKey.ArrowDown);
+        Press(PhysicalKey.Enter);
+        Assert.Equal(entries.Rows[1], entries.Selected);
+        Assert.Equal("ops", search.Text);
     });
 
     [Fact]

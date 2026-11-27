@@ -277,9 +277,49 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
                 _pinned = null;
                 ReturnToList();
                 Filter();
-                ClosePaneTheListHid();
+                ChooseFirstMatchForHidden();
             }
         }
+    }
+
+    /// <summary>The pane shows only what the list does, so a query that hides the chosen item chooses its first match instead, and closes the pane when nothing matches.</summary>
+    private void ChooseFirstMatchForHidden()
+    {
+        if (_selection is null || Rows.Any(IsSelected))
+        {
+            return;
+        }
+
+        if (!IsAdding && Rows.Count > 0)
+        {
+            MoveSelection(Rows[0].Name, SessionOf(Rows[0]));
+        }
+        else
+        {
+            Select(null);
+        }
+    }
+
+    /// <summary>Return in the search: the first match, unless the arrows or the query already chose one the list shows.</summary>
+    internal void ChooseFirstMatch()
+    {
+        if (Selected is null && Rows.Count > 0)
+        {
+            Selected = Rows[0];
+        }
+    }
+
+    /// <summary>↓ or ↑ in the search moves the choice through the matches, starting at the first, as Spotlight's highlight moves.</summary>
+    /// <param name="by">1 for the next match, -1 for the one before.</param>
+    internal void MoveChoice(int by)
+    {
+        if (Rows.Count == 0)
+        {
+            return;
+        }
+
+        var at = Selected is { } chosen ? Rows.ToList().IndexOf(chosen) : -1;
+        Selected = Rows[at < 0 ? 0 : Math.Clamp(at + by, 0, Rows.Count - 1)];
     }
 
     /// <summary>A search asks for the list, so a new item's form holding nothing to lose gives way to it; the shell has already asked about one that does.</summary>
@@ -291,7 +331,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
     }
 
-    /// <summary>The pane shows only what the list does, so the place or query just chosen closes an item it hid.</summary>
+    /// <summary>The pane shows only what the list does, so the place just chosen closes an item it hid.</summary>
     private void ClosePaneTheListHid()
     {
         if (_selection is not null && !Rows.Any(IsSelected))
@@ -306,7 +346,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     /// <b>Held as the name that reaches the item rather than as the row object, so what the list does to its rows
     /// does not decide the selection.</b> The list writes null back into this property whenever the
     /// row it had selected leaves <see cref="Rows"/>. A null from the list is therefore ignored;
-    /// <see cref="Select"/> is how the selection is deliberately dropped: by a query or place that
+    /// <see cref="Select"/> is how the selection is deliberately dropped or moved: by a query or place that
     /// hides it, <see cref="Dispose"/>, the locked branch of <see cref="Reload"/> and a completed delete.
     /// </para>
     /// <para>

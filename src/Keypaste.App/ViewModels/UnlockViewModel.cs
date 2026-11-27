@@ -886,6 +886,18 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>
+    /// Asks Windows Hello or Touch ID at once where the screen offers it alone, for an act of the person's own that brought the window forward.
+    /// An agent's request or a notice arriving never calls this (THREATS T-7), and the answer is still the person's fingerprint, face or PIN (T-44).
+    /// </summary>
+    internal void AskQuickUnlockAtOnce()
+    {
+        if (ShowsQuickUnlockAlone && ResumeCommand.CanExecute(null))
+        {
+            ResumeCommand.Execute(null);
+        }
+    }
+
     /// <summary>Opens the selected vault from its quick unlock copy, once the person answers Windows Hello or Touch ID.</summary>
     /// <remarks><c>internal</c> for the reason <see cref="UnlockAsync"/> is.</remarks>
     internal async Task ResumeAsync()
@@ -914,7 +926,12 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
             }
 
             Resumable = _session.CanResume(path);
-            UsesPassword = true;
+
+            // A cancel leaves the quick unlock where it stood, so the person can ask it again or choose the password.
+            if (!(outcome == UnlockOutcome.QuickUnlockRefused && _session.LastQuickUnlock == QuickUnlockOutcome.Cancelled))
+            {
+                UsesPassword = true;
+            }
 
             if (ExplainResume(outcome) is { } refusal)
             {

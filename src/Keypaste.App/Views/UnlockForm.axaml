@@ -64,6 +64,7 @@
                 Classes.primary="{Binding QuickUnlockIsPrimary}"
                 HorizontalAlignment="Stretch"
                 HorizontalContentAlignment="Center"
+                IsDefault="{Binding ShowsQuickUnlockAlone}"
                 Command="{Binding ResumeCommand}">
           <DockPanel HorizontalSpacing="8">
             <ctl:KpIcon DockPanel.Dock="Left" Icon="fingerprint" Size="16" />
@@ -93,7 +94,7 @@
                 Classes.busy="{Binding Busy}"
                 HorizontalAlignment="Stretch"
                 HorizontalContentAlignment="Center"
-                IsDefault="True"
+                IsDefault="{Binding ShowsPasswordForm}"
                 Command="{Binding UnlockCommand}"
                 AutomationProperties.Name="{x:Static res:Strings.Unlock}">
           <Panel>

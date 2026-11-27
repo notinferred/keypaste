@@ -107,7 +107,6 @@
   <data name="CopyLatestHash" xml:space="preserve"><value>Copy latest hash</value></data>
   <data name="CopyPassword" xml:space="preserve"><value>Copy password</value></data>
   <data name="CopyThisRevisionsPassword" xml:space="preserve"><value>Copy this revision's password</value></data>
-  <data name="CopyTheCodeTheClipboardClearsItself" xml:space="preserve"><value>Copy the code; the clipboard clears itself</value></data>
   <data name="CopyTheCommand" xml:space="preserve"><value>Copy the command</value></data>
   <data name="CopyTheTOTPCode" xml:space="preserve"><value>Copy the one-time code</value></data>
   <data name="CopyTheValueTheClipboardClearsItself" xml:space="preserve"><value>Copy the value; the clipboard clears itself</value></data>

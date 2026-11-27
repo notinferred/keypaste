@@ -347,7 +347,7 @@ public sealed class EntriesOrganizeTests : IDisposable
     // ---------------------------------------------------------------- what the selection survives
 
     [Fact]
-    public void A_search_that_hides_the_selected_row_closes_its_pane()
+    public void A_search_that_hides_the_selected_row_opens_its_first_match_and_one_with_none_closes_the_pane()
     {
         using var context = New();
         var entries = context.Entries;
@@ -358,6 +358,12 @@ public sealed class EntriesOrganizeTests : IDisposable
         entries.Search = "STRIPE";
 
         Assert.DoesNotContain(entries.Rows, row => row.Title == "production");
+        Assert.NotEmpty(entries.Rows);
+        Assert.Same(entries.Rows[0], entries.Selected);
+        Assert.Equal(entries.Rows[0].Title, entries.Detail?.Title);
+
+        entries.Search = "nothing-is-called-this";
+
         Assert.Null(entries.Detail);
     }
 

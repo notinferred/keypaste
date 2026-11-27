@@ -1,6 +1,7 @@
 <UserControl xmlns:res="using:Keypaste.App.Resources"
   xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:app="using:Keypaste.App"
              xmlns:ctl="using:Keypaste.App.Controls"
              xmlns:vm="using:Keypaste.App.ViewModels"
              xmlns:views="using:Keypaste.App.Views"
@@ -648,13 +649,13 @@
                     </Border.IsVisible>
                     <ctl:GroupedRows>
                     <ctl:FieldRow Label="{x:Static res:Strings.Username}" IsVisible="{Binding HasUsername}">
-                      <ctl:PressToCopy x:Name="CopyUsername" Command="{Binding CopyUsernameCommand}" ToolTip.Tip="{x:Static res:Strings.CopyUsername}" AutomationProperties.Name="{x:Static res:Strings.CopyUsername}">
+                      <ctl:PressToCopy x:Name="CopyUsername" Command="{Binding CopyUsernameCommand}" ToolTip.Tip="{x:Static app:ShortcutText.CopyUsername}" AutomationProperties.Name="{x:Static res:Strings.CopyUsername}">
                         <TextBlock Classes="size-13" Text="{Binding DisplayUsername}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                       </ctl:PressToCopy>
                     </ctl:FieldRow>
 
                     <ctl:FieldRow Label="{x:Static res:Strings.Password}" IsVisible="{Binding HasPassword}">
-                      <ctl:PressToCopy x:Name="CopyPasswordValue" Command="{Binding CopyPasswordCommand}" ToolTip.Tip="{x:Static res:Strings.CopyThePassword}" AutomationProperties.Name="{x:Static res:Strings.CopyThePassword}">
+                      <ctl:PressToCopy x:Name="CopyPasswordValue" Command="{Binding CopyPasswordCommand}" ToolTip.Tip="{x:Static app:ShortcutText.CopyPassword}" AutomationProperties.Name="{x:Static res:Strings.CopyThePassword}">
                         <!-- Not a TextBlock: its automation peer publishes its text as the element's name. RevealedValue draws the characters itself, only while revealed. -->
                         <ctl:RevealedValue x:Name="CurrentPassword"
                                            Source="{Binding}"
@@ -677,7 +678,7 @@
 
                     <!-- The TOTP code is masked and computed at the reveal or the copy, as the password is read; only the seconds until the next code are bound. -->
                     <ctl:FieldRow Label="{x:Static res:Strings.TOTP}" IsVisible="{Binding ShowsTotp}">
-                      <ctl:PressToCopy x:Name="CopyTotp" Command="{Binding Totp.CopyCommand}" ToolTip.Tip="{x:Static res:Strings.CopyTheCodeTheClipboardClearsItself}" AutomationProperties.Name="{x:Static res:Strings.CopyTheTOTPCode}">
+                      <ctl:PressToCopy x:Name="CopyTotp" Command="{Binding Totp.CopyCommand}" ToolTip.Tip="{x:Static app:ShortcutText.CopyOneTimeCode}" AutomationProperties.Name="{x:Static res:Strings.CopyTheTOTPCode}">
                         <ctl:RevealedValue x:Name="CurrentTotp"
                                            Source="{Binding Totp}"
                                            MaskedLength="{Binding Totp.MaskedLength}"

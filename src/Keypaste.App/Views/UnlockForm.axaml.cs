@@ -78,16 +78,17 @@ internal sealed partial class UnlockForm : UserControl
 
     private UnlockViewModel? Model => DataContext as UnlockViewModel;
 
-    /// <summary>Puts the keyboard in the field the form shows now.</summary>
+    /// <summary>Puts the keyboard in the field the form shows now, or on the quick unlock where it stands alone.</summary>
     internal void FocusForm()
     {
-        var field = Field(Model switch
+        Control target = Model switch
         {
-            { IsCreating: true } => "NewPassword",
-            { IsRestoring: true } => "BackupPassword",
-            _ => "Password",
-        });
-        Dispatcher.UIThread.Post(() => field.Focus(), DispatcherPriority.Background);
+            { IsCreating: true } => Field("NewPassword"),
+            { IsRestoring: true } => Field("BackupPassword"),
+            { ShowsQuickUnlockAlone: true } => this.FindControl<Button>("QuickUnlock")!,
+            _ => Field("Password"),
+        };
+        Dispatcher.UIThread.Post(() => target.Focus(), DispatcherPriority.Background);
     }
 
     private MaskedInput Field(string name) => this.FindControl<MaskedInput>(name)!;
