@@ -62,4 +62,8 @@ internal sealed record ProjectLaunching(
 /// <param name="Profile">The stage.</param>
 /// <param name="Directory">Where the command ran.</param>
 /// <param name="Command">The command, as typed.</param>
-internal sealed record ProjectRun(string Vault, string Project, string Profile, string Directory, string Command);
+internal sealed record ProjectRun(string Vault, string Project, string Profile, string Directory, string Command)
+{
+    /// <summary>Whether its set was protected, so asked live, which Run again has no card to ask on.</summary>
+    internal bool Protected { get; init; }
+}

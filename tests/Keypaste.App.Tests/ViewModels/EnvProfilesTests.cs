@@ -8,6 +8,7 @@ using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Projects;
+using Keypaste.Core.Settings;
 using Keypaste.Core.Tests;
 using Xunit;
 
@@ -187,17 +188,17 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.DoesNotContain(_prodValue, File.ReadAllText(path), StringComparison.Ordinal);
     }
 
-    /// <summary>The copied command asks the app holding the vault through <c>--session</c>, names that vault and names the selected environment.</summary>
+    /// <summary>The copied command names the vault while it is not the chosen one, and names the selected environment.</summary>
     [Fact]
     public void RunCommand_NamesTheProfile()
     {
         using var screen = new EnvSetsViewModel(_session, _countdown);
         var project = Open(screen);
 
-        Assert.Equal($"keypaste run --session {NamedVault} -p dev acme-api -- npm start", project.RunCommand);
+        Assert.Equal($"keypaste run {NamedVault} -p dev acme-api -- npm start", project.RunCommand);
 
         project.SelectedProfile = "prod";
-        Assert.Equal($"keypaste run --session {NamedVault} -p prod acme-api -- npm start", project.RunCommand);
+        Assert.Equal($"keypaste run {NamedVault} -p prod acme-api -- npm start", project.RunCommand);
         Assert.Equal("prod", project.Launch.Profile);
         Assert.Equal("prod", project.Import.Profile);
 
@@ -209,12 +210,53 @@ public sealed class EnvProfilesTests : IDisposable
                 [new ProjectMapping(Path.GetFullPath(_fixture.Path_), "acme-api", directory, "dotnet run")]));
 
             screen.OpenCommand.Press("acme-api");
-            Assert.Equal($"keypaste run --session {NamedVault} -p dev acme-api -- dotnet run", screen.OpenProject!.RunCommand);
+            Assert.Equal($"keypaste run {NamedVault} -p dev acme-api -- dotnet run", screen.OpenProject!.RunCommand);
         }
         finally
         {
             Directory.Delete(directory, recursive: true);
         }
+    }
+
+    /// <summary>
+    /// For the vault chosen for the terminal, which a <c>keypaste run</c> naming none reaches, the copied line names no
+    /// vault; it names this one when another open vault has a project of the same name, so the line says which.
+    /// </summary>
+    [Fact]
+    public void RunCommand_NamesNoVault_ForTheChosenOne_UnlessAnotherOpenVaultHasTheProject()
+    {
+        Assert.Equal(ChooseOutcome.Chosen, ChosenVault.Choose(_fixture.Home, _fixture.Path_, onlyIfNone: false));
+
+        using (var screen = new EnvSetsViewModel(_session, _countdown))
+        {
+            Assert.Equal("keypaste run -p dev acme-api -- npm start", Open(screen).RunCommand);
+            Assert.Equal("keypaste run acme-api -- ", screen.RunCommandFor("acme-api"));
+        }
+
+        using var shared = new EnvSetsViewModel(_session, _countdown) { ProjectElsewhere = project => project == "acme-api" };
+
+        Assert.Equal($"keypaste run {NamedVault} -p dev acme-api -- npm start", Open(shared).RunCommand);
+        Assert.Equal($"keypaste run {NamedVault} acme-api -- ", shared.RunCommandFor("acme-api"));
+        Assert.Equal("keypaste run billing -- ", shared.RunCommandFor("billing"));
+    }
+
+    /// <summary>Run reads Run… while pressing it opens the form for a directory and command, and Run once one is saved.</summary>
+    [Fact]
+    public void Run_reads_Run_with_an_ellipsis_until_a_directory_and_command_are_saved()
+    {
+        using var screen = new EnvSetsViewModel(_session, _countdown, launching: new ProjectLaunching(new Core.Launch.TerminalLaunch("launcher"), new Core.Launch.DetachedProcessLauncher(), Core.Launch.EnvironmentMerge.Inherited));
+        var project = Open(screen);
+        var changed = new List<string?>();
+        project.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        Assert.Equal("Run…", project.RunLabel);
+
+        project.Launch.Directory = _fixture.Home;
+        project.Launch.Command = "npm start";
+        project.Launch.SaveCommand.Press();
+
+        Assert.Equal("Run", project.RunLabel);
+        Assert.Contains(nameof(EnvProjectViewModel.RunLabel), changed);
     }
 
     /// <summary>A project whose name starts with <c>-</c> is copied by <c>--project=</c>, which <c>keypaste run</c> takes whole on every platform, and any other name as the operand.</summary>
@@ -224,13 +266,13 @@ public sealed class EnvProfilesTests : IDisposable
         using var screen = new EnvSetsViewModel(_session, _countdown);
 
         screen.OpenCommand.Press("-web");
-        Assert.Equal($"keypaste run --session {NamedVault} -p dev --project=-web -- npm start", screen.OpenProject!.RunCommand);
+        Assert.Equal($"keypaste run {NamedVault} -p dev --project=-web -- npm start", screen.OpenProject!.RunCommand);
 
         screen.OpenCommand.Press("acme-api");
-        Assert.Equal($"keypaste run --session {NamedVault} -p dev acme-api -- npm start", screen.OpenProject!.RunCommand);
+        Assert.Equal($"keypaste run {NamedVault} -p dev acme-api -- npm start", screen.OpenProject!.RunCommand);
 
-        Assert.Equal($"keypaste run --session {NamedVault} --project=--help -- ", screen.RunCommandFor("--help"));
-        Assert.Equal($"keypaste run --session {NamedVault} acme-api -- ", screen.RunCommandFor("acme-api"));
+        Assert.Equal($"keypaste run {NamedVault} --project=--help -- ", screen.RunCommandFor("--help"));
+        Assert.Equal($"keypaste run {NamedVault} acme-api -- ", screen.RunCommandFor("acme-api"));
     }
 
     /// <summary>
@@ -268,12 +310,15 @@ public sealed class EnvProfilesTests : IDisposable
         const string windowsVault = @"C:\v\w.kdbx";
 
         Assert.True(CopiedRunCommand.IsCopyable(project, windows: false));
-        Assert.Equal($"keypaste run --session --vault '{posixVault}' -p dev {posix} -- npm start", CopiedRunCommand.For(posixVault, project, "dev", "npm start", windows: false));
-        Assert.Equal($"keypaste run --session --vault '{posixVault}' {posix} -- ", CopiedRunCommand.For(posixVault, project, environment: null, command: string.Empty, windows: false));
+        Assert.Equal($"keypaste run --vault '{posixVault}' -p dev {posix} -- npm start", CopiedRunCommand.For(posixVault, project, "dev", "npm start", windows: false));
+        Assert.Equal($"keypaste run --vault '{posixVault}' {posix} -- ", CopiedRunCommand.For(posixVault, project, environment: null, command: string.Empty, windows: false));
+
+        Assert.Equal($"keypaste run -p dev {posix} -- npm start", CopiedRunCommand.For(vault: null, project, "dev", "npm start", windows: false));
 
         Assert.Equal(windows is not null, CopiedRunCommand.IsCopyable(project, windows: true));
-        Assert.Equal(windows is null ? null : $"keypaste run --session --vault \"{windowsVault}\" -p dev {windows} -- npm start", CopiedRunCommand.For(windowsVault, project, "dev", "npm start", windows: true));
-        Assert.Equal(windows is null ? null : $"keypaste run --session --vault \"{windowsVault}\" {windows} -- ", CopiedRunCommand.For(windowsVault, project, environment: null, command: string.Empty, windows: true));
+        Assert.Equal(windows is null ? null : $"keypaste run -p dev {windows} -- npm start", CopiedRunCommand.For(vault: null, project, "dev", "npm start", windows: true));
+        Assert.Equal(windows is null ? null : $"keypaste run --vault \"{windowsVault}\" -p dev {windows} -- npm start", CopiedRunCommand.For(windowsVault, project, "dev", "npm start", windows: true));
+        Assert.Equal(windows is null ? null : $"keypaste run --vault \"{windowsVault}\" {windows} -- ", CopiedRunCommand.For(windowsVault, project, environment: null, command: string.Empty, windows: true));
     }
 
     /// <summary>
@@ -304,7 +349,7 @@ public sealed class EnvProfilesTests : IDisposable
     public void ACopiedRunCommand_QuotesTheVaultForEachPlatformsShells_OrHasNone(string vault, bool windows, string? named)
     {
         Assert.Equal(named is not null, CopiedRunCommand.IsCopyableVault(vault, windows));
-        Assert.Equal(named is null ? null : $"keypaste run --session {named} -p dev acme-api -- npm start", CopiedRunCommand.For(vault, "acme-api", "dev", "npm start", windows));
+        Assert.Equal(named is null ? null : $"keypaste run {named} -p dev acme-api -- npm start", CopiedRunCommand.For(vault, "acme-api", "dev", "npm start", windows));
     }
 
     /// <summary>
@@ -358,8 +403,8 @@ public sealed class EnvProfilesTests : IDisposable
         Assert.True(card.HasRunCommand);
         Assert.Empty(card.RunCommandNote);
         Assert.True(card.CopyRunCommandCommand.CanExecute(null));
-        Assert.Equal(["run", "--session", "--vault", _fixture.Path_, "-p", "dev", named, "--", "npm", "start"], Pasted(card.RunCommand!));
-        Assert.Equal(["run", "--session", "--vault", _fixture.Path_, named, "--", "npm", "start"], Pasted(screen.RunCommandFor(project) + "npm start"));
+        Assert.Equal(["run", "--vault", _fixture.Path_, "-p", "dev", named, "--", "npm", "start"], Pasted(card.RunCommand!));
+        Assert.Equal(["run", "--vault", _fixture.Path_, named, "--", "npm", "start"], Pasted(screen.RunCommandFor(project) + "npm start"));
     }
 
     /// <summary>
@@ -407,8 +452,8 @@ public sealed class EnvProfilesTests : IDisposable
 
         Assert.True(card.HasRunCommand);
         Assert.Empty(card.RunCommandNote);
-        Assert.Equal(["run", "--session", .. named, "-p", "dev", "acme-api", "--", "npm", "start"], Pasted(card.RunCommand!));
-        Assert.Equal(["run", "--session", .. named, "acme-api", "--", "npm", "start"], Pasted(screen.RunCommandFor("acme-api") + "npm start"));
+        Assert.Equal(["run", .. named, "-p", "dev", "acme-api", "--", "npm", "start"], Pasted(card.RunCommand!));
+        Assert.Equal(["run", .. named, "acme-api", "--", "npm", "start"], Pasted(screen.RunCommandFor("acme-api") + "npm start"));
     }
 
     [Fact]

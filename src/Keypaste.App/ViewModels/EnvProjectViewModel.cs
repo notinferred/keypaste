@@ -193,13 +193,19 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
 
     /// <summary>The command that injects the selected profile, for the copy helper and the card, or null when the vault's path or the project's name gets none.</summary>
     /// <remarks>
-    /// It names the vault, the project and the profile, so it runs from any directory and not only the one
-    /// <c>projects.json</c> maps, and asks this vault's session even when another vault is the chosen one; the command
-    /// is the mapped one, or <c>npm start</c> to edit.
+    /// It names the project and the profile, so it runs from any directory and not only the one <c>projects.json</c>
+    /// maps, and the vault where <see cref="CopiedRunCommand.NamesVault"/> says a terminal needs it; the command is the
+    /// mapped one, or <c>npm start</c> to edit.
     /// </remarks>
     internal string? RunCommand => _session.VaultPath is { } vault
-        ? CopiedRunCommand.For(vault, Name, SelectedProfile, Launch.Mapping?.Command ?? "npm start")
+        ? CopiedRunCommand.For(CopiedRunCommand.NamesVault(vault, _session.Home, ProjectElsewhere(Name)) ? vault : null, Name, SelectedProfile, Launch.Mapping?.Command ?? "npm start")
         : null;
+
+    /// <summary>Whether another open vault has a project of this name, which <see cref="RunCommand"/> then names its vault for.</summary>
+    internal Func<string, bool> ProjectElsewhere { get; init; } = static _ => false;
+
+    /// <summary>Told once <see cref="RunCommand"/> is copied, so the window can offer to link the <c>keypaste</c> it runs; none tells nobody.</summary>
+    internal Action? RunCommandCopied { get; init; }
 
     /// <summary>Whether the card offers <see cref="RunCommand"/>, which a vault path or a name a terminal could run never gets.</summary>
     internal bool HasRunCommand => RunCommand is not null;
@@ -986,6 +992,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         if (e.PropertyName == nameof(ProjectLaunchViewModel.Mapping))
         {
             OnPropertyChanged(nameof(RunCommand));
+            OnPropertyChanged(nameof(RunLabel));
         }
 
         if (e.PropertyName is nameof(ProjectLaunchViewModel.IsSettingUp) or nameof(ProjectLaunchViewModel.IsConfirming))
@@ -1120,10 +1127,14 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         {
             await Clipboard.CopyPlainAsync(command, "Run command").ConfigureAwait(true);
             _announce(Resources.Strings.TerminalCantOpenHereSoTheRunCommandWasCopied, ToastTone.Information);
+            RunCommandCopied?.Invoke();
         }
     }
 
     private bool CanStartRun() => Launch.IsSupported ? !Launch.IsConfirming : HasRunCommand;
+
+    /// <summary>Run's words: Run… while pressing it opens the form for a directory and command, and Run once one is saved.</summary>
+    internal string RunLabel => Launch.IsSupported && !Launch.IsMapped ? Resources.Strings.RunProject : Resources.Strings.RunSavedProject;
 
     [RelayCommand(CanExecute = nameof(HasRunCommand))]
     private async Task CopyRunCommandAsync()
@@ -1131,6 +1142,7 @@ internal sealed partial class EnvProjectViewModel : ObservableObject, IDisposabl
         if (RunCommand is { } command)
         {
             await Clipboard.CopyPlainAsync(command, "Run command").ConfigureAwait(true);
+            RunCommandCopied?.Invoke();
         }
     }
 

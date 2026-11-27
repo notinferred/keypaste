@@ -56,7 +56,7 @@ When an agent asks for a locked vault, keypaste shows one notice. You see anothe
 
 ### Use keypaste in a terminal
 
-A project's copied run command and the other `keypaste` commands in this guide need `keypaste` on the terminal's `PATH`. The MSI puts it there on Windows. On macOS and Linux, Settings › keypaste in a terminal links it: on macOS as `/usr/local/bin/keypaste`, after an administrator password, and on Linux as `~/.local/bin/keypaste`.
+A project's copied run command and the other `keypaste` commands in this guide need `keypaste` on the terminal's `PATH`. The MSI puts it there on Windows. On macOS and Linux, Settings › keypaste in a terminal links it: on macOS as `/usr/local/bin/keypaste`, after an administrator password, and on Linux as `~/.local/bin/keypaste`. Until it is linked, copying a run command offers Link the keypaste command… there.
 
 On a Mac, move keypaste.app to Applications and open it from there before you link the command or turn on Open at login. A copy run from the mounted disk image, or from the temporary copy macOS makes of a downloaded app, can't be linked or opened at login, because it is gone once you eject or quit it.
 
@@ -137,11 +137,11 @@ Environments lists the vault's projects. Pick a stage, such as `dev` or `prod`, 
 
 ### Run a command with a project's variables
 
-Run with keypaste shows the stage's command, such as `keypaste run --session --vault '<this vault's path>' -p dev <project> -- npm start`, to copy. `--session` asks the app instead of opening the vault, so you type no password in the terminal. `--vault` names this vault, so the run asks it even when another vault is open. When the vault's file path or the project's name holds characters a terminal could run or change, the app shows no command and says why. The app asks before releasing the variables to a command run in a terminal, every time.
+Run with keypaste shows the stage's command, such as `keypaste run -p dev <project> -- npm start`, to copy. While the app holds the vault, `keypaste run` asks the app instead of opening the vault, so you type no password in the terminal, and Activity lists the run. The command adds `--vault '<this vault's path>'` when this vault isn't the one chosen for the terminal, or when another open vault has a project of the same name, so the run reaches this vault. When the vault's file path or the project's name holds characters a terminal could run or change, the app shows no command and says why. The app asks before releasing the variables to a command run in a terminal, every time.
 
-Run… opens a terminal running the command in a directory you save. Pressing it is your answer, so it starts at once, and Activity lists it as You pressed Run. A protected stage such as `prod` still asks first, and so does Open terminal.
+Run… asks for a directory and a command and saves them; from then on the button reads Run and opens a terminal running the command there. Pressing Run, or Edit › Open terminal, is your answer, so it starts at once, and Activity lists it as You pressed Run. A protected stage such as `prod` still asks first, on a card.
 
-Run again, in the Dock menu on a Mac and in the menu bar or tray icon's menu, runs the last command Run started once more, in the same project, stage and directory. It is off until something has run and while that vault is locked. For a protected stage it starts nothing and says to press Run in the project.
+Run again, in the Dock menu on a Mac and in the menu bar or tray icon's menu, runs the last command Run started once more, in the same project, stage and directory. It is off until something has run, while that vault is locked, and after a Run of a protected stage, which asks on its card in the project.
 
 The values go into that terminal's environment, so everything run there can read them. Locking the app does not take them back.
 

@@ -232,6 +232,8 @@
   <data name="Letters" xml:space="preserve"><value>Letters</value></data>
   <data name="Link" xml:space="preserve"><value>Link</value></data>
   <data name="LinkTheKeypasteCommand" xml:space="preserve"><value>Link the keypaste command</value></data>
+  <data name="LinkTheKeypasteCommandEllipsis" xml:space="preserve"><value>Link the keypaste command…</value></data>
+  <data name="RunCommandCopiedButATerminalCantFindKeypaste" xml:space="preserve"><value>Run command copied. A terminal can't find keypaste yet, so link it first.</value></data>
   <data name="LinksYouMadeFromAnItemsMenuXfaa446" xml:space="preserve"><value>Links you made from an item's ⋯ menu, end-to-end encrypted. The key lives in the link itself, so keypaste's servers never see it.</value></data>
   <data name="LockAndOpen" xml:space="preserve"><value>Lock and open</value></data>
   <data name="LockLabel" xml:space="preserve"><value>Lock</value></data>
@@ -592,6 +594,7 @@
   <data name="EditingItem" xml:space="preserve"><value>Editing</value></data>
   <data name="CopyThePassword" xml:space="preserve"><value>Copy the password</value></data>
   <data name="RunProject" xml:space="preserve"><value>Run…</value></data>
+  <data name="RunSavedProject" xml:space="preserve"><value>Run</value></data>
   <data name="LearnMoreAboutRecommendations" xml:space="preserve"><value>Learn more about recommendations</value></data>
   <data name="Time" xml:space="preserve"><value>Time</value></data>
   <data name="Actor" xml:space="preserve"><value>Actor</value></data>

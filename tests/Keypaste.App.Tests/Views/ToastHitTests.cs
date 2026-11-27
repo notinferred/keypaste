@@ -31,11 +31,34 @@ public sealed class ToastHitTests
         WindowInput.Hover(shell.Window, toast);
         Assert.True(toast.IsPointerOver);
 
-        var close = toast.GetVisualDescendants().OfType<Button>().Single();
+        Assert.False(toast.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "ToastOffer").IsEffectivelyVisible);
+        var close = toast.GetVisualDescendants().OfType<Button>().Single(button => button.Name != "ToastOffer");
         Assert.Equal("Close this message", AutomationProperties.GetName(close));
         close.Command!.Execute(null);
         RenderedShell.Drain();
 
+        Assert.Empty(shell.Shell.Toasts.Shown);
+    });
+
+    [Fact]
+    public Task A_toasts_offer_takes_the_press_does_what_it_offers_and_closes_the_toast() => HeadlessSession.On(() =>
+    {
+        using var shell = new RenderedShell("keypaste-toast-offer-");
+        var pressed = 0;
+        shell.Shell.Toasts.Show("Run command copied.", ToastTone.Information, new ToastAction("Link the keypaste command…", () => pressed++));
+        RenderedShell.Drain();
+        shell.Frame();
+
+        var offer = shell.Window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "ToastOffer");
+        Assert.True(offer.IsEffectivelyVisible);
+        Assert.Equal("Link the keypaste command…", offer.Content);
+        var hit = Hit(shell.Window, offer);
+        Assert.True(hit is Visual visual && (visual == offer || offer.IsVisualAncestorOf(visual)), $"the offer did not take the press: {hit}");
+
+        offer.Command!.Execute(null);
+        RenderedShell.Drain();
+
+        Assert.Equal(1, pressed);
         Assert.Empty(shell.Shell.Toasts.Shown);
     });
 

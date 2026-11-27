@@ -19,20 +19,30 @@ internal sealed class Toast : IDisposable
     private ITimer? _timer;
     private bool _held;
 
-    internal Toast(string message, ToastTone tone, TimeProvider clock, Action<Action> post, Action<Toast> remove)
+    internal Toast(string message, ToastTone tone, TimeProvider clock, Action<Action> post, Action<Toast> remove, ToastAction? offer = null)
     {
         Message = message;
         Tone = tone;
+        Offer = offer;
         _clock = clock;
         _post = post;
         _remove = remove;
         CloseCommand = new RelayCommand(() => _remove(this));
+        ActCommand = new RelayCommand(Act, () => offer is not null);
         Restart();
     }
 
     internal string Message { get; }
 
     internal ToastTone Tone { get; }
+
+    /// <summary>What the toast offers to do, or null for a toast that only says something.</summary>
+    internal ToastAction? Offer { get; }
+
+    internal bool HasOffer => Offer is not null;
+
+    /// <summary>Does what the toast offers and takes the toast away.</summary>
+    internal RelayCommand ActCommand { get; }
 
     internal bool IsSuccess => Tone == ToastTone.Success;
 
@@ -68,6 +78,12 @@ internal sealed class Toast : IDisposable
 
     public void Dispose() => _timer?.Dispose();
 
+    private void Act()
+    {
+        _remove(this);
+        Offer?.Run();
+    }
+
     private void Expire()
     {
         if (!_held)
@@ -77,12 +93,17 @@ internal sealed class Toast : IDisposable
     }
 }
 
+/// <summary>What a toast offers to do: its button's words, and what pressing it runs.</summary>
+/// <param name="Label">The button's words.</param>
+/// <param name="Run">What pressing it does.</param>
+internal sealed record ToastAction(string Label, Action Run);
+
 /// <summary>What the toast band is saying: one toast, the newest replacing the one before, and while a dialog is up the newest waits for it to close.</summary>
 internal sealed class ToastStack(TimeProvider clock, Action<Action> post) : IDisposable
 {
     private static readonly TimeSpan _shortest = TimeSpan.FromSeconds(4);
     private static readonly TimeSpan _perCharacter = TimeSpan.FromMilliseconds(60);
-    private (string Message, ToastTone Tone)? _waiting;
+    private (string Message, ToastTone Tone, ToastAction? Offer)? _waiting;
     private bool _isHeld;
 
     internal ObservableCollection<Toast> Shown { get; } = [];
@@ -97,23 +118,23 @@ internal sealed class ToastStack(TimeProvider clock, Action<Action> post) : IDis
         {
             _isHeld = value;
 
-            if (!value && _waiting is var (message, tone))
+            if (!value && _waiting is var (message, tone, offer))
             {
                 _waiting = null;
-                Show(message, tone);
+                Show(message, tone, offer);
             }
         }
     }
 
-    internal void Show(string message, ToastTone tone)
+    internal void Show(string message, ToastTone tone, ToastAction? offer = null)
     {
         if (_isHeld)
         {
-            _waiting = (message, tone);
+            _waiting = (message, tone, offer);
             return;
         }
 
-        if (Shown.FirstOrDefault(toast => toast.Message == message && toast.Tone == tone) is { } same)
+        if (Shown.FirstOrDefault(toast => toast.Message == message && toast.Tone == tone && toast.Offer == offer) is { } same)
         {
             same.Restart();
             return;
@@ -124,7 +145,7 @@ internal sealed class ToastStack(TimeProvider clock, Action<Action> post) : IDis
             Remove(older);
         }
 
-        Shown.Add(new Toast(message, tone, clock, post, Remove));
+        Shown.Add(new Toast(message, tone, clock, post, Remove, offer));
     }
 
     public void Dispose()

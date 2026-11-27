@@ -3,6 +3,7 @@ using Keypaste.App.Session;
 using Keypaste.App.ViewModels;
 using Keypaste.Core;
 using Keypaste.Core.Agents;
+using Keypaste.Core.Linking;
 using Keypaste.Core.Tests;
 using Xunit;
 
@@ -380,6 +381,53 @@ public sealed class ShellViewModelTests : IDisposable
         Assert.NotEmpty(shell.Toasts.Shown);
 
         _clock.Advance(ToastStack.DurationOf("Copied the username."));
+
+        Assert.Empty(shell.Toasts.Shown);
+    }
+
+    /// <summary>
+    /// Copying a run command offers Settings' Link the keypaste command only while a terminal can't find one: nothing is at
+    /// the link's path and no other copy is on PATH. Windows has no link to offer, since its installer puts keypaste on PATH.
+    /// </summary>
+    [Theory]
+    [InlineData(CliLinkState.Absent, null, true)]
+    [InlineData(CliLinkState.ThisCopy, null, false)]
+    [InlineData(CliLinkState.OtherCopy, null, false)]
+    [InlineData(CliLinkState.Foreign, null, false)]
+    [InlineData(CliLinkState.Absent, "/opt/homebrew/bin/keypaste", false)]
+    public async Task Copying_a_run_command_offers_to_link_keypaste_only_where_a_terminal_cannot_find_it(CliLinkState state, string? earlierCopy, bool offered)
+    {
+        var link = FakeCliLink.At(state, earlierCopy: earlierCopy);
+        using var shell = new ShellViewModel(_session, _fixture.Home, authority: null, clipboard: new Clipboard.FakeClipboard(), clock: _clock) { CliLink = link };
+        shell.Current = Destinations.Of(DestinationKind.EnvSets);
+        var projects = Assert.IsType<EnvSetsViewModel>(shell.Content);
+
+        await projects.CopyRunCommandAsync("billing");
+
+        if (!offered)
+        {
+            Assert.DoesNotContain(shell.Toasts.Shown, toast => toast.HasOffer);
+            return;
+        }
+
+        var shown = Assert.Single(shell.Toasts.Shown);
+        Assert.Equal("Link the keypaste command…", shown.Offer!.Label);
+
+        shown.ActCommand.Execute(null);
+
+        var settings = Assert.IsType<SettingsViewModel>(shell.Content);
+        await (settings.LinkCliCommand.ExecutionTask ?? Task.CompletedTask);
+        Assert.Equal(1, link.Links);
+        Assert.Empty(shell.Toasts.Shown);
+    }
+
+    [Fact]
+    public async Task Copying_a_run_command_offers_no_link_where_the_platform_needs_none()
+    {
+        using var shell = new ShellViewModel(_session, _fixture.Home, authority: null, clipboard: new Clipboard.FakeClipboard(), clock: _clock);
+        shell.Current = Destinations.Of(DestinationKind.EnvSets);
+
+        await Assert.IsType<EnvSetsViewModel>(shell.Content).CopyRunCommandAsync("billing");
 
         Assert.Empty(shell.Toasts.Shown);
     }

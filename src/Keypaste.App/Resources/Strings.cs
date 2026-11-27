@@ -361,6 +361,7 @@ public static class Strings
     public static string Link => Manager.GetString("Link", CultureInfo.CurrentUICulture)!;
     public static string LinkItInSettings => Manager.GetString("LinkItInSettings", CultureInfo.CurrentUICulture)!;
     public static string LinkTheKeypasteCommand => Manager.GetString("LinkTheKeypasteCommand", CultureInfo.CurrentUICulture)!;
+    public static string LinkTheKeypasteCommandEllipsis => Manager.GetString("LinkTheKeypasteCommandEllipsis", CultureInfo.CurrentUICulture)!;
     public static string LinksYouMadeFromAnItemsMenuXfaa446 => Manager.GetString("LinksYouMadeFromAnItemsMenuXfaa446", CultureInfo.CurrentUICulture)!;
     public static string LockAfter => Manager.GetString("LockAfter", CultureInfo.CurrentUICulture)!;
     public static string LockAndOpen => Manager.GetString("LockAndOpen", CultureInfo.CurrentUICulture)!;
@@ -568,8 +569,10 @@ public static class Strings
     public static string Rules => Manager.GetString("Rules", CultureInfo.CurrentUICulture)!;
     public static string RulesPrecedence => Manager.GetString("RulesPrecedence", CultureInfo.CurrentUICulture)!;
     public static string RunAgain => Manager.GetString("RunAgain", CultureInfo.CurrentUICulture)!;
+    public static string RunCommandCopiedButATerminalCantFindKeypaste => Manager.GetString("RunCommandCopiedButATerminalCantFindKeypaste", CultureInfo.CurrentUICulture)!;
     public static string RunInATerminal => Manager.GetString("RunInATerminal", CultureInfo.CurrentUICulture)!;
     public static string RunProject => Manager.GetString("RunProject", CultureInfo.CurrentUICulture)!;
+    public static string RunSavedProject => Manager.GetString("RunSavedProject", CultureInfo.CurrentUICulture)!;
     public static string RunWithKeypaste => Manager.GetString("RunWithKeypaste", CultureInfo.CurrentUICulture)!;
     public static string Running => Manager.GetString("Running", CultureInfo.CurrentUICulture)!;
     public static string RunningIn => Manager.GetString("RunningIn", CultureInfo.CurrentUICulture)!;

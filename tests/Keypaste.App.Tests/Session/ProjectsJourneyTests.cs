@@ -30,7 +30,7 @@ namespace Keypaste.App.Tests.Session;
 /// key with no entry chosen and imports a <c>.env</c>, and a declined or refused act writes nothing;
 /// Run gives a child exactly the stage's fields at its press, with no card, and writes its History line, on every platform,
 /// the project mapped in <c>projects.json</c> runs too, and Run again in the tray and Dock menus starts the last one once
-/// more until the vault locks.
+/// more until the vault locks, and is off after a protected stage's Run, which asks on its card.
 /// </summary>
 /// <remarks>
 /// Driven as <see cref="OneHomeJourneyTests"/> is, pressing controls where the window draws them,
@@ -44,6 +44,7 @@ namespace Keypaste.App.Tests.Session;
 public sealed class ProjectsJourneyTests
 {
     private const string _webKey = "web-journey-c4";
+    private const string _webProdKey = "web-prod-journey-c4";
     private const string _stripeKey = "stripe-journey-c4";
     private const string _replaced = "stripe-replaced-c4";
     private const string _imported = "imported-journey-c4";
@@ -64,6 +65,7 @@ public sealed class ProjectsJourneyTests
             using (var created = ClaimedVault.Create(vault, TempVault.Password))
             {
                 Seed(created, "apps", "Web", "WEB_KEY", _webKey, "env:web");
+                Seed(created, "apps", "WebProd", "WEB_KEY", _webProdKey, "env:web:prod");
                 Seed(created, "services", "Stripe", "STRIPE_KEY", _stripeKey, "env:billing", "env:billing:staging");
                 Seed(created, "services", "Mail", "MAIL_KEY", "mail-journey-c4", "env:billing");
                 Seed(created, "services", "Odd", "ODD_KEY", "odd-journey-c4", "env:billing:Prod");
@@ -253,8 +255,29 @@ public sealed class ProjectsJourneyTests
                 Assert.Equal("pressed", LastRunMethod());
                 Assert.False(main.IsVisible, "a Run again that started brought the window forward");
 
-                // A lock turns Run again off.
+                // A protected stage's Run asks on its card, and Run again then stays off, having no card to ask on.
                 app.OpenWindow();
+                var webScreen = Assert.IsType<EnvSetsViewModel>(shell.Content);
+                var webProject = webScreen.OpenProject!;
+                webProject.SelectedProfile = "prod";
+                WindowInput.Drain();
+                var prod = await ReportedAsync(
+                    webPipe,
+                    () =>
+                    {
+                        Press(main, ByName<Button>(main, "Run in a terminal"));
+                        Assert.True(webProject.Launch.IsConfirming, "a protected stage's Run showed no card");
+                        webProject.Launch.ConfirmLaunchCommand.Execute(null);
+                    },
+                    () => webScreen.Error,
+                    terminal);
+                Assert.Contains($"WEB_KEY={_webProdKey}", prod);
+                Assert.Equal("prompt", LastRunMethod());
+                await Until(() => !RunAgainInTray(app).IsEnabled, () => "Run again stayed on after a protected stage's Run");
+                Assert.False(RunAgainInDock(app).CanRun());
+                Assert.False(app.CanRunAgain);
+
+                // A lock turns Run again off.
                 Chord(main, PhysicalKey.L);
                 await Until(() => root.Content is UnlockView);
                 await Until(() => !RunAgainInTray(app).IsEnabled, () => "Run again stayed on after the lock");

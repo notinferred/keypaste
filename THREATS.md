@@ -237,7 +237,7 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Mitigation.** A label gives only what the person confirmed for it, an unlabelled bridge runs nothing, and every run is asked (T-35). The Agents screen says settings follow the name the connection was given, and `keypaste clients` lists them.
 
-**Limit.** Such an agent can take another agent's label, with its run, Allows and answers, or change its `--vault` or `--expose`. No setting covers `keypaste run --session` from an agent's own shell.
+**Limit.** Such an agent can take another agent's label, with its run, Allows and answers, or change its `--vault` or `--expose`. No setting covers `keypaste run` from an agent's own shell.
 
 **Status.** Unreleased; `v0.3.0` labels select `policy.toml` rules the same way.
 
@@ -496,11 +496,11 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 ### T-30 — A run asks the session for a whole env set
 
-**Threat.** Anything running as the user that can start `keypaste run --session`, an agent with a shell included, asks for a project's whole env set.
+**Threat.** Anything running as the user that can start `keypaste run`, an agent with a shell included, asks for a project's whole env set while the app or `keypaste approve` holds the vault.
 
-**Mitigation.** A run from a terminal or an agent is released only after the person allows it, Allow once only (T-34); no agent setting releases it. The prompt shows the project, variables, items, command and directory, never a value. A Run pressed in keypaste's own window, or Run again in its Dock or menu bar or tray menu, is the person's answer, since no agent request and no command in a terminal can press a button in keypaste's window or menus: it starts with no prompt, on macOS under the app's own launch pass (T-42), and is recorded as `pressed`. A protected stage's Run is still asked on its card, Run again starts none, and Open terminal always asks. Every run is recorded before its set is released (T-6), and the values go only to the child's environment.
+**Mitigation.** A run from a terminal or an agent is released only after the person allows it, Allow once only (T-34); no agent setting releases it. A terminal's `keypaste run` asks the app or `keypaste approve` whenever one holds the vault unlocked, so it is recorded by that holder like an agent's, where opening the vault itself left no record; `--session` asks only the holder. The prompt shows the project, variables, items, command and directory, never a value. A Run or Open terminal pressed in keypaste's own window, or Run again in its Dock or menu bar or tray menu, is the person's answer, since no agent request and no command in a terminal can press a button in keypaste's window or menus: it starts with no prompt, on macOS under the app's own launch pass (T-42), and is recorded as `pressed`. A protected stage's Run and Open terminal are still asked on its card, and Run again is off after one. Every run is recorded before its set is released (T-6), and the values go only to the child's environment.
 
-**Limit.** The command and directory are the runner's claim, so allow only a run you started. A Run pressed in the app starts the command `projects.json` held when its project opened, which any same-user process can change, and nothing shows it again before the press; Run again starts the command the last Run started. A same-user process driving the window through UI Automation, AT-SPI or macOS accessibility can press Run, as it could press the card's Start before. The child keeps its values after a lock, and the standalone `keypaste run` opens the vault itself and is not audited.
+**Limit.** The command and directory are the runner's claim, so allow only a run you started. A Run pressed in the app starts the command `projects.json` held when its project opened, which any same-user process can change, and nothing shows it again before the press; Run again starts the command the last Run started. A same-user process driving the window through UI Automation, AT-SPI or macOS accessibility can press Run, as it could press the card's Start before. The child keeps its values after a lock. A `keypaste run` with nothing holding the vault unlocked, or with `--no-session`, opens the vault itself with the master password and is not audited.
 
 **Status.** Unreleased; `v0.3.0` has only the standalone `keypaste run`.
 
@@ -538,7 +538,7 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Threat.** A same-user process repeats a command a person once allowed, to have an env set released again.
 
-**Mitigation.** Every `keypaste run --session` without the app's launch pass is a new request offered only Deny and Allow once, and no rule or remembered answer releases it. Run again repeats a run only at the person's own press in the app's menu (T-30).
+**Mitigation.** Every `keypaste run` that asks the vault's holder without the app's launch pass is a new request offered only Deny and Allow once, and no rule or remembered answer releases it. Run again repeats a run only at the person's own press in the app's menu (T-30).
 
 **Limit.** What a run says it will start is its claim (T-30).
 

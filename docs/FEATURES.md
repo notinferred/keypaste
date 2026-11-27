@@ -34,7 +34,7 @@ The guides use the 1.0.0 names.
 | Projects: `env pull`, `set`, `ls`, `rm`, `export --dotenv`, and `run <project> -- <command>` | `v0.3.0` | `--dotenv` writes plaintext ([plaintext limits](../SECURITY.md#plaintext-and-file-limits)) |
 | Projects by tag: `env:<project>` or `env:<project>:<stage>`, `env tag`, `env untag`, `-p`, `env diff`, protected `prod` and `production` | 1.0.0 | A `v0.3.0`-layout item is no longer a variable |
 | References: `kp://` in `env export`, `run --env-file`, `.env.keypaste` | 1.0.0 | [T-31] |
-| `run --session`: the app or `keypaste approve` asks, with no password typed | 1.0.0 | [T-30] |
+| `run` asks the app or `keypaste approve` while one holds the vault, with no password typed; `--session` only asks, `--no-session` never does | 1.0.0 | [T-30] |
 | Scoped tokens: `token create` and `run --token` for CI | 1.0.0 | Asks nobody except for a protected stage ([T-32]) |
 | Edits while the vault is held go to its holder, which asks you | 1.0.0 | At most 64 KiB per request ([T-43]) |
 | `keypaste import` of a KDBX file or another manager's export | 1.0.0 | Not a YubiKey vault; the desktop's import can |

@@ -23,7 +23,7 @@ namespace Keypaste.App.Tests.Session;
 
 /// <summary>
 /// The Env Sets screen imports a <c>.env</c> and starts a project's command in a real terminal with
-/// its set in the child's environment, at the person's press of Run, or for Open terminal and a protected
+/// its set in the child's environment, at the person's press of Run or Open terminal, or for a protected
 /// stage once they confirm it, and only while the unlock that asked is live.
 /// </summary>
 /// <remarks>
@@ -170,8 +170,9 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         AssertStartedIn(report);
     }
 
+    /// <summary>Open terminal pressed in the app is the person's answer, as Run is: no card, and recorded as pressed.</summary>
     [Fact]
-    public async Task Open_terminal_starts_the_terminal_in_the_directory_after_confirming()
+    public async Task Open_terminal_starts_the_terminal_in_the_directory_at_its_press()
     {
         using var screen = Screen();
         var launch = Mapped(screen, out var pipeName);
@@ -179,29 +180,44 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         if (OperatingSystem.IsMacOS())
         {
             await OpenTerminalThroughTerminalAsync(screen, launch, pipeName);
+            AssertRecorded(2, pressed: true, ApprovalPrompt.Shown(ProjectVariables.Home("dev")));
             return;
         }
 
-        var running = launch.LaunchAsync(run: false);
-        Assert.True(launch.IsConfirming);
-        Assert.Equal(_project, launch.ConfirmDirectory);
+        await launch.OpenTerminalCommand.ExecuteAsync(null).WaitAsync(Cancel);
 
-        launch.ConfirmLaunchCommand.Press();
-        await running.WaitAsync(Cancel);
-
+        Assert.False(launch.IsConfirming);
         var started = Assert.IsType<ChildResult>(launch.LastStart);
         Assert.Equal(ChildOutcome.Started, started.Outcome);
         var start = Assert.Single(_launcher.Started);
         Assert.Equal(_project, start.WorkingDirectory);
         Assert.Equal(_apiKey, start.Environment["API_KEY"]);
         AssertNoValue(string.Join(" ", start.Arguments) + start.CommandLine, "the terminal's arguments");
+        AssertRecorded(2, pressed: true, ApprovalPrompt.Shown(ProjectVariables.Home("dev")));
+        Assert.Equal(0, _asked.Count);
+    }
+
+    /// <summary>A protected stage's Open terminal still asks on the card, which names the terminal and starts nothing until confirmed.</summary>
+    [Fact]
+    public async Task A_protected_stages_Open_terminal_asks_on_the_card()
+    {
+        using var screen = ProtectedScreen(out var launch);
+
+        var running = launch.LaunchAsync(run: false);
+        Assert.True(launch.IsConfirming);
+        Assert.Equal(_project, launch.ConfirmDirectory);
+        AssertNothingStarted();
+
+        launch.CancelLaunchCommand.Press();
+        await running.WaitAsync(Cancel);
+
+        AssertNothingStarted();
     }
 
     [Fact]
     public async Task Cancelling_the_confirmation_starts_nothing()
     {
-        using var screen = Screen();
-        var launch = Mapped(screen, out _);
+        using var screen = ProtectedScreen(out var launch);
 
         var running = launch.LaunchAsync(run: false);
         launch.CancelLaunchCommand.Press();
@@ -216,8 +232,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
     [Fact]
     public async Task A_lock_while_the_confirmation_waits_withdraws_it_and_starts_nothing()
     {
-        using var screen = Screen();
-        var launch = Mapped(screen, out _);
+        using var screen = ProtectedScreen(out var launch);
 
         var running = launch.LaunchAsync(run: false);
         Assert.True(launch.IsConfirming);
@@ -233,8 +248,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
     [Fact]
     public void A_lock_between_confirming_and_starting_starts_nothing()
     {
-        using var screen = Screen();
-        var launch = Mapped(screen, out _);
+        using var screen = ProtectedScreen(out var launch);
 
         var queue = new QueuedContext();
         var previous = SynchronizationContext.Current;
@@ -534,7 +548,8 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
     {
         Protected();
 
-        using var screen = Screen();
+        List<ProjectRun> runs = [];
+        using var screen = new EnvSetsViewModel(_session, _countdown, _picker, Launching() with { Started = runs.Add });
         var launch = Mapped(screen, out var pipeName);
         screen.OpenProject!.SelectedProfile = "prod";
 
@@ -555,6 +570,9 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
         Assert.Contains($"API_KEY={_prodKey}", report);
         AssertRecorded(2, pressed: false, ApprovalPrompt.Shown(ProjectVariables.Home("dev", "prod")));
+
+        // Run again has no card to ask on, so it is told the run was protected and stays off.
+        Assert.True(Assert.Single(runs).Protected);
     }
 
     /// <summary>A Run tells Run again what it started, and Run again starts that command once more in its directory with its stage, at its own press, recorded as pressed.</summary>
@@ -575,6 +593,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
         var last = Assert.Single(runs);
         Assert.Equal((_fixture.Path_, "dev", "dev", _project, launch.Mapping!.Command), (last.Vault, last.Project, last.Profile, last.Directory, last.Command));
+        Assert.False(last.Protected);
 
         // Run again works from what Run told it, whatever the screen holds by then.
         launch.Command = "make";
@@ -962,14 +981,9 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         File.SetUnixFileMode(shell, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         _terminal!.Shell = shell;
 
-        var running = launch.LaunchAsync(run: false);
-        Assert.True(launch.IsConfirming);
-        Assert.Equal(TerminalOpen.ShownName, launch.ConfirmStarts);
-        Assert.Equal(_project, launch.ConfirmDirectory);
+        await launch.OpenTerminalCommand.ExecuteAsync(null).WaitAsync(Cancel);
 
-        launch.ConfirmLaunchCommand.Press();
-        await running.WaitAsync(Cancel);
-
+        Assert.False(launch.IsConfirming);
         AssertStarted(screen, launch);
 
         var report = await ReportAsync(pipe, connected);
@@ -1228,6 +1242,16 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
     }
 
     /// <summary>Gives dev a protected prod stage, holding both of the reporter's variables.</summary>
+    /// <summary>The screen with the project mapped and its protected stage chosen, whose every launch asks on the card.</summary>
+    private EnvSetsViewModel ProtectedScreen(out ProjectLaunchViewModel launch)
+    {
+        Protected();
+        var screen = Screen();
+        launch = Mapped(screen, out _);
+        screen.OpenProject!.SelectedProfile = "prod";
+        return screen;
+    }
+
     private void Protected() => Reopened(vault =>
     {
         ProjectVariables.Set(vault, "dev", "prod", "API_KEY", _prodKey);

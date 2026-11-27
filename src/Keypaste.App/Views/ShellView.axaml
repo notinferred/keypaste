@@ -623,7 +623,15 @@
                   <ctl:KpIcon Icon="info" Size="16" Foreground="{DynamicResource KpInfo}" IsVisible="{Binding IsInformation}" />
                   <ctl:KpIcon Icon="alert-triangle" Size="16" Foreground="{DynamicResource KpAccentText}" IsVisible="{Binding IsWarning}" />
                 </Panel>
-                <TextBlock Grid.Column="1" ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="320" />
+                <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                  <TextBlock ctl:Announcer.Says="{Binding Message}" Text="{Binding Message}" TextWrapping="Wrap" MaxWidth="320" />
+                  <Button Name="ToastOffer"
+                          Classes="link"
+                          HorizontalAlignment="Left"
+                          IsVisible="{Binding HasOffer}"
+                          Content="{Binding Offer.Label}"
+                          Command="{Binding ActCommand}" />
+                </StackPanel>
                 <Button Grid.Column="2"
                         Classes="icon ghost sm"
                         VerticalAlignment="Top"

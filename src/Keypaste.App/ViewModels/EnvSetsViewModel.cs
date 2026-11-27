@@ -172,6 +172,12 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
     /// <summary>Copies a card's run command, plainly and with no countdown.</summary>
     internal RelayCommand<string> CopyRunCommandCommand { get; }
 
+    /// <summary>Whether another open vault has a project of this name, which a copied run command then names its vault for.</summary>
+    internal Func<string, bool> ProjectElsewhere { get; init; } = static _ => false;
+
+    /// <summary>Told once a run command is copied, so the window can offer to link the <c>keypaste</c> it runs; none tells nobody.</summary>
+    internal Action? RunCommandCopied { get; init; }
+
     internal RelayCommand CloseCommand { get; }
 
     internal RelayCommand BeginAddCommand { get; }
@@ -263,7 +269,9 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
 
     /// <summary>The command that injects a project of this vault, for the card's copy helper, for the person to finish, or null when the vault's path or the name gets none.</summary>
     internal string? RunCommandFor(string project) =>
-        _session.VaultPath is { } vault ? CopiedRunCommand.For(vault, project, environment: null, command: string.Empty) : null;
+        _session.VaultPath is { } vault
+            ? CopiedRunCommand.For(CopiedRunCommand.NamesVault(vault, _session.Home, ProjectElsewhere(project)) ? vault : null, project, environment: null, command: string.Empty)
+            : null;
 
     /// <summary>Copies a project's run command, plainly and with no countdown, when it has one.</summary>
     internal async Task CopyRunCommandAsync(string project)
@@ -271,6 +279,7 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
         if (RunCommandFor(project) is { } command)
         {
             await _clipboard.CopyPlainAsync(command, "Run command").ConfigureAwait(true);
+            RunCommandCopied?.Invoke();
         }
     }
 
@@ -299,7 +308,11 @@ internal sealed partial class EnvSetsViewModel : ObservableObject, IDisposable, 
                 _picker,
                 _launching,
                 Reload,
-                RefreshProjects);
+                RefreshProjects)
+            {
+                ProjectElsewhere = ProjectElsewhere,
+                RunCommandCopied = RunCommandCopied,
+            };
     }
 
     private void Announce(string? outcome, ToastTone tone)

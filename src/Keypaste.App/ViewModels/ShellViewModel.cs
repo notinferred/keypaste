@@ -540,6 +540,34 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     internal void ShowDone(string message) => ShowToast(message, ToastTone.Success);
 
+    /// <summary>
+    /// After a run command is copied, offers to link the <c>keypaste</c> it runs while a terminal can't find one: nothing
+    /// is at the link's path and no other copy is on <c>PATH</c>. Windows needs no link, since its installer puts
+    /// <c>keypaste</c> on <c>PATH</c>.
+    /// </summary>
+    internal void OfferCliLink()
+    {
+        if (_disposed || CliLink?.Read() is not { State: CliLinkState.Absent, Translocated: false, EarlierCopy: null })
+        {
+            return;
+        }
+
+        Toasts.Show(Resources.Strings.RunCommandCopiedButATerminalCantFindKeypaste, ToastTone.Information, new ToastAction(Resources.Strings.LinkTheKeypasteCommandEllipsis, LinkCli));
+    }
+
+    /// <summary>Settings' Link the keypaste command, pressed on its General section so its outcome shows there.</summary>
+    private void LinkCli()
+    {
+        OpenSettings(SettingsSectionChoice.General);
+        (Content as SettingsViewModel)?.LinkCliCommand.Execute(null);
+    }
+
+    /// <summary>Whether an unlocked vault other than <paramref name="vault"/> has a project of this name.</summary>
+    private bool HasProjectElsewhere(AppVaultSession vault, string project) =>
+        UnlockedSections.Any(other => !ReferenceEquals(other.Session, vault)
+            && other.Session.Unlocked is { } open
+            && ProjectCatalog.Read(open).Projects.Any(listing => string.Equals(listing.Name, project, StringComparison.Ordinal)));
+
     internal void ShowToast(string message, ToastTone tone)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
@@ -768,7 +796,11 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             DestinationKind.Settings => Settings(),
             DestinationKind.AgentActivity => Activity(),
             DestinationKind.Entries => ItemsScreen(),
-            DestinationKind.EnvSets => new EnvSetsViewModel(_itemsVault.Session, Clipboard, _picker, Launching ?? ProjectLaunching.ForThisMachine(AuthorityOf(_itemsVault.Session)), ShowToast, name => OpenEntry(name, itemsVault)),
+            DestinationKind.EnvSets => new EnvSetsViewModel(_itemsVault.Session, Clipboard, _picker, Launching ?? ProjectLaunching.ForThisMachine(AuthorityOf(_itemsVault.Session)), ShowToast, name => OpenEntry(name, itemsVault))
+            {
+                ProjectElsewhere = project => HasProjectElsewhere(itemsVault, project),
+                RunCommandCopied = OfferCliLink,
+            },
             DestinationKind.Trash => new TrashViewModel(_itemsVault.Session, Tables.Trash),
             DestinationKind.Sharing => Sharing(SettingsVault().Session),
             DestinationKind.Tokens => new ScopedTokensViewModel(SettingsVault().Session, Clipboard, ShowDone),

@@ -93,11 +93,11 @@ A `request_item_change` asks to move an item to Trash, mark it expired, or delet
 
 ### Runs
 
-`keypaste run --session <project> -- <command>` asks the approver for the project's env set ([replace-dotenv](replace-dotenv.md#run-your-app)). An agent's `run` tool asks the same way once you turn run on ([agent settings](policy.md#running-commands)).
+`keypaste run <project> -- <command>` asks the approver for the project's env set while it holds the vault, and `--session` asks only it ([replace-dotenv](replace-dotenv.md#run-your-app)). An agent's `run` tool asks the same way once you turn run on ([agent settings](policy.md#running-commands)).
 
 The prompt names the project, variable names, source items, command, directory and, for an agent, its reason, never a value. A run from a terminal or an agent is asked every time, with Deny and Allow once only. Refusing it refuses the same run for a minute. Approve only a run you started or a command you understand ([THREATS](../THREATS.md) T-30, T-34, T-35).
 
-A Run you press in the desktop app, or Run again in its Dock or tray menu, is your answer and isn't asked, except in a protected stage; its line's method is `pressed` ([desktop guide](desktop.md#run-a-command-with-a-projects-variables)).
+A Run or Open terminal you press in the desktop app, or Run again in its Dock or tray menu, is your answer and isn't asked, except in a protected stage; its line's method is `pressed` ([desktop guide](desktop.md#run-a-command-with-a-projects-variables)).
 
 ## When you say no
 

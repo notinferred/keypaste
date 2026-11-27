@@ -16,10 +16,10 @@ namespace Keypaste.App.ViewModels;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Every launch goes through <see cref="AppVaultSession.Environments"/>. A Run pressed here is the
-/// person's answer, since no other program can press a button in keypaste's window, so it starts with
-/// no card and is recorded as <c>pressed</c>. Open terminal, and a Run of a protected stage, which is
-/// asked live, show the card, which is the resolver's confirmation: it sees names, never values, and
+/// Every launch goes through <see cref="AppVaultSession.Environments"/>. A Run or an Open terminal pressed
+/// here is the person's answer, since no other program can press a button in keypaste's window, so it
+/// starts with no card and is recorded as <c>pressed</c>. A launch of a protected stage, which is
+/// asked live, shows the card, which is the resolver's confirmation: it sees names, never values, and
 /// the set is read again after the person answers. A lock while the card is up withdraws it, and a
 /// lock before the resolver commits starts nothing.
 /// </para>
@@ -252,7 +252,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
         _announce("Saved. Run starts the command in a terminal there.", ToastTone.Success);
     }
 
-    /// <summary>Resolves, asking first for Open terminal and a protected stage's Run, and only on a released set starts the terminal.</summary>
+    /// <summary>Resolves, asking first for a protected stage, and only on a released set starts the terminal.</summary>
     /// <param name="run">True to run the command, false for a prompt.</param>
     internal async Task LaunchAsync(bool run)
     {
@@ -318,7 +318,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
         {
             unrecordable = SessionAuthority.Unrecordable(preview);
 
-            switch (unrecordable is null ? Asking(preview, run, again) : Ask.Refused)
+            switch (unrecordable is null ? Asking(preview, again) : Ask.Refused)
             {
                 case Ask.Pressed:
                     pressed = true;
@@ -371,7 +371,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
 
         if (result.Outcome == ChildOutcome.Started)
         {
-            Remember(mapping, resolved.Profile, run);
+            Remember(mapping, resolved, run);
             _announce(
                 run ? $"Started {mapping.Command} in a terminal in {mapping.Directory}." : $"Opened a terminal in {mapping.Directory}.",
                 ToastTone.Success);
@@ -442,7 +442,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
         {
             unrecordable = SessionAuthority.Unrecordable(preview);
 
-            switch (unrecordable is null ? Asking(preview, run, again) : Ask.Refused)
+            switch (unrecordable is null ? Asking(preview, again) : Ask.Refused)
             {
                 case Ask.Pressed:
                     pressed = true;
@@ -518,15 +518,15 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
             return;
         }
 
-        Remember(mapping, resolved.Profile, run);
+        Remember(mapping, resolved, run);
         _announce(
             run ? $"Started {mapping.Command} in a terminal in {mapping.Directory}." : $"Opened a terminal in {mapping.Directory}.",
             ToastTone.Success);
     }
 
-    /// <summary>How a launch of <paramref name="preview"/>'s set is answered: a Run by its press, unless the set is protected and asked live, on the card, which Run again cannot show.</summary>
-    private static Ask Asking(EnvPreview preview, bool run, bool again) =>
-        run && !preview.RequiresLiveApproval ? Ask.Pressed
+    /// <summary>How a launch of <paramref name="preview"/>'s set is answered: a Run or an Open terminal by its press, unless the set is protected and asked live, on the card, which Run again cannot show.</summary>
+    private static Ask Asking(EnvPreview preview, bool again) =>
+        !preview.RequiresLiveApproval ? Ask.Pressed
         : again ? Ask.Refused
         : Ask.Card;
 
@@ -537,12 +537,12 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
         Refused,
     }
 
-    /// <summary>Tells Run again what a Run started, on the stage the set was read from.</summary>
-    private void Remember(ProjectMapping mapping, string profile, bool run)
+    /// <summary>Tells Run again what a Run started, on the stage the set was read from, and whether that set is asked live.</summary>
+    private void Remember(ProjectMapping mapping, EnvResolved resolved, bool run)
     {
         if (run)
         {
-            _launching.Started?.Invoke(new ProjectRun(mapping.Vault, _project, profile, mapping.Directory, mapping.Command));
+            _launching.Started?.Invoke(new ProjectRun(mapping.Vault, _project, resolved.Profile, mapping.Directory, mapping.Command) { Protected = resolved.RequiresLiveApproval });
         }
     }
 

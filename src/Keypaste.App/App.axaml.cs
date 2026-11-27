@@ -410,8 +410,8 @@ internal sealed partial class App : Application, IDisposable
         }
     }
 
-    /// <summary>Whether Run again has a command to start: the last one a Run started, while its vault is unlocked.</summary>
-    internal bool CanRunAgain => RunAgainVault() is not null;
+    /// <summary>Whether Run again has a command to start: the last one a Run started, while its vault is unlocked, unless its stage is protected, whose run is asked on its card.</summary>
+    internal bool CanRunAgain => _lastRun is { Protected: false } && RunAgainVault() is not null;
 
     /// <summary>
     /// Run again in the Dock or tray menu: starts once more the last command a Run started, in its project, stage and
@@ -420,7 +420,7 @@ internal sealed partial class App : Application, IDisposable
     /// <returns>Completes once the run started or was refused, which brings the window forward to say why.</returns>
     internal async Task RunAgainAsync()
     {
-        if (_lastRun is not { } last || RunAgainVault() is not { } vault)
+        if (_lastRun is not { Protected: false } last || RunAgainVault() is not { } vault)
         {
             return;
         }

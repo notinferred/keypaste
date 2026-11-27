@@ -6,7 +6,7 @@ namespace Keypaste.Processes.Tests;
 
 /// <summary>
 /// On macOS the app's own Run opens Terminal: a keypaste.app laid out as a release lays it out carries the real launcher and a
-/// keypaste that starts the built CLI, the held app presses Run in a terminal, or Open terminal and its card's Start, real Terminal runs the launcher, and the window's
+/// keypaste that starts the built CLI, the held app presses Run in a terminal or Open terminal, real Terminal runs the launcher, and the window's
 /// <c>keypaste run --session</c> presents the launch pass to the app, which asks nothing more.
 /// </summary>
 /// <remarks>
@@ -22,7 +22,7 @@ public sealed class MacTerminalRunTests
     private const string _reports = "printf \"deploy=%s database=%s launch=%s driver=%s home=%s\" \"${DEPLOY_KEY-unset}\" \"${DB_URL-unset}\" \"${KEYPASTE_LAUNCH-unset}\" \"${KEYPASTE_DRIVER_PASSWORD-unset}\" \"${KEYPASTE_HOME-unset}\" >terminal.tmp && mv terminal.tmp terminal.txt";
 
     [Fact]
-    public void Run_and_Open_terminal_start_in_Terminal_with_the_set_and_one_prompt_line_and_a_lock_before_the_window_asks_starts_nothing()
+    public void Run_and_Open_terminal_start_in_Terminal_with_the_set_at_their_press_and_a_lock_before_the_window_asks_starts_nothing()
     {
         Assert.SkipUnless(OperatingSystem.IsMacOS(), "Only macOS has Terminal.");
         Assert.SkipUnless(Environment.GetEnvironmentVariable("CI") == "true", "This opens Terminal and ends every Terminal with pkill, so it runs only on a CI runner.");
@@ -79,18 +79,14 @@ public sealed class MacTerminalRunTests
             Assert.DoesNotMatch("(?im)^KEYPASTE_", laterEnvironment);
             Assert.DoesNotContain(Workspace.Master, laterEnvironment, StringComparison.Ordinal);
 
-            // Open terminal: the window's shell is released the set the same way.
+            // Open terminal: the window's shell is released the set the same way, its press the only answer, with no card.
             audited = Workspace.Count(workspace.OwnerLog);
             driver.Send($"terminal open ci {project}");
             driver.WaitForOutput("^terminal [a-z]*:", 2);
             Assert.Equal(2, driver.Output.Count(line => line.StartsWith("terminal launched: ", StringComparison.Ordinal)));
-            Assert.StartsWith(
-                $"terminal-card title=Open a terminal with 2 variables from ci? starts=Terminal directory={project} keys=DB_URL, DEPLOY_KEY sources=",
-                driver.Output.Last(line => line.StartsWith("terminal-card ", StringComparison.Ordinal)),
-                StringComparison.Ordinal);
-            Assert.EndsWith("env/ci/.env", driver.Output.Last(line => line.StartsWith("terminal-card ", StringComparison.Ordinal)), StringComparison.Ordinal);
+            Assert.DoesNotContain(driver.Output, line => line.StartsWith("terminal-card ", StringComparison.Ordinal));
             WaitForCount(windows, _confirmed, 2);
-            AssertOneLine(workspace, audited, "granted", "prompt");
+            AssertOneLine(workspace, audited, "granted", "pressed");
             AssertNoRequestLeft(requests);
 
             // A lock and unlock between the press and the window's request: the unlock it was pressed in held its pass.

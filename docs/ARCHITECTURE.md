@@ -59,7 +59,7 @@ Both solutions write into `artifacts/`.
 - `App/Session/SessionHost.cs` serves each vault to agents. `WindowApprovalChannel.cs` asks the person, one prompt at a time across all vaults, in a window under `Views/`.
 - While locked, `App/Session/LockedNotice.cs` tells the person when a bridge finds the vault locked.
 - All vaults lock together on idle, `Ctrl/Cmd+L`, the tray's Lock (`App/AppTray.cs`) and quitting. Closing the window into the tray hides it and locks none, so agents are still answered. One locks alone for `keypaste lock`, an access change or a refused reload.
-- A project's Run (`ViewModels/ProjectLaunchViewModel.cs`) starts at its press, logged as `pressed`; Open terminal and a protected stage's Run ask on its card. Run again in the Dock and tray menus starts the last `Session/ProjectLaunching.cs` `ProjectRun` once more (`App.RunAgainAsync`).
+- A project's Run and Open terminal (`ViewModels/ProjectLaunchViewModel.cs`) start at their press, logged as `pressed`; a protected stage's ask on its card. Run again in the Dock and tray menus starts the last `Session/ProjectLaunching.cs` `ProjectRun` once more (`App.RunAgainAsync`), and is off after a protected one.
 - Quick unlock: `Session/QuickUnlockCopies.cs`, with `Session/WindowsHello.cs` and `Session/TouchId.cs` as `MachineQuickUnlock.cs` picks them.
 - Agents › Connect registers an AI tool through `Core/Clients/`. `App/CrashReporting.cs` sends crash reports only under the terms the person accepted (`App/Terms/`).
 
@@ -96,11 +96,12 @@ It refuses to start without its audit log. It then holds the unlocked vault and 
 
 ### keypaste run
 
-It opens the vault, reads an env set, closes the vault and starts the child through `Core/Launch/EnvLaunch.cs`. It takes no claim.
+It opens the vault, reads an env set, closes the vault and starts the child through `Core/Launch/EnvLaunch.cs`. It takes no claim. While the vault's claim names the app or `keypaste approve` and that owner attaches with the vault unlocked, it opens nothing and sends an env request to the owner, which asks the person and records it, as `--session` does.
 
 | Flag | What it does instead |
 |---|---|
-| `--session` | Opens nothing; sends an env request to the owner, which asks the person |
+| `--session` | Only asks the owner, and opens nothing even when none answers |
+| `--no-session` | Always opens the vault with the master password, asking no owner |
 | `--token` | Sends a token env request the owner verifies against `Core/Tokens/` |
 | `--bundle` | Opens a token bundle with no vault or pipe |
 

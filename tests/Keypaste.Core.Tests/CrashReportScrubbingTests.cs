@@ -242,14 +242,16 @@ public sealed class CrashReportScrubbingTests : IDisposable
 
     private async Task<List<string>> PlacesHoldingAsync(CrashReport report, string value)
     {
-        var outbox = new CrashOutbox(Path.Combine(_directory, $"{Guid.NewGuid():N}"));
+        // On the fixtures' day, as the outbox's age rule would otherwise drop their reports 30 days after it.
+        var clock = new ManualClock(CrashFixtures.At);
+        var outbox = new CrashOutbox(Path.Combine(_directory, $"{Guid.NewGuid():N}"), clock);
         Assert.True(outbox.Add(report));
 
         var file = Assert.Single(Directory.GetFiles(outbox.Folder));
         var kept = await File.ReadAllTextAsync(file, TestContext.Current.CancellationToken);
 
         using var server = new FakeCrashServer();
-        Assert.Equal(1, await new CrashSender(server, CrashSender.KeypasteApi, outbox).SendWaitingAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(1, await new CrashSender(server, CrashSender.KeypasteApi, outbox, clock).SendWaitingAsync(TestContext.Current.CancellationToken));
 
         List<string> places = [];
 

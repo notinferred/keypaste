@@ -33,11 +33,13 @@ namespace Keypaste.Cli.Commands;
 /// what keypaste can promise about them (SECURITY.md).
 /// </para>
 /// <para>
-/// With <c>--session</c> the first phase is a question instead: the set comes from the process
-/// holding the vault unlocked, over its endpoint, after the person there approves this command, and
-/// nothing here opens the vault or reads a password, then or as a fallback. A run that
-/// Terminal starts for the app's own Run confirmation on macOS carries that confirmation in
-/// <c>KEYPASTE_LAUNCH</c>, which is sent in place of a second question and handed to no child.
+/// While the app or <c>keypaste approve</c> holds the vault unlocked, the first phase is a question
+/// instead: the set comes from that process, over its endpoint, after the person there approves this
+/// command, and that process records it; nothing here opens the vault or reads a password. Only when
+/// nothing answers for the vault, or with <c>--no-session</c>, is the vault opened here. With
+/// <c>--session</c> nothing here opens it, then or as a fallback. A run that Terminal starts for the
+/// app's own Run on macOS carries that Run in <c>KEYPASTE_LAUNCH</c>, which is sent in place of a
+/// second question and handed to no child.
 /// </para>
 /// </remarks>
 internal static class RunCommand
@@ -48,7 +50,10 @@ internal static class RunCommand
     internal static Option<string> EnvFile { get; } = Syntax.Value("--env-file", "file", "run with the variables a reference file names");
 
     internal static Option<bool> Session { get; } =
-        Syntax.Flag("--session", "ask the keypaste app or `keypaste approve`, which hold the vault unlocked, and type no password here");
+        Syntax.Flag("--session", "only ask the keypaste app or `keypaste approve`, and never open the vault here");
+
+    internal static Option<bool> NoSession { get; } =
+        Syntax.Flag("--no-session", "open the vault here with its master password, even while the app or `keypaste approve` holds it");
 
     /// <summary>Every operand, the child's command included, which <see cref="Projects"/> takes back out.</summary>
     private static readonly Argument<string[]> _operands = Syntax.Operands("project", "the project, or the one projects.json maps this directory to");
@@ -59,14 +64,16 @@ internal static class RunCommand
             + "nothing is written to disk, and the vault is closed before the command starts. with no project, the one "
             + $"projects.json maps this directory to is used, and its {EnvReferenceFile.FileName} only when that file names "
             + "nothing but that project's variables.\n\n"
-            + "with --session or --token, the process holding the vault unlocked shows you the project, its variable names, "
-            + "the command and this directory, and a token releases only what its scope covers. everything after the -- "
+            + "while the keypaste app or `keypaste approve` holds the vault unlocked, it is asked instead and no password is "
+            + "typed here: it shows you the project, its variable names, the command and this directory, and logs the run. "
+            + "--session asks only it, --no-session always opens the vault here, and a token releases only what its scope "
+            + "covers. everything after the -- "
             + "belongs to the command, and once it starts, its exit code is keypaste's: 127 means there is no such command "
             + "and 126 that it is not executable, as in a shell.",
         Execute,
         tail: "-- <command> [args...]")
     {
-        _operands, CliOptions.Profile, Project, EnvFile, Session, CliOptions.Approver, RunWithToken.Token, RunWithToken.Bundle,
+        _operands, CliOptions.Profile, Project, EnvFile, Session, NoSession, CliOptions.Approver, RunWithToken.Token, RunWithToken.Bundle,
         CliOptions.Vault, CliOptions.Keyfile,
     };
 
@@ -120,6 +127,12 @@ internal static class RunCommand
         }
 
         var session = line.GetValue(Session);
+        var here = line.GetValue(NoSession);
+
+        if (session && here)
+        {
+            return Fail(context, "--session only asks the app and --no-session never does; pass one of them");
+        }
 
         if (session && line.GetValue(CliOptions.Keyfile) is not null)
         {
@@ -166,6 +179,11 @@ internal static class RunCommand
         if (session)
         {
             return FromSession(path, line.GetValue(CliOptions.Approver), set, command, launch, context);
+        }
+
+        if (!here && FromHolder(path, set, command, context) is { } asked)
+        {
+            return asked;
         }
 
         return VaultSession.OpenThen(
@@ -364,13 +382,67 @@ internal static class RunCommand
             return (Fail(context, $"{CliOptions.Approver.Name}: {ex.Message}"), null);
         }
 
-        if (!TryRequest(set, command, vaultPath, launch, context, out var request, out var exit))
+        if (!TryRequest(set, command, vaultPath, launch, context, out var request, out var unaskable))
         {
-            return (exit, null);
+            return (Fail(context, $"{unaskable}; run without --session"), null);
         }
 
         var (reply, refusal) = AskAsync(pipe, vaultPath, request, context).GetAwaiter().GetResult();
 
+        return Received(reply, refusal, request, set, vaultPath, context);
+    }
+
+    /// <summary>
+    /// Asks the app or <c>keypaste approve</c> when its claim says it holds the vault and it answers for it unlocked, as
+    /// <c>--session</c> asks, and starts the child only with what it released.
+    /// </summary>
+    /// <returns>The exit code, or null when nothing answers for the vault unlocked or the set is one only the vault opened here resolves.</returns>
+    /// <remarks>
+    /// The claim is read, never taken, so the holder is asked only where one named itself, and a run with no holder
+    /// waits on no endpoint. A holder that answers and refuses ends the run with its reason, as with <c>--session</c>.
+    /// </remarks>
+    private static int? FromHolder(string vaultPath, RunSet set, IReadOnlyList<string> command, CliContext context)
+    {
+        var home = KeypasteHome.Resolve(context.Environment.Get(KeypasteHome.EnvironmentVariable));
+
+        if (VaultClaim.HolderOf(home, vaultPath)?.Kind is not (OwnerKind.DesktopApp or OwnerKind.TerminalAgent))
+        {
+            return null;
+        }
+
+        string pipe;
+
+        try
+        {
+            pipe = ApproverEndpoint.Resolve(null, context.Environment.Get(ApproverEndpoint.EnvironmentVariable), VaultIdentity.Of(home, vaultPath))!;
+        }
+        catch (ArgumentException ex)
+        {
+            return Fail(context, $"{ApproverEndpoint.EnvironmentVariable}: {ex.Message}");
+        }
+
+        if (!TryRequest(set, command, vaultPath, launch: null, context, out var request, out var unaskable))
+        {
+            context.Stderr.WriteLine($"keypaste run: the process holding the vault can't be asked for this run, so it is opened here: {unaskable}");
+            return null;
+        }
+
+        var (attached, reply, refusal) = AskHolderAsync(pipe, vaultPath, request, context).GetAwaiter().GetResult();
+
+        if (!attached)
+        {
+            return null;
+        }
+
+        var (exit, resolved) = Received(reply, refusal, request, set, vaultPath, context);
+
+        return resolved is null ? exit : Start(command, resolved, set, context);
+    }
+
+    /// <summary>What the owner's reply comes to: the set to start with, or the exit code with its reason on stderr.</summary>
+    private static (int Exit, EnvResolved? Loaded) Received(
+        EnvReply? reply, string refusal, EnvRequest request, RunSet set, string vaultPath, CliContext context)
+    {
         if (reply is null)
         {
             context.Stderr.WriteLine($"keypaste run: {refusal}");
@@ -400,11 +472,12 @@ internal static class RunCommand
     }
 
     /// <summary>The request a set makes: a project's profile, or a reference file's keys and lines under one profile.</summary>
+    /// <returns>False, with why the owner cannot be asked for the set, for one only the vault opened here resolves.</returns>
     private static bool TryRequest(
-        RunSet set, IReadOnlyList<string> command, string vaultPath, string? launch, CliContext context, out EnvRequest request, out int exit)
+        RunSet set, IReadOnlyList<string> command, string vaultPath, string? launch, CliContext context, out EnvRequest request, out string unaskable)
     {
         request = new EnvRequest(set.Project, command, context.WorkingDirectory) { Vault = vaultPath, Profile = set.Profile, Launch = launch };
-        exit = CliApp.ExitSuccess;
+        unaskable = string.Empty;
 
         if (set.File is not { } file)
         {
@@ -416,13 +489,13 @@ internal static class RunCommand
 
         if (envs.Count != references.Count || envs.Select(env => env.Project).Distinct(StringComparer.Ordinal).Count() > 1)
         {
-            exit = Fail(context, "item references and several projects need the vault opened directly; run without --session");
+            unaskable = "item references and several projects need the vault opened directly";
             return false;
         }
 
         if (envs.Count == 0 || envs.Select(env => env.Profile).Distinct(StringComparer.Ordinal).Count() > 1)
         {
-            exit = Fail(context, $"{set.Label} names {(envs.Count == 0 ? "no reference" : "several stages")}; run without --session, or pass -p to choose one stage");
+            unaskable = $"{OneLine(set.Label)} names {(envs.Count == 0 ? "no reference" : "several stages, and -p chooses one")}";
             return false;
         }
 
@@ -445,7 +518,7 @@ internal static class RunCommand
             || lines.Any(fileLine => fileLine.Length > ApproverProtocol.MaximumFileLineLength)
             || ApproverProtocol.Encode(request with { Session = VaultOwner.NewSession() }).Length > MessageFramer.MaximumPayloadBytes)
         {
-            exit = Fail(context, $"{OneLine(set.Label)} is too long for the prompt to show whole; run without --session");
+            unaskable = $"{OneLine(set.Label)} is too long for the prompt to show whole";
             return false;
         }
 
@@ -481,6 +554,40 @@ internal static class RunCommand
             return (null, NotStarted(attached?.Reason is { } reason ? Shown(reason) : "the keypaste process holding the vault did not answer"));
         }
 
+        return await ReleaseAsync(client, session, vaultPath, request, context, bound);
+    }
+
+    /// <summary>Asks the process whose claim holds the vault, as <see cref="AskAsync"/> does, unless it does not hold it unlocked.</summary>
+    /// <returns>Whether it holds the vault unlocked and was asked, and if so its reply, or null with the reason ready to print.</returns>
+    /// <remarks>Nothing listening and a locked vault both mean nothing holds it unlocked, as <c>keypaste lock</c> reads them.</remarks>
+    private static async Task<(bool Attached, EnvReply? Reply, string Refusal)> AskHolderAsync(
+        string pipe,
+        string vaultPath,
+        EnvRequest request,
+        CliContext context)
+    {
+        using var bound = new CancellationTokenSource(_answerBound);
+
+        await using var attachment = await SessionPipe.AttachAsync(pipe, vaultPath, bound.Token);
+
+        if (attachment is not { Client: { } client, Session: { } session })
+        {
+            return attachment.Refusal is { } refusal ? (true, null, NotStarted(Shown(refusal))) : (false, null, string.Empty);
+        }
+
+        var (reply, unanswered) = await ReleaseAsync(client, session, vaultPath, request, context, bound);
+        return (true, reply, unanswered);
+    }
+
+    /// <summary>Sends the request to the attached owner and waits for the person's answer there.</summary>
+    private static async Task<(EnvReply? Reply, string Refusal)> ReleaseAsync(
+        ApproverClient client,
+        string session,
+        string vaultPath,
+        EnvRequest request,
+        CliContext context,
+        CancellationTokenSource bound)
+    {
         var profiled = !string.Equals(request.Profile, EnvProfileNames.Default, StringComparison.Ordinal)
             || request.Keys is not null
             || request.FileLines is not null;

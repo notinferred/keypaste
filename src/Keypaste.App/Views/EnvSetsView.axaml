@@ -227,7 +227,7 @@
                             ToolTip.Tip="{x:Static res:Strings.RunInATerminal}">
                       <StackPanel Orientation="Horizontal" Spacing="6">
                         <ctl:KpIcon Icon="play" Size="14" />
-                        <TextBlock Text="{x:Static res:Strings.RunProject}" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding RunLabel}" VerticalAlignment="Center" />
                       </StackPanel>
                     </Button>
                   </StackPanel>

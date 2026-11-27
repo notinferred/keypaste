@@ -70,9 +70,10 @@ git log --oneline -- .env     # if this prints anything, treat those values as l
 keypaste run dev -- npm start
 ```
 
-This asks for the master password each time. Everything after `--` is the command.
+Everything after `--` is the command. While the desktop app or `keypaste approve` holds the vault unlocked, this asks it instead of you typing the master password: it shows the project, variable names, command and directory, and logs the run ([approvals](approvals.md#runs-that-ask-for-a-projects-variables)). A refusal starts nothing. With nothing holding the vault, it asks for the master password each time.
 
-- **No password.** `keypaste run --session dev -- npm start` asks the unlocked desktop app or `keypaste approve` instead, which shows the project, variable names, command and directory ([approvals](approvals.md#runs-that-ask-for-a-projects-variables)). A refusal starts nothing.
+- **Only the app.** `--session` asks the app or `keypaste approve` and never opens the vault itself, so with neither it starts nothing.
+- **Never the app.** `--no-session` always opens the vault with the master password, as a script that pipes it in needs.
 - **From the desktop.** Environments can import the `.env` and open a terminal running the project's command ([desktop](desktop.md#environments)).
 
 The child gets the variables in its environment and keypaste's stdin, stdout and stderr. keypaste closes the vault before starting it, passes signals to it, and returns its exit code. The child can still log or forward the values, and locking the vault cannot take them back ([SECURITY](../SECURITY.md)).
@@ -107,7 +108,7 @@ keypaste run -p staging acme-api -- npm start
 
 - A stage's variables live on the item `env/<project>/.env` or `.env.<stage>`; `--entry` names another.
 - `env diff` names a key one stage lacks or cannot release, and a value two stages share. It never prints a value.
-- `prod`, `production` and their `-*` forms are [protected stages](policy.md#protected-stages): every `--session` run asks.
+- `prod`, `production` and their `-*` forms are [protected stages](policy.md#protected-stages): every run that asks the app or `keypaste approve` is asked live.
 
 `keypaste env export acme-api -p staging > .env.keypaste` writes a `kp://` reference per variable, such as `DATABASE_URL=kp://acme-api/staging/DATABASE_URL`, which can be committed. `keypaste run --env-file .env.keypaste -- npm start` resolves every reference or starts nothing. Once the desktop app has saved a directory for a project, `keypaste run -- npm start` there finds the project itself.
 
@@ -128,12 +129,12 @@ Keep its master password in the CI's secrets. A vault in a public repository is 
 env:
   KEYPASTE_VAULT: ci.kdbx
 steps:
-  - run: printf '%s\n' "$KEYPASTE_MASTER" | keypaste run ci -- npm test
+  - run: printf '%s\n' "$KEYPASTE_MASTER" | keypaste run --no-session ci -- npm test
     env:
       KEYPASTE_MASTER: ${{ secrets.KEYPASTE_MASTER }}
 ```
 
-keypaste reads one line of stdin for the password. Without a terminal, `rm`, `env rm`, `env pull` and `env export --dotenv` need `--yes`.
+keypaste reads one line of stdin for the password. `--no-session` keeps it reading that line on a machine where the app holds the vault; without it the run would ask the app, and the password would be left on stdin for the command to read. Without a terminal, `rm`, `env rm`, `env pull` and `env export --dotenv` need `--yes`.
 
 <a id="the-escape-hatch"></a>
 

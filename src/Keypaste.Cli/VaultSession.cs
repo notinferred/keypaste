@@ -20,7 +20,7 @@ internal static class VaultSession
     /// <summary>What a refused open adds when the missing factor may be a hardware key, which only the app asks.</summary>
     internal const string HardwareKeyRefusal =
         "keypaste: a vault that also needs a YubiKey opens only in the desktop app; the CLI cannot ask a hardware key. "
-        + "While the app holds the vault, `keypaste run --session` and edits such as `keypaste set` reach it there.";
+        + "While the app holds the vault, `keypaste run` and edits such as `keypaste set` reach it there.";
 
     /// <summary>Opens the vault at <paramref name="path"/> to read, and runs <paramref name="body"/>, which cannot save it.</summary>
     /// <param name="path">The vault, already resolved by <see cref="VaultLocator.TryResolve"/>.</param>
