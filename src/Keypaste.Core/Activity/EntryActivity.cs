@@ -21,6 +21,7 @@ public enum EntryUseState
 /// <summary>An entry's state and when it was last released.</summary>
 /// <param name="State">Its state.</param>
 /// <param name="LastUsed">When it was last released, or null when never as far as keypaste knows.</param>
+/// <remarks><see cref="EntryActivity.Use"/> counts the person's browser fills too; <see cref="EntryAgentAccess.Use"/> counts agents alone.</remarks>
 public sealed record EntryUse(EntryUseState State, DateTimeOffset? LastUsed);
 
 /// <summary>One client that received an entry.</summary>
@@ -31,7 +32,7 @@ public sealed record EntryUse(EntryUseState State, DateTimeOffset? LastUsed);
 public sealed record ClientAccess(string Client, DateTimeOffset LastAt, int Releases, string How);
 
 /// <summary>Everything the Agent access card says about one entry: names and times, never a value.</summary>
-/// <param name="Use">Its state and last use.</param>
+/// <param name="Use">Its state and its last release to an agent.</param>
 /// <param name="Clients">Who received it, newest first.</param>
 /// <param name="Waiting">Whether a waiting request names it.</param>
 public sealed record EntryAgentAccess(EntryUse Use, IReadOnlyList<ClientAccess> Clients, bool Waiting);
@@ -41,22 +42,32 @@ public sealed record EntryAgentAccess(EntryUse Use, IReadOnlyList<ClientAccess> 
 /// <param name="Reach">Whether it can name an entry, given the entry's own tags: the least of its bridge's announced exposure and its settings.</param>
 public sealed record AgentReach(string Agent, Func<EntryName, IReadOnlyList<string>, ExposureReach> Reach);
 
-/// <summary>Who received each entry by name and by UUID, folded from granted audit lines alone.</summary>
+/// <summary>Who received each entry by name and by UUID, and when the person's browser last filled it, folded from granted audit lines alone.</summary>
 /// <remarks>Never changed once <see cref="EntryActivity.Fold"/> returns it, so one fold serves every refresh until new lines are read.</remarks>
 public sealed class AuditReleases
 {
     internal Dictionary<string, Dictionary<string, ClientAccess>> ByName { get; } = new(StringComparer.Ordinal);
 
     internal Dictionary<string, Dictionary<string, ClientAccess>> ByItem { get; } = new(StringComparer.Ordinal);
+
+    internal Dictionary<string, DateTimeOffset> FilledByName { get; } = new(StringComparer.Ordinal);
+
+    internal Dictionary<string, DateTimeOffset> FilledByItem { get; } = new(StringComparer.Ordinal);
 }
 
 /// <summary>
-/// Which entries agents use, from what is already recorded: this vault's granted audit lines, the
-/// owner's release ledger for this session and its waiting prompts.
+/// Which entries are used and which agents received them, from what is already recorded: this vault's
+/// granted audit lines, the owner's release ledger for this session and its waiting prompts.
 /// </summary>
 /// <remarks>
+/// <para>
+/// An entry's last use counts every release, the person's browser fills included; its Agent access counts
+/// only what agents received, because a browser pairing's lines are the person's own (THREATS.md T-59).
+/// </para>
+/// <para>
 /// A line written before lines named their vault counts for whichever vault is open, a stated limit.
 /// Every source names an entry the way prompts and audit lines do, so <see cref="KeyOf"/> is the one key.
+/// </para>
 /// </remarks>
 public sealed class EntryActivity
 {
@@ -68,11 +79,13 @@ public sealed class EntryActivity
     private readonly Dictionary<string, Dictionary<string, ClientAccess>> _releasedItems = new(StringComparer.Ordinal);
     private readonly HashSet<string> _waiting = new(StringComparer.Ordinal);
     private readonly HashSet<string> _waitingItems = new(StringComparer.Ordinal);
+    private readonly AuditReleases _folded;
     private readonly ApproverActivity _live;
     private readonly IReadOnlyList<AgentReach> _reach;
 
-    private EntryActivity(ApproverActivity live, IReadOnlyList<AgentReach> reach, DateTimeOffset now)
+    private EntryActivity(AuditReleases folded, ApproverActivity live, IReadOnlyList<AgentReach> reach, DateTimeOffset now)
     {
+        _folded = folded;
         _live = live;
         _reach = reach;
         _now = now;
@@ -95,7 +108,7 @@ public sealed class EntryActivity
         IReadOnlyList<AgentReach>? reach = null) =>
         Build(Fold(audit, vaultKey), live, session, now, reach);
 
-    /// <summary>Folds this vault's granted audit lines into who received each entry, which a refresh that read no new line can reuse.</summary>
+    /// <summary>Folds this vault's granted audit lines into who received each entry and when the person's browser filled it, which a refresh that read no new line can reuse.</summary>
     /// <param name="audit">Audit entries read so far.</param>
     /// <param name="vaultKey">The open vault's identity key.</param>
     /// <returns>What the lines released.</returns>
@@ -108,11 +121,9 @@ public sealed class EntryActivity
 
         foreach (var entry in audit)
         {
-            // A terminal's edit, an agent's item change and a merge name items but release nothing, so none is a use;
-            // the person's browser fills are the person's own, which Activity lists under Your browser.
+            // A terminal's edit, an agent's item change and a merge name items but release nothing, so none is a use.
             if (!entry.Granted
                 || entry.At is not { } at
-                || entry.ByBrowser
                 || string.Equals(entry.Tool, AuditTools.Edit, StringComparison.Ordinal)
                 || string.Equals(entry.Tool, AuditTools.ItemChange, StringComparison.Ordinal)
                 || string.Equals(entry.Tool, AuditTools.Merge, StringComparison.Ordinal)
@@ -121,14 +132,32 @@ public sealed class EntryActivity
                 continue;
             }
 
+            IReadOnlyList<string> named = entry.Entries.Count > 0 ? entry.Entries : entry.Entry.Length > 0 ? [entry.Entry] : [];
+
+            // A browser's fill is the person's own use of the item, never an agent's access to it.
+            if (entry.ByBrowser)
+            {
+                foreach (var each in named)
+                {
+                    Filled(folded.FilledByName, Key(each), at);
+                }
+
+                if (entry.Item.Length > 0)
+                {
+                    Filled(folded.FilledByItem, entry.Item, at);
+                }
+
+                continue;
+            }
+
             var client = TokenAuditReason.TryName(entry.Reason, out var token)
                 ? $"{token} · token"
                 : entry.Client.Length > 0 ? entry.Client : "an unnamed agent";
             var how = string.Equals(entry.Tool, "run", StringComparison.Ordinal) && entry.Method != "token" ? "run" : entry.Method;
 
-            foreach (var named in entry.Entries.Count > 0 ? entry.Entries : entry.Entry.Length > 0 ? [entry.Entry] : [])
+            foreach (var each in named)
             {
-                Released(folded.ByName, Key(named), client, how, at, counted: true);
+                Released(folded.ByName, Key(each), client, how, at, counted: true);
             }
 
             if (entry.Item.Length > 0)
@@ -158,7 +187,7 @@ public sealed class EntryActivity
         ArgumentNullException.ThrowIfNull(live);
         ArgumentNullException.ThrowIfNull(session);
 
-        var activity = new EntryActivity(live, reach ?? [], now);
+        var activity = new EntryActivity(released, live, reach ?? [], now);
 
         // Copied, because the session's releases below change counts and times the fold is reused for.
         CopyInto(activity._released, released.ByName);
@@ -219,7 +248,7 @@ public sealed class EntryActivity
         return Key(ApprovalPrompt.Shown(entry));
     }
 
-    /// <summary>An entry's state and last use.</summary>
+    /// <summary>An entry's state and last use, by an agent or by the person's browser.</summary>
     /// <param name="entry">The entry.</param>
     /// <param name="byItem">
     /// Whether to read only what names the entry's own UUID, for an item another shares its name with, whose name alone
@@ -231,13 +260,8 @@ public sealed class EntryActivity
         ArgumentNullException.ThrowIfNull(entry);
 
         var (released, waiting) = Recorded(entry, byItem);
-        DateTimeOffset? last = released is { } clients ? clients.Values.Max(access => access.LastAt) : null;
 
-        var state = waiting
-            ? EntryUseState.InUse
-            : last is { } at && _now - at <= RecentWindow ? EntryUseState.Recent : EntryUseState.Idle;
-
-        return new EntryUse(state, last);
+        return UseOf(new[] { LastRelease(released), LastFill(entry, byItem) }.Max(), waiting);
     }
 
     /// <summary>
@@ -297,7 +321,19 @@ public sealed class EntryActivity
             ? [.. byClient.Values.OrderByDescending(access => access.LastAt).ThenBy(access => access.Client, StringComparer.Ordinal)]
             : [];
 
-        return new EntryAgentAccess(Use(entry, byItem), clients, waiting);
+        return new EntryAgentAccess(UseOf(LastRelease(released), waiting), clients, waiting);
+    }
+
+    private static DateTimeOffset? LastRelease(Dictionary<string, ClientAccess>? released) =>
+        released is { } clients ? clients.Values.Max(access => access.LastAt) : null;
+
+    private EntryUse UseOf(DateTimeOffset? last, bool waiting)
+    {
+        var state = waiting
+            ? EntryUseState.InUse
+            : last is { } at && _now - at <= RecentWindow ? EntryUseState.Recent : EntryUseState.Idle;
+
+        return new EntryUse(state, last);
     }
 
     /// <summary>What is recorded of an entry, by its name or by its UUID, and whether a waiting request names it.</summary>
@@ -312,6 +348,17 @@ public sealed class EntryActivity
 
         var key = KeyOf(entry);
         return (_released.GetValueOrDefault(key), _waiting.Contains(key));
+    }
+
+    /// <summary>When the person's browser last filled an entry, by its name or by its UUID, or null.</summary>
+    private DateTimeOffset? LastFill(EntryName entry, bool byItem)
+    {
+        if (byItem)
+        {
+            return entry.Uuid is { } item && _folded.FilledByItem.TryGetValue(item, out var byUuid) ? byUuid : null;
+        }
+
+        return _folded.FilledByName.TryGetValue(KeyOf(entry), out var byName) ? byName : null;
     }
 
     private static void CopyInto(Dictionary<string, Dictionary<string, ClientAccess>> target, Dictionary<string, Dictionary<string, ClientAccess>> folded)
@@ -338,6 +385,14 @@ public sealed class EntryActivity
                 How = at > known.LastAt ? how : known.How,
             }
             : new ClientAccess(client, at, 1, how);
+    }
+
+    private static void Filled(Dictionary<string, DateTimeOffset> filled, string key, DateTimeOffset at)
+    {
+        if (!filled.TryGetValue(key, out var known) || at > known)
+        {
+            filled[key] = at;
+        }
     }
 
     private static string Key(string shown) =>

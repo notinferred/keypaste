@@ -7,6 +7,7 @@ using Keypaste.Core;
 using Keypaste.Core.Activity;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Browser;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Tests;
 using Xunit;
@@ -158,6 +159,39 @@ public sealed class EntryActivityRowsTests
 
         screen.Entries.Selected = other;
         Assert.Empty(screen.Entries.Detail!.AgentAccess!.Clients);
+    }
+
+    /// <summary>
+    /// The person's browser filling a login is a use of the item, so its row's last use moves, but no agent received it,
+    /// so the Agent access card stays away; an agent's release afterwards moves both.
+    /// </summary>
+    [Fact]
+    public async Task ABrowserFill_MovesTheRowsLastUse_AndAddsNothingToAgentAccess()
+    {
+        await using var app = await App.StartAsync();
+        var key = app.Authority.Session.Identity!.Key;
+        app.Fill("example", key, ago: TimeSpan.FromMinutes(30));
+
+        using (var screen = app.Screen())
+        {
+            var row = screen.Entries.Rows.Single(entry => entry.Path == "example");
+            Assert.Equal(("30m ago", true), (row.LastUsedText, row.IsRecent));
+
+            screen.Entries.Selected = row;
+            Assert.False(screen.Entries.Detail!.ShowsAgentAccess);
+            Assert.Empty(screen.Entries.Detail.AgentAccess!.Clients);
+        }
+
+        app.Audit("example", key, label: "cursor", ago: TimeSpan.FromMinutes(5));
+
+        using (var screen = app.Screen())
+        {
+            var row = screen.Entries.Rows.Single(entry => entry.Path == "example");
+            Assert.Equal("5m ago", row.LastUsedText);
+
+            screen.Entries.Selected = row;
+            Assert.Equal(["cursor · 5m ago · 1×"], screen.Entries.Detail!.AgentLines);
+        }
     }
 
     /// <summary>
@@ -343,26 +377,33 @@ public sealed class EntryActivityRowsTests
                 Token).AsTask();
 
         /// <summary>Appends a granted line written <paramref name="ago"/> before now, as a bridge wrote it then.</summary>
-        internal void Audit(string entry, string vaultKey, string label = "ci-probe", TimeSpan ago = default, string? item = null)
+        internal void Audit(string entry, string vaultKey, string label = "ci-probe", TimeSpan ago = default, string? item = null) =>
+            Append(
+                new AuditRecord
+                {
+                    Tool = "request_credential",
+                    Client = new AuditClient("some-client", null, label),
+                    Args = AuditArgs.ForCredentialRequest(entry, "password", "deploy") with { Item = item },
+                    Decision = AuditDecision.Granted,
+                    Method = AuditMethod.Prompt,
+                    Reason = "a person approved this request",
+                    Exposure = ["**"],
+                    Vault = vaultKey,
+                },
+                ago);
+
+        /// <summary>Appends the line for the person's browser filling the login at the vault's root, written <paramref name="ago"/> before now.</summary>
+        internal void Fill(string title, string vaultKey, TimeSpan ago) =>
+            Append(RequestRecords.BrowserFill(BrowserIdentity.ChromeWebStore, "Chrome on studio", new EntryName(string.Empty, title), "https://example.com", AuditDecision.Granted, AuditMethod.Picked, "you picked it in the page", Session, vaultKey), ago);
+
+        private void Append(AuditRecord record, TimeSpan ago)
         {
             var then = new ManualClock(Clock.GetUtcNow() - ago);
             Assert.True(AuditLog.TryOpen(KeypasteHome.AuditPath(Fixture.Home), then, out var log, out var error), error);
 
             using (log)
             {
-                Assert.True(log.TryAppend(
-                    new AuditRecord
-                    {
-                        Tool = "request_credential",
-                        Client = new AuditClient("some-client", null, label),
-                        Args = AuditArgs.ForCredentialRequest(entry, "password", "deploy") with { Item = item },
-                        Decision = AuditDecision.Granted,
-                        Method = AuditMethod.Prompt,
-                        Reason = "a person approved this request",
-                        Exposure = ["**"],
-                        Vault = vaultKey,
-                    },
-                    out var failure), failure);
+                Assert.True(log.TryAppend(record, out var failure), failure);
             }
         }
 

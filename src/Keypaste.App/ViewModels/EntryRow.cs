@@ -36,7 +36,7 @@ internal sealed record EntryRow(string Title, string GroupPath, MatchedFields Fi
     /// <inheritdoc/>
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    /// <summary>Whether agents use this entry now, recently, or not: the row's dot.</summary>
+    /// <summary>In use while an agent's request waits on this entry, which the row's dot shows; else recent or idle by its last use, an agent's or the person's browser's.</summary>
     internal EntryUseState Use
     {
         get => _use;
