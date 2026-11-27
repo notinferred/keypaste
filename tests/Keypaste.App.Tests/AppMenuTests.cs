@@ -107,20 +107,35 @@ public sealed class AppMenuTests : IDisposable
     });
 
     [Fact]
-    public Task The_Dock_menu_locks_and_opens_a_vault() => HeadlessSession.On(() =>
+    public Task The_Dock_menu_runs_again_locks_and_opens_a_vault() => HeadlessSession.On(() =>
     {
         var opened = 0;
+        var ran = 0;
         var commands = new AppCommands(
-            new AppCommandHost { Session = _session, Shell = () => null, Unlock = () => null, OpenWindow = () => opened++ },
+            new AppCommandHost
+            {
+                Session = _session,
+                Shell = () => null,
+                Unlock = () => null,
+                OpenWindow = () => opened++,
+                RunAgain = () => ran++,
+                CanRunAgain = () => _session.IsUnlocked,
+            },
             mac: true);
 
         var dock = AppMenu.Native(commands.Dock);
+        var runAgain = Item(dock, "Run again");
         var lockNow = Item(dock, "Lock");
+
+        Assert.True(runAgain.Command!.CanExecute(null));
+        runAgain.Command.Press();
+        Assert.Equal(1, ran);
 
         Assert.True(lockNow.Command!.CanExecute(null));
         lockNow.Command.Press();
         Assert.True(SpinWait.SpinUntil(() => !_session.IsUnlocked, TimeSpan.FromSeconds(10)), "the Dock's Lock did not lock");
         Assert.False(lockNow.Command.CanExecute(null));
+        Assert.False(runAgain.Command.CanExecute(null));
         Assert.NotNull(Item(dock, "Open vault…"));
     });
 

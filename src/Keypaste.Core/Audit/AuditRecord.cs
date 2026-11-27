@@ -183,6 +183,10 @@ public enum AuditMethod
     /// <summary>A login filled in a paired browser because the person picked it in keypaste's list in the page.</summary>
     /// <remarks>The pick is the extension's word, which keypaste cannot check (THREATS.md T-59), so it is never written as <see cref="Prompt"/>.</remarks>
     Picked = 40,
+
+    /// <summary>A project's run started because the person pressed Run, or Run again, in keypaste's own window or menu, which no other program can press.</summary>
+    /// <remarks>Nobody was shown a card about this run, so it is never written as <see cref="Prompt"/>; a protected stage's run is always asked.</remarks>
+    Pressed = 41,
 }
 
 /// <summary>How many lookups of one tool with one decision a summary line folds.</summary>

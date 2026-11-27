@@ -287,7 +287,7 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Threat.** A line or agent-facing text presents an unasked release as a person's approval.
 
-**Mitigation.** Each authority has its own method in the log: `prompt` for a person's answer, `picked` for a login filled at the person's pick in the page, `allowed` for an Allow, `blocked` for a Block and `rules-changed` for a settings change. Agent-facing text uses the same words.
+**Mitigation.** Each authority has its own method in the log: `prompt` for a person's answer, `picked` for a login filled at the person's pick in the page, `pressed` for a run started at the person's press of Run or Run again in the app, `allowed` for an Allow, `blocked` for a Block and `rules-changed` for a settings change. Agent-facing text uses the same words.
 
 **Limit.** Editing the vocabulary later breaks the chain unless the attacker repairs it too (T-5).
 
@@ -301,7 +301,7 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Mitigation.** The password is typed only into the desktop app or the terminal running `keypaste approve`. No request can make a password prompt appear: a request to a locked vault is refused, and the app's notice opens the unlock screen only at the person's press.
 
-**Limit.** `keypaste approve` has no idle lock. A same-user process can bring the app's unlock screen forward (T-29).
+**Limit.** `keypaste approve` has no idle lock. A same-user process can bring the app's unlock screen forward (T-29). On a Mac, it can also make Touch ID ask where Touch ID can reopen the vault, because a Dock click and a reopen request from another program arrive alike.
 
 **Status.** `v0.3.0` for the terminal approver; the locked-app notice unreleased.
 
@@ -371,9 +371,9 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Threat.** Someone walks up to an unattended computer while a vault is unlocked.
 
-**Mitigation.** The desktop locks after 30 minutes idle by default, settable up to 8 hours but never off, on `Ctrl/Cmd+L`, and optionally on minimize. A lock locks every open vault, clears the copy and denies waiting requests, and agent requests never count as activity.
+**Mitigation.** The desktop locks after 30 minutes idle by default, settable up to 8 hours but never off, on `Ctrl/Cmd+L`, on Lock in the menu bar or tray, on quit, and optionally on minimize. A lock locks every open vault, clears the copy and denies waiting requests, and agent requests never count as activity. Closing the window into the menu bar or tray is not a lock: the vaults stay unlocked and answering agents until one of these locks, and the idle lock counts from the last key or click as before.
 
-**Limit.** Windows Hello, PIN included, and Touch ID can undo these locks (T-44). Locking cannot erase copies (T-18), and `keypaste approve` has no idle lock.
+**Limit.** A closed window is not a locked vault: until the idle lock, anyone at the computer can open the window again from the Dock, the menu bar or the tray, and agents' requests keep reaching the prompt. Windows Hello, PIN included, and Touch ID can undo these locks (T-44). Locking cannot erase copies (T-18), and `keypaste approve` has no idle lock.
 
 **Status.** Unreleased.
 
@@ -486,7 +486,7 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Threat.** Anyone who can pass Windows Hello or Touch ID as this user reopens the vault after a lock without the master password, or a same-user program obtains the copy's key and reads the app's memory.
 
-**Mitigation.** After a password unlock the app keeps the composite key's parts sealed in memory only, under a key only quick unlock gives back: on Windows a Windows Hello signature, on macOS 32 random bytes in a keychain item that only a fingerprint enrolled when it was made releases, kept on that Mac alone, never synced and deleted when the copy is dropped. Windows Hello or Touch ID asks on every keep and resume, and only the person's lock, the idle lock, minimize-lock and the tray allow a resume. Adding or removing a fingerprint makes Touch ID's copy unreadable, and only keypaste's Developer ID build reaches the keychain item.
+**Mitigation.** After a password unlock the app keeps the composite key's parts sealed in memory only, under a key only quick unlock gives back: on Windows a Windows Hello signature, on macOS 32 random bytes in a keychain item that only a fingerprint enrolled when it was made releases, kept on that Mac alone, never synced and deleted when the copy is dropped. Windows Hello or Touch ID asks on every keep and resume, and only the person's lock, from `Ctrl/Cmd+L`, the menus or the menu bar or tray, the idle lock and minimize-lock allow a resume. Adding or removing a fingerprint makes Touch ID's copy unreadable, and only keypaste's Developer ID build reaches the keychain item.
 
 **Limit.** Anyone who passes Windows Hello, PIN included, or whose fingerprint was enrolled, can reopen the vault after those locks. A same-user program with the key and a read of the app's memory gets parts that open every copy of the vault, and a kept copy has no maximum age. Nothing has been tested against a real Windows Hello; Touch ID was seen on one Mac, with the notarized app, on 2026-11-23.
 
@@ -498,9 +498,9 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Threat.** Anything running as the user that can start `keypaste run --session`, an agent with a shell included, asks for a project's whole env set.
 
-**Mitigation.** A run is released only after the person allows it, Allow once only (T-34), or on macOS under the app's own launch pass (T-42); no agent setting releases it. The prompt shows the project, variables, items, command and directory, never a value, and every run is recorded (T-6).
+**Mitigation.** A run from a terminal or an agent is released only after the person allows it, Allow once only (T-34); no agent setting releases it. The prompt shows the project, variables, items, command and directory, never a value. A Run pressed in keypaste's own window, or Run again in its Dock or menu bar or tray menu, is the person's answer, since no agent request and no command in a terminal can press a button in keypaste's window or menus: it starts with no prompt, on macOS under the app's own launch pass (T-42), and is recorded as `pressed`. A protected stage's Run is still asked on its card, Run again starts none, and Open terminal always asks. Every run is recorded before its set is released (T-6), and the values go only to the child's environment.
 
-**Limit.** The command and directory are the runner's claim, so allow only a run you started. The child keeps its values after a lock, and the standalone `keypaste run` opens the vault itself and is not audited.
+**Limit.** The command and directory are the runner's claim, so allow only a run you started. A Run pressed in the app starts the command `projects.json` held when its project opened, which any same-user process can change, and nothing shows it again before the press; Run again starts the command the last Run started. A same-user process driving the window through UI Automation, AT-SPI or macOS accessibility can press Run, as it could press the card's Start before. The child keeps its values after a lock, and the standalone `keypaste run` opens the vault itself and is not audited.
 
 **Status.** Unreleased; `v0.3.0` has only the standalone `keypaste run`.
 
@@ -538,7 +538,7 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Threat.** A same-user process repeats a command a person once allowed, to have an env set released again.
 
-**Mitigation.** Every `keypaste run --session` is a new request offered only Deny and Allow once, and no rule or remembered answer releases it.
+**Mitigation.** Every `keypaste run --session` without the app's launch pass is a new request offered only Deny and Allow once, and no rule or remembered answer releases it. Run again repeats a run only at the person's own press in the app's menu (T-30).
 
 **Limit.** What a run says it will start is its claim (T-30).
 
@@ -556,9 +556,9 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 ### T-42 — A launch pass is a bearer for one run
 
-**Threat.** A same-user process reads the launch request or the run's environment and presents the launch pass first, receiving the env set a macOS Run confirmed.
+**Threat.** A same-user process reads the launch request or the run's environment and presents the launch pass first, receiving the env set a macOS Run started.
 
-**Mitigation.** On macOS the app hands Terminal no value, only a 32-byte pass in an owner-only file. A pass works once, for two minutes, within its unlock, for the exact request shown, and never appears on a command line.
+**Mitigation.** On macOS the app hands Terminal no value, only a 32-byte pass in an owner-only file. A pass works once, for two minutes, within its unlock, for the exact request and set the app resolved, and never appears on a command line. A press alone earns no pass for a protected set.
 
 **Limit.** A same-user process can present the pass first; the person's window then says it was used, and Activity shows both requests. Only Terminal is supported.
 

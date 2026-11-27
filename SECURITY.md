@@ -118,7 +118,8 @@ What keypaste holds to under the [laws](#security-laws), and what it can't preve
 - A value is released only on your answer or a rule you set: per-category Ask, Allow or Block, Ask by default, with each Allow confirmed in the app (unreleased), or a `policy.toml` rule (v0.3.0) [T-12] [T-15].
 - One approval releases one field (v0.3.0), or one field or attachment (unreleased).
 - A linked set of up to four fields is allowed together, asked every time, and logged one line per field (unreleased) [T-56].
-- `keypaste run --session` and the `run` tool get a whole env set for a child process, asked every time (unreleased) [T-30] [T-35].
+- `keypaste run --session` from a terminal and the `run` tool get a whole env set for a child process, asked every time (unreleased) [T-30] [T-35].
+- A Run you press in keypaste's own window, or Run again in its Dock or menu bar or tray menu, is your answer, since no agent request and no command in a terminal can press a button in keypaste's window or menus: it starts with no prompt, puts the values only in the child's environment, and is logged as `pressed` before they are released. A protected stage's Run still asks on its card, Run again starts none, and Open terminal always asks (unreleased) [T-30].
 - A scoped token releases its sets to `keypaste run --token` with no prompt, except protected sets (unreleased) [T-32].
 - Agents see an item's title, group, tags and website unasked, and its username unless Settings hides it (unreleased) [T-4].
 - An agent sees only what its bridge's `--expose` reaches (v0.3.0) [T-4].
@@ -141,7 +142,7 @@ What keypaste holds to under the [laws](#security-laws), and what it can't preve
 - Client labels are unauthenticated, so whoever starts a bridge gets what an Allow gives, even under another agent's label. Verified doesn't stop a process of the same user [T-3] [T-14] [T-36].
 - A rule covers the vault's current contents, so a new field or tag changes what an Allow releases [T-13].
 - Nobody reads the reason behind an unasked release, and timing reveals which categories are Allow [T-12] [T-17].
-- A run's command is the runner's claim, and a run can leak values its scrubber misses [T-30] [T-35].
+- A run's command is the runner's claim, and a run can leak values its scrubber misses. A Run pressed in the app starts the command `projects.json` held when its project opened, which any program running as you can change, and nothing shows it again before the press [T-30] [T-35].
 - A token bundle can't be revoked; rotate its values [T-32].
 - There is no prompt limit across items [T-11].
 - Nothing recalls a client's copies or revokes a credential at its issuer [T-12].
@@ -184,7 +185,7 @@ What keypaste holds to under the [laws](#security-laws), and what it can't preve
 
 - Secret fields show automation only their length [T-22]. A revealed value shows until you hide it, leave its item or window, or the vault locks [T-25].
 - Copies clear after 20 seconds if unchanged, as `keypaste get` does in v0.3.0 [T-19].
-- Several vaults can be open at once, each with its own claim and pipe. The idle lock, `Ctrl/Cmd+L` and quitting lock them all [T-23] [T-29].
+- Several vaults can be open at once, each with its own claim and pipe. The idle lock, `Ctrl/Cmd+L`, Lock in the menu bar or tray and quitting lock them all. Closing the window into the menu bar or tray locks none: they stay unlocked and keep answering agents until one of those, or `keypaste lock` [T-23] [T-29].
 - The idle lock comes after 30 minutes by default, and at most 8 hours [T-23].
 - Notifications carry fixed words only [T-51].
 - Crash reports are sent only after you agree, hold no value, name or path, and never come from the CLI or bridge [T-9]. [PRIVACY](PRIVACY.md#crash-reports) lists what a report holds.
@@ -194,6 +195,7 @@ What keypaste holds to under the [laws](#security-laws), and what it can't preve
 **Limits**
 
 - Screen capture and onlookers can read a revealed value [T-25].
+- A closed window is not a locked vault: until a lock, anyone at the computer can open the window again from the Dock, the menu bar or the tray [T-23].
 - Clipboard managers can ignore keypaste's markers [T-19].
 - `recent.toml` shows where vaults and key files are [T-24].
 - An earlier master password and write access to the directory roll the vault back [T-26]; keep backups off the disk too.

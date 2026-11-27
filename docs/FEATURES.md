@@ -75,9 +75,9 @@ Every row is 1.0.0. [The desktop guide](desktop.md) describes the app. Screens a
 | Trash: delete, restore, erase, empty | |
 | Safe saves: backups in `<vault>.backups`, merges with another program's save, refusal of a stale or lossy save | Data KeePassLib doesn't know, such as a newer KDBX version's, is left out of the save and kept only in its backup |
 | Restore a backup from the unlock screen; export an encrypted copy | Nothing recovers a forgotten password or lost key file ([T-26], [T-37]) |
-| Lock: manual, idle (30 minutes by default), optionally on minimize | Delivered values stay delivered ([T-23]) |
+| Lock: manual, idle (30 minutes by default), optionally on minimize; closing the window keeps vaults unlocked | Delivered values stay delivered ([T-23]) |
 | Security: secrets in notes, dropped project tags, weak, reused or expiring passwords, weak key derivation, sync conflicts | YAML-style or multi-line values in notes are not found |
-| Environments: stages, masked variables, import, export, Run and Open terminal | Locking does not stop a started terminal ([T-23]) |
+| Environments: stages, masked variables, import, export, Run, Open terminal, and Run again in the Dock and tray menus | Locking does not stop a started terminal ([T-23]); Run starts what `projects.json` holds, unasked ([T-30]) |
 | Agents: Connect an AI tool…, settings, kept answers, the waiting request, Activity | |
 | Prompt window, saying Verified when keypaste checked who asks | Verified never shown for a real AI tool ([T-3]) |
 | Share links and scoped tokens | |

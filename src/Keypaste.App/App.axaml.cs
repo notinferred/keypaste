@@ -61,6 +61,7 @@ internal sealed partial class App : Application, IDisposable
     private LockedNotice? _lockedNotice;
     private ISystemNotifications? _notifications;
     private (string Path, string? Keyfile, int? HardwareKeySlot)? _openNext;
+    private ProjectRun? _lastRun;
     private int _unlockScreens;
     private bool _shuttingDown;
     private bool _quitting;
@@ -219,7 +220,13 @@ internal sealed partial class App : Application, IDisposable
             _unlock?.TakeHanded(handed);
         }
 
-        _tray = new AppTray(OpenWindowAtPersonsAct, () => _ = _vaults?.LockAllAsync(VaultLockReason.Manual), () => _vaults?.Unlocked.Count > 0, Quit);
+        _tray = new AppTray(
+            OpenWindowAtPersonsAct,
+            () => _ = RunAgainAsync(),
+            () => CanRunAgain,
+            () => _ = _vaults?.LockAllAsync(VaultLockReason.Manual),
+            () => _vaults?.Unlocked.Count > 0,
+            Quit);
         _tray.Show(_preferences.StaysInTray);
         _preferences.Changed += OnPreferencesChanged;
         _window.Closing += OnMainWindowClosing;
@@ -302,7 +309,7 @@ internal sealed partial class App : Application, IDisposable
     /// <summary>What a project's Run and Open terminal start with, given the authority; the platform's own unless a test gives another.</summary>
     internal Func<AppAuthority?, ProjectLaunching> LaunchingFor { get; init; } = ProjectLaunching.ForThisMachine;
 
-    /// <summary>Shows the Dock icon while the main window is open and hides it while the app is only in the menu bar; set on macOS alone, and by a test.</summary>
+    /// <summary>Shows the Dock icon while the main window is open or a vault is unlocked, so ⌘Tab and the Dock reach the app, and hides it while the app is only in the menu bar; set on macOS alone, and by a test.</summary>
     internal Action<bool>? DockIcon { get; init; }
 
     /// <summary>
@@ -372,7 +379,10 @@ internal sealed partial class App : Application, IDisposable
         _shell?.OpenAgentSettings(agent);
     }
 
-    /// <summary>Closes the window into the menu bar or tray; closing still ends the session, so the process stays locked and holds no secret.</summary>
+    /// <summary>
+    /// Closes the window into the menu bar or tray. Unlocked vaults stay unlocked, answering agents, until the idle lock,
+    /// a lock the person makes, <c>keypaste lock</c> or quitting; with none unlocked the unlock screen starts over.
+    /// </summary>
     internal void CloseToTray()
     {
         if (_session is null || _window is null)
@@ -382,18 +392,70 @@ internal sealed partial class App : Application, IDisposable
 
         var unlocked = _vaults?.Unlocked.Count > 0;
 
-        // Locking also stops a hardware key waiting for its touch, so an unlock under way cannot finish with a later touch.
-        _ = _session.LockAsync(VaultLockReason.Closed);
-        _ = _vaults?.LockAllAsync(VaultLockReason.Closed);
-
         if (!unlocked)
         {
+            // Locking stops a hardware key waiting for its touch, so an unlock under way cannot finish with a later touch.
+            _ = _session.LockAsync(VaultLockReason.Closed);
+            _ = _vaults?.LockAllAsync(VaultLockReason.Closed);
+
             // A password typed on the unlock screen is dropped with it, and an unlock it started locks again as it finishes.
             ShowUnlock(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable));
         }
 
         _window.Hide();
-        DockIcon?.Invoke(false);
+
+        if (!unlocked)
+        {
+            DockIcon?.Invoke(false);
+        }
+    }
+
+    /// <summary>Whether Run again has a command to start: the last one a Run started, while its vault is unlocked.</summary>
+    internal bool CanRunAgain => RunAgainVault() is not null;
+
+    /// <summary>
+    /// Run again in the Dock or tray menu: starts once more the last command a Run started, in its project, stage and
+    /// directory. It is the person's press in keypaste's own menu, so it starts as a Run does, recorded as pressed.
+    /// </summary>
+    /// <returns>Completes once the run started or was refused, which brings the window forward to say why.</returns>
+    internal async Task RunAgainAsync()
+    {
+        if (_lastRun is not { } last || RunAgainVault() is not { } vault)
+        {
+            return;
+        }
+
+        string? refused = null;
+        using var launch = new ProjectLaunchViewModel(
+            vault.Session,
+            last.Project,
+            picker: null,
+            LaunchingFor(vault.Authority) with { Started = Remember },
+            said => refused = said ?? refused,
+            (said, tone) =>
+            {
+                if (said is not null)
+                {
+                    _shell?.ShowToast(said, tone);
+                }
+            });
+
+        await launch.RunAgainAsync(last).ConfigureAwait(true);
+
+        if (refused is not null)
+        {
+            OpenWindow();
+            _shell?.ShowToast(refused, ToastTone.Warning);
+        }
+    }
+
+    private OpenVault? RunAgainVault() =>
+        _lastRun is { } last && _vaults?.Holding(last.Vault) is { Session.IsUnlocked: true } vault ? vault : null;
+
+    private void Remember(ProjectRun run)
+    {
+        _lastRun = run;
+        Dispatcher.UIThread.Post(() => _tray?.Refresh());
     }
 
     private void OnActivated(object? sender, ActivatedEventArgs e)
@@ -492,6 +554,8 @@ internal sealed partial class App : Application, IDisposable
             Hide = mac ? MacDock.Hide : null,
             HideOthers = mac ? MacDock.HideOthers : null,
             ShowAll = mac ? MacDock.ShowAll : null,
+            RunAgain = () => _ = RunAgainAsync(),
+            CanRunAgain = () => CanRunAgain,
         });
     }
 
@@ -787,6 +851,12 @@ internal sealed partial class App : Application, IDisposable
 
             _tray?.Refresh();
 
+            // The Dock icon stays only while the window shows or a vault is unlocked.
+            if (vaults.Unlocked.Count == 0 && _window is { IsVisible: false })
+            {
+                DockIcon?.Invoke(false);
+            }
+
             if (_shell is { } shell && vaults.Unlocked is [var open, ..])
             {
                 if (ReferenceEquals(sender, shell.Anchor))
@@ -1012,7 +1082,7 @@ internal sealed partial class App : Application, IDisposable
             CliLink = CliLinkFor(),
             BrowserHosts = BrowserHostsFor(),
             Tools = ClientConnector.ForThisProcess,
-            Launching = LaunchingFor(anchor.Authority),
+            Launching = LaunchingFor(anchor.Authority) with { Started = Remember },
             Crashes = Crashes,
             Vaults = _vaults,
         };

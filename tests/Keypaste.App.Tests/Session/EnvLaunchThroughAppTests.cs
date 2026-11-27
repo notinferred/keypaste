@@ -23,8 +23,8 @@ namespace Keypaste.App.Tests.Session;
 
 /// <summary>
 /// The Env Sets screen imports a <c>.env</c> and starts a project's command in a real terminal with
-/// its set in the child's environment, only after the person confirms it and only while the unlock
-/// that asked is live.
+/// its set in the child's environment, at the person's press of Run, or for Open terminal and a protected
+/// stage once they confirm it, and only while the unlock that asked is live.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -45,11 +45,12 @@ namespace Keypaste.App.Tests.Session;
 public sealed class EnvLaunchThroughAppTests : IDisposable
 {
     private const string _macOSOnly = "Terminal is opened through keypaste run on macOS only.";
-    private const string _passSpent = "keypaste run: the run you confirmed in the app expired or was already used, so nothing was started";
+    private const string _passSpent = "keypaste run: the run you started in the app expired or was already used, so nothing was started";
     private const string _apiKey = "sk_live_e1b_api_4d9a";
     private const string _dbUrl = "postgres://e1b:db_71c2@localhost/app";
     private const string _imported = "imported_e1b_value_b83f";
     private const string _stagingKey = "sk_live_e1d_staging_5e0b";
+    private const string _prodKey = "sk_live_e1d_prod_77a1";
     private const int _releaseSeconds = 3;
 
     private readonly DateTime _startedUtc = DateTime.UtcNow.AddSeconds(-1);
@@ -118,18 +119,10 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         using var pipe = Listen(pipeName);
         var connected = pipe.WaitForConnectionAsync(Cancel);
 
-        var running = launch.RunOrSetUpCommand.ExecuteAsync(null);
+        // The press is the answer: no card, and nobody else is asked.
+        await launch.RunOrSetUpCommand.ExecuteAsync(null).WaitAsync(Cancel);
 
-        Assert.True(launch.IsConfirming);
-        Assert.Contains(pipeName, launch.ConfirmStarts, StringComparison.Ordinal);
-        Assert.Equal(_project, launch.ConfirmDirectory);
-        Assert.Equal("API_KEY, DB_URL", launch.ConfirmKeys);
-        Assert.Equal($"From {ApprovalPrompt.Shown(ProjectVariables.Home("dev"))}", launch.ConfirmSources);
-        AssertNothingStarted();
-
-        launch.ConfirmLaunchCommand.Press();
-        await running.WaitAsync(Cancel);
-
+        Assert.False(launch.IsConfirming);
         AssertStarted(screen, launch);
 
         var report = await ReportAsync(pipe, connected);
@@ -142,7 +135,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
         var commandLine = report.Single(line => line.StartsWith("cmdline=", StringComparison.Ordinal));
         AssertNoValue(commandLine, "the child's command line");
-        AssertRecorded(2, ApprovalPrompt.Shown(ProjectVariables.Home("dev")));
+        AssertRecorded(2, pressed: true, ApprovalPrompt.Shown(ProjectVariables.Home("dev")));
 
         AssertNoValue(File.ReadAllText(KeypasteHome.ProjectsPath(_fixture.Home)), "projects.json");
         AssertNoValue(string.Join("\n", screen.Notice, screen.Error, launch.ConfirmTitle, launch.ConfirmStarts, launch.ConfirmKeys, launch.ConfirmSources), "the screen");
@@ -167,9 +160,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         using var pipe = Listen(pipeName);
         var connected = pipe.WaitForConnectionAsync(Cancel);
 
-        var running = launch.LaunchAsync(run: true);
-        launch.ConfirmLaunchCommand.Press();
-        await running.WaitAsync(Cancel);
+        await launch.LaunchAsync(run: true).WaitAsync(Cancel);
 
         AssertStarted(screen, launch);
         var report = await ReportAsync(pipe, connected);
@@ -212,7 +203,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         using var screen = Screen();
         var launch = Mapped(screen, out _);
 
-        var running = launch.LaunchAsync(run: true);
+        var running = launch.LaunchAsync(run: false);
         launch.CancelLaunchCommand.Press();
         await running.WaitAsync(Cancel);
 
@@ -228,7 +219,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         using var screen = Screen();
         var launch = Mapped(screen, out _);
 
-        var running = launch.LaunchAsync(run: true);
+        var running = launch.LaunchAsync(run: false);
         Assert.True(launch.IsConfirming);
 
         _session.Lock(VaultLockReason.Manual);
@@ -251,7 +242,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
         try
         {
-            var running = launch.LaunchAsync(run: true);
+            var running = launch.LaunchAsync(run: false);
             Assert.True(launch.IsConfirming);
 
             // Confirmed, and the answer queued behind the lock: the set is read again only once the
@@ -272,9 +263,9 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.Equal("The vault was locked, so nothing was started. Unlock it, then run it again.", screen.Error);
     }
 
-    /// <summary>Once Start has released the set the launch is the person's: closing the project, which disposes its card, does not take it back.</summary>
+    /// <summary>Once the press has released the set the launch is the person's: closing the project, which disposes its screen, does not take it back.</summary>
     [Fact]
-    public async Task Closing_the_project_right_after_Start_does_not_take_the_launch_back()
+    public async Task Closing_the_project_right_after_Run_does_not_take_the_launch_back()
     {
         using var screen = Screen();
         var launch = Mapped(screen, out var pipeName);
@@ -283,7 +274,6 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         var connected = pipe.WaitForConnectionAsync(Cancel);
 
         var running = launch.LaunchAsync(run: true);
-        launch.ConfirmLaunchCommand.Press();
         screen.CloseCommand.Press();
         await running.WaitAsync(Cancel);
 
@@ -297,10 +287,10 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         AssertHandedOver();
     }
 
-    /// <summary>The unlock that confirmed the run holds its pass, so a lock before Terminal's window asks leaves that window nothing to start, even once the vault is unlocked again.</summary>
+    /// <summary>The unlock Run was pressed in holds its pass, so a lock before Terminal's window asks leaves that window nothing to start, even once the vault is unlocked again.</summary>
     [Fact]
     [SupportedOSPlatform("macos")]
-    public async Task On_macOS_a_lock_between_Start_and_the_windows_request_ends_its_pass_and_starts_nothing()
+    public async Task On_macOS_a_lock_between_Run_and_the_windows_request_ends_its_pass_and_starts_nothing()
     {
         Assert.SkipUnless(OperatingSystem.IsMacOS(), _macOSOnly);
 
@@ -313,9 +303,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
             Unlock();
         };
 
-        var running = launch.LaunchAsync(run: true);
-        launch.ConfirmLaunchCommand.Press();
-        await running.WaitAsync(Cancel);
+        await launch.LaunchAsync(run: true).WaitAsync(Cancel);
 
         var (exit, output) = Assert.Single(_terminal.Windows).Ended();
 
@@ -338,9 +326,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         var launch = MappedTo(screen, $"touch '{marker}'");
         _terminal!.Refusal = "LSOpenURLsWithRole() failed with error -10810";
 
-        var running = launch.LaunchAsync(run: true);
-        launch.ConfirmLaunchCommand.Press();
-        await running.WaitAsync(Cancel);
+        await launch.LaunchAsync(run: true).WaitAsync(Cancel);
 
         Assert.Equal("Nothing was started: Terminal did not open: LSOpenURLsWithRole() failed with error -10810. Copy the run command instead.", screen.Error);
         Assert.Empty(TerminalStandIn.Waiting());
@@ -374,9 +360,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         using var pipe = Listen(pipeName);
         var connected = pipe.WaitForConnectionAsync(Cancel);
 
-        var running = launch.LaunchAsync(run: true);
-        launch.ConfirmLaunchCommand.Press();
-        await running.WaitAsync(Cancel);
+        await launch.LaunchAsync(run: true).WaitAsync(Cancel);
 
         AssertStarted(screen, launch);
         var opened = Assert.Single(_terminal!.Openings).Environment;
@@ -429,10 +413,8 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
             using var pipe = Listen(pipeName);
             var connected = pipe.WaitForConnectionAsync(Cancel);
 
-            var running = launch.LaunchAsync(run: true);
-            Assert.True(launch.IsConfirming, screen.Error);
-            launch.ConfirmLaunchCommand.Press();
-            await running.WaitAsync(Cancel);
+            await launch.LaunchAsync(run: true).WaitAsync(Cancel);
+            Assert.False(launch.IsConfirming, screen.Error);
 
             AssertStarted(screen, launch);
 
@@ -444,7 +426,8 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
             using var line = LastAuditLine();
             Assert.Equal("granted", line.RootElement.GetProperty("decision").GetString());
-            Assert.Equal("2 variable(s), confirmed in the app", line.RootElement.GetProperty("reason").GetString());
+            Assert.Equal("pressed", line.RootElement.GetProperty("method").GetString());
+            Assert.Equal("2 variable(s), pressed in the app", line.RootElement.GetProperty("reason").GetString());
         }
         finally
         {
@@ -455,13 +438,16 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         }
     }
 
-    /// <summary>The card is the one question a Run asks, so it shows the longest command a mapping holds whole, on every platform.</summary>
+    /// <summary>The card is the one question a protected stage's Run asks, so it shows the longest command a mapping holds whole, on every platform.</summary>
     [Fact]
     public async Task The_card_shows_the_longest_command_a_mapping_holds_whole()
     {
+        Protected();
+
         using var screen = Screen();
         var command = Longest("make");
         var launch = MappedTo(screen, command);
+        screen.OpenProject!.SelectedProfile = "prod";
 
         var running = launch.LaunchAsync(run: true);
         Assert.True(launch.IsConfirming);
@@ -473,7 +459,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         AssertNothingStarted();
     }
 
-    /// <summary>A Run of the longest command a mapping holds starts through Terminal, though its request's command line is longer than the owner's prompt shows: its pass holds it to the card.</summary>
+    /// <summary>A Run of the longest command a mapping holds starts through Terminal, though its request's command line is longer than the owner's prompt shows: its pass holds it to what was pressed.</summary>
     [Fact]
     [SupportedOSPlatform("macos")]
     public async Task On_macOS_the_longest_command_a_mapping_holds_runs_through_Terminal()
@@ -489,10 +475,8 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         using var pipe = Listen(pipeName);
         var connected = pipe.WaitForConnectionAsync(Cancel);
 
-        var running = launch.LaunchAsync(run: true);
-        Assert.True(launch.IsConfirming);
-        launch.ConfirmLaunchCommand.Press();
-        await running.WaitAsync(Cancel);
+        await launch.LaunchAsync(run: true).WaitAsync(Cancel);
+        Assert.False(launch.IsConfirming);
 
         AssertStarted(screen, launch);
 
@@ -507,6 +491,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
     [Fact]
     public async Task Choosing_another_stage_while_the_card_is_up_starts_the_one_the_card_named()
     {
+        Protected();
         Reopened(vault =>
         {
             ProjectVariables.Set(vault, "dev", "staging", "API_KEY", _stagingKey);
@@ -515,13 +500,14 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
 
         using var screen = Screen();
         var launch = Mapped(screen, out var pipeName);
+        screen.OpenProject!.SelectedProfile = "prod";
 
         using var pipe = Listen(pipeName);
         var connected = pipe.WaitForConnectionAsync(Cancel);
 
         var running = launch.LaunchAsync(run: true);
         Assert.True(launch.IsConfirming);
-        Assert.Equal("Run this in a terminal with 2 variables from dev?", launch.ConfirmTitle);
+        Assert.Equal("Run this in a terminal with 2 variables from dev (prod)?", launch.ConfirmTitle);
 
         screen.OpenProject!.SelectedProfile = "staging";
         Assert.Equal("staging", launch.Profile);
@@ -532,11 +518,117 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         AssertStarted(screen, launch);
 
         var report = await ReportAsync(pipe, connected);
-        AssertHandedOver();
+        AssertHandedOver(profile: "prod");
 
-        Assert.Contains($"API_KEY={_apiKey}", report);
-        Assert.Contains($"DB_URL={_dbUrl}", report);
+        Assert.Contains($"API_KEY={_prodKey}", report);
+        Assert.Contains($"DB_URL={_prodKey}", report);
         Assert.DoesNotContain(report, line => line.Contains(_stagingKey, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// A protected stage's run is asked live (T-30, T-38), so its Run shows the card, starts only once it is confirmed,
+    /// and is recorded as the person's answer to it rather than as a press.
+    /// </summary>
+    [Fact]
+    public async Task A_protected_stages_Run_asks_on_the_card_and_is_recorded_as_confirmed()
+    {
+        Protected();
+
+        using var screen = Screen();
+        var launch = Mapped(screen, out var pipeName);
+        screen.OpenProject!.SelectedProfile = "prod";
+
+        using var pipe = Listen(pipeName);
+        var connected = pipe.WaitForConnectionAsync(Cancel);
+
+        var running = launch.LaunchAsync(run: true);
+        Assert.True(launch.IsConfirming);
+        Assert.Equal("API_KEY, DB_URL", launch.ConfirmKeys);
+        AssertNothingStarted();
+
+        launch.ConfirmLaunchCommand.Press();
+        await running.WaitAsync(Cancel);
+
+        AssertStarted(screen, launch);
+        var report = await ReportAsync(pipe, connected);
+        AssertHandedOver(profile: "prod");
+
+        Assert.Contains($"API_KEY={_prodKey}", report);
+        AssertRecorded(2, pressed: false, ApprovalPrompt.Shown(ProjectVariables.Home("dev", "prod")));
+    }
+
+    /// <summary>A Run tells Run again what it started, and Run again starts that command once more in its directory with its stage, at its own press, recorded as pressed.</summary>
+    [Fact]
+    public async Task Run_again_starts_the_last_command_a_Run_started_once_more()
+    {
+        List<ProjectRun> runs = [];
+        using var screen = new EnvSetsViewModel(_session, _countdown, _picker, Launching() with { Started = runs.Add });
+        var launch = Mapped(screen, out var pipeName);
+
+        using (var pipe = Listen(pipeName))
+        {
+            var connected = pipe.WaitForConnectionAsync(Cancel);
+            await launch.LaunchAsync(run: true).WaitAsync(Cancel);
+            await ReportAsync(pipe, connected);
+            AssertHandedOver();
+        }
+
+        var last = Assert.Single(runs);
+        Assert.Equal((_fixture.Path_, "dev", "dev", _project, launch.Mapping!.Command), (last.Vault, last.Project, last.Profile, last.Directory, last.Command));
+
+        // Run again works from what Run told it, whatever the screen holds by then.
+        launch.Command = "make";
+        launch.SaveCommand.Press();
+        screen.CloseCommand.Press();
+        var refused = new List<string?>();
+        using var again = new ProjectLaunchViewModel(_session, last.Project, picker: null, Launching() with { Started = runs.Add }, refused.Add, (_, _) => { });
+
+        using (var pipe = Listen(pipeName))
+        {
+            var connected = pipe.WaitForConnectionAsync(Cancel);
+            await again.RunAgainAsync(last).WaitAsync(Cancel);
+            Assert.Equal([null], refused);
+            Assert.False(again.IsConfirming);
+
+            var report = await ReportAsync(pipe, connected);
+            AssertHandedOver(windows: 2);
+            Assert.Contains($"API_KEY={_apiKey}", report);
+            AssertStartedIn(report);
+        }
+
+        AssertRecorded(2, pressed: true, ApprovalPrompt.Shown(ProjectVariables.Home("dev")));
+        Assert.Equal(last, runs[^1]);
+        Assert.Equal(0, _asked.Count);
+    }
+
+    /// <summary>Run again shows no card, so for a protected stage, whose run is asked live, it starts nothing and says where to run it.</summary>
+    [Fact]
+    public async Task Run_again_of_a_protected_stage_starts_nothing_and_says_where_to_run_it()
+    {
+        Protected();
+        var refused = new List<string?>();
+        using var again = new ProjectLaunchViewModel(_session, "dev", picker: null, Launching(), refused.Add, (_, _) => { });
+
+        await again.RunAgainAsync(new ProjectRun(_fixture.Path_, "dev", "prod", _project, "make")).WaitAsync(Cancel);
+
+        Assert.Equal("Nothing was started: dev (prod) is protected, so its Run asks you first. Open the project and press Run there.", refused[^1]);
+        Assert.False(again.IsConfirming);
+        AssertNothingStarted();
+        Assert.Equal(0, _asked.Count);
+    }
+
+    /// <summary>Run again after its vault locked starts nothing.</summary>
+    [Fact]
+    public async Task Run_again_while_the_vault_is_locked_starts_nothing()
+    {
+        var refused = new List<string?>();
+        using var again = new ProjectLaunchViewModel(_session, "dev", picker: null, Launching(), refused.Add, (_, _) => { });
+        _session.Lock(VaultLockReason.Manual);
+
+        await again.RunAgainAsync(new ProjectRun(_fixture.Path_, "dev", "dev", _project, "make")).WaitAsync(Cancel);
+
+        Assert.Equal("The vault was locked, so nothing was started. Unlock it, then run it again.", refused[^1]);
+        AssertNothingStarted();
     }
 
     /// <summary>The window's <c>keypaste run</c> names the project by <c>--project=</c>, so a name starting with <c>-</c> runs through Terminal like any other and its History line names its items.</summary>
@@ -558,10 +650,8 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         using var pipe = Listen(pipeName);
         var connected = pipe.WaitForConnectionAsync(Cancel);
 
-        var running = launch.LaunchAsync(run: true);
-        Assert.True(launch.IsConfirming);
-        launch.ConfirmLaunchCommand.Press();
-        await running.WaitAsync(Cancel);
+        await launch.LaunchAsync(run: true).WaitAsync(Cancel);
+        Assert.False(launch.IsConfirming);
 
         AssertStarted(screen, launch);
 
@@ -595,10 +685,8 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         using var pipe = Listen(pipeName);
         var connected = pipe.WaitForConnectionAsync(Cancel);
 
-        var running = launch.LaunchAsync(run: true);
-        Assert.True(launch.IsConfirming);
-        launch.ConfirmLaunchCommand.Press();
-        await running.WaitAsync(Cancel);
+        await launch.LaunchAsync(run: true).WaitAsync(Cancel);
+        Assert.False(launch.IsConfirming);
 
         AssertStarted(screen, launch);
 
@@ -624,10 +712,8 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         using var pipe = Listen(pipeName);
         var connected = pipe.WaitForConnectionAsync(Cancel);
 
-        var running = launch.LaunchAsync(run: true);
-        Assert.True(launch.IsConfirming);
-        launch.ConfirmLaunchCommand.Press();
-        await running.WaitAsync(Cancel);
+        await launch.LaunchAsync(run: true).WaitAsync(Cancel);
+        Assert.False(launch.IsConfirming);
 
         AssertStarted(screen, launch);
 
@@ -733,10 +819,8 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         using var pipe = Listen(pipeName);
         var connected = pipe.WaitForConnectionAsync(Cancel);
 
-        var running = launch.LaunchAsync(run: true);
-        Assert.True(launch.IsConfirming);
-        launch.ConfirmLaunchCommand.Press();
-        await running.WaitAsync(Cancel);
+        await launch.LaunchAsync(run: true).WaitAsync(Cancel);
+        Assert.False(launch.IsConfirming);
 
         AssertStarted(screen, launch);
 
@@ -759,10 +843,8 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         using var screen = Screen();
         var launch = MappedTo(screen, "make");
 
-        var running = launch.LaunchAsync(run: true);
-        Assert.True(launch.IsConfirming);
-        launch.ConfirmLaunchCommand.Press();
-        await running.WaitAsync(Cancel);
+        await launch.LaunchAsync(run: true).WaitAsync(Cancel);
+        Assert.False(launch.IsConfirming);
 
         Assert.Equal("Nothing was started: dev's variables are too large for keypaste to hand to Terminal. Copy the run command instead.", screen.Error);
         AssertNothingStarted();
@@ -930,20 +1012,21 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
     }
 
     /// <summary>
-    /// On macOS, requires that the window's launcher took its request, that the window said whose
-    /// confirmation it ran on and showed no value, and that the app asked nobody, the card having been
-    /// the only question.
+    /// On macOS, requires that the window's launcher took its request, that the window said the person
+    /// started it in the app and showed no value, and that the app asked nobody, the press or the card
+    /// having been the only answer, in the newest of <paramref name="windows"/> windows.
     /// </summary>
-    private void AssertHandedOver(string project = "dev")
+    private void AssertHandedOver(string project = "dev", string profile = "dev", int windows = 1)
     {
         if (OperatingSystem.IsMacOS())
         {
             Assert.Empty(TerminalStandIn.Waiting());
             Assert.Equal(0, _asked.Count);
+            Assert.Equal(windows, _terminal!.Windows.Count);
 
-            var (exit, output) = Assert.Single(_terminal!.Windows).Ended();
+            var (exit, output) = _terminal.Windows[^1].Ended();
             Assert.True(exit == 0, output);
-            Assert.Contains($"keypaste run: starting with {project} (dev) as you confirmed in the keypaste app", output, StringComparison.Ordinal);
+            Assert.Contains($"keypaste run: starting with {project} ({profile}) as you started it in the keypaste app", output, StringComparison.Ordinal);
             AssertNoValue(output, "the window");
         }
     }
@@ -1144,6 +1227,13 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.Equal(UnlockOutcome.Opened, (session ?? _session).TryUnlock(_fixture.Path_, master.Value));
     }
 
+    /// <summary>Gives dev a protected prod stage, holding both of the reporter's variables.</summary>
+    private void Protected() => Reopened(vault =>
+    {
+        ProjectVariables.Set(vault, "dev", "prod", "API_KEY", _prodKey);
+        ProjectVariables.Set(vault, "dev", "prod", "DB_URL", _prodKey);
+    });
+
     /// <summary>Changes the vault's file as another program would, then unlocks it again so the session reads the change.</summary>
     private void Reopened(Action<Vault> change)
     {
@@ -1194,16 +1284,16 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         return JsonDocument.Parse(reader.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries)[^1]);
     }
 
-    /// <summary>Requires that the newest History line is the Run's release, as a macOS Run's window and a Windows or Linux Run each write it.</summary>
-    private void AssertRecorded(int variables, params string[] entries)
+    /// <summary>Requires that the newest History line is the Run's release, as a macOS Run's window and a Windows or Linux Run each write it: pressed, or confirmed on its card.</summary>
+    private void AssertRecorded(int variables, bool pressed, params string[] entries)
     {
         using var line = LastAuditLine();
         var root = line.RootElement;
 
         Assert.Equal("run", root.GetProperty("tool").GetString());
         Assert.Equal("granted", root.GetProperty("decision").GetString());
-        Assert.Equal("prompt", root.GetProperty("method").GetString());
-        Assert.Equal($"{variables} variable(s), confirmed in the app", root.GetProperty("reason").GetString());
+        Assert.Equal(pressed ? "pressed" : "prompt", root.GetProperty("method").GetString());
+        Assert.Equal($"{variables} variable(s), {(pressed ? "pressed" : "confirmed")} in the app", root.GetProperty("reason").GetString());
         Assert.Equal(entries, root.GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()));
     }
 

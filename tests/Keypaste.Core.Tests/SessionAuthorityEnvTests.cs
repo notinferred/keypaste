@@ -21,7 +21,7 @@ public sealed class SessionAuthorityEnvTests : IDisposable
 {
     private const string _token1 = "sk_live_env_owner_sentinel";
     private const string _token2 = "postgres://sentinel@db/app";
-    private const string _launchSpent = "the run you confirmed in the app expired or was already used";
+    private const string _launchSpent = "the run you started in the app expired or was already used";
     private static readonly TimeSpan _wait = TimeSpan.FromSeconds(10);
     private static readonly string[] _launched = ["/bin/sh", "-c", "eval \"$1\"; exec \"${SHELL:-/bin/sh}\"", "keypaste", "npm start"];
 
@@ -779,8 +779,8 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         await using var owner = StartOwner();
         var set = EnvResolution.Resolve(_vault, "dev", EnvProfileNames.Default, keys: null, _fixture.Clock);
 
-        Assert.False(owner.Authority.RecordAppRun(set, "session-zero"));
-        Assert.True(owner.Authority.RecordAppRun(set, "session-one"));
+        Assert.False(owner.Authority.RecordAppRun(set, "session-zero", pressed: false));
+        Assert.True(owner.Authority.RecordAppRun(set, "session-one", pressed: false));
 
         Assert.Equal(0, _fixture.Channel.Asked);
         Assert.Contains(owner.Authority.Released, seen => seen is { Entry: "env/dev/.env", How: "run --session" });
@@ -799,8 +799,64 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.DoesNotContain(_token2, text, StringComparison.Ordinal);
 
         _lifetime!.End();
-        Assert.False(owner.Authority.RecordAppRun(set, "session-one"));
+        Assert.False(owner.Authority.RecordAppRun(set, "session-one", pressed: false));
         Assert.Single(AuditLines());
+    }
+
+    /// <summary>A Run pressed in the app is the person's own act, so it is recorded as pressed, never as a prompt nobody was shown (T-16, T-30).</summary>
+    [Fact]
+    public async Task A_run_pressed_in_the_app_is_recorded_as_pressed()
+    {
+        await using var owner = StartOwner();
+        var set = EnvResolution.Resolve(_vault, "dev", EnvProfileNames.Default, keys: null, _fixture.Clock);
+
+        Assert.True(owner.Authority.RecordAppRun(set, "session-one", pressed: true));
+
+        Assert.Equal(0, _fixture.Channel.Asked);
+        var line = Assert.Single(AuditLines());
+        Assert.Equal("run", line.GetProperty("tool").GetString());
+        Assert.Equal("granted", line.GetProperty("decision").GetString());
+        Assert.Equal("pressed", line.GetProperty("method").GetString());
+        Assert.Equal("2 variable(s), pressed in the app", line.GetProperty("reason").GetString());
+        Assert.Equal(["env/dev/.env"], line.GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()));
+        Assert.DoesNotContain(_token1, AuditText(), StringComparison.Ordinal);
+    }
+
+    /// <summary>A protected stage's run is asked live, so a press alone neither records one nor earns a pass (T-30, T-38).</summary>
+    [Fact]
+    public async Task A_press_alone_starts_no_run_of_a_protected_stage()
+    {
+        ProjectVariables.Set(_vault, "dev", "prod", "TOKEN", _stagingToken);
+        _vault.Save();
+        await using var owner = StartOwner();
+        var set = EnvResolution.Resolve(_vault, "dev", "prod", keys: null, _fixture.Clock);
+        Assert.True(set.RequiresLiveApproval);
+
+        Assert.False(owner.Authority.RecordAppRun(set, "session-one", pressed: true));
+        Assert.Throws<ArgumentException>(() => owner.Authority.IssueLaunch(Claim("prod") with { Pressed = true }, "session-one"));
+
+        Assert.Empty(AuditLines());
+        Assert.Equal(0, _fixture.Channel.Asked);
+    }
+
+    /// <summary>On macOS a pressed Run's pass releases the set unasked and is recorded as pressed, as a Windows or Linux Run is.</summary>
+    [Fact]
+    public async Task A_pressed_runs_pass_is_recorded_as_pressed()
+    {
+        _fixture.Channel.Answer = ApprovalAnswer.Denied;
+        await using var owner = StartOwner();
+        await using var client = await AttachedAsync(owner);
+        var claim = Claim() with { Pressed = true };
+        var pass = owner.Authority.IssueLaunch(claim, "session-one");
+        Assert.NotNull(pass);
+
+        var reply = await client.ReleaseEnvAsync(Launched(claim, pass), Token);
+
+        Assert.Equal(EnvOutcome.Resolved, reply?.Set.Outcome);
+        Assert.Equal(0, _fixture.Channel.Asked);
+        var line = Assert.Single(AuditLines());
+        Assert.Equal("pressed", line.GetProperty("method").GetString());
+        Assert.Equal("2 variable(s), pressed in the app", line.GetProperty("reason").GetString());
     }
 
     /// <summary>A pass dies with the unlock its card was answered in, and none is issued for a session that is not the live one.</summary>
@@ -982,13 +1038,13 @@ public sealed class SessionAuthorityEnvTests : IDisposable
 
         Assert.NotNull(reply);
         Assert.Equal(EnvOutcome.ChangedWhileAsked, reply.Set.Outcome);
-        Assert.Equal("dev's variables changed after you confirmed in the app", reply.Reason);
+        Assert.Equal("dev's variables changed after you started the run in the app", reply.Reason);
         Assert.Empty(reply.Set.Variables);
         Assert.Equal(0, _fixture.Channel.Asked);
 
         var line = Assert.Single(AuditLines());
         Assert.Equal("vault-changed", line.GetProperty("method").GetString());
-        Assert.Equal("dev's variables changed after you confirmed in the app", line.GetProperty("reason").GetString());
+        Assert.Equal("dev's variables changed after you started the run in the app", line.GetProperty("reason").GetString());
         Assert.DoesNotContain("sentinel", AuditText(), StringComparison.Ordinal);
     }
 

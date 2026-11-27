@@ -20,9 +20,9 @@ using Xunit;
 namespace Keypaste.App.Tests.Session;
 
 /// <summary>
-/// Closing the main window ends the session even while a request's prompt window is open: the request is refused
-/// as locked and the prompt comes down. Without the tray the app quits; with it the app stays, locked, in
-/// the menu bar or tray.
+/// Without the tray, closing the main window quits and ends the session even while a request's prompt window is open:
+/// the request is refused as locked and the prompt comes down. With the tray the app stays in the menu bar or tray,
+/// its vaults unlocked and answering agents, until Lock in the tray or the menus, <c>keypaste lock</c> or quitting.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -89,7 +89,7 @@ public sealed class ClosingTheMainWindowTests
         });
 
     [Fact]
-    public Task Closing_the_main_window_into_the_tray_ends_the_session_and_keeps_the_app() =>
+    public Task Closing_the_main_window_into_the_tray_keeps_the_vault_unlocked_and_answering_agents_until_Lock() =>
         HeadlessSession.On(async () =>
         {
             using var fixture = new TempVault();
@@ -113,22 +113,30 @@ public sealed class ClosingTheMainWindowTests
 
             Unlock(app, vault);
             await using var client = await ConnectAsync(app.Authority!, vault);
-            var reply = Request(client, app, vault);
-            var prompt = await PromptAsync(lifetime);
-            Assert.True(Item(app, AppTray.LockHeader).IsEnabled, "Lock is off while the vault is open");
 
             main.Close();
 
             Assert.False(requested, "closing into the tray asked the app to quit");
-            await AssertRefusedAsLocked(reply);
-            await Until(() => !prompt.IsVisible);
-
             Assert.False(main.IsVisible);
             Assert.Contains(main, lifetime.Windows);
-            Assert.False(app.Authority!.Session.IsUnlocked);
-            Assert.IsType<AuthorityStatus.Locked>(app.Authority.Status);
+            Assert.True(app.Authority!.Session.IsUnlocked, "closing the window locked the vault");
+            Assert.IsType<AuthorityStatus.Serving>(app.Authority.Status);
+            app.Tray.Refresh();
+            Assert.True(Item(app, AppTray.LockHeader).IsEnabled, "Lock is off while the vault is open");
+
+            // An agent's request reaches the person while the window is closed, and waits for their answer.
+            var reply = Request(client, app, vault);
+            var prompt = await PromptAsync(lifetime);
+            Assert.True(prompt.IsVisible);
+            Assert.False(reply.IsCompleted);
+
+            Item(app, AppTray.LockHeader).Command!.Press();
+
+            await AssertRefusedAsLocked(reply);
+            await Until(() => !prompt.IsVisible);
+            Assert.False(app.Authority.Session.IsUnlocked);
             await Until(() => main.FindControl<ContentControl>("Root")!.Content is UnlockView);
-            await Until(() => !Item(app, AppTray.LockHeader).IsEnabled);
+            await Until(() => { app.Tray.Refresh(); return !Item(app, AppTray.LockHeader).IsEnabled; });
 
             Item(app, AppTray.OpenHeader).Command!.Press();
             Assert.True(main.IsVisible);
@@ -136,6 +144,45 @@ public sealed class ClosingTheMainWindowTests
 
             Item(app, AppTray.QuitHeader).Command!.Press();
             Assert.True(requested, "Quit on the tray menu did not ask the app to quit");
+        });
+
+    /// <summary>With the window closed, the menus' Lock (Ctrl/Cmd+L) and <c>keypaste lock</c> still lock the vault, as the tray's Lock does.</summary>
+    [Theory]
+    [InlineData("the menus' Lock")]
+    [InlineData("keypaste lock")]
+    public Task A_lock_while_the_window_is_closed_locks_the_vault(string how) =>
+        HeadlessSession.On(async () =>
+        {
+            using var fixture = new TempVault();
+            var vault = Vault(fixture);
+
+            using var lifetime = new ClassicDesktopStyleApplicationLifetime();
+            Attach(lifetime);
+            using var app = new App { Preferences = Tray(fixture, stays: true) };
+            app.Launch(lifetime);
+            lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
+
+            var main = lifetime.MainWindow!;
+            main.Show();
+            Unlock(app, vault);
+            await using var client = await ConnectAsync(app.Authority!, vault);
+
+            main.Close();
+            Assert.True(app.Authority!.Session.IsUnlocked);
+
+            if (how == "keypaste lock")
+            {
+                var session = app.Authority.Session.SessionId!;
+                Assert.NotNull(await client.LockAsync(new LockRequest { Vault = vault, Session = session }, Token));
+            }
+            else
+            {
+                app.Menus!.All.Single(command => command.Header == Keypaste.App.Resources.Strings.LockLabel).Run();
+            }
+
+            await Until(() => !app.Authority.Session.IsUnlocked);
+            await Until(() => main.FindControl<ContentControl>("Root")!.Content is UnlockView);
+            Assert.False(main.IsVisible);
         });
 
     [Fact]
@@ -270,10 +317,11 @@ public sealed class ClosingTheMainWindowTests
         });
 
     [Fact]
-    public Task The_Dock_icon_shows_only_while_the_main_window_is_open() =>
-        HeadlessSession.On(() =>
+    public Task The_Dock_icon_shows_only_while_the_main_window_is_open_or_a_vault_is_unlocked() =>
+        HeadlessSession.On(async () =>
         {
             using var fixture = new TempVault();
+            var vault = Vault(fixture);
             var dock = new List<bool>();
 
             using var lifetime = new ClassicDesktopStyleApplicationLifetime();
@@ -296,7 +344,17 @@ public sealed class ClosingTheMainWindowTests
             app.OpenWindow();
             Assert.True(app.Main.IsVisible);
             Assert.Equal(new[] { false, true, false, true }, dock);
+
+            // With a vault unlocked the icon stays after the window closes, so ⌘Tab and the Dock still reach the app, until it locks.
+            Unlock(app, vault);
             app.Main.Close();
+            Assert.False(app.Main.IsVisible);
+            Assert.Equal(new[] { false, true, false, true }, dock);
+
+            await app.Vaults!.LockAllAsync(VaultLockReason.Idle);
+            await Until(() => dock.Count > 4);
+            Assert.Equal(new[] { false, true, false, true }, dock.Take(4));
+            Assert.All(dock.Skip(4), Assert.False);
         });
 
     [Fact]

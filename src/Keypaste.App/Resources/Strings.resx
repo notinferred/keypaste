@@ -244,6 +244,7 @@
   <data name="LogKeptForever" xml:space="preserve"><value>Forever</value></data>
   <data name="KeepInMenuBar" xml:space="preserve"><value>Keep in menu bar</value></data>
   <data name="KeepInTray" xml:space="preserve"><value>Keep in tray</value></data>
+  <data name="RunAgain" xml:space="preserve"><value>Run again</value></data>
   <data name="Locked" xml:space="preserve"><value>Locked</value></data>
   <data name="LogDayToday" xml:space="preserve"><value>Today</value></data>
   <data name="LogDayUndated" xml:space="preserve"><value>Undated</value></data>
@@ -668,7 +669,7 @@
   <data name="ExtensionNotInstalled" xml:space="preserve"><value>Extension not installed</value></data>
   <data name="KeyFileLower" xml:space="preserve"><value>key file</value></data>
   <data name="KeepAsItIs" xml:space="preserve"><value>Keep as it is</value></data>
-  <data name="ClosingTheWindowKeepsKeypasteRunningLocked" xml:space="preserve"><value>Closing the window keeps keypaste running, locked</value></data>
+  <data name="ClosingTheWindowKeepsKeypasteRunning" xml:space="preserve"><value>Closing the window keeps keypaste running, and open vaults stay unlocked until they lock</value></data>
   <data name="Yes" xml:space="preserve"><value>Yes</value></data>
   <data name="No" xml:space="preserve"><value>No</value></data>
   <data name="SetByKeypasteHome" xml:space="preserve"><value>set by KEYPASTE_HOME</value></data>

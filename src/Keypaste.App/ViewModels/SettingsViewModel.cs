@@ -331,7 +331,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
         : Strings.KeepInTray;
 #pragma warning restore CA1822
 
-    /// <summary>Whether closing the window leaves the app, locked, in the menu bar or tray rather than quitting.</summary>
+    /// <summary>Whether closing the window leaves the app in the menu bar or tray, its open vaults unlocked, rather than quitting.</summary>
     internal bool StayInTray
     {
         get => _stayInTray;
@@ -560,7 +560,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     internal bool HasBackupCopies => _session.VaultPath is { } path && VaultBackups.List(path).Count > 0;
 
 #pragma warning disable CA1822
-    internal string CloseHelp => Strings.ClosingTheWindowKeepsKeypasteRunningLocked;
+    internal string CloseHelp => Strings.ClosingTheWindowKeepsKeypasteRunning;
 
     internal string BackupsRule =>
         $"A save keeps the file it replaces: the first save after each unlock, no more often than every " +

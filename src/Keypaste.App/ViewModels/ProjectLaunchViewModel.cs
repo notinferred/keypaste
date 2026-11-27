@@ -16,21 +16,22 @@ namespace Keypaste.App.ViewModels;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Every launch goes through <see cref="AppVaultSession.Environments"/>, and the confirmation card
-/// this screen shows is the resolver's confirmation: it sees names, never values, and the set is
-/// read again after the person answers. A lock while the card is up withdraws it, and a lock before
-/// the resolver commits starts nothing.
+/// Every launch goes through <see cref="AppVaultSession.Environments"/>. A Run pressed here is the
+/// person's answer, since no other program can press a button in keypaste's window, so it starts with
+/// no card and is recorded as <c>pressed</c>. Open terminal, and a Run of a protected stage, which is
+/// asked live, show the card, which is the resolver's confirmation: it sees names, never values, and
+/// the set is read again after the person answers. A lock while the card is up withdraws it, and a
+/// lock before the resolver commits starts nothing.
 /// </para>
 /// <para>
 /// The released set is held only for the call that starts the terminal. The mapping saved to
 /// <c>projects.json</c> holds a directory and a command and nothing else.
 /// </para>
 /// <para>
-/// On macOS the set never reaches Terminal: the confirmation is the same card, and the run
-/// Terminal starts presents the launch pass it earned to the app's launch endpoint, which answers
-/// whether or not agents can reach the vault. On Windows and Linux the app's
-/// authority writes the same History line before the terminal starts, and a Run whose line cannot
-/// be written starts nothing.
+/// On macOS the set never reaches Terminal: the run Terminal starts presents the launch pass the
+/// press or the card earned to the app's launch endpoint, which answers whether or not agents can
+/// reach the vault. On Windows and Linux the app's authority writes the same History line before the
+/// terminal starts, and a Run whose line cannot be written starts nothing.
 /// </para>
 /// </remarks>
 internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDisposable
@@ -248,10 +249,10 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
         Command = command;
         IsSettingUp = false;
         _report(null);
-        _announce("Saved. Run starts the command in a terminal there, after you confirm it.", ToastTone.Success);
+        _announce("Saved. Run starts the command in a terminal there.", ToastTone.Success);
     }
 
-    /// <summary>Asks, resolves and, only on a released set, starts the terminal.</summary>
+    /// <summary>Resolves, asking first for Open terminal and a protected stage's Run, and only on a released set starts the terminal.</summary>
     /// <param name="run">True to run the command, false for a prompt.</param>
     internal async Task LaunchAsync(bool run)
     {
@@ -263,9 +264,26 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
             return;
         }
 
+        await LaunchAsync(mapping, run, again: false).ConfigureAwait(true);
+    }
+
+    /// <summary>Runs once more a command a Run started, in its directory with its stage, as Run again in the Dock or tray menu does.</summary>
+    /// <param name="last">The run, as Run started it.</param>
+    /// <remarks>Nobody sees this screen's card, so a protected stage, whose run is asked live, starts nothing and says to run it from its project.</remarks>
+    internal Task RunAgainAsync(ProjectRun last)
+    {
+        ArgumentNullException.ThrowIfNull(last);
+
+        _report(null);
+        Profile = last.Profile;
+        return LaunchAsync(new ProjectMapping(last.Vault, last.Project, last.Directory, last.Command), run: true, again: true);
+    }
+
+    private async Task LaunchAsync(ProjectMapping mapping, bool run, bool again)
+    {
         if (OperatingSystem.IsMacOS() && _launching.Terminal.Platform == TerminalPlatform.MacOS)
         {
-            await OpenTerminalAsync(mapping, run).ConfigureAwait(true);
+            await OpenTerminalAsync(mapping, run, again).ConfigureAwait(true);
             return;
         }
 
@@ -288,19 +306,29 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
             return;
         }
 
-        // The line names the session the card is answered in, which must still be the live one after Start.
+        // The line names the session the Run is started in, which must still be the live one once the set is read again.
         var lifetime = _session.Lifetime?.Id;
         string? unrecordable = null;
+        var pressed = false;
+        var unaskable = false;
         EnvResolved resolved;
 
-        // A set its History line could not name is refused before the card, as on macOS.
+        // A set its History line could not name is refused before anyone is asked, as on macOS.
         ValueTask<bool> ConfirmAsync(EnvPreview preview, CancellationToken token)
         {
             unrecordable = SessionAuthority.Unrecordable(preview);
 
-            return unrecordable is null
-                ? AskAsync(preview, run ? mapping.Command : target!.FileName, target!.WorkingDirectory ?? string.Empty, run, token)
-                : ValueTask.FromResult(false);
+            switch (unrecordable is null ? Asking(preview, run, again) : Ask.Refused)
+            {
+                case Ask.Pressed:
+                    pressed = true;
+                    return ValueTask.FromResult(true);
+                case Ask.Card:
+                    return AskAsync(preview, run ? mapping.Command : target!.FileName, target!.WorkingDirectory ?? string.Empty, run, token);
+                default:
+                    unaskable = unrecordable is null;
+                    return ValueTask.FromResult(false);
+            }
         }
 
         try
@@ -320,13 +348,19 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
             return;
         }
 
+        if (unaskable)
+        {
+            _report(Protected(resolved.Profile));
+            return;
+        }
+
         if (resolved.Outcome != EnvOutcome.Resolved)
         {
             _report(Refused(resolved));
             return;
         }
 
-        if (lifetime is null || !authority.RecordRun(resolved, lifetime))
+        if (lifetime is null || !authority.RecordRun(resolved, lifetime, pressed))
         {
             _report("Nothing was started: its History line could not be written. Check that the audit log can be written, then run it again.");
             return;
@@ -337,6 +371,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
 
         if (result.Outcome == ChildOutcome.Started)
         {
+            Remember(mapping, resolved.Profile, run);
             _announce(
                 run ? $"Started {mapping.Command} in a terminal in {mapping.Directory}." : $"Opened a terminal in {mapping.Directory}.",
                 ToastTone.Success);
@@ -348,16 +383,16 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
     }
 
     /// <summary>
-    /// Asks, then hands Terminal the run the person confirmed: the window's <c>keypaste run --session</c>
+    /// Hands Terminal the run the person pressed, or confirmed on its card: the window's <c>keypaste run --session</c>
     /// presents the launch pass this issues, and the owner releases the set to it unasked.
     /// </summary>
     /// <remarks>
-    /// The set is resolved only so the card is the resolver's, and goes no further. Once Start has
-    /// released it the launch is the person's, whatever the screen does next, as on Windows and Linux;
-    /// a lock ends the unlock holding the pass, so a request it leaves behind starts nothing.
+    /// The set is resolved only so the pass names what the resolver read, and the card is the resolver's; it goes no
+    /// further. Once the set is released the launch is the person's, whatever the screen does next, as on Windows and
+    /// Linux; a lock ends the unlock holding the pass, so a request it leaves behind starts nothing.
     /// </remarks>
     [SupportedOSPlatform("macos")]
-    private async Task OpenTerminalAsync(ProjectMapping mapping, bool run)
+    private async Task OpenTerminalAsync(ProjectMapping mapping, bool run, bool again)
     {
         if (!_launching.Terminal.TryPlanThroughSession(mapping.Directory, run ? mapping.Command : null, _launching.Parent(), out var plan, out var refusal))
         {
@@ -390,7 +425,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
             return;
         }
 
-        // The owner refuses a request it cannot record (T-6), so a Run is not confirmed while the log will not open.
+        // The owner refuses a request it cannot record (T-6), so a Run is not started while the log will not open.
         if (authority.AuditFailure is { } unopened)
         {
             _report(Shown($"Nothing was started: a Run from the app writes a History line, and {unopened.TrimEnd('.')}. Check that the audit log can be written, then run it again."));
@@ -398,16 +433,26 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
         }
 
         string? unrecordable = null;
+        var pressed = false;
+        var unaskable = false;
         EnvResolved resolved;
 
-        // The owner refuses unasked a set its History line could not name, so the card is not shown for one.
+        // The owner refuses unasked a set its History line could not name, so nobody is asked about one.
         ValueTask<bool> ConfirmAsync(EnvPreview preview, CancellationToken token)
         {
             unrecordable = SessionAuthority.Unrecordable(preview);
 
-            return unrecordable is null
-                ? AskAsync(preview, run ? mapping.Command : TerminalOpen.ShownName, plan.Directory, run, token)
-                : ValueTask.FromResult(false);
+            switch (unrecordable is null ? Asking(preview, run, again) : Ask.Refused)
+            {
+                case Ask.Pressed:
+                    pressed = true;
+                    return ValueTask.FromResult(true);
+                case Ask.Card:
+                    return AskAsync(preview, run ? mapping.Command : TerminalOpen.ShownName, plan.Directory, run, token);
+                default:
+                    unaskable = unrecordable is null;
+                    return ValueTask.FromResult(false);
+            }
         }
 
         try
@@ -427,6 +472,12 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
             return;
         }
 
+        if (unaskable)
+        {
+            _report(Protected(resolved.Profile));
+            return;
+        }
+
         if (resolved.Outcome != EnvOutcome.Resolved)
         {
             _report(Refused(resolved));
@@ -439,8 +490,8 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
             return;
         }
 
-        // The set read again after Start, which the resolver held to the card's environment, names, items and protection.
-        var claim = new LaunchClaim(_project, resolved.Profile, plan.Directory, plan.Arguments, resolved.Preview);
+        // The set read again after the press or the card, which the resolver held to the first read's environment, names, items and protection.
+        var claim = new LaunchClaim(_project, resolved.Profile, plan.Directory, plan.Arguments, resolved.Preview) { Pressed = pressed };
 
         if (authority.IssueLaunch(claim, lifetime) is not { } issued)
         {
@@ -467,10 +518,36 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
             return;
         }
 
+        Remember(mapping, resolved.Profile, run);
         _announce(
             run ? $"Started {mapping.Command} in a terminal in {mapping.Directory}." : $"Opened a terminal in {mapping.Directory}.",
             ToastTone.Success);
     }
+
+    /// <summary>How a launch of <paramref name="preview"/>'s set is answered: a Run by its press, unless the set is protected and asked live, on the card, which Run again cannot show.</summary>
+    private static Ask Asking(EnvPreview preview, bool run, bool again) =>
+        run && !preview.RequiresLiveApproval ? Ask.Pressed
+        : again ? Ask.Refused
+        : Ask.Card;
+
+    private enum Ask
+    {
+        Pressed,
+        Card,
+        Refused,
+    }
+
+    /// <summary>Tells Run again what a Run started, on the stage the set was read from.</summary>
+    private void Remember(ProjectMapping mapping, string profile, bool run)
+    {
+        if (run)
+        {
+            _launching.Started?.Invoke(new ProjectRun(mapping.Vault, _project, profile, mapping.Directory, mapping.Command));
+        }
+    }
+
+    private string Protected(string profile) =>
+        $"Nothing was started: {Source(profile)} is protected, so its Run asks you first. Open the project and press Run there.";
 
     private async ValueTask<bool> AskAsync(EnvPreview preview, string starts, string directory, bool run, CancellationToken token)
     {

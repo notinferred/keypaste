@@ -18,7 +18,7 @@ namespace Keypaste.Core.Tests;
 public sealed class LaunchEndpointTests : IDisposable
 {
     private const string _token = "sk_live_launch_endpoint_sentinel";
-    private const string _launchOnly = "this connection is only for a run confirmed in the keypaste app";
+    private const string _launchOnly = "this connection is only for a run started in the keypaste app";
     private static readonly TimeSpan _wait = TimeSpan.FromSeconds(10);
     private static readonly string[] _launched = ["/bin/sh", "-c", TerminalLaunch.RunScript, "keypaste", "npm start"];
 

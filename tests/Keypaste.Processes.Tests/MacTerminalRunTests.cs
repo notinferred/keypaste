@@ -6,7 +6,7 @@ namespace Keypaste.Processes.Tests;
 
 /// <summary>
 /// On macOS the app's own Run opens Terminal: a keypaste.app laid out as a release lays it out carries the real launcher and a
-/// keypaste that starts the built CLI, the held app presses Run in a terminal and Start, real Terminal runs the launcher, and the window's
+/// keypaste that starts the built CLI, the held app presses Run in a terminal, or Open terminal and its card's Start, real Terminal runs the launcher, and the window's
 /// <c>keypaste run --session</c> presents the launch pass to the app, which asks nothing more.
 /// </summary>
 /// <remarks>
@@ -18,7 +18,7 @@ public sealed class MacTerminalRunTests
 {
     private const string _deploy = "SENTINEL-RUN-SESSION-DEPLOY-5e2b90";
     private const string _database = "SENTINEL-RUN-SESSION-DB-a17c3d";
-    private const string _confirmed = "keypaste run: starting with ci (dev) as you confirmed in the keypaste app";
+    private const string _confirmed = "keypaste run: starting with ci (dev) as you started it in the keypaste app";
     private const string _reports = "printf \"deploy=%s database=%s launch=%s driver=%s home=%s\" \"${DEPLOY_KEY-unset}\" \"${DB_URL-unset}\" \"${KEYPASTE_LAUNCH-unset}\" \"${KEYPASTE_DRIVER_PASSWORD-unset}\" \"${KEYPASTE_HOME-unset}\" >terminal.tmp && mv terminal.tmp terminal.txt";
 
     [Fact]
@@ -55,20 +55,16 @@ public sealed class MacTerminalRunTests
             using var driver = RunningProcess.Start(Built.AppDriver, environment, "hold", workspace.Vault, "--terminal-bundle", bundle);
             driver.WaitForOutput("^holding session");
 
-            // Run in a terminal: what Terminal runs has the set and the app's home, and the app's card was the only question.
+            // Run in a terminal: what Terminal runs has the set and the app's home, and the press of Run was the only answer, with no card.
             var audited = Workspace.Count(workspace.OwnerLog);
             driver.Send($"terminal run ci {project} {_reports}");
             driver.WaitForOutput("^terminal [a-z]*:");
             Assert.Contains(driver.Output, line => line.StartsWith("terminal launched: ", StringComparison.Ordinal));
-            Assert.StartsWith(
-                $"terminal-card title=Run this in a terminal with 2 variables from ci? starts={_reports} directory={project} keys=DB_URL, DEPLOY_KEY sources=",
-                driver.Output.Last(line => line.StartsWith("terminal-card ", StringComparison.Ordinal)),
-                StringComparison.Ordinal);
-            Assert.EndsWith("env/ci/.env", driver.Output.Last(line => line.StartsWith("terminal-card ", StringComparison.Ordinal)), StringComparison.Ordinal);
+            Assert.DoesNotContain(driver.Output, line => line.StartsWith("terminal-card ", StringComparison.Ordinal));
             WaitForText(reported, "deploy=");
             Assert.Equal($"deploy={_deploy} database={_database} launch=unset driver=unset home={workspace.Home}", File.ReadAllText(reported));
             WaitForText(windows, _confirmed);
-            AssertOneLine(workspace, audited, "granted", "prompt");
+            AssertOneLine(workspace, audited, "granted", "pressed");
             Assert.Equal(["env/ci/.env"], Workspace.Lines(workspace.OwnerLog)[^1].GetProperty("entries").EnumerateArray().Select(e => e.GetString()));
             AssertNoRequestLeft(requests);
 
@@ -92,11 +88,12 @@ public sealed class MacTerminalRunTests
                 $"terminal-card title=Open a terminal with 2 variables from ci? starts=Terminal directory={project} keys=DB_URL, DEPLOY_KEY sources=",
                 driver.Output.Last(line => line.StartsWith("terminal-card ", StringComparison.Ordinal)),
                 StringComparison.Ordinal);
+            Assert.EndsWith("env/ci/.env", driver.Output.Last(line => line.StartsWith("terminal-card ", StringComparison.Ordinal)), StringComparison.Ordinal);
             WaitForCount(windows, _confirmed, 2);
             AssertOneLine(workspace, audited, "granted", "prompt");
             AssertNoRequestLeft(requests);
 
-            // A lock and unlock between Start and the window's request: the unlock that confirmed it held its pass.
+            // A lock and unlock between the press and the window's request: the unlock it was pressed in held its pass.
             audited = Workspace.Count(workspace.OwnerLog);
             File.WriteAllText(held, "");
             driver.Send($"terminal run ci {project} touch ran-after-a-lock");
@@ -180,7 +177,7 @@ public sealed class MacTerminalRunTests
             (line.GetProperty("client").GetProperty("name").GetString(), line.GetProperty("decision").GetString(), line.GetProperty("method").GetString()));
         if (decision == "granted")
         {
-            Assert.Equal("2 variable(s), confirmed in the app", line.GetProperty("reason").GetString());
+            Assert.Equal(method == "pressed" ? "2 variable(s), pressed in the app" : "2 variable(s), confirmed in the app", line.GetProperty("reason").GetString());
         }
     }
 

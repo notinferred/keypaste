@@ -54,7 +54,7 @@ internal sealed class DesktopPreferences
     /// </remarks>
     internal bool LockWhenMinimized => Current.LockWhenMinimized;
 
-    /// <summary>Whether closing the window leaves the app, locked, in the menu bar or tray.</summary>
+    /// <summary>Whether closing the window leaves the app in the menu bar or tray, its open vaults unlocked until they lock.</summary>
     /// <remarks>A Linux desktop may show no tray at all, so there it is off until chosen.</remarks>
     internal bool StaysInTray => Current.StayInTray ?? !OperatingSystem.IsLinux();
 

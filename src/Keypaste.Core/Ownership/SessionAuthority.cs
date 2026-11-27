@@ -72,8 +72,9 @@ public sealed class SessionAuthority : IApproverHandler
 
     private const string _lockedReason = "the vault is locked";
     private const string _unrecordedNarration = "the audit log could not be written, so nothing was sent";
-    private const string _launchSpent = "the run you confirmed in the app expired or was already used";
-    private const string _launchOnly = "this connection is only for a run confirmed in the keypaste app";
+    private const string _launchSpent = "the run you started in the app expired or was already used";
+    private const string _protectedPressed = "a protected stage's run is asked live, so a press of Run alone does not start it";
+    private const string _launchOnly = "this connection is only for a run started in the keypaste app";
 
     private readonly VaultIdentity _vault;
     private readonly Func<SessionLifetime?> _lifetime;
@@ -197,11 +198,11 @@ public sealed class SessionAuthority : IApproverHandler
         }
     }
 
-    /// <summary>Issues the pass that lets exactly one <c>keypaste run --session</c> request through as the app's Run confirmation answered it.</summary>
-    /// <param name="claim">The request the confirmation named, and the set it showed.</param>
-    /// <param name="lifetimeId">The session the confirmation was answered in.</param>
+    /// <summary>Issues the pass that lets exactly one <c>keypaste run --session</c> request through as the person started it in the app: pressed, or confirmed on its card.</summary>
+    /// <param name="claim">The request the app named, and the set it resolved.</param>
+    /// <param name="lifetimeId">The session the run was started in.</param>
     /// <returns>The pass, or null when that session is no longer the live one or this owner takes no passes.</returns>
-    /// <exception cref="ArgumentException">The claim is one <see cref="TerminalLaunch.ClaimProblem"/> refuses.</exception>
+    /// <exception cref="ArgumentException">The claim is one <see cref="TerminalLaunch.ClaimProblem"/> refuses, or a press alone for a protected set.</exception>
     public string? IssueLaunch(LaunchClaim claim, string lifetimeId)
     {
         ArgumentNullException.ThrowIfNull(claim);
@@ -212,6 +213,11 @@ public sealed class SessionAuthority : IApproverHandler
             throw new ArgumentException(problem, nameof(claim));
         }
 
+        if (claim.Pressed && claim.Preview.RequiresLiveApproval)
+        {
+            throw new ArgumentException(_protectedPressed, nameof(claim));
+        }
+
         return Live() is { } lifetime && string.Equals(lifetime.Id, lifetimeId, StringComparison.Ordinal)
             ? _environments?.Launches?.Issue(claim, lifetime.Id)
             : null;
@@ -219,18 +225,21 @@ public sealed class SessionAuthority : IApproverHandler
 
     /// <summary>
     /// Records a Run the app starts itself, on Windows and Linux, before its terminal starts, in the line a macOS
-    /// Run's pass is recorded with when its window asks: the set's items, <c>prompt</c>, and the reason
+    /// Run's pass is recorded with when its window asks: the set's items, and <c>pressed</c> with the reason
+    /// <c>&lt;N&gt; variable(s), pressed in the app</c>, or for a run confirmed on its card <c>prompt</c> with
     /// <c>&lt;N&gt; variable(s), confirmed in the app</c>.
     /// </summary>
-    /// <param name="set">The set the app's confirmation released, read again after the person answered.</param>
-    /// <param name="lifetimeId">The session the confirmation was answered in.</param>
-    /// <returns><see langword="true"/> once the line is written; a Run whose line is not written, or from a session that has ended, starts nothing (T-6).</returns>
-    public bool RecordAppRun(EnvResolved set, string lifetimeId)
+    /// <param name="set">The set the app released, read again after the person pressed Run or answered its card.</param>
+    /// <param name="lifetimeId">The session the run was started in.</param>
+    /// <param name="pressed">Whether the press of Run was the answer, with no card shown.</param>
+    /// <returns><see langword="true"/> once the line is written; a Run whose line is not written, from a session that has ended, or pressed for a protected set, which is asked live, starts nothing (T-6).</returns>
+    public bool RecordAppRun(EnvResolved set, string lifetimeId, bool pressed)
     {
         ArgumentNullException.ThrowIfNull(set);
         ArgumentNullException.ThrowIfNull(lifetimeId);
 
         if (set.Outcome != EnvOutcome.Resolved
+            || (pressed && set.RequiresLiveApproval)
             || Live() is not { } lifetime
             || !string.Equals(lifetime.Id, lifetimeId, StringComparison.Ordinal))
         {
@@ -240,7 +249,7 @@ public sealed class SessionAuthority : IApproverHandler
         var released = new EnvReply(set, set.Refusal);
         var recorded = _recorder.Recorded(
             released,
-            RequestRecords.EnvRun(set.Project, set.Profile, AuditMethod.Prompt, released, lifetimeId, _vault.Key, confirmedInApp: true));
+            RequestRecords.EnvRun(set.Project, set.Profile, pressed ? AuditMethod.Pressed : AuditMethod.Prompt, released, lifetimeId, _vault.Key, confirmedInApp: true));
 
         if (!ReferenceEquals(recorded, released))
         {
@@ -947,7 +956,7 @@ public sealed class SessionAuthority : IApproverHandler
                     return false;
                 }
 
-                // The person answered the app's card about exactly these names, items and protection, and nothing else.
+                // The person pressed Run on, or answered the app's card about, exactly these names, items and protection, and nothing else.
                 if (launch is not null)
                 {
                     if (preview.SameAs(launch.Preview))
@@ -983,7 +992,7 @@ public sealed class SessionAuthority : IApproverHandler
         // As the run path records them; an approval the runner hung up on before it was used is a cancellation.
         var method = delivered.Set.Outcome switch
         {
-            EnvOutcome.Resolved => AuditMethod.Prompt,
+            EnvOutcome.Resolved => launch is { Pressed: true } ? AuditMethod.Pressed : AuditMethod.Prompt,
             EnvOutcome.Declined => answer.Releases() ? AuditMethod.Cancelled : answer.ToAuditMethod(),
             _ => MethodOf(delivered.Set.Outcome),
         };
@@ -1362,7 +1371,7 @@ public sealed class SessionAuthority : IApproverHandler
         && PathIdentity.SameFile(claim.Directory, request.Directory);
 
     private static string ChangedSince(LaunchClaim claim) =>
-        $"{claim.Project}'s variables changed after you confirmed in the app";
+        $"{claim.Project}'s variables changed after you started the run in the app";
 
     /// <summary>Each source entry of a released set, once, as every prompt and audit line writes it.</summary>
     private static List<string> EntriesOf(EnvResolved set) =>

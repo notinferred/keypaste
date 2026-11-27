@@ -350,9 +350,9 @@ internal sealed class SessionHost : IDisposable
         return browsers?.Remove(id) ?? new PairingRemoval(false, _notAnswering);
     }
 
-    /// <summary>Issues the pass a Run confirmed in the app hands the <c>keypaste run --session</c> Terminal starts on macOS.</summary>
-    /// <param name="claim">The request the confirmation named, and the set it showed.</param>
-    /// <param name="lifetimeId">The session the confirmation was answered in.</param>
+    /// <summary>Issues the pass a Run started in the app hands the <c>keypaste run --session</c> Terminal starts on macOS.</summary>
+    /// <param name="claim">The request the app named, and the set it resolved.</param>
+    /// <param name="lifetimeId">The session the Run was started in.</param>
     /// <returns>The pass and the launch endpoint that run must ask, read together, or null when no launch endpoint listens or that session has ended.</returns>
     internal (string Pass, string Endpoint)? IssueLaunch(LaunchClaim claim, string lifetimeId)
     {
@@ -373,14 +373,15 @@ internal sealed class SessionHost : IDisposable
     }
 
     /// <summary>Records a Run the app starts itself on Windows and Linux in the authority's log, before the terminal starts.</summary>
-    /// <param name="set">The set the confirmation released.</param>
-    /// <param name="lifetimeId">The session the confirmation was answered in.</param>
+    /// <param name="set">The set released.</param>
+    /// <param name="lifetimeId">The session the Run was started in.</param>
+    /// <param name="pressed">Whether the press of Run was the answer, with no card shown.</param>
     /// <returns>Whether the line was written; false when nothing is hosted for that session.</returns>
-    internal bool RecordRun(Core.EnvResolved set, string lifetimeId)
+    internal bool RecordRun(Core.EnvResolved set, string lifetimeId, bool pressed)
     {
         lock (_gate)
         {
-            return _hosted?.RecordRun(set, lifetimeId) == true;
+            return _hosted?.RecordRun(set, lifetimeId, pressed) == true;
         }
     }
 
@@ -551,7 +552,7 @@ internal sealed class SessionHost : IDisposable
 
         internal void WithdrawLaunch(string pass) => _server.Authority.WithdrawLaunch(pass);
 
-        internal bool RecordRun(Core.EnvResolved set, string lifetimeId) => _server.Authority.RecordAppRun(set, lifetimeId);
+        internal bool RecordRun(Core.EnvResolved set, string lifetimeId, bool pressed) => _server.Authority.RecordAppRun(set, lifetimeId, pressed);
 
         internal Core.VaultMergeSave Merge(Core.Vault open, Func<Core.Vault, bool> swap) => _server.Authority.Merge(open, swap, Surface);
 

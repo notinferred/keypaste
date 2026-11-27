@@ -552,8 +552,8 @@ public sealed class SecretHygieneTests
         Assert.Contains("starting with hygiene", harness.Err, StringComparison.Ordinal);
         Assert.Contains("1 injected", harness.Err, StringComparison.Ordinal);
         Assert.Contains("expired or was already used", harness.Err, StringComparison.Ordinal);
-        Assert.Contains("variables changed after you confirmed", harness.Err, StringComparison.Ordinal);
-        Assert.Contains("does not hold a run confirmed", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("variables changed after you started the run", harness.Err, StringComparison.Ordinal);
+        Assert.Contains("does not hold a run started", harness.Err, StringComparison.Ordinal);
 
         foreach (var sentinel in _everySentinel.Concat([released, changed]))
         {

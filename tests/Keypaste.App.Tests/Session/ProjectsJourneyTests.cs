@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.IO.Pipes;
 using System.Runtime.Versioning;
 using System.Text.Json;
-using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -17,6 +16,7 @@ using Keypaste.Core;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Launch;
 using Keypaste.Core.Projects;
+using Keypaste.Core.Settings;
 using Keypaste.Core.Tests;
 using Xunit;
 using static Keypaste.App.Tests.Session.JourneyDriver;
@@ -28,8 +28,9 @@ namespace Keypaste.App.Tests.Session;
 /// where each value lives, the entry two stages share and the tag that puts its entry in no
 /// project; it adds an entry to a stage, takes another out, replaces the shared value, adds a
 /// key with no entry chosen and imports a <c>.env</c>, and a declined or refused act writes nothing;
-/// Run gives a child exactly the stage's fields and writes its History line, on every platform,
-/// and the project mapped in <c>projects.json</c> runs too.
+/// Run gives a child exactly the stage's fields at its press, with no card, and writes its History line, on every platform,
+/// the project mapped in <c>projects.json</c> runs too, and Run again in the tray and Dock menus starts the last one once
+/// more until the vault locks.
 /// </summary>
 /// <remarks>
 /// Driven as <see cref="OneHomeJourneyTests"/> is, pressing controls where the window draws them,
@@ -96,12 +97,16 @@ public sealed class ProjectsJourneyTests
 
                 using var lifetime = new ClassicDesktopStyleApplicationLifetime();
                 Attach(lifetime);
+                var launcher = new RecordingLauncher(started);
+                var preferences = new DesktopPreferences(fixture.Home);
+                preferences.Update(AppSettings.Default with { StayInTray = true });
                 using var app = new App
                 {
+                    Preferences = preferences,
                     Pickers = _ => picker,
                     LaunchingFor = authority => OperatingSystem.IsMacOS()
                         ? ProjectLaunching.ForMacBundle(authority, terminal!.Bundle, terminal.Open)
-                        : ProjectLaunching.ForThisMachine(authority),
+                        : ProjectLaunching.ForThisMachine(authority) with { Launcher = launcher },
                 };
                 app.Launch(lifetime);
                 lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
@@ -122,6 +127,11 @@ public sealed class ProjectsJourneyTests
                 var shell = Assert.IsType<ShellViewModel>(Assert.IsType<ShellView>(root.Content).DataContext);
                 var unlocked = app.Authority!.Session.Unlocked!;
                 DrawnFrame.Capture(main);
+
+                // Nothing has run yet, so Run again is off in the tray's menu and the Dock's.
+                Assert.False(app.CanRunAgain);
+                Assert.False(RunAgainInTray(app).IsEnabled);
+                Assert.False(RunAgainInDock(app).CanRun());
 
                 // Both projects under the vault's Environments, each value's entry, the entry two stages share and the ignored tag.
                 Press(main, Row(main, "Nav", row => row is PlaceRow { Place: ItemPlace.Environments }));
@@ -209,30 +219,46 @@ public sealed class ProjectsJourneyTests
                     File.ReadAllText(references),
                     StringComparison.Ordinal);
 
-                // Run gives a child exactly dev's fields, the confirmation naming where they come from; where it runs is set under Edit.
+                // Run gives a child exactly dev's fields at its press, with no card; where it runs is set under Edit.
                 ChooseFromMore(main, "ProjectWhereItRuns");
                 Fill(main, "Project directory", billingDirectory);
                 Fill(main, "Command", Reporter(billingPipe));
                 Press(main, ByCommand(main, project.Launch.SaveCommand));
                 Assert.True(project.Launch.IsMapped, screen.Error);
 
-                var billing = await RunAsync(main, shell, billingPipe, "From env/billing/.env, services/Stripe", started, terminal);
+                var billing = await RunAsync(main, shell, billingPipe, terminal);
                 Assert.Equal(
                     [$"STRIPE_KEY={_replaced}", "MAIL_KEY unset", "QUEUE_KEY unset", "NEW_KEY=" + unlocked.ReadField(home, "NEW_KEY"), $"IMPORTED_KEY={_imported}", "WEB_KEY unset"],
                     billing);
                 var (reason, entries) = LastRun();
-                Assert.Equal("3 variable(s), confirmed in the app", reason);
+                Assert.Equal("3 variable(s), pressed in the app", reason);
+                Assert.Equal("pressed", LastRunMethod());
                 Assert.Equal(["env/billing/.env", "services/Stripe"], entries.Order(StringComparer.Ordinal));
 
                 // The project projects.json maps runs where it is mapped.
                 Press(main, Row(main, "Nav", row => row is ProjectRow { Name: "web" }));
                 Assert.Equal("web", Assert.IsType<EnvSetsViewModel>(shell.Content).OpenProject?.Name);
-                Assert.Equal(
-                    ["STRIPE_KEY unset", "MAIL_KEY unset", "QUEUE_KEY unset", "NEW_KEY unset", "IMPORTED_KEY unset", $"WEB_KEY={_webKey}"],
-                    await RunAsync(main, shell, webPipe, "From apps/Web", started, terminal));
+                string[] web = ["STRIPE_KEY unset", "MAIL_KEY unset", "QUEUE_KEY unset", "NEW_KEY unset", "IMPORTED_KEY unset", $"WEB_KEY={_webKey}"];
+                Assert.Equal(web, await RunAsync(main, shell, webPipe, terminal));
 
+                // Run again, from the tray's menu with the window closed, starts web's command once more as the person's own press.
+                await Until(() => RunAgainInTray(app).IsEnabled, () => "Run again stayed off after a Run");
+                Assert.True(RunAgainInDock(app).CanRun());
+                main.Close();
+                Assert.False(main.IsVisible);
+                Assert.Equal(web, await ReportedAsync(webPipe, () => RunAgainInTray(app).Command!.Press(), () => null, terminal));
+                var (againReason, againEntries) = LastRun();
+                Assert.Equal("1 variable(s), pressed in the app", againReason);
+                Assert.Equal(["apps/Web"], againEntries);
+                Assert.Equal("pressed", LastRunMethod());
+                Assert.False(main.IsVisible, "a Run again that started brought the window forward");
+
+                // A lock turns Run again off.
+                app.OpenWindow();
                 Chord(main, PhysicalKey.L);
                 await Until(() => root.Content is UnlockView);
+                await Until(() => !RunAgainInTray(app).IsEnabled, () => "Run again stayed on after the lock");
+                Assert.False(RunAgainInDock(app).CanRun());
                 main.Close();
             }
             finally
@@ -243,12 +269,10 @@ public sealed class ProjectsJourneyTests
             }
         });
 
-    /// <summary>Presses Run in a terminal and Start, reads what the child reports, and hangs up so it exits.</summary>
-    /// <remarks>On macOS Start opens a window of <paramref name="terminal"/>, which ends it.</remarks>
-    private static async Task<List<string>> RunAsync(Window main, ShellViewModel shell, string pipeName, string sources, List<int> started, TerminalStandIn? terminal)
+    /// <summary>Presses Run in a terminal, which starts with no card, reads what the child reports, and hangs up so it exits.</summary>
+    /// <remarks>On macOS the press opens a window of <paramref name="terminal"/>, which ends it.</remarks>
+    private static async Task<List<string>> RunAsync(Window main, ShellViewModel shell, string pipeName, TerminalStandIn? terminal)
     {
-        using var pipe = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
-        var connected = pipe.WaitForConnectionAsync(Token);
         var screen = Assert.IsType<EnvSetsViewModel>(shell.Content);
         var project = screen.OpenProject!;
 
@@ -259,26 +283,26 @@ public sealed class ProjectsJourneyTests
 
         WindowInput.Drain();
         var run = ByName<Button>(main, "Run in a terminal");
-        Press(main, run);
-        await Until(() => project.Launch.IsConfirming, () => screen.Error ?? $"no confirmation and no error; the press reached {Hit(main, run)}");
-        Assert.Contains(sources, AutomationNames(main));
-        WindowInput.Reveal(main, ByCommand(main, project.Launch.ConfirmLaunchCommand));
-        Assert.False(run.IsEffectivelyEnabled);
-        AccentElements.AssertOne(main, ByCommand(main, project.Launch.ConfirmLaunchCommand), "the run confirmation, whose Start takes the accent while Run… is greyed");
+        var report = await ReportedAsync(pipeName, () => Press(main, run), () => screen.Error, terminal);
+
+        Assert.False(project.Launch.IsConfirming, "Run showed a card");
+        Assert.Null(screen.Error);
+        return report;
+    }
+
+    /// <summary>Presses what starts a run, reads what its child reports, and hangs up so it exits.</summary>
+    /// <remarks>On macOS the run opens a window of <paramref name="terminal"/>, which ends it.</remarks>
+    private static async Task<List<string>> ReportedAsync(string pipeName, Action press, Func<string?> error, TerminalStandIn? terminal)
+    {
+        using var pipe = new NamedPipeServerStream(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+        var connected = pipe.WaitForConnectionAsync(Token);
         var windows = terminal?.Windows.Count ?? 0;
-        Press(main, ByCommand(main, project.Launch.ConfirmLaunchCommand));
+        press();
 
         if (terminal is not null)
         {
-            await Until(() => terminal.Windows.Count > windows || screen.Error is not null, () => screen.Error ?? "Terminal was not opened");
-            Assert.Null(screen.Error);
-        }
-        else
-        {
-            await Until(() => project.Launch.LastStart is not null);
-            var start = Assert.IsType<ChildResult>(project.Launch.LastStart);
-            Assert.Equal(ChildOutcome.Started, start.Outcome);
-            started.Add(start.ProcessId);
+            await Until(() => terminal.Windows.Count > windows || error() is not null, () => error() ?? "Terminal was not opened");
+            Assert.Null(error());
         }
 
         await connected.WaitAsync(TimeSpan.FromSeconds(60), Token);
@@ -305,12 +329,46 @@ public sealed class ProjectsJourneyTests
         return (line.RootElement.GetProperty("reason").GetString(), [.. line.RootElement.GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()!)]);
     }
 
-    /// <summary>What the window finds at the centre of <paramref name="control"/>, for a press that did nothing.</summary>
-    private static string Hit(Window window, Control control) =>
-        control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), window) is { } centre
-            && window.InputHitTest(centre) is Control hit
-            ? $"{hit.GetType().Name} in {(hit.FindAncestorOfType<Button>(includeSelf: true) is { } button ? $"the button '{AutomationProperties.GetName(button)}'" : "no button")}"
-            : "nothing";
+    /// <summary>The method of the newest History line.</summary>
+    private static string? LastRunMethod()
+    {
+        var log = KeypasteHome.AuditPath(Environment.GetEnvironmentVariable(KeypasteHome.EnvironmentVariable));
+        using var stream = new FileStream(log, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using var reader = new StreamReader(stream);
+        using var line = JsonDocument.Parse(reader.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries)[^1]);
+
+        return line.RootElement.GetProperty("method").GetString();
+    }
+
+    private static NativeMenuItem RunAgainInTray(App app)
+    {
+        app.Tray!.Refresh();
+        return app.Tray.Menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == AppTray.RunAgainHeader);
+    }
+
+    private static AppCommand RunAgainInDock(App app) =>
+        app.Menus!.Dock.OfType<AppCommand>().Single(command => command.Header == Keypaste.App.Resources.Strings.RunAgain);
+
+    /// <summary>The real launcher, keeping each terminal's process id so the test ends what a Run or a Run again started.</summary>
+    private sealed class RecordingLauncher(List<int> started) : IProcessLauncher
+    {
+        private readonly DetachedProcessLauncher _real = new();
+
+        public ChildResult Run(ChildStart start)
+        {
+            var result = _real.Run(start);
+
+            if (result.Outcome == ChildOutcome.Started)
+            {
+                lock (started)
+                {
+                    started.Add(result.ProcessId);
+                }
+            }
+
+            return result;
+        }
+    }
 
     private static void Seed(Vault vault, string group, string title, string key, string value, params string[] tags)
     {

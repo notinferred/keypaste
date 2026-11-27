@@ -69,6 +69,15 @@ public sealed class LogRowTests
         Assert.Equal("Asks again before filling", unallow.Action);
     }
 
+    /// <summary>A Run started at the person's press in the app says so, apart from an answer on a card.</summary>
+    [Fact]
+    public void A_run_pressed_in_the_app_says_so()
+    {
+        var pressed = Row(Entry("run", "granted", "pressed") with { Entry = "env/acme-api/dev" });
+
+        Assert.Equal(("You pressed Run", LogTone.Ok), (pressed.Result, pressed.Tone));
+    }
+
     /// <summary>
     /// The browser's line is the person's, in the browser its pairing names, and its detail names the extension and the
     /// pairing, never an agent; a page's list of logins is a lookup and a fill is not.

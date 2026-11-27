@@ -680,7 +680,7 @@ public static class RequestRecords
     /// <param name="reply">The owner's answer; a released set gives the line its entries and its count.</param>
     /// <param name="session">The session the request named.</param>
     /// <param name="vault">The vault's identity key.</param>
-    /// <param name="confirmedInApp">Whether the request carried the launch pass of the app's Run confirmation, which a release's reason then names.</param>
+    /// <param name="confirmedInApp">Whether the request carried the launch pass of a Run started in the app, which a release's reason then names: pressed, or confirmed on its card.</param>
     /// <returns>The record to append.</returns>
     public static AuditRecord EnvRun(
         string project,
@@ -696,7 +696,9 @@ public static class RequestRecords
             profile,
             method,
             reply,
-            said => confirmedInApp && reply.Set.Outcome == EnvOutcome.Resolved ? $"{said}, confirmed in the app" : said,
+            said => !confirmedInApp || reply.Set.Outcome != EnvOutcome.Resolved ? said
+                : method == AuditMethod.Pressed ? $"{said}, pressed in the app"
+                : $"{said}, confirmed in the app",
             session,
             vault);
 

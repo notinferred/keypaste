@@ -137,9 +137,11 @@ Environments lists the vault's projects. Pick a stage, such as `dev` or `prod`, 
 
 ### Run a command with a project's variables
 
-Run with keypaste shows the stage's command, such as `keypaste run --session --vault '<this vault's path>' -p dev <project> -- npm start`, to copy. `--session` asks the app instead of opening the vault, so you type no password in the terminal. `--vault` names this vault, so the run asks it even when another vault is open. When the vault's file path or the project's name holds characters a terminal could run or change, the app shows no command and says why. The app asks before releasing the variables.
+Run with keypaste shows the stage's command, such as `keypaste run --session --vault '<this vault's path>' -p dev <project> -- npm start`, to copy. `--session` asks the app instead of opening the vault, so you type no password in the terminal. `--vault` names this vault, so the run asks it even when another vault is open. When the vault's file path or the project's name holds characters a terminal could run or change, the app shows no command and says why. The app asks before releasing the variables to a command run in a terminal, every time.
 
-Run… opens a terminal running the command in a directory you save.
+Run… opens a terminal running the command in a directory you save. Pressing it is your answer, so it starts at once, and Activity lists it as You pressed Run. A protected stage such as `prod` still asks first, and so does Open terminal.
+
+Run again, in the Dock menu on a Mac and in the menu bar or tray icon's menu, runs the last command Run started once more, in the same project, stage and directory. It is off until something has run and while that vault is locked. For a protected stage it starts nothing and says to press Run in the project.
 
 The values go into that terminal's environment, so everything run there can read them. Locking the app does not take them back.
 
@@ -208,7 +210,9 @@ Settings › This vault › Vault access › Change… changes the master passwo
 
 ## Lock and settings
 
-The vault locks after thirty minutes without keyboard or mouse input; Settings accepts one minute to eight hours, and idle locking cannot be turned off. An agent's request never counts as activity. `Ctrl/Cmd+L` locks at once, and Settings can also lock on minimize.
+The vault locks after thirty minutes without keyboard or mouse input; Settings accepts one minute to eight hours, and idle locking cannot be turned off. An agent's request never counts as activity. `Ctrl/Cmd+L` and Lock in the menu bar or tray icon's menu lock at once, so does quitting, and Settings can also lock on minimize.
+
+Closing the window with Keep in menu bar, or Keep in tray, on leaves keypaste running with your vaults unlocked: agents are still answered and Run again still works, until a lock. On a Mac the Dock icon stays while a vault is unlocked, so the Dock and ⌘Tab still reach keypaste. With the setting off, closing the window quits.
 
 Locking refuses waiting and later agent requests until you unlock. Values already released to an agent, a terminal or the clipboard are not recalled. [SECURITY](../SECURITY.md) states the memory and clipboard limits.
 
@@ -242,7 +246,7 @@ Every command is also in the menus.
 | `Down`, `Up`, `Return` in the search | Choose the next or previous match, or the first |
 | `Ctrl/Cmd+O` | Open a vault |
 | `Ctrl/Cmd+L` | Lock |
-| `Ctrl/Cmd+W` | Close the window, which locks |
+| `Ctrl/Cmd+W` | Close the window; vaults stay unlocked until they lock |
 | `Ctrl/Cmd+Q` | Quit |
 
 <a id="removing-keypaste"></a>

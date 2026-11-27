@@ -92,6 +92,12 @@ internal sealed class AppCommandHost
     internal Action? HideOthers { get; init; }
 
     internal Action? ShowAll { get; init; }
+
+    /// <summary>Starts once more the last command a Run started, as the Dock menu's Run again does.</summary>
+    internal Action? RunAgain { get; init; }
+
+    /// <summary>Whether Run again has a command to start, its vault unlocked.</summary>
+    internal Func<bool> CanRunAgain { get; init; } = static () => false;
 }
 
 /// <summary>
@@ -438,7 +444,12 @@ internal sealed class AppCommands
         ]);
 
         Menus = [file, edit, item, projects, agents, view, window, help];
-        Dock = [lockNow, new AppCommand(_openVault.Header, [], CanOpenVault, OpenVaultFromDock)];
+        Dock =
+        [
+            new AppCommand(Strings.RunAgain, [], () => host.RunAgain is not null && host.CanRunAgain(), () => host.RunAgain?.Invoke()),
+            lockNow,
+            new AppCommand(_openVault.Header, [], CanOpenVault, OpenVaultFromDock),
+        ];
     }
 
     /// <summary>Has the sidebar's menu item say what it would do now.</summary>

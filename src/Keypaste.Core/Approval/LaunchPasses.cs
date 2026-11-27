@@ -3,13 +3,17 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Keypaste.Core.Approval;
 
-/// <summary>Exactly the <c>keypaste run --session</c> request the app's Run confirmation named. Holds no value.</summary>
+/// <summary>Exactly the <c>keypaste run --session</c> request a Run started in the app named. Holds no value.</summary>
 /// <param name="Project">The project.</param>
 /// <param name="Profile">The environment.</param>
 /// <param name="Directory">Where the run starts.</param>
 /// <param name="Command">The command the run's request names, one argument per item.</param>
-/// <param name="Preview">The names, the items each comes from and the protection the confirmation showed.</param>
-public sealed record LaunchClaim(string Project, string Profile, string Directory, IReadOnlyList<string> Command, EnvPreview Preview);
+/// <param name="Preview">The names, the items each comes from and the protection the app resolved, and showed when it asked.</param>
+public sealed record LaunchClaim(string Project, string Profile, string Directory, IReadOnlyList<string> Command, EnvPreview Preview)
+{
+    /// <summary>Whether the person's press of Run was the answer, with no card shown; never so for a protected set, which is asked live.</summary>
+    public bool Pressed { get; init; }
+}
 
 /// <summary>
 /// The owner's single-use launch passes: each authorises exactly the one <c>keypaste run --session</c>

@@ -8,7 +8,7 @@ namespace Keypaste.Core.Ownership;
 /// </summary>
 /// <remarks>
 /// <para>
-/// It is apart from the vault's endpoint, so a Run confirmed in the app starts while agents cannot reach
+/// It is apart from the vault's endpoint, so a Run started in the app starts while agents cannot reach
 /// the vault: a <c>KEYPASTE_APPROVER</c> that names no usable pipe, or a vault's endpoint that cannot be
 /// bound. Its listener refuses a peer running as another user as the vault's does (THREATS.md T-10), and
 /// the unlock's own authority admits, records and releases what it reads.

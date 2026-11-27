@@ -165,7 +165,7 @@ public sealed record AppSettings
     /// </remarks>
     public required bool LockWhenMinimized { get; init; }
 
-    /// <summary>Whether closing the window leaves the app locked in the menu bar or tray; null until chosen, when the platform decides.</summary>
+    /// <summary>Whether closing the window leaves the app in the menu bar or tray, its open vaults unlocked; null until chosen, when the platform decides.</summary>
     public bool? StayInTray { get; init; }
     /// <summary>The vault agents and the CLI use when no <c>--vault</c> or <c>KEYPASTE_VAULT</c> names one, or null.</summary>
     /// <remarks>A full path and never anything read from the vault.</remarks>

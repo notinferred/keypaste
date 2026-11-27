@@ -198,9 +198,9 @@ internal sealed class AppAuthority : IDisposable
     /// <summary>Whether a prompt waits for the person's answer on screen; called on the UI thread.</summary>
     internal bool IsAsking => _host.IsAsking;
 
-    /// <summary>Issues the pass that lets the <c>keypaste run --session</c> Terminal starts through as this Run confirmation answered it.</summary>
-    /// <param name="claim">The request the confirmation named, and the set it showed.</param>
-    /// <param name="lifetimeId">The session the confirmation was answered in.</param>
+    /// <summary>Issues the pass that lets the <c>keypaste run --session</c> Terminal starts through as the person started this Run: pressed, or confirmed on its card.</summary>
+    /// <param name="claim">The request the app named, and the set it resolved.</param>
+    /// <param name="lifetimeId">The session the Run was started in.</param>
     /// <returns>The pass and the launch endpoint that run asks, or null when no launch endpoint listens or that session has ended.</returns>
     internal (string Pass, string Endpoint)? IssueLaunch(LaunchClaim claim, string lifetimeId) => _host.IssueLaunch(claim, lifetimeId);
 
@@ -209,10 +209,11 @@ internal sealed class AppAuthority : IDisposable
     internal void WithdrawLaunch(string pass) => _host.WithdrawLaunch(pass);
 
     /// <summary>Writes the History line of a Run the app starts itself on Windows and Linux, before the terminal starts.</summary>
-    /// <param name="set">The set the confirmation released, read again after the person answered.</param>
-    /// <param name="lifetimeId">The session the confirmation was answered in.</param>
+    /// <param name="set">The set released, read again after the person pressed Run or answered its card.</param>
+    /// <param name="lifetimeId">The session the Run was started in.</param>
+    /// <param name="pressed">Whether the press of Run was the answer, with no card shown.</param>
     /// <returns>Whether the line was written; a Run whose line was not starts nothing (T-6).</returns>
-    internal bool RecordRun(Core.EnvResolved set, string lifetimeId) => _host.RecordRun(set, lifetimeId);
+    internal bool RecordRun(Core.EnvResolved set, string lifetimeId, bool pressed) => _host.RecordRun(set, lifetimeId, pressed);
 
     /// <summary>Quits: the session locks before its endpoint stops, so what an agent has waiting is answered as locked rather than dropped with the endpoint.</summary>
     public void Dispose()

@@ -136,7 +136,7 @@ internal static class RunCommand
         // Refused rather than sent without it, which would ask the person a second time.
         if (launch is not null && !LaunchPasses.IsWellFormed(launch))
         {
-            return Fail(context, $"{LaunchPasses.EnvironmentVariable} does not hold a run confirmed in the keypaste app, so nothing was started");
+            return Fail(context, $"{LaunchPasses.EnvironmentVariable} does not hold a run started in the keypaste app, so nothing was started");
         }
 
         if (!TryChoose(line, projects, envFile, profile, path, context, out var set, out var exit))
@@ -389,7 +389,7 @@ internal static class RunCommand
         if (request.Launch is not null && reply.Set.Outcome == EnvOutcome.Resolved)
         {
             context.Stderr.WriteLine(
-                $"keypaste run: starting with {OneLine(request.Project)} ({OneLine(request.Profile)}) as you confirmed in the keypaste app");
+                $"keypaste run: starting with {OneLine(request.Project)} ({OneLine(request.Profile)}) as you started it in the keypaste app");
         }
 
         var admitted = Admit(reply.Set, set with { File = null }, reply.Reason, context);

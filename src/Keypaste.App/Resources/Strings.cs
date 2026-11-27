@@ -131,7 +131,7 @@ public static class Strings
     public static string CloseThisMessage => Manager.GetString("CloseThisMessage", CultureInfo.CurrentUICulture)!;
     public static string CloseVault => Manager.GetString("CloseVault", CultureInfo.CurrentUICulture)!;
     public static string CloseWindow => Manager.GetString("CloseWindow", CultureInfo.CurrentUICulture)!;
-    public static string ClosingTheWindowKeepsKeypasteRunningLocked => Manager.GetString("ClosingTheWindowKeepsKeypasteRunningLocked", CultureInfo.CurrentUICulture)!;
+    public static string ClosingTheWindowKeepsKeypasteRunning => Manager.GetString("ClosingTheWindowKeepsKeypasteRunning", CultureInfo.CurrentUICulture)!;
     public static string ComesBackAtTheTopLevel => Manager.GetString("ComesBackAtTheTopLevel", CultureInfo.CurrentUICulture)!;
     public static string Command => Manager.GetString("Command", CultureInfo.CurrentUICulture)!;
     public static string ConfigurationCopied => Manager.GetString("ConfigurationCopied", CultureInfo.CurrentUICulture)!;
@@ -567,6 +567,7 @@ public static class Strings
     public static string RuleForTheRest => Manager.GetString("RuleForTheRest", CultureInfo.CurrentUICulture)!;
     public static string Rules => Manager.GetString("Rules", CultureInfo.CurrentUICulture)!;
     public static string RulesPrecedence => Manager.GetString("RulesPrecedence", CultureInfo.CurrentUICulture)!;
+    public static string RunAgain => Manager.GetString("RunAgain", CultureInfo.CurrentUICulture)!;
     public static string RunInATerminal => Manager.GetString("RunInATerminal", CultureInfo.CurrentUICulture)!;
     public static string RunProject => Manager.GetString("RunProject", CultureInfo.CurrentUICulture)!;
     public static string RunWithKeypaste => Manager.GetString("RunWithKeypaste", CultureInfo.CurrentUICulture)!;

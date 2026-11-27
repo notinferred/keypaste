@@ -147,8 +147,8 @@ public sealed class LaunchPassesTests
         Assert.Equal(wellFormed, LaunchPasses.IsWellFormed(text));
 
     /// <summary>
-    /// The claim is what the card showed, names and where each comes from, so the store holds no value
-    /// between the confirmation and the run however long it waits.
+    /// The claim is what the app resolved, names and where each comes from, and whether a press answered it, so the
+    /// store holds no value between the press or the card and the run however long it waits.
     /// </summary>
     [Fact]
     public void A_claim_has_no_member_a_value_could_travel_in()
@@ -156,7 +156,7 @@ public sealed class LaunchPassesTests
         static string[] Members(Type type) =>
             [.. type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(property => property.Name).Order(StringComparer.Ordinal)];
 
-        Assert.Equal(["Command", "Directory", "Preview", "Profile", "Project"], Members(typeof(LaunchClaim)));
+        Assert.Equal(["Command", "Directory", "Pressed", "Preview", "Profile", "Project"], Members(typeof(LaunchClaim)));
         Assert.Equal(["Keys", "Profile", "Project", "RequiresLiveApproval", "Sources"], Members(typeof(EnvPreview)));
         Assert.Equal(["Entry", "Field", "Key"], Members(typeof(EnvSource)));
     }

@@ -327,7 +327,7 @@ public sealed class RunSessionTests : IDisposable
         Assert.DoesNotContain(child.Values, value => value.Contains(pass, StringComparison.Ordinal));
         Assert.Null(owner.Channel.Last);
         Assert.Empty(_harness.Prompt.PromptsSeen);
-        Assert.Contains("keypaste run: starting with dev (dev) as you confirmed in the keypaste app", _harness.Err, StringComparison.Ordinal);
+        Assert.Contains("keypaste run: starting with dev (dev) as you started it in the keypaste app", _harness.Err, StringComparison.Ordinal);
         Assert.DoesNotContain("answer in its prompt", _harness.Err, StringComparison.Ordinal);
         Assert.DoesNotContain(pass, _harness.Out + _harness.Err, StringComparison.Ordinal);
         Assert.DoesNotContain(_value, _harness.Out + _harness.Err, StringComparison.Ordinal);
@@ -368,7 +368,7 @@ public sealed class RunSessionTests : IDisposable
 
         if (confirmedInTheApp)
         {
-            Assert.Contains("keypaste run: starting with --help (dev) as you confirmed in the keypaste app", _harness.Err, StringComparison.Ordinal);
+            Assert.Contains("keypaste run: starting with --help (dev) as you started it in the keypaste app", _harness.Err, StringComparison.Ordinal);
         }
     }
 
@@ -383,7 +383,7 @@ public sealed class RunSessionTests : IDisposable
         _harness.AssertExit(CliApp.ExitInternalError, RunLaunched("dev"));
 
         Assert.Contains(
-            "keypaste run: the run you confirmed in the app expired or was already used, so nothing was started",
+            "keypaste run: the run you started in the app expired or was already used, so nothing was started",
             _harness.Err,
             StringComparison.Ordinal);
         Assert.DoesNotContain("starting with", _harness.Err, StringComparison.Ordinal);
@@ -472,7 +472,7 @@ public sealed class RunSessionTests : IDisposable
         _harness.AssertExit(CliApp.ExitUsageError, Run("dev"));
 
         Assert.Contains(
-            "keypaste run: KEYPASTE_LAUNCH does not hold a run confirmed in the keypaste app, so nothing was started",
+            "keypaste run: KEYPASTE_LAUNCH does not hold a run started in the keypaste app, so nothing was started",
             _harness.Err,
             StringComparison.Ordinal);
         Assert.Equal(0, liar.Attaches);

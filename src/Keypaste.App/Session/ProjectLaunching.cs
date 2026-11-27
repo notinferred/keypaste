@@ -26,6 +26,9 @@ internal sealed record ProjectLaunching(
     /// <summary>The authority whose log a Run's History line is written in: on macOS by answering the window's <c>keypaste run --session</c>, whose pass it issues, and on Windows and Linux before the terminal starts.</summary>
     internal AppAuthority? Authority { get; init; }
 
+    /// <summary>Told of each project command a Run started, which Run again starts once more; none tells nobody.</summary>
+    internal Action<ProjectRun>? Started { get; init; }
+
     /// <summary>The platform's terminal: on Windows and Linux started detached with this process's environment beneath the set, on macOS Terminal through this bundle's launcher.</summary>
     /// <param name="authority">The app's authority, or null when nothing records a Run, which then starts nothing.</param>
     /// <returns>The launching.</returns>
@@ -52,3 +55,11 @@ internal sealed record ProjectLaunching(
             Authority = authority,
         };
 }
+
+/// <summary>A project command a Run started from the app: where and what, never a value.</summary>
+/// <param name="Vault">The vault the project's variables come from.</param>
+/// <param name="Project">The project.</param>
+/// <param name="Profile">The stage.</param>
+/// <param name="Directory">Where the command ran.</param>
+/// <param name="Command">The command, as typed.</param>
+internal sealed record ProjectRun(string Vault, string Project, string Profile, string Directory, string Command);

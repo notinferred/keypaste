@@ -58,7 +58,8 @@ Both solutions write into `artifacts/`.
 - One copy runs per user and `KEYPASTE_HOME` (`Core/Ownership/AppClaim.cs`). A second start or a handed file (`HandedFile.cs`) goes to the running copy.
 - `App/Session/SessionHost.cs` serves each vault to agents. `WindowApprovalChannel.cs` asks the person, one prompt at a time across all vaults, in a window under `Views/`.
 - While locked, `App/Session/LockedNotice.cs` tells the person when a bridge finds the vault locked.
-- All vaults lock together on idle, `Ctrl/Cmd+L`, quitting and closing into the tray (`App/AppTray.cs`). One locks alone for `keypaste lock`, an access change or a refused reload.
+- All vaults lock together on idle, `Ctrl/Cmd+L`, the tray's Lock (`App/AppTray.cs`) and quitting. Closing the window into the tray hides it and locks none, so agents are still answered. One locks alone for `keypaste lock`, an access change or a refused reload.
+- A project's Run (`ViewModels/ProjectLaunchViewModel.cs`) starts at its press, logged as `pressed`; Open terminal and a protected stage's Run ask on its card. Run again in the Dock and tray menus starts the last `Session/ProjectLaunching.cs` `ProjectRun` once more (`App.RunAgainAsync`).
 - Quick unlock: `Session/QuickUnlockCopies.cs`, with `Session/WindowsHello.cs` and `Session/TouchId.cs` as `MachineQuickUnlock.cs` picks them.
 - Agents › Connect registers an AI tool through `Core/Clients/`. `App/CrashReporting.cs` sends crash reports only under the terms the person accepted (`App/Terms/`).
 
@@ -130,7 +131,7 @@ A browser request:
 3. `Core/Ownership/SessionBrowsers.cs` decides, bound to the proven pairing.
 4. The relay seals the reply.
 
-A Run from the app on macOS: `App/ViewModels/ProjectLaunchViewModel.cs` → `SessionAuthority.IssueLaunch` (`Core/Approval/LaunchPasses.cs`) → Terminal → `keypaste run --session` → `Core/Ownership/LaunchEndpoint.cs`, which takes the pass and releases the set without asking, then records it.
+A Run from the app on macOS: `App/ViewModels/ProjectLaunchViewModel.cs` → `SessionAuthority.IssueLaunch` (`Core/Approval/LaunchPasses.cs`) → Terminal → `keypaste run --session` → `Core/Ownership/LaunchEndpoint.cs`, which takes the pass and releases the set without asking, then records it as `pressed`, or `prompt` for one confirmed on its card. On Windows and Linux `SessionAuthority.RecordAppRun` writes the same line before the terminal starts.
 
 ## Where each concern lives
 
