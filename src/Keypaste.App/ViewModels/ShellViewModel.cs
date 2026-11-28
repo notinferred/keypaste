@@ -1,6 +1,7 @@
 using System.Globalization;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Globalization;
+using Keypaste.App.GlobalShortcuts;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.Core;
@@ -532,6 +533,35 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         });
     }
 
+    /// <summary>
+    /// The search shortcut's and Search…'s: Items, with its search emptied and holding the keyboard, from any place, asking
+    /// first about a draft it would leave, as Find does.
+    /// </summary>
+    internal void StartSearch()
+    {
+        CloseSidebarOverlay();
+
+        // On Items nothing is left, so a draft is asked about only when the search changes, as typing in it asks.
+        if (_current.Kind == DestinationKind.Entries)
+        {
+            Search = string.Empty;
+
+            if (!HasDiscardPrompt)
+            {
+                SearchFocusRequested?.Invoke(this, EventArgs.Empty);
+            }
+
+            return;
+        }
+
+        Leave(() =>
+        {
+            MoveTo(Destinations.Of(DestinationKind.Entries));
+            Search = string.Empty;
+            SearchFocusRequested?.Invoke(this, EventArgs.Empty);
+        });
+    }
+
     /// <summary>Find's first chord on the search field, in the platform's own spelling.</summary>
     public static string SearchShortcut => OperatingSystem.IsMacOS() ? "⌘F" : "Ctrl F";
 
@@ -867,6 +897,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
             OffersTheme = OffersTheme,
             Login = LoginItem,
             CliLink = CliLink,
+            SearchShortcut = GlobalSearch,
             BrowserFill = Authority is null ? null : new BrowserFillViewModel(Authority, _post),
             BrowserHosts = Authority is null || BrowserHosts is not { } hosts ? null : new BrowserHostsViewModel(hosts.Hosts, hosts.Unavailable),
             AgentDefaults = AuthorityOf(vault.Session) is { } authority ? new AgentRulesViewModel(authority) : null,
@@ -1058,6 +1089,9 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
 
     /// <summary>The <c>keypaste</c> a terminal runs, which Settings links to this app's own; none where the platform needs no link.</summary>
     internal ICliLink? CliLink { get; init; }
+
+    /// <summary>The chord that searches keypaste from any app, which Settings › General chooses; none where the app composes none.</summary>
+    internal SearchShortcut? GlobalSearch { get; init; }
 
     /// <summary>The browsers' hosts, which Settings › Browser fill turns on and off beside the pairings; none lists no browsers.</summary>
     internal BrowserHostSetup? BrowserHosts { get; init; }

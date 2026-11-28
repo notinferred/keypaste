@@ -301,7 +301,7 @@ internal sealed record LogRow
             "automatic" or "automatic-commands" or "policy" or "exposure" or "allowed" => (Strings.AllowedByRule, LogTone.Ok),
             "narrowing" => ("Narrowed", LogTone.Muted),
             "picked" => ("You picked it in the page", LogTone.Ok),
-            "pressed" => ("You pressed Run", LogTone.Ok),
+            "pressed" => (entry.Reason.EndsWith(RequestRecords.OpenTerminalPressed, StringComparison.Ordinal) ? "You pressed Open terminal" : "You pressed Run", LogTone.Ok),
             "merged" => ("Merged", LogTone.Muted),
             "token" => (Strings.TokenResult, LogTone.Info),
             "share-created" => (Strings.Shared, LogTone.Muted),

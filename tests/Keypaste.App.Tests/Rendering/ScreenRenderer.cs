@@ -11,9 +11,11 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
+using Keypaste.App.GlobalShortcuts;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
+using Keypaste.App.Tests.GlobalShortcuts;
 using Keypaste.App.Tests.Session;
 using Keypaste.App.Tests.ViewModels;
 using Keypaste.App.ViewModels;
@@ -440,7 +442,8 @@ public sealed class ScreenRenderer
             Assert.Equal(UnlockOutcome.Opened, session.TryUnlock(demo.Path, master.Value));
         }
 
-        using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(AppClock.Start), picker: new FakeVaultFilePicker()) { OffersTheme = true };
+        using var search = TakenSearch(demo.Home);
+        using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(AppClock.Start), picker: new FakeVaultFilePicker()) { OffersTheme = true, GlobalSearch = search };
         var window = new MainWindow { Width = _width * InterfaceZoom.Factor, Height = _height * InterfaceZoom.Factor };
         window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell };
         window.Show();
@@ -1792,6 +1795,16 @@ public sealed class ScreenRenderer
         window.Close();
     }
 
+    /// <summary>A search shortcut whose default chord another app holds, so General draws its row with the note it is longest with.</summary>
+    private static SearchShortcut TakenSearch(string home)
+    {
+#pragma warning disable CA2000 // The search shortcut owns the system's chord.
+        var system = new FakeGlobalShortcut();
+        system.Taken.Add(GlobalChord.Default(OperatingSystem.IsMacOS()));
+        return new SearchShortcut(system, new DesktopPreferences(home), () => { });
+#pragma warning restore CA2000
+    }
+
     /// <summary>The trash with two deleted entries in it; drawn last, because it changes the demo vault.</summary>
     private static void DrawTrashWithRows(DemoVault demo, string output)
     {
@@ -1806,7 +1819,8 @@ public sealed class ScreenRenderer
         session.Unlocked.RemoveEntry(_openAi);
         session.Unlocked.Save();
 
-        using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(AppClock.Start));
+        using var search = TakenSearch(demo.Home);
+        using var shell = new ShellViewModel(session, demo.Home, null, clipboard: new FakeClipboard(), clock: new ManualClock(AppClock.Start)) { GlobalSearch = search };
         var window = new MainWindow { Width = _width, Height = _height };
         window.FindControl<ContentControl>("Root")!.Content = new ShellView { DataContext = shell };
         window.Show();

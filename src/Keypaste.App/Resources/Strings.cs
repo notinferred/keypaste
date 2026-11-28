@@ -592,6 +592,8 @@ public static class Strings
     public static string ScopeOfOneKeyExample => Manager.GetString("ScopeOfOneKeyExample", CultureInfo.CurrentUICulture)!;
     public static string ScopedTokens => Manager.GetString("ScopedTokens", CultureInfo.CurrentUICulture)!;
     public static string Search => Manager.GetString("Search", CultureInfo.CurrentUICulture)!;
+    public static string SearchFromAnyApp => Manager.GetString("SearchFromAnyApp", CultureInfo.CurrentUICulture)!;
+    public static string SearchFromAnyAppHelp => Manager.GetString("SearchFromAnyAppHelp", CultureInfo.CurrentUICulture)!;
     public static string SecondsUntilTheNextCode => Manager.GetString("SecondsUntilTheNextCode", CultureInfo.CurrentUICulture)!;
     public static string Security => Manager.GetString("Security", CultureInfo.CurrentUICulture)!;
     public static string SelectAll => Manager.GetString("SelectAll", CultureInfo.CurrentUICulture)!;

@@ -372,7 +372,7 @@ public sealed class ClosingTheMainWindowTests
             Assert.Same(app.Main, lifetime.MainWindow);
         });
 
-    private static string Vault(TempVault fixture)
+    internal static string Vault(TempVault fixture)
     {
         var vault = Path.Combine(fixture.Home, "agents.kdbx");
 
@@ -412,7 +412,7 @@ public sealed class ClosingTheMainWindowTests
         return unlock.UnlockAsync();
     }
 
-    private static DesktopPreferences Tray(TempVault fixture, bool stays)
+    internal static DesktopPreferences Tray(TempVault fixture, bool stays)
     {
         var preferences = new DesktopPreferences(fixture.Home);
         preferences.Update(AppSettings.Default with { StayInTray = stays });
@@ -422,13 +422,13 @@ public sealed class ClosingTheMainWindowTests
     private static NativeMenuItem Item(App app, string header) =>
         app.Tray!.Menu.Items.OfType<NativeMenuItem>().Single(item => item.Header == header);
 
-    private static void Unlock(App app, string vault)
+    internal static void Unlock(App app, string vault)
     {
         using var master = TempVault.Secret(TempVault.Password);
         Assert.Equal(UnlockOutcome.Opened, app.Authority!.Session.TryUnlock(vault, master.Value));
     }
 
-    private static Task<CredentialReply?> Request(ApproverClient client, App app, string vault) =>
+    internal static Task<CredentialReply?> Request(ApproverClient client, App app, string vault) =>
         client.RequestAsync(
             new CredentialRequest
             {
@@ -443,7 +443,7 @@ public sealed class ClosingTheMainWindowTests
             },
             Token).AsTask();
 
-    private static async Task<Window> PromptAsync(ClassicDesktopStyleApplicationLifetime lifetime)
+    internal static async Task<Window> PromptAsync(ClassicDesktopStyleApplicationLifetime lifetime)
     {
         await Until(() => lifetime.Windows.Any(window => window is ApprovalWindow));
         return lifetime.Windows.Single(window => window is ApprovalWindow);
@@ -459,7 +459,7 @@ public sealed class ClosingTheMainWindowTests
         Assert.Null(answered.Value);
     }
 
-    private static void Attach(ClassicDesktopStyleApplicationLifetime lifetime)
+    internal static void Attach(ClassicDesktopStyleApplicationLifetime lifetime)
     {
         var subscribe = typeof(ClassicDesktopStyleApplicationLifetime).GetMethod(
             "SubscribeGlobalEvents",
@@ -469,7 +469,7 @@ public sealed class ClosingTheMainWindowTests
         subscribe.Invoke(lifetime, null);
     }
 
-    private static async Task<ApproverClient> ConnectAsync(AppAuthority authority, string vault)
+    internal static async Task<ApproverClient> ConnectAsync(AppAuthority authority, string vault)
     {
         var endpoint = Assert.IsType<AuthorityStatus.Serving>(authority.Status).Endpoint;
         var client = await ApproverClient.TryConnectAsync(endpoint, _wait, Token);
@@ -498,7 +498,7 @@ public sealed class ClosingTheMainWindowTests
         }
     }
 
-    private static async Task Until(Func<bool> condition)
+    internal static async Task Until(Func<bool> condition)
     {
         var deadline = DateTime.UtcNow + _wait;
 

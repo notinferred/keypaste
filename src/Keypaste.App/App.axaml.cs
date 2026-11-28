@@ -10,6 +10,7 @@ using Avalonia.Styling;
 using Avalonia.Threading;
 using Keypaste.App.Clipboard;
 using Keypaste.App.Globalization;
+using Keypaste.App.GlobalShortcuts;
 using Keypaste.App.HardwareKeys;
 using Keypaste.App.Notifications;
 using Keypaste.App.Session;
@@ -56,6 +57,7 @@ internal sealed partial class App : Application, IDisposable
     private ShellViewModel? _shell;
     private IClassicDesktopStyleApplicationLifetime? _desktop;
     private AppTray? _tray;
+    private SearchShortcut? _searchShortcut;
     private IActivatableLifetime? _activatable;
     private IDisposable? _reopen;
     private LockedNotice? _lockedNotice;
@@ -222,12 +224,14 @@ internal sealed partial class App : Application, IDisposable
 
         _tray = new AppTray(
             OpenWindowAtPersonsAct,
+            SearchAtPersonsAct,
             () => _ = RunAgainAsync(),
             () => CanRunAgain,
             () => _ = _vaults?.LockAllAsync(VaultLockReason.Manual),
             () => _vaults?.Unlocked.Count > 0,
             Quit);
         _tray.Show(_preferences.StaysInTray);
+        _searchShortcut = GlobalShortcutFor is { } system ? new SearchShortcut(system(), _preferences, SearchAtPersonsAct) : null;
         _preferences.Changed += OnPreferencesChanged;
         _window.Closing += OnMainWindowClosing;
 
@@ -279,8 +283,14 @@ internal sealed partial class App : Application, IDisposable
     /// <summary>The menu bar or tray icon <see cref="Launch"/> composed.</summary>
     internal AppTray? Tray => _tray;
 
+    /// <summary>The chord that searches keypaste from any app, as <see cref="Launch"/> composed it, or null where none is.</summary>
+    internal SearchShortcut? SearchShortcut => _searchShortcut;
+
     /// <summary>What tells the person an agent found a vault locked; none unless <see cref="Claim"/> is held, or after quitting.</summary>
     internal LockedNotice? LockedNotice => _lockedNotice;
+
+    /// <summary>The system-wide chord the search shortcut registers; this platform's when <c>Program</c> starts the app, none unless a test gives one.</summary>
+    internal Func<IGlobalShortcut>? GlobalShortcutFor { get; init; }
 
     /// <summary>The system's notifications; this platform's unless a test gives others.</summary>
     internal ISystemNotifications? Notifications { get; init; }
@@ -361,6 +371,34 @@ internal sealed partial class App : Application, IDisposable
     {
         OpenWindow();
         AskQuickUnlockAtOnce();
+    }
+
+    /// <summary>
+    /// The search shortcut, pressed in any app, and Search… in the menu bar or tray: an agent's request waiting for an
+    /// answer comes forward first, focused on Deny and disarmed for a second (THREATS T-11); otherwise the window, on Items
+    /// with its search empty and holding the keyboard, or with every vault locked the unlock screen, which asks Windows
+    /// Hello or Touch ID at once.
+    /// </summary>
+    internal void SearchAtPersonsAct()
+    {
+        // A Mac app pressed from the background is made active first, so what it shows comes in front of the app in use.
+        DockIcon?.Invoke(true);
+
+        if (_vaults?.ShowPrompt() == true)
+        {
+            return;
+        }
+
+        OpenWindow();
+
+        if (_shell is null)
+        {
+            AskQuickUnlockAtOnce();
+        }
+        else
+        {
+            _commands?.StartSearch();
+        }
     }
 
     private void AskQuickUnlockAtOnce()
@@ -1080,6 +1118,7 @@ internal sealed partial class App : Application, IDisposable
             CalmMoment = _notifications is { } notifications ? new CalmPermission(notifications, () => _vaults?.IsAsking == true).Offer : null,
             LoginItem = LoginItemFor(),
             CliLink = CliLinkFor(),
+            GlobalSearch = _searchShortcut,
             BrowserHosts = BrowserHostsFor(),
             Tools = ClientConnector.ForThisProcess,
             Launching = LaunchingFor(anchor.Authority) with { Started = Remember },
@@ -1236,6 +1275,8 @@ internal sealed partial class App : Application, IDisposable
         _unlock = null;
         _tray?.Dispose();
         _tray = null;
+        _searchShortcut?.Dispose();
+        _searchShortcut = null;
 
         if (_activatable is not null)
         {

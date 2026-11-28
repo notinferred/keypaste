@@ -13,6 +13,9 @@ public sealed record LaunchClaim(string Project, string Profile, string Director
 {
     /// <summary>Whether the person's press of Run was the answer, with no card shown; never so for a protected set, which is asked live.</summary>
     public bool Pressed { get; init; }
+
+    /// <summary>Whether it was Open terminal, a terminal at a prompt, rather than a Run of the project's command, which its line says.</summary>
+    public bool OpensTerminal { get; init; }
 }
 
 /// <summary>

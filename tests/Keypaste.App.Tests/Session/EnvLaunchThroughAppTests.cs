@@ -180,7 +180,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         if (OperatingSystem.IsMacOS())
         {
             await OpenTerminalThroughTerminalAsync(screen, launch, pipeName);
-            AssertRecorded(2, pressed: true, ApprovalPrompt.Shown(ProjectVariables.Home("dev")));
+            AssertRecorded(2, [ApprovalPrompt.Shown(ProjectVariables.Home("dev"))], opensTerminal: true);
             return;
         }
 
@@ -193,7 +193,7 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.Equal(_project, start.WorkingDirectory);
         Assert.Equal(_apiKey, start.Environment["API_KEY"]);
         AssertNoValue(string.Join(" ", start.Arguments) + start.CommandLine, "the terminal's arguments");
-        AssertRecorded(2, pressed: true, ApprovalPrompt.Shown(ProjectVariables.Home("dev")));
+        AssertRecorded(2, [ApprovalPrompt.Shown(ProjectVariables.Home("dev"))], opensTerminal: true);
         Assert.Equal(0, _asked.Count);
     }
 
@@ -1309,7 +1309,12 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
     }
 
     /// <summary>Requires that the newest History line is the Run's release, as a macOS Run's window and a Windows or Linux Run each write it: pressed, or confirmed on its card.</summary>
-    private void AssertRecorded(int variables, bool pressed, params string[] entries)
+    private void AssertRecorded(int variables, bool pressed, params string[] entries) => AssertRecorded(variables, entries, pressed, opensTerminal: false);
+
+    /// <summary>Requires that the newest History line is an Open terminal's release, pressed, which its reason says.</summary>
+    private void AssertRecorded(int variables, string[] entries, bool opensTerminal) => AssertRecorded(variables, entries, pressed: true, opensTerminal);
+
+    private void AssertRecorded(int variables, string[] entries, bool pressed, bool opensTerminal)
     {
         using var line = LastAuditLine();
         var root = line.RootElement;
@@ -1317,7 +1322,9 @@ public sealed class EnvLaunchThroughAppTests : IDisposable
         Assert.Equal("run", root.GetProperty("tool").GetString());
         Assert.Equal("granted", root.GetProperty("decision").GetString());
         Assert.Equal(pressed ? "pressed" : "prompt", root.GetProperty("method").GetString());
-        Assert.Equal($"{variables} variable(s), {(pressed ? "pressed" : "confirmed")} in the app", root.GetProperty("reason").GetString());
+        Assert.Equal(
+            opensTerminal ? $"{variables} variable(s){RequestRecords.OpenTerminalPressed}" : $"{variables} variable(s), {(pressed ? "pressed" : "confirmed")} in the app",
+            root.GetProperty("reason").GetString());
         Assert.Equal(entries, root.GetProperty("entries").EnumerateArray().Select(entry => entry.GetString()));
     }
 

@@ -822,6 +822,29 @@ public sealed class SessionAuthorityEnvTests : IDisposable
         Assert.DoesNotContain(_token1, AuditText(), StringComparison.Ordinal);
     }
 
+    /// <summary>Open terminal pressed in the app is recorded as pressed too, its reason saying it was Open terminal and not Run, on Windows and Linux and through a macOS pass.</summary>
+    [Fact]
+    public async Task Open_terminal_pressed_in_the_app_says_so_in_its_line()
+    {
+        await using var owner = StartOwner();
+        await using var client = await AttachedAsync(owner);
+        var set = EnvResolution.Resolve(_vault, "dev", EnvProfileNames.Default, keys: null, _fixture.Clock);
+        Assert.True(owner.Authority.RecordAppRun(set, "session-one", pressed: true, opensTerminal: true));
+
+        var claim = Claim() with { Pressed = true, OpensTerminal = true };
+        var pass = owner.Authority.IssueLaunch(claim, "session-one");
+        Assert.NotNull(pass);
+        Assert.Equal(EnvOutcome.Resolved, (await client.ReleaseEnvAsync(Launched(claim, pass), Token))?.Set.Outcome);
+
+        Assert.Equal(0, _fixture.Channel.Asked);
+        Assert.All(AuditLines(), line =>
+        {
+            Assert.Equal("pressed", line.GetProperty("method").GetString());
+            Assert.Equal("2 variable(s)" + RequestRecords.OpenTerminalPressed, line.GetProperty("reason").GetString());
+        });
+        Assert.Equal(2, AuditLines().Count);
+    }
+
     /// <summary>A protected stage's run is asked live, so a press alone neither records one nor earns a pass (T-30, T-38).</summary>
     [Fact]
     public async Task A_press_alone_starts_no_run_of_a_protected_stage()

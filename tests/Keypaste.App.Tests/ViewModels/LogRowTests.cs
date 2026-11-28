@@ -69,13 +69,15 @@ public sealed class LogRowTests
         Assert.Equal("Asks again before filling", unallow.Action);
     }
 
-    /// <summary>A Run started at the person's press in the app says so, apart from an answer on a card.</summary>
+    /// <summary>A Run or an Open terminal started at the person's press in the app says which, apart from an answer on a card.</summary>
     [Fact]
     public void A_run_pressed_in_the_app_says_so()
     {
-        var pressed = Row(Entry("run", "granted", "pressed") with { Entry = "env/acme-api/dev" });
+        var pressed = Row(Entry("run", "granted", "pressed") with { Entry = "env/acme-api/dev", Reason = "2 variable(s), pressed in the app" });
+        var terminal = Row(Entry("run", "granted", "pressed") with { Entry = "env/acme-api/dev", Reason = "2 variable(s)" + RequestRecords.OpenTerminalPressed });
 
         Assert.Equal(("You pressed Run", LogTone.Ok), (pressed.Result, pressed.Tone));
+        Assert.Equal(("You pressed Open terminal", LogTone.Ok), (terminal.Result, terminal.Tone));
     }
 
     /// <summary>

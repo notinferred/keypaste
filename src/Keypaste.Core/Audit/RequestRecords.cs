@@ -673,6 +673,9 @@ public static class RequestRecords
 
     private static string Count(int n, string noun) => n == 1 ? $"1 {noun}" : Invariant($"{n} {noun}s");
 
+    /// <summary>How the reason of a line written for Open terminal, pressed in the app, ends; Run's ends in <c>, pressed in the app</c>.</summary>
+    public const string OpenTerminalPressed = ", Open terminal pressed in the app";
+
     /// <summary>The line for a <c>keypaste run --session</c> request.</summary>
     /// <param name="project">The project asked for.</param>
     /// <param name="profile">The profile asked for.</param>
@@ -681,6 +684,7 @@ public static class RequestRecords
     /// <param name="session">The session the request named.</param>
     /// <param name="vault">The vault's identity key.</param>
     /// <param name="confirmedInApp">Whether the request carried the launch pass of a Run started in the app, which a release's reason then names: pressed, or confirmed on its card.</param>
+    /// <param name="opensTerminal">Whether what was pressed was Open terminal rather than Run, which a pressed release's reason ends in <see cref="OpenTerminalPressed"/> to say.</param>
     /// <returns>The record to append.</returns>
     public static AuditRecord EnvRun(
         string project,
@@ -689,7 +693,8 @@ public static class RequestRecords
         EnvReply reply,
         string? session,
         string? vault,
-        bool confirmedInApp = false) =>
+        bool confirmedInApp = false,
+        bool opensTerminal = false) =>
         SetRun(
             new AuditClient(SessionRunner, CoreInfo.Version, null),
             project,
@@ -697,7 +702,7 @@ public static class RequestRecords
             method,
             reply,
             said => !confirmedInApp || reply.Set.Outcome != EnvOutcome.Resolved ? said
-                : method == AuditMethod.Pressed ? $"{said}, pressed in the app"
+                : method == AuditMethod.Pressed ? $"{said}{(opensTerminal ? OpenTerminalPressed : ", pressed in the app")}"
                 : $"{said}, confirmed in the app",
             session,
             vault);

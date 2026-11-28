@@ -240,6 +240,27 @@ public sealed class AppSettingsTests : IDisposable
         Assert.DoesNotContain("[[recommendations]]", File.ReadAllText(SettingsFile), StringComparison.Ordinal);
     }
 
+    /// <summary>The search shortcut is kept as the app writes it, in a section of its own; with nothing chosen the file has no section, and the app's default holds.</summary>
+    [Fact]
+    public void The_search_shortcut_round_trips_as_text_beside_what_its_section_holds_and_is_absent_until_chosen()
+    {
+        Assert.Null(AppSettings.Load(SettingsFile).SearchShortcut);
+
+        File.WriteAllText(SettingsFile, "[[settings]]\ntheme = \"dark\"\n\n[[shortcut]]\nsearch = \"ctrl+cmd+k\"\nnote = \"kept\"\n");
+        Assert.Equal("ctrl+cmd+k", AppSettings.Load(SettingsFile).SearchShortcut);
+
+        Assert.True(AppSettings.Save(SettingsFile, AppSettings.Load(SettingsFile) with { SearchShortcut = "off" }));
+        var text = File.ReadAllText(SettingsFile);
+        Assert.Equal("off", AppSettings.Load(SettingsFile).SearchShortcut);
+        Assert.Equal(AppTheme.Dark, AppSettings.Load(SettingsFile).Theme);
+        Assert.Contains("note = \"kept\"", text, StringComparison.Ordinal);
+        Assert.Single(text.Split('\n'), line => line == "[[shortcut]]");
+
+        File.Delete(SettingsFile);
+        Assert.True(AppSettings.Save(SettingsFile, AppSettings.Default));
+        Assert.DoesNotContain("[[shortcut]]", File.ReadAllText(SettingsFile), StringComparison.Ordinal);
+    }
+
     [Fact]
     public void The_file_it_writes_contains_no_true_or_false()
     {

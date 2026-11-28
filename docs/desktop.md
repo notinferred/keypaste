@@ -42,7 +42,7 @@ Drag a `.kdbx` onto the window, choose Open a vault…, or pick it from the rece
 
 - **Key file.** Choose it with Key file… under Unlock.
 - **YubiKey.** Choose YubiKey… (slot 2 by default), programmed for HMAC-SHA1 challenge-response, and touch the key when asked. Every save asks again. The CLI reaches such a vault only through the app while the app holds it. No physical YubiKey has been tested.
-- **Windows Hello and Touch ID.** After an idle lock or a lock you made, Unlock with Windows Hello, or Unlock with Touch ID on a Mac, reopens the vault. Quitting, `keypaste lock`, a changed password or key file, and on a Mac an added or removed fingerprint need the master password. Bringing keypaste forward yourself, from the Dock, the menu bar or tray icon, your browser's Unlock… or the notification that an agent asked for a locked vault, asks Windows Hello or Touch ID at once where they can reopen it, unless another vault is unlocked. If you cancel it, the button stays. An agent's request alone never asks.
+- **Windows Hello and Touch ID.** After an idle lock or a lock you made, Unlock with Windows Hello, or Unlock with Touch ID on a Mac, reopens the vault. Quitting, `keypaste lock`, a changed password or key file, and on a Mac an added or removed fingerprint need the master password. Bringing keypaste forward yourself, from the Dock, the menu bar or tray icon, the [search shortcut](#search-from-any-app), your browser's Unlock… or the notification that an agent asked for a locked vault, asks Windows Hello or Touch ID at once where they can reopen it, unless another vault is unlocked. If you cancel it, the button stays. An agent's request alone never asks.
 
 One vault has one approver at a time: while `keypaste approve` holds it in a terminal, the app cannot, and the other way round.
 
@@ -74,6 +74,17 @@ A vault is one flat list of items, organized by tags. The app shows no groups, a
 Find searches titles, group paths, usernames, websites and tags. Passwords, notes and protected fields are never searched. A row never shows a secret value.
 
 While you type, `Down` and `Up` choose through the matches and `Return` chooses the first, with the keyboard still in the search. A search that hides the chosen item chooses its first match instead. In the search, `Ctrl/Cmd+C` copies the chosen item's password unless you have selected some of the search's text.
+
+<a id="search-from-any-app"></a>
+
+### Search from any app
+
+`⌃⌘K` on a Mac, or `Alt+Shift+K` on Windows and Linux, brings keypaste forward from whatever app you are in, on Items with the search empty and ready to type in. Search… in the menu bar or tray icon's menu does the same.
+
+- With every vault locked it shows the unlock screen, which asks Windows Hello or Touch ID at once where they can reopen a vault.
+- With an agent's request waiting, it brings that request's prompt forward instead, with Deny holding the keyboard and the allows waiting a second, as always.
+- Settings › General › Search from any app chooses other keys, or Off. If another app already uses the keys, the row says so and they do nothing in keypaste until you choose others.
+- It needs no permission, not even Accessibility on a Mac: the system hands keypaste only that one chord, never another key. On Linux it needs an X11 session; Wayland lets no app take a key from the others, so the row says there is none.
 
 ### Copy and reveal
 
@@ -137,9 +148,9 @@ Environments lists the vault's projects. Pick a stage, such as `dev` or `prod`, 
 
 ### Run a command with a project's variables
 
-Run with keypaste shows the stage's command, such as `keypaste run -p dev <project> -- npm start`, to copy. While the app holds the vault, `keypaste run` asks the app instead of opening the vault, so you type no password in the terminal, and Activity lists the run. The command adds `--vault '<this vault's path>'` when this vault isn't the one chosen for the terminal, or when another open vault has a project of the same name, so the run reaches this vault. When the vault's file path or the project's name holds characters a terminal could run or change, the app shows no command and says why. The app asks before releasing the variables to a command run in a terminal, every time.
+Run with keypaste shows the stage's command, such as `keypaste run -p dev <project> -- npm start`, to copy. While the app holds the vault, `keypaste run` in a terminal asks the app instead of opening the vault, so you type no password, and Activity lists the run. With its input piped, as in a script, it opens the vault itself and reads the master password from the pipe. The command adds `--vault '<this vault's path>'` when this vault isn't the one chosen for the terminal, or when another open vault has a project of the same name, so the run reaches this vault. When the vault's file path or the project's name holds characters a terminal could run or change, the app shows no command and says why. The app asks before releasing the variables to a command run in a terminal, every time.
 
-Run… asks for a directory and a command and saves them; from then on the button reads Run and opens a terminal running the command there. Pressing Run, or Edit › Open terminal, is your answer, so it starts at once, and Activity lists it as You pressed Run. A protected stage such as `prod` still asks first, on a card.
+Run… asks for a directory and a command and saves them; from then on the button reads Run and opens a terminal running the command there. Pressing Run, or Edit › Open terminal, is your answer, so it starts at once, and Activity lists it as You pressed Run or You pressed Open terminal. A protected stage such as `prod` still asks first, on a card.
 
 Run again, in the Dock menu on a Mac and in the menu bar or tray icon's menu, runs the last command Run started once more, in the same project, stage and directory. It is off until something has run, while that vault is locked, and after a Run of a protected stage, which asks on its card in the project.
 
@@ -155,7 +166,7 @@ When an agent asks, the app shows who is asking, the item and the agent's own wo
 | Allow once | Releases this one value |
 | Always allow | For an agent whose bridge has a label: keeps allowing that field to that agent |
 
-A click on an allow works once the prompt has focus; Return and Space wait a second. [Approvals](approvals.md) owns the prompt, what each answer keeps and the log.
+A click on an allow works once the prompt has focus; Return and Space wait a second. The [search shortcut](#search-from-any-app) brings a waiting prompt forward the same way, on Deny. [Approvals](approvals.md) owns the prompt, what each answer keeps and the log.
 
 ## Set up agents
 
@@ -216,7 +227,7 @@ Closing the window with Keep in menu bar, or Keep in tray, on leaves keypaste ru
 
 Locking refuses waiting and later agent requests until you unlock. Values already released to an agent, a terminal or the clipboard are not recalled. [SECURITY](../SECURITY.md) states the memory and clipboard limits.
 
-Settings also holds Open keypaste at login, crash reports and where backups are kept.
+Settings also holds Open keypaste at login, the [search shortcut](#search-from-any-app), crash reports and where backups are kept.
 
 ### Files it keeps
 
@@ -239,6 +250,7 @@ Every command is also in the menus.
 |---|---|
 | `Ctrl/Cmd+1` … `4` | Items, Agents, Security, Settings |
 | `Ctrl/Cmd+F`, `Ctrl/Cmd+K` | Search |
+| `⌃⌘K` on a Mac, `Alt+Shift+K` elsewhere, in any app | [Search from any app](#search-from-any-app) |
 | `Ctrl/Cmd+N` | New item |
 | `Ctrl/Cmd+C` | Outside a text field, or in the search with none of its text selected, copy the chosen item's password |
 | `Shift+Ctrl/Cmd+C` | Copy the chosen item's username |

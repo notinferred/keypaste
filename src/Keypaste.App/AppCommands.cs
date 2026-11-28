@@ -452,6 +452,9 @@ internal sealed class AppCommands
         ];
     }
 
+    /// <summary>The search shortcut's and Search…'s: Items with an empty search holding the keyboard, unless a dialog holds the window.</summary>
+    internal void StartSearch() => Unmodal()?.StartSearch();
+
     /// <summary>Has the sidebar's menu item say what it would do now.</summary>
     internal void SidebarChanged() => _sidebar.Reword();
 

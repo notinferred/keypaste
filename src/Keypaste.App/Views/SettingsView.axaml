@@ -138,6 +138,25 @@
                                       IsChecked="{Binding OpenAtLogin}" />
                       </ctl:FieldRow.Actions>
                     </ctl:FieldRow>
+                    <ctl:FieldRow Classes="adaptive" Label="{x:Static res:Strings.SearchFromAnyApp}" IsVisible="{Binding OffersSearchShortcut}">
+                      <TextBlock Name="SearchShortcutNote" Classes="caption" TextWrapping="Wrap" Text="{Binding SearchShortcutNote}" IsVisible="{Binding HasSearchShortcutNote}" />
+                      <ctl:FieldRow.Actions>
+                        <ComboBox Name="SearchShortcut"
+                                  ItemsSource="{Binding SearchShortcutChoices}"
+                                  SelectedItem="{Binding SearchShortcutChoice}"
+                                  IsEnabled="{Binding SearchShortcutChangeable}"
+                                  AutomationProperties.Name="{x:Static res:Strings.SearchFromAnyApp}"
+                                  AutomationProperties.HelpText="{x:Static res:Strings.SearchFromAnyAppHelp}"
+                                  ToolTip.Tip="{x:Static res:Strings.SearchFromAnyAppHelp}"
+                                  MinWidth="160">
+                          <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SearchShortcutChoice">
+                              <TextBlock Text="{Binding Label}" />
+                            </DataTemplate>
+                          </ComboBox.ItemTemplate>
+                        </ComboBox>
+                      </ctl:FieldRow.Actions>
+                    </ctl:FieldRow>
                     <ctl:FieldRow Label="{x:Static res:Strings.ReduceTransparency}" IsVisible="{x:Static vm:SettingsViewModel.OffersReduceTransparency}">
                       <ctl:FieldRow.Actions>
                         <ToggleSwitch Name="ReduceTransparency"

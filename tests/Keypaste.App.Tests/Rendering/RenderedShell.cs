@@ -5,9 +5,11 @@ using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Keypaste.App.Controls;
+using Keypaste.App.GlobalShortcuts;
 using Keypaste.App.Navigation;
 using Keypaste.App.Session;
 using Keypaste.App.Tests.Clipboard;
+using Keypaste.App.Tests.GlobalShortcuts;
 using Keypaste.App.Tests.ViewModels;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
@@ -49,6 +51,7 @@ internal sealed class RenderedShell : IDisposable
     private readonly string _directory;
     private readonly Shortcuts _shortcuts;
     private readonly CrashReporting _crashes;
+    private readonly SearchShortcut _search;
     private OpenVaults? _vaults;
     private ShellViewModel? _shell;
     private UnlockViewModel? _unlock;
@@ -87,7 +90,13 @@ internal sealed class RenderedShell : IDisposable
         Window = new MainWindow { Height = 1000 };
         // Crash reports composed as launch composes them, so Settings shows their switch and Diagnostics their list.
         _crashes = new CrashReporting(_directory, new DesktopPreferences(_directory), endpoint: null);
-        _shell = new ShellViewModel(Session, _directory, null, clipboard: Clipboard, clock: new ManualClock(AppClock.Start)) { Crashes = _crashes, OffersTheme = offersTheme, Vaults = _vaults };
+        // Its default chord taken, so General draws the row with the note it is longest with.
+#pragma warning disable CA2000 // The search shortcut owns the system's chord.
+        var system = new FakeGlobalShortcut();
+        system.Taken.Add(GlobalChord.Default(OperatingSystem.IsMacOS()));
+        _search = new SearchShortcut(system, new DesktopPreferences(_directory), () => { });
+#pragma warning restore CA2000
+        _shell = new ShellViewModel(Session, _directory, null, clipboard: Clipboard, clock: new ManualClock(AppClock.Start)) { Crashes = _crashes, OffersTheme = offersTheme, Vaults = _vaults, GlobalSearch = _search };
         _shortcuts = App.Bind(Window, Session, () => _unlock, () => _shell);
         Root.Content = new ShellView { DataContext = _shell, Commands = _shortcuts.Commands };
         Session.Locked += OnLocked;
@@ -289,6 +298,7 @@ internal sealed class RenderedShell : IDisposable
         _shell?.Dispose();
         _unlock?.Dispose();
         _crashes.Dispose();
+        _search.Dispose();
 
         if (_vaults is null)
         {

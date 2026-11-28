@@ -108,6 +108,8 @@ public sealed record AppSettings
     internal const string AppearanceSectionName = "appearance";
     internal const string ReduceTransparencyKey = "reduce_transparency";
     internal const string AccountVaultSectionName = "account_vault";
+    internal const string ShortcutSectionName = "shortcut";
+    internal const string SearchShortcutKey = "search";
     internal const string AccountVaultPathKey = "path";
 
     /// <summary>How many days before an item expires Recommendations lists it, until chosen.</summary>
@@ -118,6 +120,7 @@ public sealed record AppSettings
 
     private const string _vaultComment = "the vault agents and the CLI use without --vault";
     private const string _accountVaultComment = "a vault the local account holds";
+    private const string _searchShortcutComment = "the keys that bring keypaste forward to search from any app, or off";
 
     private static readonly string[] _knownKeys = [IdleTimeoutKey, ThemeKey, LockWhenMinimizedKey, StayInTrayKey, VaultKey, CrashReportsKey, EarlierCrashReportsKey, TermsKey];
     private static readonly string[] _knownWindowKeys = [WindowBoundsKey, WindowStateKey, WindowListShareKey, WindowSidebarHiddenKey, WindowZoomKey, WindowTableSortsKey, WindowTableWidthsKey];
@@ -217,6 +220,10 @@ public sealed record AppSettings
     /// <remarks>In its own section, <c>[[appearance]]</c>, since <c>[[settings]]</c> already holds seven of the eight keys a section may.</remarks>
     public bool ReduceTransparency { get; init; }
 
+    /// <summary>The chord that brings the desktop forward to search from any app, as the app writes it, such as <c>ctrl+cmd+k</c>, or <c>off</c>; null until chosen, when the app's default holds.</summary>
+    /// <remarks>Kept as text, since which chords a platform offers is the app's to say. In its own section, <c>[[shortcut]]</c>, since <c>[[settings]]</c> already holds seven of the eight keys a section may.</remarks>
+    public string? SearchShortcut { get; init; }
+
     /// <summary>Reads the preferences.</summary>
     /// <param name="path">The file, from <see cref="KeypasteHome.SettingsPath"/>.</param>
     /// <returns>What the file asked for, or <see cref="Default"/> when it asked for nothing usable.</returns>
@@ -306,6 +313,11 @@ public sealed record AppSettings
             && appearance.TryGet(ReduceTransparencyKey, out var reduce) && reduce.Value.Kind == TomlValueKind.Number)
         {
             settings = settings with { ReduceTransparency = reduce.Value.Number != 0 };
+        }
+
+        if (document.Tables.FirstOrDefault(IsShortcutSection) is { } shortcut && TextOf(shortcut, SearchShortcutKey) is { } search)
+        {
+            settings = settings with { SearchShortcut = search };
         }
 
         List<string> held = [];
@@ -444,6 +456,7 @@ public sealed record AppSettings
         var log = existing.Tables.FirstOrDefault(IsLogSection);
         var recommendations = existing.Tables.FirstOrDefault(IsRecommendationsSection);
         var appearance = existing.Tables.FirstOrDefault(IsAppearanceSection);
+        var shortcut = existing.Tables.FirstOrDefault(IsShortcutSection);
 
         try
         {
@@ -502,12 +515,27 @@ public sealed record AppSettings
                 }
             }
 
+            if (shortcut is not null || settings.SearchShortcut is not null)
+            {
+                writer.BlankLine().Table(ShortcutSectionName);
+
+                if (settings.SearchShortcut is { } search && writer.CanWrite(SearchShortcutKey, search, _searchShortcutComment))
+                {
+                    writer.Text(SearchShortcutKey, search, _searchShortcutComment);
+                }
+
+                if (shortcut is not null && !TryWrite(writer, shortcut.Pairs.Where(pair => !string.Equals(pair.Key, SearchShortcutKey, StringComparison.Ordinal))))
+                {
+                    return false;
+                }
+            }
+
             foreach (var vault in settings.AccountVaults.Where(CanRecord))
             {
                 writer.BlankLine().Table(AccountVaultSectionName).Text(AccountVaultPathKey, RecentVaults.Portable(vault), _accountVaultComment);
             }
 
-            foreach (var table in existing.Tables.Where(other => !ReferenceEquals(other, section) && !ReferenceEquals(other, window) && !ReferenceEquals(other, share) && !ReferenceEquals(other, log) && !ReferenceEquals(other, recommendations) && !ReferenceEquals(other, appearance) && !IsAccountVaultSection(other)))
+            foreach (var table in existing.Tables.Where(other => !ReferenceEquals(other, section) && !ReferenceEquals(other, window) && !ReferenceEquals(other, share) && !ReferenceEquals(other, log) && !ReferenceEquals(other, recommendations) && !ReferenceEquals(other, appearance) && !ReferenceEquals(other, shortcut) && !IsAccountVaultSection(other)))
             {
                 writer.BlankLine().Table(table.Name);
 
@@ -588,6 +616,8 @@ public sealed record AppSettings
     private static bool IsRecommendationsSection(TomlTable table) => string.Equals(table.Name, RecommendationsSectionName, StringComparison.Ordinal);
 
     private static bool IsAppearanceSection(TomlTable table) => string.Equals(table.Name, AppearanceSectionName, StringComparison.Ordinal);
+
+    private static bool IsShortcutSection(TomlTable table) => string.Equals(table.Name, ShortcutSectionName, StringComparison.Ordinal);
 
     private static bool IsAccountVaultSection(TomlTable table) => string.Equals(table.Name, AccountVaultSectionName, StringComparison.Ordinal);
 

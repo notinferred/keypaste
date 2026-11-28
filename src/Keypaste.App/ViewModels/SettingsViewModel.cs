@@ -1,5 +1,6 @@
 using System.Globalization;
 using Keypaste.App.Globalization;
+using Keypaste.App.GlobalShortcuts;
 using Keypaste.App.Resources;
 using Keypaste.App.Session;
 using Keypaste.Core;
@@ -30,6 +31,14 @@ internal sealed record ExpiryReminderChoice(int Days, string Label);
 /// <param name="Path">The vault's file, or null for None.</param>
 /// <param name="Label">Its name in the pop-up.</param>
 internal sealed record AgentVaultChoice(string? Path, string Label)
+{
+    public override string ToString() => Label;
+}
+
+/// <summary>One chord General offers for searching keypaste from any app, or Off.</summary>
+/// <param name="Text">What <c>app.toml</c> says for it.</param>
+/// <param name="Label">How it reads in the pop-up.</param>
+internal sealed record SearchShortcutChoice(string Text, string Label)
 {
     public override string ToString() => Label;
 }
@@ -65,6 +74,7 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     private CliLinkStatus? _cliStatus;
     private IReadOnlyList<AgentVaultChoice>? _agentVaultChoices;
     private IReadOnlyList<RecentVault>? _recentVaults;
+    private IReadOnlyList<SearchShortcutChoice>? _searchShortcutChoices;
 
     internal SettingsViewModel(
         AppVaultSession session,
@@ -388,6 +398,49 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
             }
         }
     }
+
+    /// <summary>The chord that searches keypaste from any app, which General chooses; null where the app composes none.</summary>
+    internal SearchShortcut? SearchShortcut { get; init; }
+
+    internal bool OffersSearchShortcut => SearchShortcut is not null;
+
+    /// <summary>Whether the pop-up can be changed: not where the desktop gives an app no system-wide chord.</summary>
+    internal bool SearchShortcutChangeable => SearchShortcut is { Unavailable: null };
+
+    /// <summary>Off, then this platform's chords, the default first.</summary>
+    internal IReadOnlyList<SearchShortcutChoice> SearchShortcutChoices => _searchShortcutChoices ??=
+        SearchShortcut is { } shortcut
+            ? [new(GlobalChord.OffText, Strings.Off), .. GlobalChord.Offered(shortcut.Mac).Select(chord => new SearchShortcutChoice(chord.Text, chord.Shown(shortcut.Mac)))]
+            : [];
+
+    /// <summary>The chord in force, or Off; choosing one writes it and registers it at once.</summary>
+    internal SearchShortcutChoice? SearchShortcutChoice
+    {
+        get => SearchShortcut is { } shortcut
+            ? SearchShortcutChoices.FirstOrDefault(choice => string.Equals(choice.Text, shortcut.Chosen?.Text ?? GlobalChord.OffText, StringComparison.Ordinal))
+            : null;
+        set
+        {
+            if (value is not null && SearchShortcut is not null && !Equals(value, SearchShortcutChoice))
+            {
+                Persist(_settings with { SearchShortcut = value.Text });
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(SearchShortcutNote));
+                OnPropertyChanged(nameof(HasSearchShortcutNote));
+            }
+        }
+    }
+
+    /// <summary>Why the chosen chord does nothing, which stays on screen, or nothing while it works or is off.</summary>
+    internal string SearchShortcutNote => SearchShortcut switch
+    {
+        { State: SearchShortcutState.Unavailable, Unavailable: { } reason } => reason,
+        { State: SearchShortcutState.Taken, Chosen: { } chord } shortcut =>
+            $"Another app or the system already uses {chord.Shown(shortcut.Mac)}, so it does nothing here. Choose other keys.",
+        _ => string.Empty,
+    };
+
+    internal bool HasSearchShortcutNote => SearchShortcutNote.Length > 0;
 
     /// <summary>The vaults General's pop-up offers agents and the CLI: this computer's recent and open vaults, and None while none is chosen.</summary>
     internal IReadOnlyList<AgentVaultChoice> AgentVaultChoices => _agentVaultChoices ??= ReadAgentVaultChoices();

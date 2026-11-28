@@ -147,7 +147,7 @@ public sealed class LaunchPassesTests
         Assert.Equal(wellFormed, LaunchPasses.IsWellFormed(text));
 
     /// <summary>
-    /// The claim is what the app resolved, names and where each comes from, and whether a press answered it, so the
+    /// The claim is what the app resolved, names and where each comes from, and whether a press of Run or Open terminal answered it, so the
     /// store holds no value between the press or the card and the run however long it waits.
     /// </summary>
     [Fact]
@@ -156,7 +156,7 @@ public sealed class LaunchPassesTests
         static string[] Members(Type type) =>
             [.. type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(property => property.Name).Order(StringComparer.Ordinal)];
 
-        Assert.Equal(["Command", "Directory", "Pressed", "Preview", "Profile", "Project"], Members(typeof(LaunchClaim)));
+        Assert.Equal(["Command", "Directory", "OpensTerminal", "Pressed", "Preview", "Profile", "Project"], Members(typeof(LaunchClaim)));
         Assert.Equal(["Keys", "Profile", "Project", "RequiresLiveApproval", "Sources"], Members(typeof(EnvPreview)));
         Assert.Equal(["Entry", "Field", "Key"], Members(typeof(EnvSource)));
     }

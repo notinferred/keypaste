@@ -360,7 +360,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
             return;
         }
 
-        if (lifetime is null || !authority.RecordRun(resolved, lifetime, pressed))
+        if (lifetime is null || !authority.RecordRun(resolved, lifetime, pressed, opensTerminal: !run))
         {
             _report("Nothing was started: its History line could not be written. Check that the audit log can be written, then run it again.");
             return;
@@ -491,7 +491,7 @@ internal sealed partial class ProjectLaunchViewModel : ObservableObject, IDispos
         }
 
         // The set read again after the press or the card, which the resolver held to the first read's environment, names, items and protection.
-        var claim = new LaunchClaim(_project, resolved.Profile, plan.Directory, plan.Arguments, resolved.Preview) { Pressed = pressed };
+        var claim = new LaunchClaim(_project, resolved.Profile, plan.Directory, plan.Arguments, resolved.Preview) { Pressed = pressed, OpensTerminal = !run };
 
         if (authority.IssueLaunch(claim, lifetime) is not { } issued)
         {

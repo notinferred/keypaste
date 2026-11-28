@@ -232,8 +232,9 @@ public sealed class SessionAuthority : IApproverHandler
     /// <param name="set">The set the app released, read again after the person pressed Run or answered its card.</param>
     /// <param name="lifetimeId">The session the run was started in.</param>
     /// <param name="pressed">Whether the press of Run was the answer, with no card shown.</param>
+    /// <param name="opensTerminal">Whether the press was Open terminal, a terminal at a prompt, rather than Run.</param>
     /// <returns><see langword="true"/> once the line is written; a Run whose line is not written, from a session that has ended, or pressed for a protected set, which is asked live, starts nothing (T-6).</returns>
-    public bool RecordAppRun(EnvResolved set, string lifetimeId, bool pressed)
+    public bool RecordAppRun(EnvResolved set, string lifetimeId, bool pressed, bool opensTerminal = false)
     {
         ArgumentNullException.ThrowIfNull(set);
         ArgumentNullException.ThrowIfNull(lifetimeId);
@@ -249,7 +250,7 @@ public sealed class SessionAuthority : IApproverHandler
         var released = new EnvReply(set, set.Refusal);
         var recorded = _recorder.Recorded(
             released,
-            RequestRecords.EnvRun(set.Project, set.Profile, pressed ? AuditMethod.Pressed : AuditMethod.Prompt, released, lifetimeId, _vault.Key, confirmedInApp: true));
+            RequestRecords.EnvRun(set.Project, set.Profile, pressed ? AuditMethod.Pressed : AuditMethod.Prompt, released, lifetimeId, _vault.Key, confirmedInApp: true, opensTerminal));
 
         if (!ReferenceEquals(recorded, released))
         {
@@ -855,16 +856,16 @@ public sealed class SessionAuthority : IApproverHandler
                 RequestRecords.EnvRun(request.Project, request.Profile, refusal.Method, unadmitted, session: null, VaultNamed(request.Vault)));
         }
 
-        var (method, decided, confirmedInApp) = await Decided(
+        var (method, decided, launch) = await Decided(
             token => DecideEnvAsync(request, admitted, launchOnly, token),
             admitted,
-            (how, reason) => (how, Refused(request.Project, request.Profile, OutcomeOf(how), reason), false),
+            (how, reason) => (how, Refused(request.Project, request.Profile, OutcomeOf(how), reason), (LaunchClaim?)null),
             CancellationToken.None,
             cancellationToken).ConfigureAwait(false);
 
         var reply = _recorder.Recorded(
             decided,
-            RequestRecords.EnvRun(request.Project, request.Profile, method, decided, request.Session, _vault.Key, confirmedInApp));
+            RequestRecords.EnvRun(request.Project, request.Profile, method, decided, request.Session, _vault.Key, confirmedInApp: launch is not null, opensTerminal: launch?.OpensTerminal == true));
 
         if (reply.Set.Outcome == EnvOutcome.Resolved)
         {
@@ -874,7 +875,7 @@ public sealed class SessionAuthority : IApproverHandler
         return reply;
     }
 
-    private async ValueTask<(AuditMethod Method, EnvReply Reply, bool ConfirmedInApp)> DecideEnvAsync(
+    private async ValueTask<(AuditMethod Method, EnvReply Reply, LaunchClaim? Launch)> DecideEnvAsync(
         EnvRequest request,
         SessionLifetime admitted,
         bool launchOnly,
@@ -882,7 +883,7 @@ public sealed class SessionAuthority : IApproverHandler
     {
         if (launchOnly && request.Launch is null)
         {
-            return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Unauthorized, _launchOnly), false);
+            return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Unauthorized, _launchOnly), null);
         }
 
         if (_environments is not { } environments)
@@ -890,7 +891,7 @@ public sealed class SessionAuthority : IApproverHandler
             return (
                 AuditMethod.NoSession,
                 Refused(request.Project, request.Profile, EnvOutcome.NoSession, "the keypaste process holding this vault does not release env sets"),
-                false);
+                null);
         }
 
         LaunchClaim? launch = null;
@@ -898,33 +899,31 @@ public sealed class SessionAuthority : IApproverHandler
         // Spent on its first admitted presentation, before anything else is checked, so no pass is tried twice.
         if (request.Launch is { } pass && environments.Launches?.TryTake(pass, admitted.Id, out launch) != true)
         {
-            return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Unauthorized, _launchSpent), false);
+            return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Unauthorized, _launchSpent), null);
         }
-
-        var confirmedInApp = launch is not null;
 
         // A request carrying a pass is never shown on a prompt, and Claims holds its command to the one IssueLaunch bounded.
         if (EnvReleasePrompt.Problem(request.Project, request.Command, request.Directory, boundCommandLine: launch is null) is { } problem)
         {
-            return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Invalid, problem), confirmedInApp);
+            return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Invalid, problem), launch);
         }
 
         if (!EnvProfileNames.IsValid(request.Profile, out var invalid))
         {
-            return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Invalid, invalid), confirmedInApp);
+            return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Invalid, invalid), launch);
         }
 
         foreach (var key in request.Keys ?? [])
         {
             if (!EnvConvention.IsValidKey(key, out invalid))
             {
-                return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Invalid, invalid), confirmedInApp);
+                return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Invalid, invalid), launch);
             }
         }
 
         if (launch is not null && !Claims(launch, request))
         {
-            return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Unauthorized, _launchSpent), confirmedInApp);
+            return (AuditMethod.InvalidRequest, Refused(request.Project, request.Profile, EnvOutcome.Unauthorized, _launchSpent), launch);
         }
 
         // Every run is a new connection, so the cooldown names the request and not the connection:
@@ -997,7 +996,7 @@ public sealed class SessionAuthority : IApproverHandler
             _ => MethodOf(delivered.Set.Outcome),
         };
 
-        return (method, delivered, confirmedInApp);
+        return (method, delivered, launch);
     }
 
     /// <inheritdoc/>

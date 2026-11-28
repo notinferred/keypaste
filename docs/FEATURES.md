@@ -34,7 +34,7 @@ The guides use the 1.0.0 names.
 | Projects: `env pull`, `set`, `ls`, `rm`, `export --dotenv`, and `run <project> -- <command>` | `v0.3.0` | `--dotenv` writes plaintext ([plaintext limits](../SECURITY.md#plaintext-and-file-limits)) |
 | Projects by tag: `env:<project>` or `env:<project>:<stage>`, `env tag`, `env untag`, `-p`, `env diff`, protected `prod` and `production` | 1.0.0 | A `v0.3.0`-layout item is no longer a variable |
 | References: `kp://` in `env export`, `run --env-file`, `.env.keypaste` | 1.0.0 | [T-31] |
-| `run` asks the app or `keypaste approve` while one holds the vault, with no password typed; `--session` only asks, `--no-session` never does | 1.0.0 | [T-30] |
+| `run` from a terminal asks the app or `keypaste approve` while one holds the vault, with no password typed; `--session` only asks, `--no-session` and a piped password never do | 1.0.0 | [T-30] |
 | Scoped tokens: `token create` and `run --token` for CI | 1.0.0 | Asks nobody except for a protected stage ([T-32]) |
 | Edits while the vault is held go to its holder, which asks you | 1.0.0 | At most 64 KiB per request ([T-43]) |
 | `keypaste import` of a KDBX file or another manager's export | 1.0.0 | Not a YubiKey vault; the desktop's import can |
@@ -69,6 +69,7 @@ Every row is 1.0.0. [The desktop guide](desktop.md) describes the app. Screens a
 | Change access in Settings: password, key file and YubiKey | [T-28] |
 | Items: templates, custom fields, tags, URLs, one-time codes, attachments, duplicate, rename, undo | No auto-type editor |
 | Find over titles, groups, usernames, URLs and tags | Never reads a password, note or protected field |
+| Search from any app: ⌃⌘K or Alt+Shift+K, chosen or turned off in Settings, and Search… in the menu bar or tray | None under Wayland; no person has pressed it ([T-7]) |
 | Copy and reveal, a copy cleared on a timer, a reveal hidden on leaving, and both on lock and on quit, with clipboard markers | The CLI's macOS and Linux copies carry no marker ([T-19]) |
 | Generator and rotate | Rotation changes the vault, not the provider ([T-12]) |
 | History: list, reveal and restore a revision | History is in the same file, not a backup |
@@ -122,6 +123,7 @@ These tests run against source; `v0.3.0` passed its own release's gate. This is 
 [T-3]: ../THREATS.md#t-3--confused-deputy-a-malicious-or-impersonating-client
 [T-4]: ../THREATS.md#t-4--over-exposure-of-the-listing-surface
 [T-5]: ../THREATS.md#t-5--audit-log-tampering
+[T-7]: ../THREATS.md#t-7--where-the-master-password-is-typed
 [T-12]: ../THREATS.md#t-12--a-standing-approval-used-under-a-reason-nobody-read
 [T-13]: ../THREATS.md#t-13--an-allow-covers-a-kind-of-value-not-the-values-you-pictured
 [T-14]: ../THREATS.md#t-14--an-allow-is-a-standing-grant-to-anything-that-can-reach-the-owner

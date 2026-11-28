@@ -86,7 +86,7 @@ public sealed class MacTerminalRunTests
             Assert.Equal(2, driver.Output.Count(line => line.StartsWith("terminal launched: ", StringComparison.Ordinal)));
             Assert.DoesNotContain(driver.Output, line => line.StartsWith("terminal-card ", StringComparison.Ordinal));
             WaitForCount(windows, _confirmed, 2);
-            AssertOneLine(workspace, audited, "granted", "pressed");
+            AssertOneLine(workspace, audited, "granted", "pressed", opensTerminal: true);
             AssertNoRequestLeft(requests);
 
             // A lock and unlock between the press and the window's request: the unlock it was pressed in held its pass.
@@ -164,7 +164,7 @@ public sealed class MacTerminalRunTests
         return bundle;
     }
 
-    private static void AssertOneLine(Workspace workspace, int before, string decision, string method)
+    private static void AssertOneLine(Workspace workspace, int before, string decision, string method, bool opensTerminal = false)
     {
         var lines = Workspace.Lines(workspace.OwnerLog, before);
         var line = Assert.Single(lines);
@@ -173,7 +173,11 @@ public sealed class MacTerminalRunTests
             (line.GetProperty("client").GetProperty("name").GetString(), line.GetProperty("decision").GetString(), line.GetProperty("method").GetString()));
         if (decision == "granted")
         {
-            Assert.Equal(method == "pressed" ? "2 variable(s), pressed in the app" : "2 variable(s), confirmed in the app", line.GetProperty("reason").GetString());
+            Assert.Equal(
+                method != "pressed" ? "2 variable(s), confirmed in the app"
+                : opensTerminal ? "2 variable(s), Open terminal pressed in the app"
+                : "2 variable(s), pressed in the app",
+                line.GetProperty("reason").GetString());
         }
     }
 

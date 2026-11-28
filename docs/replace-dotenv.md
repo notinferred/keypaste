@@ -70,10 +70,10 @@ git log --oneline -- .env     # if this prints anything, treat those values as l
 keypaste run dev -- npm start
 ```
 
-Everything after `--` is the command. While the desktop app or `keypaste approve` holds the vault unlocked, this asks it instead of you typing the master password: it shows the project, variable names, command and directory, and logs the run ([approvals](approvals.md#runs-that-ask-for-a-projects-variables)). A refusal starts nothing. With nothing holding the vault, it asks for the master password each time.
+Everything after `--` is the command. While the desktop app or `keypaste approve` holds the vault unlocked, this asks it from a terminal instead of you typing the master password: it shows the project, variable names, command and directory, and logs the run ([approvals](approvals.md#runs-that-ask-for-a-projects-variables)). A refusal starts nothing. With nothing holding the vault, it asks for the master password each time.
 
 - **Only the app.** `--session` asks the app or `keypaste approve` and never opens the vault itself, so with neither it starts nothing.
-- **Never the app.** `--no-session` always opens the vault with the master password, as a script that pipes it in needs.
+- **Never the app.** `--no-session` always opens the vault with the master password. With the password piped in, as a script does, it opens the vault itself without the flag too.
 - **From the desktop.** Environments can import the `.env` and open a terminal running the project's command ([desktop](desktop.md#environments)).
 
 The child gets the variables in its environment and keypaste's stdin, stdout and stderr. keypaste closes the vault before starting it, passes signals to it, and returns its exit code. The child can still log or forward the values, and locking the vault cannot take them back ([SECURITY](../SECURITY.md)).
@@ -134,7 +134,7 @@ steps:
       KEYPASTE_MASTER: ${{ secrets.KEYPASTE_MASTER }}
 ```
 
-keypaste reads one line of stdin for the password. `--no-session` keeps it reading that line on a machine where the app holds the vault; without it the run would ask the app, and the password would be left on stdin for the command to read. Without a terminal, `rm`, `env rm`, `env pull` and `env export --dotenv` need `--yes`.
+keypaste reads one line of stdin for the password. With stdin piped it always opens the vault itself and reads that line, even on a machine where the app holds the vault, so the password is never left on stdin for the command to read; `--no-session` says so explicitly. Without a terminal, `rm`, `env rm`, `env pull` and `env export --dotenv` need `--yes`.
 
 <a id="the-escape-hatch"></a>
 

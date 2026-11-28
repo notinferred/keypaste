@@ -376,12 +376,13 @@ internal sealed class SessionHost : IDisposable
     /// <param name="set">The set released.</param>
     /// <param name="lifetimeId">The session the Run was started in.</param>
     /// <param name="pressed">Whether the press of Run was the answer, with no card shown.</param>
+    /// <param name="opensTerminal">Whether the press was Open terminal rather than Run.</param>
     /// <returns>Whether the line was written; false when nothing is hosted for that session.</returns>
-    internal bool RecordRun(Core.EnvResolved set, string lifetimeId, bool pressed)
+    internal bool RecordRun(Core.EnvResolved set, string lifetimeId, bool pressed, bool opensTerminal)
     {
         lock (_gate)
         {
-            return _hosted?.RecordRun(set, lifetimeId, pressed) == true;
+            return _hosted?.RecordRun(set, lifetimeId, pressed, opensTerminal) == true;
         }
     }
 
@@ -552,7 +553,7 @@ internal sealed class SessionHost : IDisposable
 
         internal void WithdrawLaunch(string pass) => _server.Authority.WithdrawLaunch(pass);
 
-        internal bool RecordRun(Core.EnvResolved set, string lifetimeId, bool pressed) => _server.Authority.RecordAppRun(set, lifetimeId, pressed);
+        internal bool RecordRun(Core.EnvResolved set, string lifetimeId, bool pressed, bool opensTerminal) => _server.Authority.RecordAppRun(set, lifetimeId, pressed, opensTerminal);
 
         internal Core.VaultMergeSave Merge(Core.Vault open, Func<Core.Vault, bool> swap) => _server.Authority.Merge(open, swap, Surface);
 

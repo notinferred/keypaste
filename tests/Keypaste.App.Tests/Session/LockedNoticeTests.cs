@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Keypaste.App.Notifications;
 using Keypaste.App.Session;
+using Keypaste.App.Tests.GlobalShortcuts;
 using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
@@ -524,6 +525,42 @@ public sealed class LockedNoticeTests
             await Until(() => app.Authority.Session.IsUnlocked);
             Assert.Equal(2, keys.Asked);
             Assert.True(app.Main!.IsVisible);
+            app.Main.Close();
+        });
+
+    /// <summary>The search shortcut is the person's own act too, so with every vault locked it brings the unlock screen forward and asks quick unlock at once.</summary>
+    [Fact]
+    public Task The_search_shortcut_with_every_vault_locked_asks_quick_unlock_at_once() =>
+        HeadlessSession.On(async () =>
+        {
+            using var home = new TempHome();
+            using var vault = new TempVault();
+            using var claim = Claim(home);
+            using var lifetime = new ClassicDesktopStyleApplicationLifetime();
+            Attach(lifetime);
+            var keys = new FakeQuickUnlockKeys(MachineQuickUnlock.TouchIdName);
+            var system = new FakeGlobalShortcut();
+            using var app = new App { Preferences = Tray(home), Claim = claim, Notifications = new NoSystemNotifications(), QuickUnlockKeys = () => keys, GlobalShortcutFor = () => system };
+            app.Launch(lifetime, background: true);
+            lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
+            Assert.True(Screen(app).Offer(vault.Path_));
+
+            Unlock(app, vault.Path_);
+            Assert.Equal(QuickUnlockOutcome.Done, app.Authority!.Session.KeepForQuickUnlock());
+            WindowInput.Drain();
+            var unlocked = Screen(app);
+            app.Authority.Session.Lock(VaultLockReason.Manual);
+            await Until(() => !ReferenceEquals(Screen(app), unlocked));
+            Assert.True(Screen(app).Offer(vault.Path_));
+            Assert.True(Screen(app).ShowsQuickUnlockAlone);
+            Assert.False(app.Main!.IsVisible);
+            var asked = keys.Asked;
+
+            system.Press();
+
+            await Until(() => app.Authority.Session.IsUnlocked);
+            Assert.Equal(asked + 1, keys.Asked);
+            Assert.True(app.Main.IsVisible);
             app.Main.Close();
         });
 

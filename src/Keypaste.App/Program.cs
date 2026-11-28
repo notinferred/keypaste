@@ -1,5 +1,6 @@
 using Avalonia;
 using Keypaste.App.Globalization;
+using Keypaste.App.GlobalShortcuts;
 using Keypaste.App.Session;
 using Keypaste.Core;
 using Keypaste.Core.Audit;
@@ -82,6 +83,7 @@ internal static class Program
                         DockIcon = OperatingSystem.IsMacOS() ? MacDock.Show : null,
                         HandedPath = HandedFile.FromArguments(args, Environment.CurrentDirectory),
                         BrowserHostsFor = () => browserHosts,
+                        GlobalShortcutFor = PlatformShortcut.ForThisProcess,
                     },
                     showsInDock: !hidden).StartWithClassicDesktopLifetime(args);
             }),

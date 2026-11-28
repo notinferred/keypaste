@@ -36,10 +36,10 @@ namespace Keypaste.Cli.Commands;
 /// While the app or <c>keypaste approve</c> holds the vault unlocked, the first phase is a question
 /// instead: the set comes from that process, over its endpoint, after the person there approves this
 /// command, and that process records it; nothing here opens the vault or reads a password. Only when
-/// nothing answers for the vault, or with <c>--no-session</c>, is the vault opened here. With
-/// <c>--session</c> nothing here opens it, then or as a fallback. A run that Terminal starts for the
-/// app's own Run on macOS carries that Run in <c>KEYPASTE_LAUNCH</c>, which is sent in place of a
-/// second question and handed to no child.
+/// nothing answers for the vault, when standard input is not a terminal, or with <c>--no-session</c>,
+/// is the vault opened here. With <c>--session</c> nothing here opens it, then or as a fallback. A
+/// run that Terminal starts for the app's own Run on macOS carries that Run in <c>KEYPASTE_LAUNCH</c>,
+/// which is sent in place of a second question and handed to no child.
 /// </para>
 /// </remarks>
 internal static class RunCommand
@@ -64,8 +64,9 @@ internal static class RunCommand
             + "nothing is written to disk, and the vault is closed before the command starts. with no project, the one "
             + $"projects.json maps this directory to is used, and its {EnvReferenceFile.FileName} only when that file names "
             + "nothing but that project's variables.\n\n"
-            + "while the keypaste app or `keypaste approve` holds the vault unlocked, it is asked instead and no password is "
-            + "typed here: it shows you the project, its variable names, the command and this directory, and logs the run. "
+            + "run from a terminal while the keypaste app or `keypaste approve` holds the vault unlocked, that process is asked "
+            + "instead and no password is typed here: it shows you the project, its variable names, the command and this directory, "
+            + "and logs the run. with standard input piped, the vault is opened here with the password it reads from it. "
             + "--session asks only it, --no-session always opens the vault here, and a token releases only what its scope "
             + "covers. everything after the -- "
             + "belongs to the command, and once it starts, its exit code is keypaste's: 127 means there is no such command "
@@ -181,7 +182,8 @@ internal static class RunCommand
             return FromSession(path, line.GetValue(CliOptions.Approver), set, command, launch, context);
         }
 
-        if (!here && FromHolder(path, set, command, context) is { } asked)
+        // A password piped in for a script is read here, never left on standard input for the child to read.
+        if (!here && context.Prompt.IsInteractive && FromHolder(path, set, command, context) is { } asked)
         {
             return asked;
         }

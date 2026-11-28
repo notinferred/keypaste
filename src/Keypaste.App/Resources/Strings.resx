@@ -307,6 +307,8 @@
   <data name="OpenInYourBrowser" xml:space="preserve"><value>Open in your browser</value></data>
   <data name="OpenItem" xml:space="preserve"><value>Open item</value></data>
   <data name="OpenAtLogin" xml:space="preserve"><value>Open at login</value></data>
+  <data name="SearchFromAnyApp" xml:space="preserve"><value>Search from any app</value></data>
+  <data name="SearchFromAnyAppHelp" xml:space="preserve"><value>These keys bring keypaste forward with its search ready, whatever app you're in. With every vault locked they show the unlock screen, and with an agent's request waiting, its prompt.</value></data>
   <data name="OpenTerminal" xml:space="preserve"><value>Open terminal</value></data>
   <data name="OpenVault" xml:space="preserve"><value>Open vault…</value></data>
   <data name="OptionalOneYouHaveOrANewX7bc1a7" xml:space="preserve"><value>Optional: one you have, or a new one keypaste makes where you choose. Losing it locks the vault.</value></data>

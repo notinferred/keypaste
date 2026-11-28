@@ -10,9 +10,10 @@ using Xunit;
 namespace Keypaste.Cli.Tests;
 
 /// <summary>
-/// A plain <c>keypaste run</c> asks the app or <c>keypaste approve</c> while its claim holds the vault and it answers
-/// unlocked, exactly as <c>--session</c> does, and that owner records it; with nothing answering it opens the vault with
-/// the master password as before, and <c>--no-session</c> always does.
+/// A plain <c>keypaste run</c> from a terminal asks the app or <c>keypaste approve</c> while its claim holds the vault and
+/// it answers unlocked, exactly as <c>--session</c> does, and that owner records it; with nothing answering it opens the
+/// vault with the master password as before, and <c>--no-session</c> always does. With its standard input piped, as a
+/// script's is, it opens the vault with the password it reads there, so that line never reaches the child.
 /// </summary>
 public sealed class RunAsksTheHolderTests : IDisposable
 {
@@ -33,6 +34,7 @@ public sealed class RunAsksTheHolderTests : IDisposable
         }
 
         _harness.Prompt.PromptsSeen.Clear();
+        _harness.Prompt.Interactive = true;
         _harness.Environment[ApproverEndpoint.EnvironmentVariable] = _pipe;
         _harness.Environment[KeypasteHome.EnvironmentVariable] = _harness.Directory;
     }
@@ -72,6 +74,27 @@ public sealed class RunAsksTheHolderTests : IDisposable
         var asked = Assert.IsType<EnvReleasePrompt>(owner.Channel.Last);
         Assert.Equal("deploy --to staging", asked.Command);
         Assert.Contains("\"entries\":[\"env/dev/.env\"", Assert.Single(owner.AuditLines()), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(OwnerKind.DesktopApp)]
+    [InlineData(OwnerKind.TerminalAgent)]
+    public async Task A_plain_run_with_its_input_piped_reads_the_password_there_and_asks_no_holder(OwnerKind holder)
+    {
+        await using var owner = Owner(ApprovalAnswer.ApprovedOnce);
+        _harness.Prompt.Interactive = false;
+        _harness.Prompt.Enqueue(_master);
+
+        using (Hold(holder))
+        {
+            _harness.AssertExit(0, Run());
+        }
+
+        Assert.Equal([CliHarness.MasterPasswordPrompt], _harness.Prompt.PromptsSeen);
+        Assert.Equal(_value, _harness.ProcessLauncher.Environment["TOKEN"]);
+        Assert.DoesNotContain("answer in its prompt", _harness.Err, StringComparison.Ordinal);
+        Assert.Null(owner.Channel.Last);
+        Assert.Empty(owner.AuditLines());
     }
 
     [Fact]

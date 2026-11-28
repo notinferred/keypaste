@@ -93,7 +93,7 @@ A `request_item_change` asks to move an item to Trash, mark it expired, or delet
 
 ### Runs
 
-`keypaste run <project> -- <command>` asks the approver for the project's env set while it holds the vault, and `--session` asks only it ([replace-dotenv](replace-dotenv.md#run-your-app)). An agent's `run` tool asks the same way once you turn run on ([agent settings](policy.md#running-commands)).
+`keypaste run <project> -- <command>` in a terminal asks the approver for the project's env set while it holds the vault, and `--session` asks only it; with its input piped, it opens the vault itself with the master password it reads there ([replace-dotenv](replace-dotenv.md#run-your-app)). An agent's `run` tool asks the same way once you turn run on ([agent settings](policy.md#running-commands)).
 
 The prompt names the project, variable names, source items, command, directory and, for an agent, its reason, never a value. A run from a terminal or an agent is asked every time, with Deny and Allow once only. Refusing it refuses the same run for a minute. Approve only a run you started or a command you understand ([THREATS](../THREATS.md) T-30, T-34, T-35).
 
@@ -176,7 +176,7 @@ The next record starts a new file. Check the archive with `keypaste log verify -
 |---|---|
 | `prompt` | You answered |
 | `picked` | A login filled at your pick in keypaste's list in the page |
-| `pressed` | A run you started with Run or Run again in the app |
+| `pressed` | A run you started with Run, Open terminal or Run again in the app |
 | `allowed` / `blocked` | Released or refused without asking by a setting or kept answer |
 | `exposure` | A listing |
 | `out-of-scope` | Out of reach or absent, one answer for both |

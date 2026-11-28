@@ -212,8 +212,9 @@ internal sealed class AppAuthority : IDisposable
     /// <param name="set">The set released, read again after the person pressed Run or answered its card.</param>
     /// <param name="lifetimeId">The session the Run was started in.</param>
     /// <param name="pressed">Whether the press of Run was the answer, with no card shown.</param>
+    /// <param name="opensTerminal">Whether the press was Open terminal rather than Run, which the line says.</param>
     /// <returns>Whether the line was written; a Run whose line was not starts nothing (T-6).</returns>
-    internal bool RecordRun(Core.EnvResolved set, string lifetimeId, bool pressed) => _host.RecordRun(set, lifetimeId, pressed);
+    internal bool RecordRun(Core.EnvResolved set, string lifetimeId, bool pressed, bool opensTerminal = false) => _host.RecordRun(set, lifetimeId, pressed, opensTerminal);
 
     /// <summary>Quits: the session locks before its endpoint stops, so what an agent has waiting is answered as locked rather than dropped with the endpoint.</summary>
     public void Dispose()
