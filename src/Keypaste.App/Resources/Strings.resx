@@ -308,7 +308,7 @@
   <data name="OpenItem" xml:space="preserve"><value>Open item</value></data>
   <data name="OpenAtLogin" xml:space="preserve"><value>Open at login</value></data>
   <data name="SearchFromAnyApp" xml:space="preserve"><value>Search from any app</value></data>
-  <data name="SearchFromAnyAppHelp" xml:space="preserve"><value>These keys bring keypaste forward with its search ready, whatever app you're in. With every vault locked they show the unlock screen, and with an agent's request waiting, its prompt.</value></data>
+  <data name="SearchFromAnyAppHelp" xml:space="preserve"><value>These keys open quick search, or the keypaste window, whatever app you're in. With every vault locked they ask Touch ID or Windows Hello first where it can unlock one, or show the unlock screen, and with an agent's request waiting, its prompt.</value></data>
   <data name="OpenTerminal" xml:space="preserve"><value>Open terminal</value></data>
   <data name="OpenVault" xml:space="preserve"><value>Open vault…</value></data>
   <data name="OptionalOneYouHaveOrANewX7bc1a7" xml:space="preserve"><value>Optional: one you have, or a new one keypaste makes where you choose. Losing it locks the vault.</value></data>
@@ -756,4 +756,11 @@
   <data name="YourHardwareKeyAsksForATouchWhenItSaves" xml:space="preserve"><value>Your hardware key asks for a touch when it saves.</value></data>
   <data name="StrengthenedThisVaultsPasswordProtection" xml:space="preserve"><value>Strengthened this vault's password protection. A copy of the file from before is kept with this vault's backups.</value></data>
   <data name="AnotherProgramSavedThisVaultSoItWasntStrengthened" xml:space="preserve"><value>Another program saved this vault meanwhile, and keypaste has merged its save, so the vault wasn't strengthened. Strengthen again.</value></data>
+  <data name="QuickSearch" xml:space="preserve"><value>Quick search</value></data>
+  <data name="QuickSearchHint" xml:space="preserve"><value>Type to search the titles, usernames, websites and tags of every unlocked vault.</value></data>
+  <data name="OpenInKeypaste" xml:space="preserve"><value>Open in keypaste</value></data>
+  <data name="QuickSearchResults" xml:space="preserve"><value>Matching items</value></data>
+  <data name="TheShortcutOpens" xml:space="preserve"><value>The shortcut opens</value></data>
+  <data name="TheShortcutOpensHelp" xml:space="preserve"><value>Quick search copies an item's password and hands you back to the app you were in. The keypaste window opens on Items with its search ready.</value></data>
+  <data name="TheKeypasteWindow" xml:space="preserve"><value>The keypaste window</value></data>
 </root>

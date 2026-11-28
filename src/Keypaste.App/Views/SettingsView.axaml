@@ -157,6 +157,23 @@
                         </ComboBox>
                       </ctl:FieldRow.Actions>
                     </ctl:FieldRow>
+                    <ctl:FieldRow Classes="adaptive" Label="{x:Static res:Strings.TheShortcutOpens}" IsVisible="{Binding OffersSearchShortcut}">
+                      <ctl:FieldRow.Actions>
+                        <ComboBox Name="SearchOpens"
+                                  ItemsSource="{Binding SearchOpensChoices}"
+                                  SelectedItem="{Binding SearchOpensChoice}"
+                                  AutomationProperties.Name="{x:Static res:Strings.TheShortcutOpens}"
+                                  AutomationProperties.HelpText="{x:Static res:Strings.TheShortcutOpensHelp}"
+                                  ToolTip.Tip="{x:Static res:Strings.TheShortcutOpensHelp}"
+                                  MinWidth="160">
+                          <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SearchOpensChoice">
+                              <TextBlock Text="{Binding Label}" />
+                            </DataTemplate>
+                          </ComboBox.ItemTemplate>
+                        </ComboBox>
+                      </ctl:FieldRow.Actions>
+                    </ctl:FieldRow>
                     <ctl:FieldRow Label="{x:Static res:Strings.ReduceTransparency}" IsVisible="{x:Static vm:SettingsViewModel.OffersReduceTransparency}">
                       <ctl:FieldRow.Actions>
                         <ToggleSwitch Name="ReduceTransparency"

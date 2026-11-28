@@ -261,6 +261,27 @@ public sealed class AppSettingsTests : IDisposable
         Assert.DoesNotContain("[[shortcut]]", File.ReadAllText(SettingsFile), StringComparison.Ordinal);
     }
 
+    /// <summary>What the search shortcut opens is quick search until the keypaste window is chosen, which alone is written, beside the chord and what its section holds.</summary>
+    [Fact]
+    public void What_the_search_shortcut_opens_round_trips_and_is_quick_search_unless_the_window_is_written()
+    {
+        Assert.Equal(SearchOpens.QuickSearch, AppSettings.Load(SettingsFile).SearchOpens);
+
+        File.WriteAllText(SettingsFile, "[[shortcut]]\nsearch = \"ctrl+cmd+k\"\nopens = \"spotlight\"\nnote = \"kept\"\n");
+        Assert.Equal(SearchOpens.QuickSearch, AppSettings.Load(SettingsFile).SearchOpens);
+
+        Assert.True(AppSettings.Save(SettingsFile, AppSettings.Load(SettingsFile) with { SearchOpens = SearchOpens.Window }));
+        var text = File.ReadAllText(SettingsFile);
+        Assert.Equal(SearchOpens.Window, AppSettings.Load(SettingsFile).SearchOpens);
+        Assert.Equal("ctrl+cmd+k", AppSettings.Load(SettingsFile).SearchShortcut);
+        Assert.Contains("note = \"kept\"", text, StringComparison.Ordinal);
+        Assert.Single(text.Split('\n'), line => line.StartsWith("opens = ", StringComparison.Ordinal));
+
+        Assert.True(AppSettings.Save(SettingsFile, AppSettings.Load(SettingsFile) with { SearchOpens = SearchOpens.QuickSearch }));
+        Assert.DoesNotContain("opens = ", File.ReadAllText(SettingsFile), StringComparison.Ordinal);
+        Assert.Equal(SearchOpens.QuickSearch, AppSettings.Load(SettingsFile).SearchOpens);
+    }
+
     [Fact]
     public void The_file_it_writes_contains_no_true_or_false()
     {

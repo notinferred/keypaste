@@ -301,7 +301,7 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Mitigation.** The password is typed only into the desktop app or the terminal running `keypaste approve`. No request can make a password prompt appear: a request to a locked vault is refused, and the app's notice opens the unlock screen only at the person's press.
 
-**Limit.** `keypaste approve` has no idle lock. A same-user process can bring the app's unlock screen forward (T-29). On a Mac, it can also make Touch ID ask where Touch ID can reopen the vault, because a Dock click and a reopen request from another program arrive alike. A process that can type keys, as any same-user program can on Windows and X11 and one with the Accessibility permission on a Mac, can press the search shortcut, which brings the unlock screen forward and asks Windows Hello or Touch ID the same way.
+**Limit.** `keypaste approve` has no idle lock. A same-user process can bring the app's unlock screen forward (T-29). On a Mac, it can also make Touch ID ask where Touch ID can reopen the vault, because a Dock click and a reopen request from another program arrive alike. A process that can type keys, as any same-user program can on Windows and X11 and one with the Accessibility permission on a Mac, can press the search shortcut, which asks Windows Hello or Touch ID the same way, before quick search or on the unlock screen.
 
 **Status.** `v0.3.0` for the terminal approver; the locked-app notice unreleased.
 
@@ -331,7 +331,7 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Mitigation.** The bridge and `keypaste approve` never touch the clipboard. The CLI and the desktop clear a copied value after 20 seconds, and the desktop also on lock and quit. Copies opt out of Windows Clipboard History, and the desktop's carry secret markers for macOS and KDE managers.
 
-**Limit.** Managers may ignore the markers, nothing stops a process reading the clipboard, and remote sessions can copy it elsewhere. A crash, forced quit or power loss skips the clear.
+**Limit.** Managers may ignore the markers, nothing stops a process reading the clipboard, and remote sessions can copy it elsewhere. A crash, forced quit or power loss skips the clear. A process that can type keys, as any same-user program can on Windows and X11, can press the search shortcut, type a title and press Return in quick search, as it could in the window, and so put a password on the clipboard it then reads.
 
 **Status.** `v0.3.0` for `keypaste get`; desktop clearing and markers unreleased.
 

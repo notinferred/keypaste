@@ -528,7 +528,10 @@ public sealed class LockedNoticeTests
             app.Main.Close();
         });
 
-    /// <summary>The search shortcut is the person's own act too, so with every vault locked it brings the unlock screen forward and asks quick unlock at once.</summary>
+    /// <summary>
+    /// The search shortcut is the person's own act too, so with every vault locked and the keypaste window chosen it brings the unlock
+    /// screen forward and asks quick unlock at once; quick search asks it with no window, as <see cref="QuickSearchTests"/> holds.
+    /// </summary>
     [Fact]
     public Task The_search_shortcut_with_every_vault_locked_asks_quick_unlock_at_once() =>
         HeadlessSession.On(async () =>
@@ -540,7 +543,9 @@ public sealed class LockedNoticeTests
             Attach(lifetime);
             var keys = new FakeQuickUnlockKeys(MachineQuickUnlock.TouchIdName);
             var system = new FakeGlobalShortcut();
-            using var app = new App { Preferences = Tray(home), Claim = claim, Notifications = new NoSystemNotifications(), QuickUnlockKeys = () => keys, GlobalShortcutFor = () => system };
+            var preferences = Tray(home);
+            preferences.Update(preferences.Current with { SearchOpens = SearchOpens.Window });
+            using var app = new App { Preferences = preferences, Claim = claim, Notifications = new NoSystemNotifications(), QuickUnlockKeys = () => keys, GlobalShortcutFor = () => system };
             app.Launch(lifetime, background: true);
             lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
             Assert.True(Screen(app).Offer(vault.Path_));

@@ -468,6 +468,7 @@ public static class Strings
     public static string OpenAVault => Manager.GetString("OpenAVault", CultureInfo.CurrentUICulture)!;
     public static string OpenAsItsOwnVault => Manager.GetString("OpenAsItsOwnVault", CultureInfo.CurrentUICulture)!;
     public static string OpenAtLogin => Manager.GetString("OpenAtLogin", CultureInfo.CurrentUICulture)!;
+    public static string OpenInKeypaste => Manager.GetString("OpenInKeypaste", CultureInfo.CurrentUICulture)!;
     public static string OpenInYourBrowser => Manager.GetString("OpenInYourBrowser", CultureInfo.CurrentUICulture)!;
     public static string OpenItem => Manager.GetString("OpenItem", CultureInfo.CurrentUICulture)!;
     public static string OpenProject => Manager.GetString("OpenProject", CultureInfo.CurrentUICulture)!;
@@ -497,6 +498,9 @@ public static class Strings
     public static string ProjectTagsDropped => Manager.GetString("ProjectTagsDropped", CultureInfo.CurrentUICulture)!;
     public static string ProtectField => Manager.GetString("ProtectField", CultureInfo.CurrentUICulture)!;
     public static string ProtectThisField => Manager.GetString("ProtectThisField", CultureInfo.CurrentUICulture)!;
+    public static string QuickSearch => Manager.GetString("QuickSearch", CultureInfo.CurrentUICulture)!;
+    public static string QuickSearchHint => Manager.GetString("QuickSearchHint", CultureInfo.CurrentUICulture)!;
+    public static string QuickSearchResults => Manager.GetString("QuickSearchResults", CultureInfo.CurrentUICulture)!;
     public static string Quit => Manager.GetString("Quit", CultureInfo.CurrentUICulture)!;
     public static string QuitKeypaste => Manager.GetString("QuitKeypaste", CultureInfo.CurrentUICulture)!;
     public static string ReadProjectStageKeyOrStarForTheWholeSet => Manager.GetString("ReadProjectStageKeyOrStarForTheWholeSet", CultureInfo.CurrentUICulture)!;
@@ -664,9 +668,12 @@ public static class Strings
     public static string TermsOfUse => Manager.GetString("TermsOfUse", CultureInfo.CurrentUICulture)!;
     public static string TheCheckAsksTheYubiKeyTheUnlockX4a39c1 => Manager.GetString("TheCheckAsksTheYubiKeyTheUnlockX4a39c1", CultureInfo.CurrentUICulture)!;
     public static string TheCommandAndProgramsRunningAsYouCanReadTheseValues => Manager.GetString("TheCommandAndProgramsRunningAsYouCanReadTheseValues", CultureInfo.CurrentUICulture)!;
+    public static string TheKeypasteWindow => Manager.GetString("TheKeypasteWindow", CultureInfo.CurrentUICulture)!;
     public static string TheNameAProjectReadsItUnderX9a2ebe => Manager.GetString("TheNameAProjectReadsItUnderX9a2ebe", CultureInfo.CurrentUICulture)!;
     public static string ThePassword => Manager.GetString("ThePassword", CultureInfo.CurrentUICulture)!;
     public static string ThePasswordAsAnObject => Manager.GetString("ThePasswordAsAnObject", CultureInfo.CurrentUICulture)!;
+    public static string TheShortcutOpens => Manager.GetString("TheShortcutOpens", CultureInfo.CurrentUICulture)!;
+    public static string TheShortcutOpensHelp => Manager.GetString("TheShortcutOpensHelp", CultureInfo.CurrentUICulture)!;
     public static string TheTOTPCode => Manager.GetString("TheTOTPCode", CultureInfo.CurrentUICulture)!;
     public static string TheTokenAsAnObject => Manager.GetString("TheTokenAsAnObject", CultureInfo.CurrentUICulture)!;
     public static string TheTotpCodeAsAnObject => Manager.GetString("TheTotpCodeAsAnObject", CultureInfo.CurrentUICulture)!;

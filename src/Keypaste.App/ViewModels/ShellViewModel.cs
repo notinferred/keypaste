@@ -1041,6 +1041,29 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
         return entries;
     }
 
+    /// <summary>
+    /// Quick search over every unlocked vault, matching as Items' list does and copying through this shell's clipboard, so a
+    /// copy counts down and clears as one made in the window does, and a lock, which disposes the shell, clears it too.
+    /// </summary>
+    /// <param name="done">Closes quick search and gives the keyboard back to the app in use.</param>
+    /// <param name="showWindow">Closes quick search and brings the keypaste window forward.</param>
+    internal QuickSearchViewModel QuickSearch(Action done, Action showWindow)
+    {
+        ArgumentNullException.ThrowIfNull(done);
+        ArgumentNullException.ThrowIfNull(showWindow);
+
+        var unlocked = UnlockedSections;
+        var home = unlocked.Count > 0 ? unlocked[0] : _itemsVault;
+        IReadOnlyList<AppVaultSession> others = [.. unlocked.Where(vault => vault != home).Select(vault => vault.Session)];
+        var entries = new EntriesViewModel(home.Session, Clipboard, post: _post, table: Tables.Items, alsoListed: others, titleOf: session => SectionOf(session).Title) { VaultTitle = home.Title };
+
+        return new QuickSearchViewModel(entries, Clipboard, session => SectionOf(session).Title, done, (name, vault) =>
+        {
+            showWindow();
+            OpenEntry(name, vault);
+        });
+    }
+
     /// <summary>Shows Agents with one agent's settings open on its row.</summary>
     /// <param name="agent">The agent's name.</param>
     internal void OpenAgentSettings(string agent) => Leave(() =>
@@ -1266,7 +1289,7 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     internal void OpenEntry(EntryName name) => OpenEntry(name, _session);
 
     /// <summary>Items listing every item of <paramref name="vault"/>'s vault with <paramref name="name"/> selected.</summary>
-    private void OpenEntry(EntryName name, AppVaultSession vault)
+    internal void OpenEntry(EntryName name, AppVaultSession vault)
     {
         ArgumentNullException.ThrowIfNull(name);
 

@@ -58,6 +58,9 @@ internal sealed partial class App : Application, IDisposable
     private IClassicDesktopStyleApplicationLifetime? _desktop;
     private AppTray? _tray;
     private SearchShortcut? _searchShortcut;
+    private QuickSearchWindow? _quickSearch;
+    private ActivityWatch? _quickSearchActivity;
+    private bool _quickSearchFromKeypaste;
     private IActivatableLifetime? _activatable;
     private IDisposable? _reopen;
     private LockedNotice? _lockedNotice;
@@ -382,19 +385,40 @@ internal sealed partial class App : Application, IDisposable
     }
 
     /// <summary>
-    /// The search shortcut, pressed in any app, and Search… in the menu bar or tray: an agent's request waiting for an
-    /// answer comes forward first, focused on Deny and disarmed for a second (THREATS T-11); otherwise the window, on Items
-    /// with its search empty and holding the keyboard, or with every vault locked the unlock screen, which asks Windows
-    /// Hello or Touch ID at once.
+    /// The search shortcut, pressed in any app, and Search… in the menu bar, tray and Dock: an agent's request waiting for an
+    /// answer comes forward first, focused on Deny and disarmed for a second (THREATS T-11). Otherwise, as Settings chooses,
+    /// quick search, or the window on Items with its search empty and holding the keyboard. With every vault locked, quick
+    /// search first asks Windows Hello or Touch ID where they can reopen a vault, and opens once it does; without them, and
+    /// for the window, it is the unlock screen, which asks them at once.
     /// </summary>
     internal void SearchAtPersonsAct()
     {
+        // Read before keypaste comes forward: whether the person was in keypaste, where quick search hands the keyboard back.
+        var fromKeypaste = _desktop?.Windows.Any(window => window is { IsVisible: true, IsActive: true }) == true;
+
         // A Mac app pressed from the background is made active first, so what it shows comes in front of the app in use.
         DockIcon?.Invoke(true);
 
         if (_vaults?.ShowPrompt() == true)
         {
             return;
+        }
+
+        if (_preferences?.Current.SearchOpens != Core.Settings.SearchOpens.Window && Crashes is not { AsksTerms: true })
+        {
+            if (_shell is { } open)
+            {
+                ShowQuickSearch(open, fromKeypaste);
+                return;
+            }
+
+            if (_unlock is { AsksQuickUnlockAtOnce: true } unlock)
+            {
+                // The person's own act, so an unlock the browser asked for earlier no longer hands keypaste back to it.
+                _unlockForBrowser = null;
+                _ = QuickSearchAfterQuickUnlockAsync(unlock, fromKeypaste);
+                return;
+            }
         }
 
         OpenWindow();
@@ -406,6 +430,80 @@ internal sealed partial class App : Application, IDisposable
         else
         {
             _commands?.StartSearch();
+        }
+    }
+
+    /// <summary>Asks Windows Hello or Touch ID with no window shown, then opens quick search; the unlock screen says why one opened nothing, and a cancel shows nothing.</summary>
+    private async Task QuickSearchAfterQuickUnlockAsync(UnlockViewModel unlock, bool fromKeypaste)
+    {
+        await unlock.ResumeAsync().ConfigureAwait(true);
+
+        if (_shell is { } open)
+        {
+            ShowQuickSearch(open, fromKeypaste);
+        }
+        else if (ReferenceEquals(unlock, _unlock) && (unlock.HasMessage || unlock.HasOwner))
+        {
+            OpenWindow();
+        }
+    }
+
+    /// <summary>Quick search's window, while it is open.</summary>
+    internal QuickSearchWindow? QuickSearch => _quickSearch;
+
+    /// <summary>Opens quick search over every unlocked vault, or brings it forward where it is open.</summary>
+    private void ShowQuickSearch(ShellViewModel shell, bool fromKeypaste)
+    {
+        if (_quickSearch is { } showing)
+        {
+            showing.Activate();
+            return;
+        }
+
+        _quickSearchFromKeypaste = fromKeypaste;
+        var window = new QuickSearchWindow(shell.QuickSearch(HandBackFromQuickSearch, () =>
+        {
+            CloseQuickSearch();
+            OpenWindow();
+        }));
+
+        window.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_quickSearch, window))
+            {
+                _quickSearch = null;
+                _quickSearchActivity?.Dispose();
+                _quickSearchActivity = null;
+            }
+
+            (window.DataContext as IDisposable)?.Dispose();
+        };
+
+        _quickSearch = window;
+
+        // Typing in quick search is someone at the computer, as in the window.
+        if (_vaults is { } vaults)
+        {
+            _quickSearchActivity = Observe(window, vaults, TimeProvider.System, () => _shell?.ClearCountdown());
+        }
+
+        window.Show();
+        window.Activate();
+    }
+
+    private void CloseQuickSearch() => _quickSearch?.Close();
+
+    /// <summary>
+    /// Closes quick search so the app the person was in has the keyboard back: closing is enough on Windows and Linux, and on a
+    /// Mac keypaste hides as Hide keypaste does, unless the person was in keypaste or an agent's prompt waits beside it.
+    /// </summary>
+    private void HandBackFromQuickSearch()
+    {
+        CloseQuickSearch();
+
+        if (!_quickSearchFromKeypaste && _vaults?.IsAsking != true)
+        {
+            HideApp?.Invoke();
         }
     }
 
@@ -924,6 +1022,9 @@ internal sealed partial class App : Application, IDisposable
     {
         Dispatcher.UIThread.Post(() =>
         {
+            // Quick search lists every unlocked vault's items, so any lock closes it.
+            CloseQuickSearch();
+
             // An app ending after a crash builds no screen it is about to take down.
             if (_crashed || _vaults is not { } vaults)
             {
@@ -1052,7 +1153,8 @@ internal sealed partial class App : Application, IDisposable
         }
 
         // The shell leaves the tree rather than being hidden, and its view models are disposed, so
-        // nothing derived from an open vault can outlive the lock.
+        // nothing derived from an open vault can outlive the lock; quick search copies through its clipboard.
+        CloseQuickSearch();
         _shell?.Dispose();
         _shell = null;
 
@@ -1140,6 +1242,7 @@ internal sealed partial class App : Application, IDisposable
             return;
         }
 
+        CloseQuickSearch();
         _shell?.Dispose();
         _lockedAll = false;
         _shell = new ShellViewModel(
@@ -1321,6 +1424,7 @@ internal sealed partial class App : Application, IDisposable
         _activity = null;
         _shortcuts?.Dispose();
         _shortcuts = null;
+        CloseQuickSearch();
         _shell?.Dispose();
         _shell = null;
         _unlock?.Dispose();

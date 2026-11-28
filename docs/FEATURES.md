@@ -69,7 +69,7 @@ Every row is 1.0.0. [The desktop guide](desktop.md) describes the app. Screens a
 | Change access in Settings: password, key file and YubiKey | [T-28] |
 | Items: templates, custom fields, tags, URLs, one-time codes, attachments, duplicate, rename, undo | No auto-type editor |
 | Find over titles, groups, usernames, URLs and tags | Never reads a password, note or protected field |
-| Search from any app: ⌃⌘K or Alt+Shift+K, chosen or turned off in Settings, and Search… in the menu bar or tray | None under Wayland; no person has pressed it ([T-7]) |
+| Search from any app: ⌃⌘K or Alt+Shift+K, chosen or turned off in Settings, and Search… in the menu bar, tray and Dock, opening quick search, which copies a password, username or one-time code and hands back to the app in use, or the window | None under Wayland; no person has pressed it ([T-7], [T-19]) |
 | Copy and reveal, a copy cleared on a timer, a reveal hidden on leaving, and both on lock and on quit, with clipboard markers | The CLI's macOS and Linux copies carry no marker ([T-19]) |
 | Generator and rotate | Rotation changes the vault, not the provider ([T-12]) |
 | History: list, reveal and restore a revision | History is in the same file, not a backup |

@@ -43,6 +43,14 @@ internal sealed record SearchShortcutChoice(string Text, string Label)
     public override string ToString() => Label;
 }
 
+/// <summary>One thing General offers the search shortcut to open.</summary>
+/// <param name="Opens">What it opens.</param>
+/// <param name="Label">How it reads on its segment.</param>
+internal sealed record SearchOpensChoice(SearchOpens Opens, string Label)
+{
+    public override string ToString() => Label;
+}
+
 /// <summary>
 /// Settings' sections that are not screens of their own: General, This vault, Browser and Agents.
 /// </summary>
@@ -441,6 +449,24 @@ internal sealed partial class SettingsViewModel : ObservableObject, IDisposable,
     };
 
     internal bool HasSearchShortcutNote => SearchShortcutNote.Length > 0;
+
+    /// <summary>Quick search, then the keypaste window, in the language in force as Settings opens.</summary>
+    internal IReadOnlyList<SearchOpensChoice> SearchOpensChoices { get; } =
+        [new(SearchOpens.QuickSearch, Strings.QuickSearch), new(SearchOpens.Window, Strings.TheKeypasteWindow)];
+
+    /// <summary>What the search shortcut and Search… open while a vault is unlocked; choosing writes it, and the next press follows it.</summary>
+    internal SearchOpensChoice SearchOpensChoice
+    {
+        get => SearchOpensChoices.First(choice => choice.Opens == _settings.SearchOpens);
+        set
+        {
+            if (value is not null && value.Opens != _settings.SearchOpens)
+            {
+                Persist(_settings with { SearchOpens = value.Opens });
+                OnPropertyChanged();
+            }
+        }
+    }
 
     /// <summary>The vaults General's pop-up offers agents and the CLI: this computer's recent and open vaults, and None while none is chosen.</summary>
     internal IReadOnlyList<AgentVaultChoice> AgentVaultChoices => _agentVaultChoices ??= ReadAgentVaultChoices();

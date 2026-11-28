@@ -7,6 +7,7 @@ using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Settings;
 using Xunit;
 using static Keypaste.App.Tests.Session.ClosingTheMainWindowTests;
 using static Keypaste.App.Tests.Session.DesktopApprovalTests;
@@ -23,6 +24,7 @@ public sealed class SearchFromAnyAppTests
 {
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
+    /// <summary>With the keypaste window chosen over quick search in Settings, which <see cref="QuickSearchTests"/> covers.</summary>
     [Fact]
     public Task The_shortcut_and_Search_bring_Items_forward_with_an_empty_search_holding_the_keyboard() =>
         HeadlessSession.On(async () =>
@@ -32,7 +34,9 @@ public sealed class SearchFromAnyAppTests
             using var lifetime = new ClassicDesktopStyleApplicationLifetime();
             Attach(lifetime);
             var system = new FakeGlobalShortcut();
-            using var app = new App { Preferences = Tray(fixture, stays: true), GlobalShortcutFor = () => system };
+            var preferences = Tray(fixture, stays: true);
+            preferences.Update(preferences.Current with { SearchOpens = SearchOpens.Window });
+            using var app = new App { Preferences = preferences, GlobalShortcutFor = () => system };
             app.Launch(lifetime);
             lifetime.ShutdownRequested += (_, e) => e.Cancel = true;
             Assert.Equal(GlobalChord.Default(OperatingSystem.IsMacOS()), system.Registered);

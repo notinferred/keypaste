@@ -268,6 +268,7 @@ public sealed class ScreenRenderer
         var everything = Assert.IsType<EntriesViewModel>(shell.Content);
         everything.Selected = everything.Rows.First(row => row.Title == "netflix");
         Save(window, output, "95-vaults-all-accounts");
+        DrawQuickSearch(shell, output);
 
         shell.Current = Destinations.Of(DestinationKind.Recommendations);
         Save(window, output, "95-vaults-security");
@@ -293,6 +294,30 @@ public sealed class ScreenRenderer
 
         Wait(locked.UnlockAsync());
         Save(window, output, "95b-vaults-one-locked-wrong-password");
+
+        window.Close();
+    }
+
+    /// <summary>Quick search over both vaults: waiting for a query, matches from each with the first chosen, none, and a copy it could not make.</summary>
+    private static void DrawQuickSearch(ShellViewModel shell, string output)
+    {
+        using var model = shell.QuickSearch(() => { }, () => { });
+        var window = new QuickSearchWindow(model);
+        window.Show();
+        Save(window, output, "96-quick-search-empty");
+
+        model.Search = "i";
+        Save(window, output, "96-quick-search");
+
+        model.MoveChoice(1);
+        Save(window, output, "96-quick-search-second");
+
+        model.Search = "nothing like this";
+        Save(window, output, "96-quick-search-no-match");
+
+        model.Search = "netflix";
+        Wait(model.CopyOneTimeCodeAsync());
+        Save(window, output, "96-quick-search-no-code");
 
         window.Close();
     }

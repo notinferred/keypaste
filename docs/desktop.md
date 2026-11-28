@@ -80,10 +80,14 @@ While you type, `Down` and `Up` choose through the matches and `Return` chooses 
 
 ### Search from any app
 
-`⌃⌘K` on a Mac, or `Alt+Shift+K` on Windows and Linux, brings keypaste forward from whatever app you are in, on Items with the search empty and ready to type in. Search… in the menu bar or tray icon's menu, and in the Dock menu on a Mac, does the same.
+`⌃⌘K` on a Mac, or `Alt+Shift+K` on Windows and Linux, opens quick search from whatever app you are in: a small window that searches every unlocked vault as [Search](#search) does. Search… in the menu bar or tray icon's menu, and in the Dock menu on a Mac, does the same.
 
-- With every vault locked it shows the unlock screen, which asks Windows Hello or Touch ID at once where they can reopen a vault.
+- Each match shows its title, username and vault, never a password, note or field's value. The first match is chosen as you type, and `Down` and `Up` choose another.
+- `Return` copies the chosen item's password, which clears after twenty seconds as any [copy](#copy-and-reveal) does, and closes quick search so the app you were in has the keyboard back; on a Mac keypaste hides, as Hide keypaste does. `Shift+Ctrl/Cmd+C` copies the username and `Ctrl/Cmd+T` the one-time code the same way.
+- `Ctrl/Cmd+Return`, or Open in keypaste, opens the item in keypaste's window. `Escape` closes quick search, and so do clicking another window and any lock.
+- With every vault locked it asks Windows Hello or Touch ID first where they can reopen a vault, then opens; if you cancel, nothing more shows. Where neither can, it shows the unlock screen.
 - With an agent's request waiting, it brings that request's prompt forward instead, with Deny holding the keyboard and the allows waiting a second, as always.
+- Settings › General › The shortcut opens can choose The keypaste window instead, which comes forward on Items with the search empty and ready to type in, or with every vault locked on the unlock screen, which asks Windows Hello or Touch ID at once.
 - Settings › General › Search from any app chooses other keys, or Off. If another app already uses the keys, the row says so and they do nothing in keypaste until you choose others.
 - It needs no permission, not even Accessibility on a Mac: the system hands keypaste only that one chord, never another key. On Linux it needs an X11 session; Wayland lets no app take a key from the others, so the row says there is none.
 
@@ -252,7 +256,9 @@ Every command is also in the menus.
 |---|---|
 | `Ctrl/Cmd+1` … `4` | Items, Agents, Security, Settings |
 | `Ctrl/Cmd+F`, `Ctrl/Cmd+K` | Search |
-| `⌃⌘K` on a Mac, `Alt+Shift+K` elsewhere, in any app | [Search from any app](#search-from-any-app) |
+| `⌃⌘K` on a Mac, `Alt+Shift+K` elsewhere, in any app | Quick search, or the window as Settings chooses ([Search from any app](#search-from-any-app)) |
+| `Return`, `Shift+Ctrl/Cmd+C`, `Ctrl/Cmd+T` in quick search | Copy the chosen item's password, username or one-time code, and close |
+| `Ctrl/Cmd+Return` in quick search | Open the chosen item in the window |
 | `Ctrl/Cmd+N` | New item |
 | `Ctrl/Cmd+C` | Outside a text field, or in the search with none of its text selected, copy the chosen item's password |
 | `Shift+Ctrl/Cmd+C` | Copy the chosen item's username |

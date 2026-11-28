@@ -18,6 +18,16 @@ public enum AppTheme
     Dark = 2,
 }
 
+/// <summary>What the desktop's search shortcut, and Search… in its menus, opens while a vault is unlocked.</summary>
+public enum SearchOpens
+{
+    /// <summary>The small quick search window, which hands the keyboard back to the app in use once it copies.</summary>
+    QuickSearch = 0,
+
+    /// <summary>The keypaste window, on Items with its search ready.</summary>
+    Window = 1,
+}
+
 /// <summary>
 /// The desktop app's preferences and the chosen vault, as they sit in <c>app.toml</c>.
 /// </summary>
@@ -110,6 +120,7 @@ public sealed record AppSettings
     internal const string AccountVaultSectionName = "account_vault";
     internal const string ShortcutSectionName = "shortcut";
     internal const string SearchShortcutKey = "search";
+    internal const string SearchOpensKey = "opens";
     internal const string AccountVaultPathKey = "path";
 
     /// <summary>How many days before an item expires Recommendations lists it, until chosen.</summary>
@@ -121,6 +132,10 @@ public sealed record AppSettings
     private const string _vaultComment = "the vault agents and the CLI use without --vault";
     private const string _accountVaultComment = "a vault the local account holds";
     private const string _searchShortcutComment = "the keys that bring keypaste forward to search from any app, or off";
+    private const string _searchOpensComment = "what those keys open while a vault is unlocked: quick_search or window";
+
+    // Only the keypaste window is written, so a file that names anything else, or nothing, opens quick search.
+    private const string _opensWindow = "window";
 
     private static readonly string[] _knownKeys = [IdleTimeoutKey, ThemeKey, LockWhenMinimizedKey, StayInTrayKey, VaultKey, CrashReportsKey, EarlierCrashReportsKey, TermsKey];
     private static readonly string[] _knownWindowKeys = [WindowBoundsKey, WindowStateKey, WindowListShareKey, WindowSidebarHiddenKey, WindowZoomKey, WindowTableSortsKey, WindowTableWidthsKey];
@@ -224,6 +239,10 @@ public sealed record AppSettings
     /// <remarks>Kept as text, since which chords a platform offers is the app's to say. In its own section, <c>[[shortcut]]</c>, since <c>[[settings]]</c> already holds seven of the eight keys a section may.</remarks>
     public string? SearchShortcut { get; init; }
 
+    /// <summary>What the search shortcut opens while a vault is unlocked; quick search until chosen.</summary>
+    /// <remarks>In <c>[[shortcut]]</c> beside the chord, written only once the keypaste window is chosen.</remarks>
+    public SearchOpens SearchOpens { get; init; }
+
     /// <summary>Reads the preferences.</summary>
     /// <param name="path">The file, from <see cref="KeypasteHome.SettingsPath"/>.</param>
     /// <returns>What the file asked for, or <see cref="Default"/> when it asked for nothing usable.</returns>
@@ -315,9 +334,17 @@ public sealed record AppSettings
             settings = settings with { ReduceTransparency = reduce.Value.Number != 0 };
         }
 
-        if (document.Tables.FirstOrDefault(IsShortcutSection) is { } shortcut && TextOf(shortcut, SearchShortcutKey) is { } search)
+        if (document.Tables.FirstOrDefault(IsShortcutSection) is { } shortcut)
         {
-            settings = settings with { SearchShortcut = search };
+            if (TextOf(shortcut, SearchShortcutKey) is { } search)
+            {
+                settings = settings with { SearchShortcut = search };
+            }
+
+            if (TextOf(shortcut, SearchOpensKey) is { } opens && string.Equals(opens, _opensWindow, StringComparison.OrdinalIgnoreCase))
+            {
+                settings = settings with { SearchOpens = SearchOpens.Window };
+            }
         }
 
         List<string> held = [];
@@ -515,7 +542,7 @@ public sealed record AppSettings
                 }
             }
 
-            if (shortcut is not null || settings.SearchShortcut is not null)
+            if (shortcut is not null || settings.SearchShortcut is not null || settings.SearchOpens != SearchOpens.QuickSearch)
             {
                 writer.BlankLine().Table(ShortcutSectionName);
 
@@ -524,7 +551,12 @@ public sealed record AppSettings
                     writer.Text(SearchShortcutKey, search, _searchShortcutComment);
                 }
 
-                if (shortcut is not null && !TryWrite(writer, shortcut.Pairs.Where(pair => !string.Equals(pair.Key, SearchShortcutKey, StringComparison.Ordinal))))
+                if (settings.SearchOpens == SearchOpens.Window)
+                {
+                    writer.Text(SearchOpensKey, _opensWindow, _searchOpensComment);
+                }
+
+                if (shortcut is not null && !TryWrite(writer, shortcut.Pairs.Where(pair => !string.Equals(pair.Key, SearchShortcutKey, StringComparison.Ordinal) && !string.Equals(pair.Key, SearchOpensKey, StringComparison.Ordinal))))
                 {
                     return false;
                 }

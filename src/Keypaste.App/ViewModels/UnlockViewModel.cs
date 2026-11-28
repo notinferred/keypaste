@@ -892,11 +892,14 @@ internal sealed partial class UnlockViewModel : ObservableObject, IDisposable
     /// </summary>
     internal void AskQuickUnlockAtOnce()
     {
-        if (ShowsQuickUnlockAlone && ResumeCommand.CanExecute(null))
+        if (AsksQuickUnlockAtOnce)
         {
             ResumeCommand.Execute(null);
         }
     }
+
+    /// <summary>Whether <see cref="AskQuickUnlockAtOnce"/> would ask: the screen offers Windows Hello or Touch ID alone, and nothing is under way.</summary>
+    internal bool AsksQuickUnlockAtOnce => ShowsQuickUnlockAlone && ResumeCommand.CanExecute(null);
 
     /// <summary>Opens the selected vault from its quick unlock copy, once the person answers Windows Hello or Touch ID.</summary>
     /// <remarks><c>internal</c> for the reason <see cref="UnlockAsync"/> is.</remarks>
