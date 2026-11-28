@@ -43,6 +43,7 @@ Drag a `.kdbx` onto the window, choose Open a vault…, or pick it from the rece
 - **Key file.** Choose it with Key file… under Unlock.
 - **YubiKey.** Choose YubiKey… (slot 2 by default), programmed for HMAC-SHA1 challenge-response, and touch the key when asked. Every save asks again. The CLI reaches such a vault only through the app while the app holds it. No physical YubiKey has been tested.
 - **Windows Hello and Touch ID.** After an idle lock or a lock you made, Unlock with Windows Hello, or Unlock with Touch ID on a Mac, reopens the vault. Quitting, `keypaste lock`, a changed password or key file, and on a Mac an added or removed fingerprint need the master password. Bringing keypaste forward yourself, from the Dock, the menu bar or tray icon, the [search shortcut](#search-from-any-app), your browser's Unlock… or the notification that an agent asked for a locked vault, asks Windows Hello or Touch ID at once where they can reopen it, unless another vault is unlocked. If you cancel it, the button stays. An agent's request alone never asks.
+- **From your browser.** Unlock… in keypaste's list on a page brings keypaste forward on that vault's unlock. Once that vault opens, keypaste hides again so the browser is in front, and the key icon lists its logins: on a Mac as Hide keypaste does, and on Windows and Linux into the tray, as closing the window does. With Keep in tray off on Windows or Linux, or an agent's request waiting, the window stays in front. A vault you unlock after bringing keypaste forward yourself keeps it in front.
 
 One vault has one approver at a time: while `keypaste approve` holds it in a terminal, the app cannot, and the other way round.
 
@@ -79,7 +80,7 @@ While you type, `Down` and `Up` choose through the matches and `Return` chooses 
 
 ### Search from any app
 
-`⌃⌘K` on a Mac, or `Alt+Shift+K` on Windows and Linux, brings keypaste forward from whatever app you are in, on Items with the search empty and ready to type in. Search… in the menu bar or tray icon's menu does the same.
+`⌃⌘K` on a Mac, or `Alt+Shift+K` on Windows and Linux, brings keypaste forward from whatever app you are in, on Items with the search empty and ready to type in. Search… in the menu bar or tray icon's menu, and in the Dock menu on a Mac, does the same.
 
 - With every vault locked it shows the unlock screen, which asks Windows Hello or Touch ID at once where they can reopen a vault.
 - With an agent's request waiting, it brings that request's prompt forward instead, with Deny holding the keyboard and the allows waiting a second, as always.
@@ -102,6 +103,7 @@ New in the sidebar offers Login, API key, Environment, Card and Note, and More t
 - An API key is kept as a protected field named like a variable, such as `OPENAI_API_KEY`.
 - A card or identity is tagged so agent settings treat its protected fields as card or identity values.
 - Any item with a username, a password and a website fills in your browser.
+- New login… in keypaste's list on a page opens a login in the site's vault, titled with the page's site, such as `github.com`, with the page's address as its website and the username that vault uses most, which typing replaces. The title and website come from the address your browser shows for the tab, never from the page. Save and Cancel hide keypaste again, as the browser's Unlock… does.
 
 The password generator, opened from a password field, makes random characters or an EFF word-list passphrase.
 

@@ -214,9 +214,12 @@ public sealed class VaultSearchTests : IDisposable
         Assert.Empty(vault.Search("no-entry-has-this"));
     }
 
-    /// <summary>A username box suggests what the vault already uses, so the list holds usernames alone: never a password, a note or a deleted or reserved item's.</summary>
+    /// <summary>
+    /// A username box suggests what the vault already uses, so the list holds usernames alone, each with how many live items hold it:
+    /// never a password, a note or a deleted or reserved item's.
+    /// </summary>
     [Fact]
-    public void UsernamesAreEachLiveUsernameOnceAndNothingElse()
+    public void UsernamesAreEachLiveUsernameOnceWithItsUsesAndNothingElse()
     {
         using var vault = Seeded();
         vault.AddEntry(new VaultEntry { Title = "Mail", Username = "dba@example.test", Password = "another-secret", GroupPath = "personal" });
@@ -225,10 +228,10 @@ public sealed class VaultSearchTests : IDisposable
         vault.AddEntry(new VaultEntry { Title = "Spaces", Username = "  ", Password = "p" });
         Assert.Equal(DeletionOutcome.Recycled, vault.RemoveEntry(new EntryName("servers", "Old")));
 
-        var usernames = vault.ReadUsernames();
+        var uses = vault.ReadUsernameUses();
 
-        Assert.Equal(["dba@example.test"], usernames);
-        Assert.DoesNotContain(usernames, username => username.Contains("secret", StringComparison.Ordinal) || username.Contains("recovery", StringComparison.Ordinal));
+        Assert.Equal(new Dictionary<string, int> { ["dba@example.test"] = 2 }, uses);
+        Assert.DoesNotContain(uses.Keys, username => username.Contains("secret", StringComparison.Ordinal) || username.Contains("recovery", StringComparison.Ordinal));
     }
 
     private Vault Seeded() => Seeded(NewVaultPath());

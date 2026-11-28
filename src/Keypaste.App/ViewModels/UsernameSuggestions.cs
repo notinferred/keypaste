@@ -12,8 +12,15 @@ internal sealed class UsernameSuggestions
     private readonly IReadOnlyList<string> _used;
 
     /// <param name="vault">The unlocked vault, or null for none to offer.</param>
-    internal UsernameSuggestions(Vault? vault) =>
-        _used = vault is null ? [] : [.. vault.ReadUsernames().Where(username => !DisplayTextSanitizer.Sanitize(username).WasAltered)];
+    internal UsernameSuggestions(Vault? vault)
+    {
+        var uses = vault?.ReadUsernameUses() ?? new Dictionary<string, int>(StringComparer.Ordinal);
+        _used = [.. uses.Keys.Where(username => !DisplayTextSanitizer.Sanitize(username).WasAltered).Order(StringComparer.Ordinal)];
+        MostUsed = _used.Count == 0 ? null : _used.MaxBy(username => uses[username]);
+    }
+
+    /// <summary>The username the most items hold, the first in <see cref="Used"/>'s order where several tie, or null for none.</summary>
+    internal string? MostUsed { get; }
 
     private string? _matchedText;
     private IReadOnlyList<string> _matched = [];

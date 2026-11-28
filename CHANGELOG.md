@@ -18,6 +18,8 @@ A keyboard shortcut brings keypaste forward from any app with the item search em
 
 Bringing keypaste forward yourself, from the Dock, the menu bar or tray icon, or your browser's Unlock…, now asks Touch ID or Windows Hello at once for a vault they can reopen, as pressing the notification already did; if you cancel, Unlock with Touch ID or Windows Hello stays on the screen. Where the unlock screen offers it alone, that button has the keyboard and answers Return. An agent's request never asks.
 
+Your browser's Unlock… and New login… now hand you back to the browser. Once the vault Unlock… named opens, by its master password, Touch ID or Windows Hello, keypaste hides so the browser is in front and the key icon lists that vault's logins; on Windows and Linux it goes into the tray, and stays in front while Keep in tray is off. A vault you unlock after bringing keypaste forward yourself keeps it in front. New login… opens titled with the page's site, such as github.com, with the page's address as its website, as before, and the username the vault uses most filled in, and Save or Cancel hides keypaste again. Search… is also in the Dock menu on a Mac.
+
 New's menu in the sidebar shows its choices again; it had opened empty. An item's notes can be selected, and copying a selection clears it from the clipboard after the countdown, as Copy password does. The Agents screen's list starts level with Items' instead of lower.
 
 The app's title band is thinner, New spans the sidebar, the item list shows its count beside its title with the search under it, and a new sidebar place, Other, lists identities, SSH keys and Wi-Fi networks.

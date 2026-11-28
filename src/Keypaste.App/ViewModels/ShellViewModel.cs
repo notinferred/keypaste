@@ -1096,6 +1096,9 @@ internal sealed partial class ShellViewModel : ObservableObject, IDisposable
     /// <summary>The browsers' hosts, which Settings › Browser fill turns on and off beside the pairings; none lists no browsers.</summary>
     internal BrowserHostSetup? BrowserHosts { get; init; }
 
+    /// <summary>Puts the browser back in front once a new login it asked for is saved or cancelled; none leaves the window where it is.</summary>
+    internal Action? HandBack { get; init; }
+
     /// <summary>What Agents finds and connects AI tools through each time it opens; none looks for no tools.</summary>
     internal Func<ClientConnector?> Tools { get; init; } = () => null;
 

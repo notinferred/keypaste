@@ -6,6 +6,7 @@ using Keypaste.App.Tests.Rendering;
 using Keypaste.App.ViewModels;
 using Keypaste.App.Views;
 using Keypaste.Core;
+using Keypaste.Core.Browser;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Tests;
 using Xunit;
@@ -68,7 +69,7 @@ public sealed class SeveralVaultsWindowTests
             Assert.True(acme.Session.IsUnlocked);
             Assert.Equal("test", Assert.IsType<LockedVaultViewModel>(rebuilt.Content).Unlock.Heading);
 
-            vaults.Pairings.Show!(BrowserShow.NewLogin, "acme", "https://github.com");
+            vaults.Pairings.Show!(BrowserShow.NewLogin, "acme", NewLoginPage.Of("https://github.com/login"));
             await Until(() => rebuilt.Content is EntriesViewModel { NewItem: not null } items ? items : null);
             Assert.Equal("https://github.com", Assert.IsType<EntriesViewModel>(rebuilt.Content).NewItem!.Url);
 

@@ -387,7 +387,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
     {
         if (IsAdding)
         {
-            CancelAdd();
+            CloseAdd();
         }
 
         Select(name, vault);
@@ -1098,7 +1098,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
             // The add form stands in the pane's place, so choosing an entry to look at closes it.
             if (name is not null && IsAdding)
             {
-                CancelAdd();
+                CloseAdd();
             }
 
             Detail = name is null ? null : Build(name, vault!);
@@ -1147,8 +1147,16 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         return [inView, .. places.Where(place => !ReferenceEquals(place.Session, _session) && place.Session.IsUnlocked)];
     }
 
+    /// <summary>The form's Cancel: closes it, and puts the browser back in front of a form the browser asked for.</summary>
     [RelayCommand(CanExecute = nameof(IsAdding))]
     private void CancelAdd()
+    {
+        var handBack = _newItem?.HandBack;
+        CloseAdd();
+        handBack?.Invoke();
+    }
+
+    private void CloseAdd()
     {
         NewItem = null;
         Error = null;
@@ -1166,6 +1174,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
 
         var savedIn = form.SaveIn;
+        var handBack = form.HandBack;
         NewItem = null;
         Error = null;
         Reload();
@@ -1178,6 +1187,7 @@ internal sealed partial class EntriesViewModel : ObservableObject, IDisposable, 
         }
 
         ShowHeldChange();
+        handBack?.Invoke();
     }
 
     private void DeleteOrAsk()

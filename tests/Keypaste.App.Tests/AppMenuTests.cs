@@ -107,10 +107,11 @@ public sealed class AppMenuTests : IDisposable
     });
 
     [Fact]
-    public Task The_Dock_menu_runs_again_locks_and_opens_a_vault() => HeadlessSession.On(() =>
+    public Task The_Dock_menu_searches_runs_again_locks_and_opens_a_vault() => HeadlessSession.On(() =>
     {
         var opened = 0;
         var ran = 0;
+        var searched = 0;
         var commands = new AppCommands(
             new AppCommandHost
             {
@@ -120,10 +121,16 @@ public sealed class AppMenuTests : IDisposable
                 OpenWindow = () => opened++,
                 RunAgain = () => ran++,
                 CanRunAgain = () => _session.IsUnlocked,
+                Search = () => searched++,
             },
             mac: true);
 
         var dock = AppMenu.Native(commands.Dock);
+        var search = Item(dock, "Search…");
+        Assert.True(search.Command!.CanExecute(null));
+        search.Command.Press();
+        Assert.Equal(1, searched);
+
         var runAgain = Item(dock, "Run again");
         var lockNow = Item(dock, "Lock");
 

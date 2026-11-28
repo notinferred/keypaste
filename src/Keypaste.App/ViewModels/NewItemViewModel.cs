@@ -4,6 +4,7 @@ using Keypaste.App.Clipboard;
 using Keypaste.App.Session;
 using Keypaste.Core;
 using Keypaste.Core.Agents;
+using Keypaste.Core.Browser;
 using Keypaste.Core.Totp;
 
 namespace Keypaste.App.ViewModels;
@@ -206,6 +207,8 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     private IReadOnlyList<string> _projectTags = [];
     private ItemTemplate? _template;
     private string _presetTitle = string.Empty;
+    private string _presetUsername = string.Empty;
+    private string _presetUrl = string.Empty;
     private IReadOnlyList<string> _presetTags = [];
     private bool _titleRefused;
     private bool _keyNameRefused;
@@ -331,6 +334,33 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsChoosingTemplate));
         ChooseTemplateCommand.NotifyCanExecuteChanged();
     }
+
+    /// <summary>
+    /// Starts a login for the page a browser asked from: the page's site as its title, its origin as its website and the username
+    /// this vault uses most, none of which counts as a draft until changed.
+    /// </summary>
+    /// <param name="page">What the browser's address for the page gives.</param>
+    /// <param name="handBack">What Save and Cancel do once the form closes, to put the browser back in front.</param>
+    internal void StartFrom(NewLoginPage page, Action handBack)
+    {
+        ArgumentNullException.ThrowIfNull(page);
+        ArgumentNullException.ThrowIfNull(handBack);
+
+        if (page.Title.Length > 0)
+        {
+            _presetTitle = page.Title;
+            Title = page.Title;
+        }
+
+        _presetUrl = page.Website;
+        Url = page.Website;
+        _presetUsername = _usernames.MostUsed ?? string.Empty;
+        Username = _presetUsername;
+        HandBack = handBack;
+    }
+
+    /// <summary>What closing this form by Save or Cancel does after it closes, for a form the browser asked for; null otherwise.</summary>
+    internal Action? HandBack { get; private set; }
 
     /// <summary>The options the add button lists, those not yet in the form; a custom or protected field can be added again.</summary>
     internal IReadOnlyList<NewItemFieldOption> FieldOptions { get; private set; } = [];
@@ -614,10 +644,12 @@ internal sealed partial class NewItemViewModel : ObservableObject, IDisposable
     /// <summary>Whether Save can go on: it waits for a title.</summary>
     internal bool HasTitle => Title.Trim().Length > 0;
 
-    /// <summary>What leaving would lose: anything typed, and never what the template preset or a password keypaste generated.</summary>
+    /// <summary>What leaving would lose: anything typed, and never what the template or the browser's page preset or a password keypaste generated.</summary>
     internal string? UnsavedDraft =>
         Title.Trim() != _presetTitle
-        || new[] { Username, Url, Host, KeyName, Notes, DraftTag }.Any(text => text.Trim().Length > 0)
+        || Username.Trim() != _presetUsername
+        || Url.Trim() != _presetUrl
+        || new[] { Host, KeyName, Notes, DraftTag }.Any(text => text.Trim().Length > 0)
         || !Tags.Select(chip => chip.Tag).SequenceEqual(_presetTags, StringComparer.Ordinal)
         || CustomFields.Any(custom => custom.HoldsDraft)
         || KeyValue.HasValue

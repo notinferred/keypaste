@@ -89,14 +89,14 @@ internal sealed partial class KeePassInterop
         return paths;
     }
 
-    /// <summary>Each distinct username a live entry outside keypaste's own groups holds, ordinal order, by the traversal <see cref="Collect"/> uses; no other field is read.</summary>
-    internal IReadOnlyList<string> ReadUsernames()
+    /// <summary>Each distinct username a live entry outside keypaste's own groups holds, with how many hold it, by the traversal <see cref="Collect"/> uses; no other field is read.</summary>
+    internal IReadOnlyDictionary<string, int> ReadUsernameUses()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        SortedSet<string> usernames = new(StringComparer.Ordinal);
-        CollectUsernames(_database.RootGroup, string.Empty, usernames, Bin());
-        return [.. usernames];
+        Dictionary<string, int> uses = new(StringComparer.Ordinal);
+        CollectUsernames(_database.RootGroup, string.Empty, uses, Bin());
+        return uses;
     }
 
     /// <summary>When each live entry outside keypaste's own groups last changed, by its UUID as hex, by the traversal <see cref="Collect"/> uses; no field is read.</summary>
@@ -246,7 +246,7 @@ internal sealed partial class KeePassInterop
         || (wanted.StartsWith(groupPath, StringComparison.Ordinal)
             && (wanted.Length == groupPath.Length || wanted[groupPath.Length] == '/'));
 
-    private static void CollectUsernames(PwGroup group, string groupPath, SortedSet<string> usernames, PwGroup? bin)
+    private static void CollectUsernames(PwGroup group, string groupPath, Dictionary<string, int> uses, PwGroup? bin)
     {
         if (ReservedGroups.IsReserved(groupPath))
         {
@@ -257,7 +257,7 @@ internal sealed partial class KeePassInterop
         {
             if (ReadField(entry, PwDefs.UserNameField).Trim() is { Length: > 0 } username)
             {
-                usernames.Add(username);
+                uses[username] = uses.GetValueOrDefault(username) + 1;
             }
         }
 
@@ -265,7 +265,7 @@ internal sealed partial class KeePassInterop
         {
             if (!ReferenceEquals(child, bin))
             {
-                CollectUsernames(child, ChildPath(groupPath, child.Name), usernames, bin);
+                CollectUsernames(child, ChildPath(groupPath, child.Name), uses, bin);
             }
         }
     }

@@ -3,6 +3,7 @@ using Keypaste.App.Navigation;
 using Keypaste.App.Resources;
 using Keypaste.App.Session;
 using Keypaste.Core;
+using Keypaste.Core.Browser;
 using Keypaste.Core.Ipc;
 
 namespace Keypaste.App.ViewModels;
@@ -376,13 +377,15 @@ internal sealed partial class ShellViewModel
 
     /// <summary>
     /// What a page's list asked keypaste to show, the window already forward: a locked vault's unlock form, New login in
-    /// the site's vault with the page's address filled in, or the window as it is.
+    /// the site's vault started from the page, whose Save and Cancel put the browser back in front, or the window as it is.
     /// </summary>
     /// <param name="what">What the person pressed.</param>
     /// <param name="vaultName">The vault the list named, by its file's name, or empty for the vault in view.</param>
-    /// <param name="url">The page's address for a new login, or empty.</param>
-    internal void ShowAsked(BrowserShow what, string vaultName, string url)
+    /// <param name="page">What a new login starts with.</param>
+    internal void ShowAsked(BrowserShow what, string vaultName, NewLoginPage page)
     {
+        ArgumentNullException.ThrowIfNull(page);
+
         if (_disposed || what == BrowserShow.Open)
         {
             return;
@@ -418,11 +421,7 @@ internal sealed partial class ShellViewModel
             if (Content is EntriesViewModel entries)
             {
                 entries.BeginAddOfKindCommand.Press(ItemTemplate.Login);
-
-                if (entries.NewItem is { } form && url.Length > 0)
-                {
-                    form.Url = url;
-                }
+                entries.NewItem?.StartFrom(page, () => HandBack?.Invoke());
             }
         });
     }

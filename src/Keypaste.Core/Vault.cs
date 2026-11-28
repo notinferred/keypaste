@@ -1783,14 +1783,14 @@ public sealed class Vault : IDisposable
         }
     }
 
-    /// <summary>Each distinct username an entry outside the recycle bin and keypaste's own groups holds, in ordinal order, for a username box to suggest; no other field is read.</summary>
-    public IReadOnlyList<string> ReadUsernames()
+    /// <summary>Each distinct username an entry outside the recycle bin and keypaste's own groups holds, with how many entries hold it, for a username box to suggest; no other field is read.</summary>
+    public IReadOnlyDictionary<string, int> ReadUsernameUses()
     {
         lock (_state)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
-            return _interop.ReadUsernames();
+            return _interop.ReadUsernameUses();
         }
     }
 

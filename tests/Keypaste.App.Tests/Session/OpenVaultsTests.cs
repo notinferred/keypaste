@@ -5,6 +5,7 @@ using Keypaste.Core;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
+using Keypaste.Core.Browser;
 using Keypaste.Core.Ipc;
 using Keypaste.Core.Settings;
 using Keypaste.Core.Sharing;
@@ -402,25 +403,59 @@ public sealed class OpenVaultsTests : IDisposable
         Assert.True(acme.IsLocked);
         Assert.Equal(1, _vaults.Listed.Count(vault => _vaults.PathOf(vault.Session) == AcmePath));
 
-        shell.ShowAsked(Core.Ipc.BrowserShow.Unlock, "acme", string.Empty);
+        shell.ShowAsked(Core.Ipc.BrowserShow.Unlock, "acme", NewLoginPage.None);
 
         Assert.Equal("acme", Assert.IsType<LockedVaultViewModel>(shell.Content).Unlock.Heading);
         Assert.Equal(acme, shell.SelectedSidebarRow);
     }
 
+    /// <summary>
+    /// A page's New login… opens in the site's vault titled with the page's site, its origin as the website and the username that
+    /// vault uses most, none of it a draft yet; its Save and its Cancel put the browser back in front, and a person's own New login does not.
+    /// </summary>
     [Fact]
-    public void A_pages_new_login_opens_in_the_sites_vault_with_the_page_filled_in()
+    public void A_pages_new_login_starts_from_its_site_in_the_sites_vault_and_hands_back_to_the_browser_after_Save_or_Cancel()
     {
         UnlockBoth();
-        using var shell = new ShellViewModel(_personal.Session, _fixture.Home, authority: null, clock: _clock) { Vaults = _vaults };
+        Assert.True(_acme.Session.Write(
+            vault =>
+            {
+                vault.AddEntry(new VaultEntry { Title = "gitlab", Username = "maya@acme.dev", Password = "acme-gl-4Tr8" });
+                vault.AddEntry(new VaultEntry { Title = "jira", Username = "maya@acme.dev", Password = "acme-jr-2Wq5" });
+                vault.AddEntry(new VaultEntry { Title = "aws", Username = "admin@acme.dev", Password = "acme-aw-7Pk1" });
+                return true;
+            },
+            added => added).Outcome == WriteOutcome.Saved);
+        var handedBack = 0;
+        using var shell = new ShellViewModel(_personal.Session, _fixture.Home, authority: null, clock: _clock) { Vaults = _vaults, HandBack = () => handedBack++ };
 
-        shell.ShowAsked(Core.Ipc.BrowserShow.NewLogin, "acme", "https://github.com");
+        shell.ShowAsked(Core.Ipc.BrowserShow.NewLogin, "acme", NewLoginPage.Of("https://www.github.com/login?return_to=%2Fsettings"));
 
         var items = Assert.IsType<EntriesViewModel>(shell.Content);
+        var form = Assert.IsType<NewItemViewModel>(items.NewItem);
         Assert.Equal("acme", items.ListSubtitle);
         Assert.Equal(ItemPlace.Logins, items.Place);
-        Assert.Equal("https://github.com", items.NewItem?.Url);
-        Assert.Equal(ItemTemplate.Login, items.NewItem?.Template);
+        Assert.Equal(ItemTemplate.Login, form.Template);
+        Assert.Equal("github.com", form.Title);
+        Assert.Equal("https://www.github.com", form.Url);
+        Assert.Equal("maya@acme.dev", form.Username);
+        Assert.Null(form.UnsavedDraft);
+
+        items.CancelAddCommand.Press();
+        Assert.Null(items.NewItem);
+        Assert.Equal(1, handedBack);
+
+        shell.ShowAsked(Core.Ipc.BrowserShow.NewLogin, "acme", NewLoginPage.Of("https://www.github.com/login"));
+        items = Assert.IsType<EntriesViewModel>(shell.Content);
+        items.ConfirmAddCommand.Press();
+        Assert.Null(items.NewItem);
+        Assert.Equal(2, handedBack);
+        Assert.Equal("maya@acme.dev", _acme.Session.Unlocked!.Find(new EntryName(string.Empty, "github.com"))?.Username);
+
+        items.BeginAddOfKindCommand.Press(ItemTemplate.Login);
+        Assert.Equal(string.Empty, items.NewItem?.Username);
+        items.CancelAddCommand.Press();
+        Assert.Equal(2, handedBack);
     }
 
     /// <summary>An edit of one vault counts its places again, and a vault locked or unlocked since its count is counted with it.</summary>

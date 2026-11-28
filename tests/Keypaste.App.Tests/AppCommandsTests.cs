@@ -67,7 +67,7 @@ public sealed class AppCommandsTests : IDisposable
 
         // Windows reports AltGr as Ctrl+Alt, so no chord there holds Alt.
         Assert.DoesNotContain(other.All.SelectMany(command => command.Keys), chord => chord.KeyModifiers.HasFlag(KeyModifiers.Alt));
-        Assert.Equal(["Run again", "Lock", "Open vault…"], Headers(mac.Dock));
+        Assert.Equal(["Search…", "Run again", "Lock", "Open vault…"], Headers(mac.Dock));
     }
 
     [Fact]

@@ -62,6 +62,7 @@ Both solutions write into `artifacts/`.
 - A project's Run and Open terminal (`ViewModels/ProjectLaunchViewModel.cs`) start at their press, logged as `pressed`; a protected stage's ask on its card. Run again in the Dock and tray menus starts the last `Session/ProjectLaunching.cs` `ProjectRun` once more (`App.RunAgainAsync`), and is off after a protected one.
 - Quick unlock: `Session/QuickUnlockCopies.cs`, with `Session/WindowsHello.cs` and `Session/TouchId.cs` as `MachineQuickUnlock.cs` picks them.
 - The search shortcut: `GlobalShortcuts/SearchShortcut.cs` keeps `app.toml`'s chord registered through `IGlobalShortcut`, which `PlatformShortcut.cs` picks: Carbon's hot keys, Windows's `RegisterHotKey` or X11's `XGrabKey`. A press runs `App.SearchAtPersonsAct`, as Search… in the tray does: a waiting prompt first, then Items' search or the unlock screen.
+- A browser's Unlock… and New login… come through `SessionBrowsers.ShowAsync` to `App.ShowAsked`. Once the vault Unlock… named opens, or the new login, started from `Core/Browser/NewLoginPage.cs`, is saved or cancelled, `App.HandBackToBrowser` hides keypaste so the browser is in front.
 - Agents › Connect registers an AI tool through `Core/Clients/`. `App/CrashReporting.cs` sends crash reports only under the terms the person accepted (`App/Terms/`).
 
 The [desktop guide](desktop.md) describes what the person sees.

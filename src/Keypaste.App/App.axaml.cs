@@ -65,6 +65,7 @@ internal sealed partial class App : Application, IDisposable
     private (string Path, string? Keyfile, int? HardwareKeySlot)? _openNext;
     private ProjectRun? _lastRun;
     private int _unlockScreens;
+    private string? _unlockForBrowser;
     private bool _shuttingDown;
     private bool _quitting;
     private bool _lockedAll;
@@ -176,7 +177,8 @@ internal sealed partial class App : Application, IDisposable
         _vaults.Locked += OnLocked;
 
         // A page's list asks to bring keypaste forward: the window, a locked vault's unlock, or New login in the site's vault.
-        _vaults.Pairings.Show = (what, vault, url) => Dispatcher.UIThread.Post(() => ShowAsked(what, vault, url));
+        _vaults.Pairings.Show = (what, vault, page) => Dispatcher.UIThread.Post(() => ShowAsked(what, vault, page));
+        _vaults.Opened += (opened, _) => Dispatcher.UIThread.Post(() => HandBackAfterTheBrowsersUnlock(opened as AppVaultSession));
         _session.Opened += (_, _) => Dispatcher.UIThread.Post(() => _tray?.Refresh());
 
         InterfaceZoom.Set(_preferences.Current.Window?.ZoomPercent ?? Core.Settings.WindowLayout.ActualSizePercent);
@@ -322,6 +324,9 @@ internal sealed partial class App : Application, IDisposable
     /// <summary>Shows the Dock icon while the main window is open or a vault is unlocked, so ⌘Tab and the Dock reach the app, and hides it while the app is only in the menu bar; set on macOS alone, and by a test.</summary>
     internal Action<bool>? DockIcon { get; init; }
 
+    /// <summary>Hides the whole app so the app used before it comes in front, as macOS's Hide keypaste does; none where the platform has no such call.</summary>
+    internal Action? HideApp { get; init; }
+
     /// <summary>
     /// The crash reports of the process the app's start runs, whose choice the unlock screen also asks; none for an
     /// app a test or the previewer composes, which then shows neither and leaves an exception on the UI thread to the runtime.
@@ -350,6 +355,9 @@ internal sealed partial class App : Application, IDisposable
         {
             return;
         }
+
+        // The window comes forward for something else now, so an unlock the browser asked for earlier keeps it in front.
+        _unlockForBrowser = null;
 
         _desktop.MainWindow ??= _window;
         DockIcon?.Invoke(true);
@@ -445,6 +453,40 @@ internal sealed partial class App : Application, IDisposable
         if (!unlocked)
         {
             DockIcon?.Invoke(false);
+        }
+    }
+
+    /// <summary>
+    /// Puts the browser that brought keypaste forward back in front, so the person can pick there: on a Mac keypaste hides as
+    /// Hide keypaste does, elsewhere the window goes into the tray as closing it does. Vaults stay unlocked. With no tray on
+    /// Windows or Linux the window stays, since nothing would bring it back, and so does one an agent's prompt waits beside.
+    /// </summary>
+    internal void HandBackToBrowser()
+    {
+        if (_window is null || _vaults?.IsAsking == true)
+        {
+            return;
+        }
+
+        if (HideApp is { } hide)
+        {
+            hide();
+        }
+        else if (_preferences?.StaysInTray == true)
+        {
+            _window.Hide();
+        }
+    }
+
+    /// <summary>Hands keypaste back to the browser once the first vault to open after the browser's Unlock… is the one it asked for.</summary>
+    private void HandBackAfterTheBrowsersUnlock(AppVaultSession? opened)
+    {
+        var asked = _unlockForBrowser;
+        _unlockForBrowser = null;
+
+        if (asked is not null && opened is not null && _vaults?.PathOf(opened) is { } path && Core.Settings.ChosenVault.Same(path, asked))
+        {
+            HandBackToBrowser();
         }
     }
 
@@ -594,6 +636,7 @@ internal sealed partial class App : Application, IDisposable
             ShowAll = mac ? MacDock.ShowAll : null,
             RunAgain = () => _ = RunAgainAsync(),
             CanRunAgain = () => CanRunAgain,
+            Search = SearchAtPersonsAct,
         });
     }
 
@@ -1120,6 +1163,7 @@ internal sealed partial class App : Application, IDisposable
             CliLink = CliLinkFor(),
             GlobalSearch = _searchShortcut,
             BrowserHosts = BrowserHostsFor(),
+            HandBack = HandBackToBrowser,
             Tools = ClientConnector.ForThisProcess,
             Launching = LaunchingFor(anchor.Authority) with { Started = Remember },
             Crashes = Crashes,
@@ -1130,14 +1174,22 @@ internal sealed partial class App : Application, IDisposable
             new ShellView { DataContext = _shell, Commands = _commands };
     }
 
-    /// <summary>What a page's list asked keypaste to show: the window forward, then a vault's unlock form or New login in the shell, or the vault on the unlock screen when every vault is locked.</summary>
-    private void ShowAsked(Core.Ipc.BrowserShow what, string vault, string url)
+    /// <summary>
+    /// What a page's list asked keypaste to show: the window forward, then a vault's unlock form or New login in the shell, or the
+    /// vault on the unlock screen when every vault is locked. A locked vault the browser asked to unlock hands keypaste back to it once open.
+    /// </summary>
+    private void ShowAsked(Core.Ipc.BrowserShow what, string vault, Core.Browser.NewLoginPage page)
     {
         OpenWindow();
 
+        if (what == Core.Ipc.BrowserShow.Unlock && _vaults?.Named(vault) is { Session.IsUnlocked: false } asked)
+        {
+            _unlockForBrowser = _vaults.PathOf(asked.Session);
+        }
+
         if (_shell is { } shell)
         {
-            shell.ShowAsked(what, vault, url);
+            shell.ShowAsked(what, vault, page);
         }
         else if (what == Core.Ipc.BrowserShow.Unlock && _vaults?.Named(vault) is { } named && _vaults.PathOf(named.Session) is { } path)
         {

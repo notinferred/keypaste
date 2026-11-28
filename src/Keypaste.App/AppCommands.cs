@@ -98,6 +98,9 @@ internal sealed class AppCommandHost
 
     /// <summary>Whether Run again has a command to start, its vault unlocked.</summary>
     internal Func<bool> CanRunAgain { get; init; } = static () => false;
+
+    /// <summary>Brings keypaste forward with its search ready, as the search shortcut and the tray's Search… do.</summary>
+    internal Action? Search { get; init; }
 }
 
 /// <summary>
@@ -446,6 +449,7 @@ internal sealed class AppCommands
         Menus = [file, edit, item, projects, agents, view, window, help];
         Dock =
         [
+            new AppCommand(AppTray.SearchHeader, [], () => host.Search is not null, () => host.Search?.Invoke()),
             new AppCommand(Strings.RunAgain, [], () => host.RunAgain is not null && host.CanRunAgain(), () => host.RunAgain?.Invoke()),
             lockNow,
             new AppCommand(_openVault.Header, [], CanOpenVault, OpenVaultFromDock),

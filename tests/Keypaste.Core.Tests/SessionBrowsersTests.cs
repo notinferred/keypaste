@@ -338,15 +338,23 @@ public sealed class SessionBrowsersTests : IDisposable
         Assert.Equal("vault-locked", _log.Lines()[^1].GetProperty("method").GetString());
     }
 
-    /// <summary>A new login from a page's list starts with the page's origin alone, so no path, query or token the address carried reaches the item.</summary>
+    /// <summary>
+    /// A new login from a page's list starts with the page's origin alone, so no path, query or token the address carried reaches the
+    /// item, and is titled with the origin's site, so a sign-in subdomain is named as the site it belongs to.
+    /// </summary>
     [Theory]
-    [InlineData("https://github.com/login?return_to=%2Fsettings&token=abc#top", "https://github.com")]
-    [InlineData("http://intranet.example.com:8080/sign-in", "http://intranet.example.com:8080")]
-    [InlineData("https://maya@github.com/login", "")]
-    [InlineData("chrome://settings/passwords", "")]
-    [InlineData("", "")]
-    public void A_new_login_starts_with_its_pages_origin(string url, string website) =>
-        Assert.Equal(website, SessionBrowsers.NewLoginAddress(url));
+    [InlineData("https://github.com/login?return_to=%2Fsettings&token=abc#top", "https://github.com", "github.com")]
+    [InlineData("https://www.github.com/login", "https://www.github.com", "github.com")]
+    [InlineData("https://accounts.google.co.uk/signin", "https://accounts.google.co.uk", "google.co.uk")]
+    [InlineData("http://intranet.example.com:8080/sign-in", "http://intranet.example.com:8080", "example.com")]
+    [InlineData("https://maya.github.io/admin", "https://maya.github.io", "maya.github.io")]
+    [InlineData("http://192.168.1.1/login", "http://192.168.1.1", "192.168.1.1")]
+    [InlineData("http://nas:5000/", "http://nas:5000", "nas")]
+    [InlineData("https://maya@github.com/login", "", "")]
+    [InlineData("chrome://settings/passwords", "", "")]
+    [InlineData("", "", "")]
+    public void A_new_login_starts_with_its_pages_origin_titled_with_its_site(string url, string website, string title) =>
+        Assert.Equal(new NewLoginPage(website, title), NewLoginPage.Of(url));
 
     [Theory]
     [InlineData("", "the name cannot be empty")]

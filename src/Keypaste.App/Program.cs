@@ -81,6 +81,7 @@ internal static class Program
                         Preferences = preferences,
                         Crashes = crashes,
                         DockIcon = OperatingSystem.IsMacOS() ? MacDock.Show : null,
+                        HideApp = OperatingSystem.IsMacOS() ? MacDock.Hide : null,
                         HandedPath = HandedFile.FromArguments(args, Environment.CurrentDirectory),
                         BrowserHostsFor = () => browserHosts,
                         GlobalShortcutFor = PlatformShortcut.ForThisProcess,

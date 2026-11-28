@@ -45,10 +45,10 @@ public sealed class OwnerPairings(BrowserPairings file, Func<IReadOnlyList<Pairi
 
     /// <summary>
     /// Brings keypaste forward for what the person pressed in a page's list, on whichever thread asked: what was pressed, the
-    /// vault the list named, a locked one for an unlock or the site's for a new login, and the page's origin for a new login;
+    /// vault the list named, a locked one for an unlock or the site's for a new login, and what a new login starts with;
     /// null in an owner with no window, which refuses it.
     /// </summary>
-    public Action<BrowserShow, string, string>? Show { get; set; }
+    public Action<BrowserShow, string, NewLoginPage>? Show { get; set; }
 
     /// <summary>When the pairing was last paired or checked here, or null when it has not been since this process started.</summary>
     /// <param name="pairing">The pairing's name.</param>
@@ -555,20 +555,8 @@ public sealed class SessionBrowsers : IBrowserRequests
         show(
             request.What,
             request.What == BrowserShow.Open ? string.Empty : request.VaultName,
-            request.What == BrowserShow.NewLogin ? NewLoginAddress(request.Url) : string.Empty);
+            request.What == BrowserShow.NewLogin ? NewLoginPage.Of(request.Url) : NewLoginPage.None);
         return ValueTask.FromResult(new BrowserReply(BrowserOutcome.Done, string.Empty));
-    }
-
-    /// <summary>The website a new login for a page starts with: its origin, with no path, query or fragment, or empty for no web page.</summary>
-    internal static string NewLoginAddress(string url)
-    {
-        if (!WebOrigin.TryRead(url, out var origin, out _))
-        {
-            return string.Empty;
-        }
-
-        var defaultPort = string.Equals(origin.Scheme, Uri.UriSchemeHttps, StringComparison.Ordinal) ? 443 : 80;
-        return origin.Port == defaultPort ? $"{origin.Scheme}://{origin.Host}" : origin.ToString();
     }
 
     /// <summary>What the page's list warns of before a pick, such as its connection not being secure, or empty.</summary>

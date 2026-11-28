@@ -1110,7 +1110,7 @@ public sealed class ScreenRenderer
         // The username box completes the best username the vault already uses in grey, and Down lists the others.
         var usernameBox = window.GetVisualDescendants().OfType<UsernameBox>().Single(box => box.Name == "NewEntryUsername");
         usernameBox.GetVisualDescendants().OfType<TextBox>().First().Focus(NavigationMethod.Tab);
-        var used = authority.Session.Unlocked!.ReadUsernames()[0];
+        var used = authority.Session.Unlocked!.ReadUsernameUses().Keys.Order(StringComparer.Ordinal).First();
         entries.NewItem!.Username = used[..Math.Min(3, used.Length - 1)];
         Save(window, output, "13h-secrets-new-username-typeahead");
         usernameBox.GetVisualDescendants().OfType<TextBox>().First().RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Down });
