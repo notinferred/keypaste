@@ -149,9 +149,11 @@ run_block() {
     export HOME="$SCRATCH/home"
     [ -n "$shim" ] && export PATH="$shim:$PATH"
     if [ "$OS" = "windows" ]; then
-      pwsh -NoProfile -NonInteractive -Command "\$ErrorActionPreference='Stop'; $(cat "$BLOCK")"
+      # As a person's paste runs: no stop-on-error preference, so the block must stop itself.
+      pwsh -NoProfile -NonInteractive -Command "$(cat "$BLOCK"); if (-not \$?) { exit 1 }"
     else
-      bash -euo pipefail "$BLOCK"
+      # As a person's paste runs: no -e, so the block must stop itself when the checksum fails.
+      bash "$BLOCK"
     fi
   )
   local rc=$?

@@ -10,9 +10,9 @@ Apple Silicon.
 ```sh
 curl -fLO https://dl.keypaste.com/v0.3.0/keypaste-0.3.0-osx-arm64.tar.gz
 curl -fLO https://dl.keypaste.com/v0.3.0/keypaste-0.3.0-osx-arm64.tar.gz.sha256
-shasum -a 256 -c keypaste-0.3.0-osx-arm64.tar.gz.sha256
-tar -xzf keypaste-0.3.0-osx-arm64.tar.gz
-mkdir -p ~/.local/bin && mv keypaste keypaste-mcp ~/.local/bin/
+shasum -a 256 -c keypaste-0.3.0-osx-arm64.tar.gz.sha256 &&
+  tar -xzf keypaste-0.3.0-osx-arm64.tar.gz &&
+  mkdir -p ~/.local/bin && mv keypaste keypaste-mcp ~/.local/bin/
 ```
 <!-- /install:macos -->
 
@@ -32,9 +32,9 @@ x64 and arm64.
 ```sh
 curl -fLO https://dl.keypaste.com/v0.3.0/keypaste-0.3.0-linux-x64.tar.gz
 curl -fLO https://dl.keypaste.com/v0.3.0/keypaste-0.3.0-linux-x64.tar.gz.sha256
-sha256sum -c keypaste-0.3.0-linux-x64.tar.gz.sha256
-tar -xzf keypaste-0.3.0-linux-x64.tar.gz
-mkdir -p ~/.local/bin && mv keypaste keypaste-mcp ~/.local/bin/
+sha256sum -c keypaste-0.3.0-linux-x64.tar.gz.sha256 &&
+  tar -xzf keypaste-0.3.0-linux-x64.tar.gz &&
+  mkdir -p ~/.local/bin && mv keypaste keypaste-mcp ~/.local/bin/
 ```
 <!-- /install:linux -->
 
@@ -56,8 +56,7 @@ $a = "keypaste-0.3.0-win-x64.zip"
 Invoke-WebRequest -OutFile $a "https://dl.keypaste.com/v0.3.0/$a"
 Invoke-WebRequest -OutFile "$a.sha256" "https://dl.keypaste.com/v0.3.0/$a.sha256"
 $want = (Get-Content "$a.sha256" -Raw).Split()[0]
-if ((Get-FileHash $a -Algorithm SHA256).Hash -ne $want) { throw "checksum mismatch" }
-Expand-Archive $a -DestinationPath .
+if ((Get-FileHash $a -Algorithm SHA256).Hash -eq $want) { Expand-Archive $a -DestinationPath . } else { Write-Error "checksum mismatch: delete $a and download it again" }
 ```
 <!-- /install:windows -->
 
