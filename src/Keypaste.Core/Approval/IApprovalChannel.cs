@@ -98,4 +98,12 @@ public interface IApprovalChannel
     /// <remarks>A channel that cannot show this has asked nobody, which is a no: nothing is paired.</remarks>
     ValueTask<PairingAnswer> AskAsync(PairingPrompt prompt, CancellationToken cancellationToken) =>
         ValueTask.FromResult(PairingAnswer.NoChannel);
+
+    /// <summary>Asks a human whether a paired browser may be offered a sign-in frame's own logins inside another site's page, and waits for their answer.</summary>
+    /// <param name="prompt">What to show. Render it as inert text.</param>
+    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
+    /// <returns>What the human said, or why they were not asked; only <see cref="ApprovalAnswer.ApprovedOnce"/> trusts it.</returns>
+    /// <remarks>A channel that cannot show this has asked nobody, which is a no: nothing is trusted.</remarks>
+    ValueTask<ApprovalAnswer> AskAsync(FrameTrustPrompt prompt, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(ApprovalAnswer.NoChannel);
 }

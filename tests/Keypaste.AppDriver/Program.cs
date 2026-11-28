@@ -170,6 +170,7 @@ internal static class Program
                 ["tags-dismiss", var vault, var entry, var tag] => await driver.DismissLostTagAsync(vault, entry, tag).ConfigureAwait(true),
                 ["tags-again", var vault, var entry, var tag] => await driver.ReviewLostTagAgainAsync(vault, entry, tag).ConfigureAwait(true),
                 ["raw-add", var vault, var group, var title] => RawAdd(vault, group, title),
+                ["totp", var vault, var group, var title] => SetTotp(vault, group, title),
                 ["hold", var vault, .. var options] => await HoldAsync(driver, vault, options).ConfigureAwait(true),
                 ["launch"] => AppLaunch.Run(KeypasteHome.Resolve(home), []),
                 ["launch", "--background"] => AppLaunch.Run(KeypasteHome.Resolve(home), ["--background"]),
@@ -224,6 +225,19 @@ internal static class Program
 
         using var screen = new PromptScreen();
         return await driver.HoldAsync(vault, screen.Open, locked, screen, terminalBundle).ConfigureAwait(true);
+    }
+
+    /// <summary>Gives an item the one-time code whose setup key or <c>otpauth://</c> URI standard input holds, as the item pane's Add one-time code does.</summary>
+    private static int SetTotp(string vault, string group, string title)
+    {
+        var password = Environment.GetEnvironmentVariable("KEYPASTE_DRIVER_PASSWORD") ?? string.Empty;
+        var setup = Console.In.ReadLine() ?? string.Empty;
+
+        using var v = ClaimedVault.Open(vault, password);
+        v.SetTotp(new EntryName(group, title), setup);
+        v.Save();
+        Console.WriteLine("totp set");
+        return 0;
     }
 
     // KeePassXC can store a name keypaste refuses to create, so this writes below the product's rules.
@@ -1017,6 +1031,14 @@ internal sealed class Driver(string home)
                     Unpair(authority, command["unpair ".Length..]);
                     break;
 
+                case ["frames"]:
+                    Frames(authority);
+                    break;
+
+                case ["distrust", var top, var frame]:
+                    Distrust(authority, top, frame);
+                    break;
+
                 case ["browser-status"]:
                     BrowserStatus();
                     break;
@@ -1091,6 +1113,36 @@ internal sealed class Driver(string home)
         {
             Console.Out.WriteLine($"pairing identity={row.Identity} name={row.Name}");
         }
+    }
+
+    /// <summary>Prints the sign-in frames Settings › Browser fill lists as trusted, or <c>frames none</c>.</summary>
+    private static void Frames(AppAuthority authority)
+    {
+        using var browserFill = new BrowserFillViewModel(authority);
+
+        if (browserFill.Frames.Count == 0)
+        {
+            Console.Out.WriteLine("frames none");
+        }
+
+        foreach (var row in browserFill.Frames)
+        {
+            Console.Out.WriteLine($"frame pairing={row.Trust.Pairing} top={row.Trust.Top} frame={row.Trust.Frame}");
+        }
+    }
+
+    /// <summary>Presses Remove on the trusted frame of that page and frame in Settings › Browser fill.</summary>
+    private static void Distrust(AppAuthority authority, string top, string frame)
+    {
+        using var browserFill = new BrowserFillViewModel(authority);
+        var row = browserFill.Frames.FirstOrDefault(row => string.Equals(row.Trust.Top, top, StringComparison.Ordinal) && string.Equals(row.Trust.Frame, frame, StringComparison.Ordinal))
+            ?? throw new DriverException($"Settings lists no trusted frame {frame} on {top}");
+
+        browserFill.AskRemoveFrameCommand.Execute(row);
+        browserFill.RemoveFrameCommand.Execute(row);
+        Console.Out.WriteLine(browserFill.Frames.Contains(row) || browserFill.Frames.Any(left => left.Trust == row.Trust)
+            ? $"not distrusted: {browserFill.Message}"
+            : $"distrusted {top} {frame}");
     }
 
     /// <summary>Presses Remove on the pairing of that name in Settings › Browser fill.</summary>

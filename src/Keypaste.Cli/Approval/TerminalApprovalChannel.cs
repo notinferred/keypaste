@@ -352,6 +352,37 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
         return allowed ? new PairingAnswer(ApprovalAnswer.ApprovedOnce, request.SuggestedName) : new PairingAnswer(ApprovalAnswer.Denied, null);
     }
 
+    /// <summary>Shows a paired browser's question whether a sign-in frame of another site may be offered its own logins, and reads <c>y</c> to trust it.</summary>
+    public async ValueTask<ApprovalAnswer> AskAsync(FrameTrustPrompt request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var started = _clock.GetTimestamp();
+        _console.WriteLine(Render(request, RuleLine));
+
+        char choice;
+
+        try
+        {
+            choice = await ChooseAsync(_confirmChoices, () => Confirmation(Remaining(started), "trust"), cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception unanswered) when (IsUnanswerable(unanswered))
+        {
+            return Unanswered(unanswered, "Nothing was trusted.");
+        }
+
+        var trusted = choice == 'y';
+
+        _console.WriteLine(string.Join(
+            Environment.NewLine,
+            trusted
+                ? _console.Paint(Tone.Ok, $"keypaste: trusted sign-in from {request.Frame} on {request.Top}.")
+                : _console.Paint(Tone.Danger, "keypaste: denied. Nothing was trusted."),
+            RuleLine));
+
+        return trusted ? ApprovalAnswer.ApprovedOnce : ApprovalAnswer.Denied;
+    }
+
     /// <summary>Shows an agent's linked set, every item and field, and reads <c>y</c> to allow it once; anything else denies the whole set.</summary>
     public async ValueTask<ApprovalAnswer> AskAsync(SetPrompt request, CancellationToken cancellationToken)
     {
@@ -742,6 +773,23 @@ internal sealed class TerminalApprovalChannel : IApprovalChannel
             string.Empty,
             "  [d] deny: nothing is paired.",
             "  [y] pair: that browser can ask you for logins from the vaults open here.");
+
+    /// <summary>A sign-in frame of another site: its host, the page's, the pairing and what trusting it does.</summary>
+    internal static string Render(FrameTrustPrompt request, string rule) =>
+        string.Join(
+            Environment.NewLine,
+            string.Empty,
+            rule,
+            $"keypaste: trust sign-in from {request.Frame} on {request.Top}?",
+            string.Empty,
+            $"  sign-in from  {request.Frame}",
+            $"  shown on      {request.Top}",
+            $"  browser       {request.Pairing}",
+            string.Empty,
+            $"  {request.Explanation}",
+            string.Empty,
+            "  [d] deny: nothing is trusted.",
+            $"  [y] trust: {request.Frame}'s logins are offered in it on {request.Top}.");
 
     /// <summary>A terminal's edit: the command, the item, where it says it came from and what changes, never a value.</summary>
     internal static string Render(TerminalEditPrompt request, string rule)

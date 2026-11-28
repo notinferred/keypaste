@@ -315,7 +315,11 @@ public sealed class SessionAuthority : IApproverHandler
         _attached[connectionId] = attachment;
 
         // A browser's attachment is told the hash its extension files this computer's pairing under.
-        return Answer(AttachReply.To(lifetime.Id) with { DatabaseHash = browser is null ? null : _browsers?.DatabaseHash() });
+        return Answer(AttachReply.To(lifetime.Id) with
+        {
+            DatabaseHash = browser is null ? null : _browsers?.DatabaseHash(),
+            BrowserFeatures = browser is null || _browsers is null ? null : BrowserFeatures.All,
+        });
     }
 
     /// <inheritdoc/>

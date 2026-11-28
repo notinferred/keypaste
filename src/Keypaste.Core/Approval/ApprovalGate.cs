@@ -361,6 +361,24 @@ public sealed class ApprovalGate : IDisposable
             : new PairingAnswer(answer == ApprovalAnswer.ApprovedOnce ? ApprovalAnswer.Denied : answer, null);
     }
 
+    /// <summary>Asks a human whether a paired browser may be offered a sign-in frame's own logins in another site's page, under the same window and slot as every other question.</summary>
+    /// <param name="prompt">What the human is shown.</param>
+    /// <param name="cancellationToken">Cancelled when the answer is no longer wanted.</param>
+    /// <returns>The answer; only <see cref="ApprovalAnswer.ApprovedOnce"/> trusts the frame.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="prompt"/> is null.</exception>
+    /// <remarks>A refusal, or no answer, holds the same question back as an agent's request is, so a page cannot keep it in front of the person (THREATS.md T-11).</remarks>
+    public ValueTask<ApprovalAnswer> AskAsync(FrameTrustPrompt prompt, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(prompt);
+
+        return AskThroughAsync(
+            [$"browser-frame\n{prompt.Pairing}\n{prompt.Top}\n{prompt.Frame}"],
+            new Asked(null, null, null, null),
+            token => _channel.AskAsync(prompt, token),
+            cancellationToken,
+            coolUnanswered: true);
+    }
+
     private async ValueTask<ApprovalAnswer> AskThroughAsync(
         IReadOnlyList<string> cooldownKeys,
         Asked listed,

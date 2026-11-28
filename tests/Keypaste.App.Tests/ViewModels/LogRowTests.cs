@@ -102,6 +102,24 @@ public sealed class LogRowTests
     }
 
     [Fact]
+    public void A_continued_fill_and_a_sign_in_frame_s_trust_say_so()
+    {
+        var continued = Row(Entry("browser", "granted", "continued") with { Field = "fill", Entry = "web/GitHub" });
+        var trusted = Row(Entry("browser", "granted", "prompt") with { Field = "trust" });
+        var refused = Row(Entry("browser", "denied", "prompt") with { Field = "trust" });
+        var removed = Row(Entry("browser", "granted", "removed") with { Field = "trust" });
+
+        Assert.Equal(("Filled a login", "Continued your pick", LogTone.Ok), (continued.Action, continued.Result, continued.Tone));
+        Assert.Equal("Trusted a sign-in frame", trusted.Action);
+        Assert.Equal(("Asked to trust a sign-in frame", LogTone.Danger), (refused.Action, refused.Tone));
+        Assert.Equal("Stopped trusting a sign-in frame", removed.Action);
+
+        // Each is the person's, in their browser but for the trust they removed in keypaste, and none is a lookup to hide.
+        Assert.All([continued, trusted, refused], row => Assert.Equal((true, true, false), (row.ByYou, row.ByBrowser, row.IsLookup)));
+        Assert.Equal((LogRow.You, true, false, false), (removed.Actor, removed.ByYou, removed.ByBrowser, removed.IsLookup));
+    }
+
+    [Fact]
     public void A_refusal_is_denied_in_danger()
     {
         var row = Row(Entry("request_credential", "denied", "prompt") with { Entry = "Work/github", Field = "username" });

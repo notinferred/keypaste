@@ -100,8 +100,8 @@ public sealed record AuditEntry
 
     /// <summary>
     /// Whether the person's paired browser made this request through keypaste's extension, rather than an agent: a pairing,
-    /// a pairing's check, a page's lookup, a fill, or a day of its lookups folded into one line. A pairing the person
-    /// removed in keypaste itself is not the browser's.
+    /// a pairing's check, a page's lookup, a fill, the person's answer to a sign-in frame's trust, or a day of its lookups
+    /// folded into one line. A pairing or a frame's trust the person removed in keypaste itself is not the browser's.
     /// </summary>
     /// <remarks>Only the vault's owner writes the browser's lines and its summaries, under tool names no bridge can give its own.</remarks>
     public bool ByBrowser => IsBrowserSummary

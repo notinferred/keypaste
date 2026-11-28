@@ -843,6 +843,7 @@ public sealed class AuditLog : IDisposable
         AuditMethod.Compaction => AuditCompaction.Method,
         AuditMethod.Picked => "picked",
         AuditMethod.Pressed => "pressed",
+        AuditMethod.Continued => "continued",
         _ => "unknown",
     };
 

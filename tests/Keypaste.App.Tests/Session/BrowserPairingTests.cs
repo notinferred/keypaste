@@ -207,6 +207,45 @@ public sealed partial class BrowserPairingTests
         Assert.Single(app.Windows);
     });
 
+    [Fact]
+    public Task A_sign_in_frame_of_another_site_is_asked_about_in_the_app_and_Settings_lists_its_trust_until_Remove() => HeadlessSession.On(async () =>
+    {
+        await using var app = await PromptedApp.StartAsync(seed: vault =>
+            vault.AddEntry(new VaultEntry { GroupPath = "web", Title = "Shop sign-in", Username = "dana", Password = "sso-s3cret", Url = "https://login.sso.example" }));
+        await PairAsync(app, "laptop");
+        await using var link = await AttachAsync(app, BrowserIdentity.ChromeWebStore);
+        Assert.Equal(BrowserOutcome.Done, (await link.CheckAsync(Check(app, "laptop"), Token))?.Outcome);
+        using var browserFill = new BrowserFillViewModel(app.Authority);
+        Assert.False(browserFill.HasFrames);
+
+        var listing = link.ListAsync(List(app, "https://login.sso.example/frame") with { TopUrl = "https://www.shop.example/" }, Token).AsTask();
+        var window = Assert.IsType<FrameTrustWindow>(await app.PromptAsync(app.Windows.Count + 1));
+
+        Assert.Equal("Trust sign-in from login.sso.example on www.shop.example?", Text(window, "TitleText"));
+        Assert.Equal(("login.sso.example", "www.shop.example", "laptop"), (Text(window, "FrameText"), Text(window, "TopText"), Text(window, "PairingText")));
+        Assert.DoesNotMatch(Retired(), Text(window, "ExplanationText")!);
+        Assert.True(window.FindControl<Button>("Deny")!.IsFocused);
+        Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(), button => button.IsDefault);
+
+        await app.ArmAsync();
+        Click(window, "Allow");
+
+        Assert.Equal(["Shop sign-in"], (await listing.WaitAsync(_wait, Token))!.Names.Select(name => name.Title));
+        await PromptedApp.WithdrawnAsync(window);
+
+        var row = Assert.Single(browserFill.Frames);
+        Assert.Equal("login.sso.example on www.shop.example", row.Name);
+        Assert.StartsWith("laptop · trusted ", row.Summary, StringComparison.Ordinal);
+
+        browserFill.AskRemoveFrameCommand.Press(row);
+        Assert.True(row.IsConfirmingRemove);
+        browserFill.RemoveFrameCommand.Press(row);
+
+        Assert.Empty(browserFill.Frames);
+        Assert.StartsWith("keypaste no longer trusts sign-in from login.sso.example on www.shop.example.", browserFill.Message, StringComparison.Ordinal);
+        Assert.Empty(app.Authority.FrameTrusts());
+    });
+
     private static BrowserListRequest List(PromptedApp app, string url) =>
         new("laptop", _key, url) { Vault = app.Vault, Session = app.SessionId };
 

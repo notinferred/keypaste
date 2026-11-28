@@ -161,6 +161,8 @@ internal sealed class PromptScreen : IDisposable
                 $"warning={Text(window, "WarningText")} changes={string.Join("; ", Changes(window))}",
             PairingWindow =>
                 $"pair-prompt identity={Text(window, "IdentityText")} code={Text(window, "CodeText")} name={window.FindControl<TextBox>("NameBox")?.Text}",
+            FrameTrustWindow =>
+                $"frame-prompt pairing={Text(window, "PairingText")} top={Text(window, "TopText")} frame={Text(window, "FrameText")}",
             _ =>
                 $"prompt client={Text(window, "ClientText")} label={Text(window, "LabelText")} " +
                 $"entry={Text(window, "EntryText")} field={Text(window, "FieldText")} for=once always=none",
@@ -170,6 +172,7 @@ internal sealed class PromptScreen : IDisposable
         {
             TerminalEditWindow => "edit-prompt withdrawn",
             PairingWindow => "pair-prompt withdrawn",
+            FrameTrustWindow => "frame-prompt withdrawn",
             _ => "prompt withdrawn",
         };
 

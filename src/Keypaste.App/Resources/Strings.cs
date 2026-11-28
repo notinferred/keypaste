@@ -138,6 +138,7 @@ public static class Strings
     public static string ConfirmMasterPassword => Manager.GetString("ConfirmMasterPassword", CultureInfo.CurrentUICulture)!;
     public static string ConfirmNewMasterPassword => Manager.GetString("ConfirmNewMasterPassword", CultureInfo.CurrentUICulture)!;
     public static string ConfirmRemovingThePairingValue => Manager.GetString("ConfirmRemovingThePairingValue", CultureInfo.CurrentUICulture)!;
+    public static string ConfirmStopTrustingValue => Manager.GetString("ConfirmStopTrustingValue", CultureInfo.CurrentUICulture)!;
     public static string ConnectAnAITool => Manager.GetString("ConnectAnAITool", CultureInfo.CurrentUICulture)!;
     public static string ConnectAnAIToolEllipsis => Manager.GetString("ConnectAnAIToolEllipsis", CultureInfo.CurrentUICulture)!;
     public static string ConnectLabel => Manager.GetString("ConnectLabel", CultureInfo.CurrentUICulture)!;
@@ -517,6 +518,7 @@ public static class Strings
     public static string RemindMeBeforeAnItemExpiresHelp => Manager.GetString("RemindMeBeforeAnItemExpiresHelp", CultureInfo.CurrentUICulture)!;
     public static string Remove => Manager.GetString("Remove", CultureInfo.CurrentUICulture)!;
     public static string RemoveAttachment => Manager.GetString("RemoveAttachment", CultureInfo.CurrentUICulture)!;
+    public static string RemoveEllipsis => Manager.GetString("RemoveEllipsis", CultureInfo.CurrentUICulture)!;
     public static string RemoveField => Manager.GetString("RemoveField", CultureInfo.CurrentUICulture)!;
     public static string RemoveFromFavorites => Manager.GetString("RemoveFromFavorites", CultureInfo.CurrentUICulture)!;
     public static string RemoveKey => Manager.GetString("RemoveKey", CultureInfo.CurrentUICulture)!;
@@ -527,6 +529,7 @@ public static class Strings
     public static string RemoveThePairingValue => Manager.GetString("RemoveThePairingValue", CultureInfo.CurrentUICulture)!;
     public static string RemoveThisAttachment => Manager.GetString("RemoveThisAttachment", CultureInfo.CurrentUICulture)!;
     public static string RemoveThisKeyFromItsItem => Manager.GetString("RemoveThisKeyFromItsItem", CultureInfo.CurrentUICulture)!;
+    public static string RemoveTrustValue => Manager.GetString("RemoveTrustValue", CultureInfo.CurrentUICulture)!;
     public static string RemoveValue => Manager.GetString("RemoveValue", CultureInfo.CurrentUICulture)!;
     public static string Rename => Manager.GetString("Rename", CultureInfo.CurrentUICulture)!;
     public static string RenameFieldLabel => Manager.GetString("RenameFieldLabel", CultureInfo.CurrentUICulture)!;
@@ -648,6 +651,7 @@ public static class Strings
     public static string Stages => Manager.GetString("Stages", CultureInfo.CurrentUICulture)!;
     public static string Start => Manager.GetString("Start", CultureInfo.CurrentUICulture)!;
     public static string StartsLockedWithNoWindow => Manager.GetString("StartsLockedWithNoWindow", CultureInfo.CurrentUICulture)!;
+    public static string StopTrustingValue => Manager.GetString("StopTrustingValue", CultureInfo.CurrentUICulture)!;
     public static string StopUsingAKeyFile => Manager.GetString("StopUsingAKeyFile", CultureInfo.CurrentUICulture)!;
     public static string StopUsingTheYubiKey => Manager.GetString("StopUsingTheYubiKey", CultureInfo.CurrentUICulture)!;
     public static string StopWaitingForTheYubiKey => Manager.GetString("StopWaitingForTheYubiKey", CultureInfo.CurrentUICulture)!;
@@ -703,6 +707,7 @@ public static class Strings
     public static string TouchYourYubiKey => Manager.GetString("TouchYourYubiKey", CultureInfo.CurrentUICulture)!;
     public static string Trash => Manager.GetString("Trash", CultureInfo.CurrentUICulture)!;
     public static string TrashIsEmpty => Manager.GetString("TrashIsEmpty", CultureInfo.CurrentUICulture)!;
+    public static string TrustedSignInFrames => Manager.GetString("TrustedSignInFrames", CultureInfo.CurrentUICulture)!;
     public static string TryAgain => Manager.GetString("TryAgain", CultureInfo.CurrentUICulture)!;
     public static string TurnOnForThisBrowser => Manager.GetString("TurnOnForThisBrowser", CultureInfo.CurrentUICulture)!;
     public static string TurnTheSwitchOffHereToStopIt => Manager.GetString("TurnTheSwitchOffHereToStopIt", CultureInfo.CurrentUICulture)!;

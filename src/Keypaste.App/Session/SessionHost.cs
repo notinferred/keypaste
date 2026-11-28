@@ -350,6 +350,35 @@ internal sealed class SessionHost : IDisposable
         return browsers?.Remove(id) ?? new PairingRemoval(false, _notAnswering);
     }
 
+    /// <summary>The sign-in frames of other sites the person trusted for this computer's pairings; none while nothing here answers browsers.</summary>
+    internal IReadOnlyList<FrameTrust> FrameTrusts()
+    {
+        SessionBrowsers? browsers;
+
+        lock (_gate)
+        {
+            browsers = _hosted?.Browsers;
+        }
+
+        // Outside the lock, which a lock of the session takes: listing reads the session's vault.
+        return browsers?.FrameTrusts() ?? [];
+    }
+
+    /// <summary>Removes the person's trust of a sign-in frame, saving it and recording it.</summary>
+    /// <param name="trust">The trust, as <see cref="FrameTrusts"/> listed it.</param>
+    /// <returns>Whether it was removed, and why not.</returns>
+    internal PairingRemoval RemoveFrameTrust(FrameTrust trust)
+    {
+        SessionBrowsers? browsers;
+
+        lock (_gate)
+        {
+            browsers = _hosted?.Browsers;
+        }
+
+        return browsers?.RemoveFrameTrust(trust) ?? new PairingRemoval(false, _notAnswering);
+    }
+
     /// <summary>Issues the pass a Run started in the app hands the <c>keypaste run --session</c> Terminal starts on macOS.</summary>
     /// <param name="claim">The request the app named, and the set it resolved.</param>
     /// <param name="lifetimeId">The session the Run was started in.</param>

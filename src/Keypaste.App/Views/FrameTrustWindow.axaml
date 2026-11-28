@@ -1,0 +1,61 @@
+<views:PromptWindow xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:vm="using:Keypaste.App.ViewModels"
+                    xmlns:views="using:Keypaste.App.Views"
+                    xmlns:ctl="using:Keypaste.App.Controls"
+                    x:Class="Keypaste.App.Views.FrameTrustWindow"
+                    x:DataType="vm:FrameTrustViewModel"
+                    Icon="avares://keypaste-app/Assets/keypaste.ico"
+                    Title="keypaste: a browser asks to trust a sign-in frame"
+                    Width="508"
+                    SizeToContent="Height"
+                    CanResize="False"
+                    WindowDecorations="None"
+                    TransparencyLevelHint="Transparent"
+                    Background="Transparent"
+                    Topmost="True"
+                    WindowStartupLocation="CenterScreen">
+
+  <Window.Styles>
+    <StyleInclude Source="avares://keypaste-app/Views/PromptStyles.axaml" />
+  </Window.Styles>
+
+  <!-- A claim card for a sign-in frame of another site: the hosts are the browser's, never the page's words, and trusting one
+       offers it only its own site's logins (THREATS.md T-62). The trust lasts until Settings removes it, so no button is the
+       default: Enter trusts nothing, and Escape denies. -->
+
+  <Border Classes="claim" Classes.arming="{Binding IsArming}">
+    <StackPanel>
+      <StackPanel Classes="claim-body">
+        <TextBlock Classes="live" ctl:Announcer.Says="{Binding Opening}" />
+        <views:PromptHead />
+
+        <TextBlock Name="TitleText" Classes="claim-title size-15" Text="{Binding Title}" TextWrapping="Wrap" />
+
+        <Border Classes="claim-block">
+          <Grid Classes="claim-facts size-13" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="6">
+            <TextBlock Classes="fact" Text="Sign-in from" />
+            <TextBlock Grid.Column="1" Name="FrameText" Classes="mono" Text="{Binding Frame}" TextTrimming="CharacterEllipsis" />
+            <TextBlock Grid.Row="1" Classes="fact" Text="Shown on" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Name="TopText" Classes="mono" Text="{Binding Top}" TextTrimming="CharacterEllipsis" />
+            <TextBlock Grid.Row="2" Classes="fact" Text="Browser" />
+            <TextBlock Grid.Row="2" Grid.Column="1" Name="PairingText" Text="{Binding Pairing}" TextTrimming="CharacterEllipsis" />
+          </Grid>
+        </Border>
+
+        <TextBlock Name="ExplanationText" Classes="claim-line size-13" Text="{Binding Explanation}" TextWrapping="Wrap" />
+      </StackPanel>
+
+      <Border Classes="claim-rule" />
+
+      <StackPanel Classes="claim-foot">
+        <Button Name="Deny" Classes="claim keyed" Content="Deny" Tag="esc"
+                IsCancel="True" Command="{Binding DenyCommand}" />
+        <Button Name="Allow" Classes="claim primary" Content="Trust"
+                Command="{Binding AllowOnceCommand}" />
+      </StackPanel>
+      <ProgressBar Name="TimeBar" Classes="claim-time" Value="{Binding TimeLeft}" AutomationProperties.Name="{Binding DeniesIn}" />
+    </StackPanel>
+  </Border>
+
+</views:PromptWindow>

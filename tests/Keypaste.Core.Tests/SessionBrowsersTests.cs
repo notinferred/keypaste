@@ -18,7 +18,7 @@ namespace Keypaste.Core.Tests;
 /// build's pairing and key; a removal recorded and refused from its next check; a database hash naming this computer; and a
 /// page's list of names across every unlocked vault, whose pick fills at once, asking nobody, and is recorded with the page's origin.
 /// </summary>
-public sealed class SessionBrowsersTests : IDisposable
+public sealed partial class SessionBrowsersTests : IDisposable
 {
     private const string _master = "correct horse battery staple";
 

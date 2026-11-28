@@ -158,6 +158,76 @@ public sealed class ApproverBrowserProtocolTests
     }
 
     [Fact]
+    public void A_browser_s_attach_reply_carries_the_features_its_owner_decides_and_an_older_owner_s_none()
+    {
+        var told = AttachReply.To("s") with { BrowserFeatures = BrowserFeatures.All };
+
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(told), out AttachReply? decoded));
+        Assert.Equal(BrowserFeatures.All, decoded.BrowserFeatures);
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned("""{"kind":"attach","session":"s","reason":""}"""), out AttachReply? older));
+        Assert.Null(older.BrowserFeatures);
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned("""{"kind":"attach","method":0,"reason":"locked","browser_features":["fill"]}"""), out AttachReply? _));
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned("""{"kind":"attach","session":"s","reason":"","browser_features":[1]}"""), out AttachReply? _));
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned("""{"kind":"attach","session":"s","reason":"","browser_features":[""]}"""), out AttachReply? _));
+    }
+
+    [Fact]
+    public void A_fill_round_trips_the_parts_the_page_shows_a_continuation_and_a_frame_s_tab_and_a_relay_before_them_asks_for_both()
+    {
+        var release = new BrowserReleaseRequest("laptop", _key, "https://idmsa.apple.com/signin", "0123456789abcdef0123456789abcdef")
+        {
+            TopUrl = "https://www.icloud.com/",
+            Fill = BrowserFill.Password,
+            Continued = true,
+            Vault = "/v.kdbx",
+            Session = "s",
+        };
+        var list = new BrowserListRequest("laptop", _key, "https://idmsa.apple.com/signin") { TopUrl = "https://www.icloud.com/", Vault = "/v.kdbx", Session = "s" };
+        var unasked = list with { AsksTrust = false };
+
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(release), out BrowserReleaseRequest? decodedRelease));
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(list), out BrowserListRequest? decodedList));
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(unasked), out BrowserListRequest? decodedUnasked));
+        Assert.Equal(release, decodedRelease);
+        Assert.Equal(list, decodedList);
+        Assert.Equal(unasked, decodedUnasked);
+
+        // A list that may ask writes no asks_trust, as a relay before the fill shortcut wrote none; one that is not a boolean is refused.
+        Assert.DoesNotContain("asks_trust", System.Text.Encoding.UTF8.GetString(ApproverProtocol.Encode(list)), StringComparison.Ordinal);
+        var olderList = """{"kind":"browser-list","vault":"/v.kdbx","session":"s","pairing":"laptop","identification_key":"k","url":"https://github.com/"}""";
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned(olderList), out BrowserListRequest? asks));
+        Assert.True(asks.AsksTrust);
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(olderList.Replace("}", ""","asks_trust":"false"}""", StringComparison.Ordinal)), out BrowserListRequest? _));
+
+        // What a 1.0.0 relay writes: no fill, no continuation and no tab.
+        var older = """{"kind":"browser-release","vault":"/v.kdbx","session":"s","pairing":"laptop","identification_key":"k","url":"https://github.com/","uuid":"0123456789abcdef0123456789abcdef"}""";
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned(older), out BrowserReleaseRequest? both));
+        Assert.Equal((BrowserFill.Both, false, (string?)null), (both.Fill, both.Continued, both.TopUrl));
+
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(older.Replace("}", ""","fill":9}""", StringComparison.Ordinal)), out BrowserReleaseRequest? _));
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(older.Replace("}", ""","continued":"true"}""", StringComparison.Ordinal)), out BrowserReleaseRequest? _));
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(older.Replace("}", ""","top_url":3}""", StringComparison.Ordinal)), out BrowserReleaseRequest? _));
+    }
+
+    [Fact]
+    public void A_fill_reply_round_trips_a_one_time_code_and_where_it_continues_and_an_older_owner_s_none()
+    {
+        var login = new BrowserLogin(string.Empty, string.Empty, "GitHub", "0123456789abcdef0123456789abcdef") { Totp = "123456" };
+        var fill = new BrowserFillReply(BrowserOutcome.Done, string.Empty) { Logins = [login], ContinueSite = "github.com", ContinueSeconds = 120 };
+
+        Assert.True(ApproverProtocol.TryDecode(ApproverProtocol.Encode(fill), out BrowserFillReply? decoded));
+        Assert.Equal(fill.Logins, decoded.Logins);
+        Assert.Equal(("github.com", 120), (decoded.ContinueSite, decoded.ContinueSeconds));
+
+        var older = """{"kind":"browser-release","outcome":0,"reason":"","logins":[{"login":"ada","password":"hunter2","name":"GitHub","uuid":"0123456789abcdef0123456789abcdef"}]}""";
+        Assert.True(ApproverProtocol.TryDecode(ApproverFrame.Versioned(older), out BrowserFillReply? both));
+        Assert.Equal((string.Empty, string.Empty, 0), (Assert.Single(both.Logins).Totp, both.ContinueSite, both.ContinueSeconds));
+
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(older.Replace("]}", "],\"continue_site\":\"github.com\"}", StringComparison.Ordinal)), out BrowserFillReply? _));
+        Assert.False(ApproverProtocol.TryDecode(ApproverFrame.Versioned(older.Replace("]}", "],\"continue_site\":\"github.com\",\"continue_seconds\":0}", StringComparison.Ordinal)), out BrowserFillReply? _));
+    }
+
+    [Fact]
     public void A_description_leaves_keys_usernames_and_passwords_out()
     {
         var described = string.Join(
@@ -167,9 +237,10 @@ public sealed class ApproverBrowserProtocolTests
             new BrowserListRequest("pairing", _key, "https://github.com/").ToString(),
             new BrowserReleaseRequest("pairing", _key, "https://github.com/", "uuid").ToString(),
             new BrowserFillReply(BrowserOutcome.Done, string.Empty) { Logins = [new BrowserLogin("ada", "hunter2", "GitHub", "uuid")] }.ToString(),
-            new BrowserLogin("ada", "hunter2", "GitHub", "uuid").ToString());
+            new BrowserLogin("ada", "hunter2", "GitHub", "uuid") { Totp = "918273" }.ToString());
 
         Assert.DoesNotContain(_key, described, StringComparison.Ordinal);
+        Assert.DoesNotContain("918273", described, StringComparison.Ordinal);
         Assert.DoesNotContain("hunter2", described, StringComparison.Ordinal);
         Assert.DoesNotContain("ada", described, StringComparison.Ordinal);
     }

@@ -2088,6 +2088,35 @@ public sealed class Vault : IDisposable
         }
     }
 
+    /// <summary>A live item's TOTP settings, found by UUID as <see cref="ReadSavedLogin"/> finds it, but only while this vault holds exactly what its file holds.</summary>
+    /// <param name="uuid">The item's UUID, as 32 hex digits.</param>
+    /// <param name="spec">When the answer is <see cref="SavedRead.Current"/>, the settings, which the caller disposes, or null when the item holds none or there is no such item.</param>
+    /// <param name="refusal">Why settings it holds cannot make a code, or null.</param>
+    /// <returns>Whether the vault matches its file, and if not, why.</returns>
+    internal SavedRead ReadSavedLoginTotp(string uuid, out TotpSpec? spec, out string? refusal)
+    {
+        ArgumentNullException.ThrowIfNull(uuid);
+
+        spec = null;
+        refusal = null;
+
+        lock (_state)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            var read = Compare();
+            if (read != SavedRead.Current)
+            {
+                return read;
+            }
+
+            spec = _interop.ReadLiveCustomFieldsByUuid(uuid, TotpSpec.IsSourceField) is { } fields
+                ? TotpSpec.Read(fields, out refusal)
+                : null;
+            return SavedRead.Current;
+        }
+    }
+
     private static PlaceholderFill? Filled(string value, Func<PlaceholderFields?> read)
     {
         if (KeePassPlaceholders.HoldsPlaceholder(value))

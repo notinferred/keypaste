@@ -351,6 +351,18 @@ internal sealed class FakeChannel : IApprovalChannel
         return ValueTask.FromResult(AnswerPairing(prompt));
     }
 
+    /// <summary>How a sign-in frame's question is answered; a no unless a test says otherwise.</summary>
+    internal Func<FrameTrustPrompt, ApprovalAnswer> AnswerFrame { get; set; } = _ => ApprovalAnswer.Denied;
+
+    /// <summary>Every sign-in frame's question shown, in order.</summary>
+    internal List<FrameTrustPrompt> FramePrompts { get; } = [];
+
+    public ValueTask<ApprovalAnswer> AskAsync(FrameTrustPrompt prompt, CancellationToken cancellationToken)
+    {
+        FramePrompts.Add(prompt);
+        return ValueTask.FromResult(AnswerFrame(prompt));
+    }
+
     private async ValueTask<ApprovalAnswer> AnswerAsync(CancellationToken cancellationToken)
     {
         Asked++;

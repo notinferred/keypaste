@@ -150,6 +150,25 @@ internal sealed partial class KeePassInterop
         return (Read(entry, groupPath), PlaceholderFieldsOf(entry, groupPath));
     }
 
+    /// <summary>The values of a live entry's custom fields whose names <paramref name="include"/> accepts, found as <see cref="ReadLiveByUuid"/> finds it, or null when there is none.</summary>
+    internal Dictionary<string, string>? ReadLiveCustomFieldsByUuid(string uuidHex, Func<string, bool> include)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (uuidHex.Length != 32 || !uuidHex.All(char.IsAsciiHexDigit)
+            || _database.RootGroup.FindEntry(new PwUuid(Convert.FromHexString(uuidHex)), true) is not { } entry
+            || PathOf(entry.ParentGroup) is not { } groupPath
+            || ReservedGroups.IsReserved(groupPath)
+            || IsInBin(entry.ParentGroup))
+        {
+            return null;
+        }
+
+        return entry.Strings
+            .Where(field => !PwDefs.IsStandardField(field.Key) && include(field.Key))
+            .ToDictionary(field => field.Key, field => Uncached(field.Value), StringComparer.Ordinal);
+    }
+
     /// <summary>Every live entry with its own tags, and the variable fields of each one a project tag names, by the traversal <see cref="Collect"/> uses.</summary>
     internal IReadOnlyList<EnvEntry> ReadEnvEntries()
     {

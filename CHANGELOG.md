@@ -2,6 +2,14 @@
 
 Published versions are available at `https://dl.keypaste.com/v<version>/` with checksums and corresponding source. From 1.0.0, Windows programs and the installer are signed with keypaste's Authenticode identity, and macOS code is signed with its Developer ID and notarized; Linux binaries and the AppImage are unsigned and attested, and earlier CLI/MCP binaries are unsigned and un-notarized. [RELEASE.md](docs/RELEASE.md) records platform support and verification requirements. The release workflow requires a section matching each tag.
 
+## Unreleased
+
+The browser extension, version 1.0.1, fills only the fields a page shows: a page that asks for your username first gets the username, and your password stays in keypaste. On the next page, within two minutes and on the same site, a click on keypaste's key icon in the password field fills that login's password with no list, and a one-time-code field after it gets the item's current code; keypaste fills each part once and logs it as continuing your pick. The extension fills one-time codes again, from keypaste, which never sends it the code's setup key.
+
+A sign-in form in a frame was refused unless the frame had the page's own address. A frame of the page's own site now fills as the page does, over https, and one from another site, such as Apple's sign-in on iCloud, is offered that site's own logins, never the page's. keypaste knows Apple's on www.icloud.com and icloud.com, and asks once about any other, in its own window ("Trust sign-in from idmsa.apple.com on www.icloud.com?"). Settings › Browser fill lists the frames you trusted, with Remove. The extension recognises www.icloud.com, appleid.apple.com and account.apple.com as Apple's sign-in pages, as it did idmsa.apple.com.
+
+The extension's fill shortcut, ⌃⇧U on a Mac and Alt+Shift+U on Windows and Linux, now does what a click on the key icon does, and works with no field selected: it moves to the page's first login field, the username, or the password on a page that shows no username, and opens keypaste's list there, or, on the next page of a sign-in within two minutes, fills the password or one-time code with no list. On a page whose sign-in form is in a frame, such as Apple's on iCloud, it reaches into the frame when keypaste already fills it there, and it never asks you to trust a frame. With a field selected it works in that field, as before.
+
 ## 1.0.0
 
 Closing keypaste's window into the menu bar or tray no longer locks your vaults: they stay unlocked, and agents still get their answers, until the idle lock, Ctrl+L or ⌘L, Lock in the menu bar or tray, `keypaste lock` or quitting. On a Mac the Dock icon stays while a vault is unlocked, so the Dock and ⌘Tab still reach keypaste.

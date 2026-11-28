@@ -168,6 +168,7 @@ internal sealed class AttachReplyFrame(AttachReply reply)
     public string Reason => reply.Reason;
     public string? OwnerVersion => reply.OwnerVersion;
     public string? DatabaseHash => reply.DatabaseHash;
+    public IReadOnlyList<string>? BrowserFeatures => reply.BrowserFeatures;
 }
 
 internal sealed class CredentialRequestFrame(CredentialRequest request)
@@ -563,6 +564,10 @@ internal sealed class BrowserListRequestFrame(BrowserListRequest request)
     public string IdentificationKey => request.IdentificationKey;
     public string Url => request.Url;
     public string? SubmitUrl => request.SubmitUrl;
+    public string? TopUrl => request.TopUrl;
+
+    // Written only when false, so a list that may ask is the frame it always was.
+    public bool? AsksTrust => request.AsksTrust ? null : false;
 }
 
 internal sealed class BrowserReleaseRequestFrame(BrowserReleaseRequest request)
@@ -576,6 +581,9 @@ internal sealed class BrowserReleaseRequestFrame(BrowserReleaseRequest request)
     public string Url => request.Url;
     public string? SubmitUrl => request.SubmitUrl;
     public string Uuid => request.Uuid;
+    public string? TopUrl => request.TopUrl;
+    public int Fill => (int)request.Fill;
+    public bool Continued => request.Continued;
 }
 
 internal sealed class BrowserShowRequestFrame(BrowserShowRequest request)
@@ -625,6 +633,8 @@ internal sealed class BrowserFillReplyFrame(BrowserFillReply reply)
     public int Outcome => (int)reply.Outcome;
     public string Reason => reply.Reason;
     public IEnumerable<BrowserLoginRow> Logins => reply.Logins.Select(login => new BrowserLoginRow(login));
+    public string ContinueSite => reply.ContinueSite;
+    public int ContinueSeconds => reply.ContinueSeconds;
 }
 
 internal sealed class BrowserLoginRow(BrowserLogin login)
@@ -633,6 +643,7 @@ internal sealed class BrowserLoginRow(BrowserLogin login)
     public string Password => login.Password;
     public string Name => login.Name;
     public string Uuid => login.Uuid;
+    public string Totp => login.Totp;
 }
 
 internal sealed class SaveRequestFrame(SaveRequest request)

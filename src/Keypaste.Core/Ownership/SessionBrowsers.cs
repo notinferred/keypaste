@@ -1,9 +1,11 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using Keypaste.Core.Agents;
 using Keypaste.Core.Approval;
 using Keypaste.Core.Audit;
 using Keypaste.Core.Browser;
 using Keypaste.Core.Ipc;
+using Keypaste.Core.Totp;
 
 namespace Keypaste.Core.Ownership;
 
@@ -29,6 +31,7 @@ public sealed class OwnerPairings(BrowserPairings file, Func<IReadOnlyList<Pairi
     public static readonly TimeSpan LongestHoldBack = TimeSpan.FromHours(1);
 
     private readonly ConcurrentDictionary<string, DateTimeOffset> _uses = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ContinuedFill> _continued = new(StringComparer.Ordinal);
     private readonly Func<IReadOnlyList<PairingVault>> _unlocked = unlocked ?? (() => []);
     private readonly Func<IReadOnlyList<string>> _locked = locked ?? (() => []);
     private readonly List<SessionBrowsers> _serving = [];
@@ -70,7 +73,7 @@ public sealed class OwnerPairings(BrowserPairings file, Func<IReadOnlyList<Pairi
         }
     }
 
-    /// <summary>Serves one unlock's browsers until its lifetime ends, so a page's list spans its vault.</summary>
+    /// <summary>Serves one unlock's browsers until its lifetime ends, so a page's list spans its vault; a lock continues no fill.</summary>
     internal void Serve(SessionBrowsers browsers, CancellationToken ended)
     {
         lock (_gate)
@@ -83,13 +86,70 @@ public sealed class OwnerPairings(BrowserPairings file, Func<IReadOnlyList<Pairi
             lock (_gate)
             {
                 _serving.Remove(browsers);
+                _continued.Clear();
             }
         });
     }
 
     internal void Used(string pairing, DateTimeOffset at) => _uses[pairing] = at;
 
-    internal void Forget(string pairing) => _uses.TryRemove(pairing, out _);
+    internal void Forget(string pairing)
+    {
+        _uses.TryRemove(pairing, out _);
+
+        lock (_gate)
+        {
+            _continued.Remove(pairing);
+        }
+    }
+
+    /// <summary>What the last fill for a pairing may still be continued by, or null.</summary>
+    internal ContinuedFill? Continued(string pairing)
+    {
+        lock (_gate)
+        {
+            return _continued.GetValueOrDefault(pairing);
+        }
+    }
+
+    /// <summary>Has a fill for a pairing continue as <paramref name="next"/> says, or nothing continue it when that is null, replacing what continued before.</summary>
+    internal void Continue(string pairing, ContinuedFill? next)
+    {
+        lock (_gate)
+        {
+            if (next is null)
+            {
+                _continued.Remove(pairing);
+            }
+            else
+            {
+                _continued[pairing] = next;
+            }
+        }
+    }
+
+    /// <summary>Takes the continuation a fill was checked against, once, putting <paramref name="next"/> in its place; false when another fill took it first.</summary>
+    internal bool TryTake(ContinuedFill taken, ContinuedFill? next)
+    {
+        lock (_gate)
+        {
+            if (!_continued.TryGetValue(taken.Pairing, out var held) || !ReferenceEquals(held, taken))
+            {
+                return false;
+            }
+
+            if (next is null)
+            {
+                _continued.Remove(taken.Pairing);
+            }
+            else
+            {
+                _continued[taken.Pairing] = next;
+            }
+
+            return true;
+        }
+    }
 
     internal void Change() => Changed?.Invoke(this, EventArgs.Empty);
 
@@ -184,8 +244,15 @@ public sealed record PairingRemoval(bool Removed, string Reason);
 /// </para>
 /// <para>
 /// A page's list carries the names of its logins in every vault unlocked in this process and never a password; a pick then
-/// releases that one login at once, since the person chose it in keypaste's list (THREATS.md T-59). Each list that names a
-/// login and each release is recorded with the page's origin before the reply.
+/// releases that one login at once, since the person chose it in keypaste's list (THREATS.md T-59), and only the parts the page
+/// shows. Each list that names a login and each release is recorded with the page's origin before the reply.
+/// </para>
+/// <para>
+/// A fill may be continued once per part left, with no list and no pick, by the next click or fill shortcut in the same tab within
+/// <see cref="ContinuedFill.Window"/> on a page of the same registrable domain and scheme: the password after the username, or the
+/// one-time code. An https frame of the page's own site, the same registrable domain and scheme, is filled as the page itself is; a frame
+/// of another site is offered only its own site's logins, and only once it is a known sign-in frame or
+/// the person trusted it for the pairing here (THREATS.md T-62).
 /// </para>
 /// </remarks>
 public sealed class SessionBrowsers : IBrowserRequests
@@ -279,6 +346,50 @@ public sealed class SessionBrowsers : IBrowserRequests
         Record(removed.Identity, id, BrowserAct.Remove, AuditDecision.Granted, AuditMethod.Removed, "the person removed the pairing in keypaste");
         _narrate?.Invoke($"removed the pairing {id}");
         Removed?.Invoke(this, id);
+        _pairings.Change();
+        return new PairingRemoval(true, string.Empty);
+    }
+
+    /// <summary>The sign-in frames of other sites the person trusted, for pairings any unlocked vault vouches for.</summary>
+    /// <returns>The frames, by pairing, page and frame; none while locked.</returns>
+    public IReadOnlyList<FrameTrust> FrameTrusts()
+    {
+        try
+        {
+            return _unlockedFor(_lifetime) is { } vault ? _pairings.File.Frames(Vouching(vault)) : [];
+        }
+        catch (Exception failure) when (failure is VaultException or ObjectDisposedException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>Removes the person's trust of a sign-in frame for a pairing, for every vault, recording it, so the frame is asked about again.</summary>
+    /// <param name="trust">The trust, as <see cref="FrameTrusts"/> listed it.</param>
+    /// <returns>Whether it was removed, and why not.</returns>
+    public PairingRemoval RemoveFrameTrust(FrameTrust trust)
+    {
+        ArgumentNullException.ThrowIfNull(trust);
+
+        if (!_lifetime.IsLive || _unlockedFor(_lifetime) is not { } vault)
+        {
+            return new PairingRemoval(false, "the vault is locked");
+        }
+
+        if (!_pairings.File.TryDistrust(Sealing(vault), trust.Pairing, trust.Top, trust.Frame, out _, out var problem))
+        {
+            return new PairingRemoval(false, problem);
+        }
+
+        var identity = _pairings.File.List(Vouching(vault)).FirstOrDefault(pairing => string.Equals(pairing.Id, trust.Pairing, StringComparison.Ordinal))?.Identity;
+        var named = $"sign-in from {trust.Frame} on {trust.Top}";
+
+        if (identity is not null)
+        {
+            Record(identity, trust.Pairing, BrowserAct.Trust, AuditDecision.Granted, AuditMethod.Removed, $"the person removed their trust of {named} in keypaste");
+        }
+
+        _narrate?.Invoke($"no longer trusts {named} for {trust.Pairing}");
         _pairings.Change();
         return new PairingRemoval(true, string.Empty);
     }
@@ -441,10 +552,10 @@ public sealed class SessionBrowsers : IBrowserRequests
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(browser);
 
-        return ValueTask.FromResult(List(request, browser));
+        return ListOwnAsync(request, browser, cancellationToken);
     }
 
-    private BrowserListReply List(BrowserListRequest request, BrowserIdentity browser)
+    private async ValueTask<BrowserListReply> ListOwnAsync(BrowserListRequest request, BrowserIdentity browser, CancellationToken cancellationToken)
     {
         if (_unlockedFor(_lifetime) is null)
         {
@@ -470,6 +581,24 @@ public sealed class SessionBrowsers : IBrowserRequests
             return new BrowserListReply(BrowserOutcome.Done, string.Empty) { LockedVaults = locked };
         }
 
+        if (!TryFrame(lookup, request.TopUrl, out var top, out var refusal))
+        {
+            Record(browser, pairing.Id, BrowserAct.List, AuditDecision.Denied, AuditMethod.OutOfScope, $"{refusal}, on {lookup.Page}");
+            return new BrowserListReply(BrowserOutcome.Refused, refusal);
+        }
+
+        if (top is not null && !request.AsksTrust && !IsTrusted(pairing, top, lookup.Page))
+        {
+            var unasked = $"sign-in from {lookup.Page.Host} on {top.Host} is not trusted, and the fill shortcut asks nobody";
+            Record(browser, pairing.Id, BrowserAct.List, AuditDecision.Denied, AuditMethod.OutOfScope, $"{unasked}, on {lookup.Page}");
+            return new BrowserListReply(BrowserOutcome.Refused, unasked);
+        }
+
+        if (top is not null && await TrustAsync(browser, pairing, top, lookup.Page, cancellationToken).ConfigureAwait(false) is { } distrusted)
+        {
+            return new BrowserListReply(BrowserOutcome.Refused, distrusted);
+        }
+
         var serving = Serving();
         var named = serving.Count + locked.Count > 1;
         List<BrowserLoginName> names = [.. serving.SelectMany(vault => vault.Names(lookup, named)).Take(MaximumNames)];
@@ -486,7 +615,7 @@ public sealed class SessionBrowsers : IBrowserRequests
             return reply;
         }
 
-        var origin = lookup.Page.ToString();
+        var origin = top is null ? lookup.Page.ToString() : $"{lookup.Page} in a sign-in frame on {top}";
         var line = RequestRecords.Browser(browser, pairing.Id, BrowserAct.List, AuditDecision.Granted, AuditMethod.Exposure, $"listed {names.Count} login(s) by name, no password, on {origin}", _lifetime.Id, _vault.Key);
         return _recorder.Recorded(reply, line);
     }
@@ -528,17 +657,176 @@ public sealed class SessionBrowsers : IBrowserRequests
             return new BrowserFillReply(BrowserOutcome.Refused, "keypaste fills no login on this page");
         }
 
+        var origin = lookup.Page.ToString();
+
+        if (!TryFrame(lookup, request.TopUrl, out var top, out var refusal))
+        {
+            return Refuse(browser, pairing.Id, AuditMethod.OutOfScope, refusal, origin);
+        }
+
+        if (top is not null && !IsTrusted(pairing, top, lookup.Page))
+        {
+            return Refuse(browser, pairing.Id, AuditMethod.OutOfScope, $"sign-in from {lookup.Page.Host} on {top.Host} is not trusted", origin);
+        }
+
+        var parts = ContinuedFill.PartsOf(request.Fill);
+        var continuing = (ContinuedFill?)null;
+
+        if (request.Continued && !TryContinuing(pairing, request.Uuid, lookup.Page, parts, out continuing, out var why))
+        {
+            return Refuse(browser, pairing.Id, AuditMethod.OutOfScope, why, origin);
+        }
+
         foreach (var vault in Serving())
         {
             var waiting = vault._lifetime.Waiting;
 
             if (vault.Holds(lookup, request.Uuid, out var read))
             {
-                return vault.ReleaseOwn(lookup, read, request, pairing, browser, waiting);
+                return vault.ReleaseOwn(lookup, read, new Fill(request.Uuid, parts, continuing, top), pairing, browser, waiting);
             }
         }
 
-        return Refuse(browser, pairing.Id, AuditMethod.OutOfScope, "no open vault holds that login for this page", lookup.Page.ToString());
+        return Refuse(browser, pairing.Id, AuditMethod.OutOfScope, "no open vault holds that login for this page", origin);
+    }
+
+    /// <summary>What a release fills: the item, the parts the page shows, the fill it continues if it does, and the tab's origin when the page is a frame of another.</summary>
+    private sealed record Fill(string Uuid, LoginParts Parts, ContinuedFill? Continuing, WebOrigin? Top);
+
+    /// <summary>The fill a continued request continues, when one for this pairing and item is armed, unlapsed, on this page's site and has the parts it asks for left.</summary>
+    private bool TryContinuing(BrowserPairing pairing, string uuid, WebOrigin page, LoginParts parts, [NotNullWhen(true)] out ContinuedFill? continuing, out string why)
+    {
+        continuing = _pairings.Continued(pairing.Id);
+        why = continuing switch
+        {
+            null => "nothing filled in this browser in the last two minutes is left to continue",
+            _ when !string.Equals(continuing.Uuid, uuid, StringComparison.OrdinalIgnoreCase) => "the fill it continues was of another login",
+            _ when _clock.GetUtcNow() > continuing.Until => "the fill it continues was more than two minutes ago",
+            _ when !string.Equals(page.Scheme, continuing.PickedOn.Scheme, StringComparison.Ordinal) || !string.Equals(page.Site, continuing.Site, StringComparison.Ordinal) => "the fill it continues was on another site",
+            _ when (parts & ~continuing.Left) != LoginParts.None => $"the fill it continues has no {ContinuedFill.Described(parts & ~continuing.Left)} left to fill",
+            _ => string.Empty,
+        };
+
+        return why.Length == 0;
+    }
+
+    /// <summary>
+    /// The tab's origin when the page is a frame of another site, or null when it is the tab's own page or an https frame of its
+    /// site, the same registrable domain and scheme, which is filled as the page is; false, with why, when keypaste fills nothing
+    /// in it, as in any frame of another origin over http.
+    /// </summary>
+    private static bool TryFrame(LoginLookup lookup, string? topUrl, out WebOrigin? top, out string refusal)
+    {
+        top = null;
+        refusal = string.Empty;
+
+        if (topUrl is null)
+        {
+            return true;
+        }
+
+        if (!WebOrigin.TryRead(topUrl, out var tab, out _))
+        {
+            refusal = "keypaste fills no login in a frame of a page it cannot read";
+            return false;
+        }
+
+        if (string.Equals(tab.ToString(), lookup.Page.ToString(), StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (!string.Equals(lookup.Page.Scheme, Uri.UriSchemeHttps, StringComparison.Ordinal))
+        {
+            refusal = "keypaste fills a frame of another origin only over https";
+            return false;
+        }
+
+        // A frame of the page's own site is answered by the same site as the page, so it is the page's own as far as logins go.
+        if (string.Equals(tab.Scheme, lookup.Page.Scheme, StringComparison.Ordinal) && tab.Site is { } site && string.Equals(site, lookup.Page.Site, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        top = tab;
+        return true;
+    }
+
+    /// <summary>Whether a frame may be offered its own site's logins in the tab's page: a known sign-in frame, or one the person trusted for this pairing.</summary>
+    private bool IsTrusted(BrowserPairing pairing, WebOrigin top, WebOrigin frame)
+    {
+        if (SignInFrames.IsKnown(top.Host, frame.Host))
+        {
+            return true;
+        }
+
+        try
+        {
+            return _unlockedFor(_lifetime) is { } vault && _pairings.File.Trusts(Vouching(vault), pairing.Id, top.Host, frame.Host);
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Null when a frame may be offered its own site's logins in the tab's page, asking the person first when it is neither a
+    /// known sign-in frame nor one they trusted, and recording their trust; otherwise why not, recorded.
+    /// </summary>
+    private async ValueTask<string?> TrustAsync(BrowserIdentity browser, BrowserPairing pairing, WebOrigin top, WebOrigin frame, CancellationToken cancellationToken)
+    {
+        if (IsTrusted(pairing, top, frame))
+        {
+            return null;
+        }
+
+        var waiting = _lifetime.Waiting;
+        var named = $"sign-in from {frame.Host} on {top.Host}";
+        var prompt = new FrameTrustPrompt { Identity = browser, Pairing = pairing.Id, Top = top.Host, Frame = frame.Host };
+        var answer = await _gate.AskAsync(prompt, cancellationToken).ConfigureAwait(false);
+
+        if (!_lifetime.IsLive || waiting.IsCancellationRequested)
+        {
+            var withdrawn = _lifetime.IsLive ? $"{_lifetime.WithdrawnBecause} before {named} was trusted" : $"the vault was locked before {named} was trusted";
+            Record(browser, pairing.Id, BrowserAct.Trust, AuditDecision.Denied, _lifetime.IsLive ? AuditMethod.VaultChanged : AuditMethod.VaultLocked, withdrawn);
+            return withdrawn;
+        }
+
+        if (answer != ApprovalAnswer.ApprovedOnce)
+        {
+            var why = answer switch
+            {
+                ApprovalAnswer.Denied => $"a person did not trust {named}",
+                ApprovalAnswer.TimedOut => "nobody answered inside the window",
+                ApprovalAnswer.Busy => "another prompt is waiting for an answer; try again once it is answered",
+                ApprovalAnswer.Cooldown => $"a person did not trust {named} a moment ago; try again in a minute",
+                ApprovalAnswer.Cancelled => "the request was withdrawn before anybody answered",
+                _ => "the question could not be shown, so nobody was asked",
+            };
+
+            Record(browser, pairing.Id, BrowserAct.Trust, AuditDecision.Denied, answer.ToAuditMethod(), why);
+            _narrate?.Invoke($"did not trust {named}: {why}");
+            return why;
+        }
+
+        if (!_lifetime.TryCommitAfter(waiting) || _unlockedFor(_lifetime) is not { } open)
+        {
+            Record(browser, pairing.Id, BrowserAct.Trust, AuditDecision.Denied, AuditMethod.VaultLocked, $"the vault was locked before {named} was trusted");
+            return "the vault is locked";
+        }
+
+        if (!_pairings.File.TryTrust(Sealing(open), pairing.Id, top.Host, frame.Host, _clock.GetUtcNow(), out var problem))
+        {
+            var failed = $"a person trusted {named}, and then: {problem}";
+            Record(browser, pairing.Id, BrowserAct.Trust, AuditDecision.Denied, AuditMethod.Failed, failed);
+            return failed;
+        }
+
+        Record(browser, pairing.Id, BrowserAct.Trust, AuditDecision.Granted, AuditMethod.Prompt, $"a person trusted {named}");
+        _narrate?.Invoke($"trusted {named} for {pairing.Id}");
+        _pairings.Change();
+        return null;
     }
 
     /// <inheritdoc/>
@@ -600,16 +888,16 @@ public sealed class SessionBrowsers : IBrowserRequests
     private BrowserFillReply ReleaseOwn(
         LoginLookup lookup,
         (IReadOnlyList<BrowserItem> Candidates, IReadOnlyList<RefusedMatch> Refused) read,
-        BrowserReleaseRequest request,
+        Fill fill,
         BrowserPairing pairing,
         BrowserIdentity browser,
         CancellationToken waiting)
     {
         var origin = lookup.Page.ToString();
 
-        if (read.Candidates.FirstOrDefault(candidate => IsItem(candidate, request.Uuid)) is not { } item)
+        if (read.Candidates.FirstOrDefault(candidate => IsItem(candidate, fill.Uuid)) is not { } item)
         {
-            return read.Refused.FirstOrDefault(refused => IsItem(refused.Item, request.Uuid)) is { } kept
+            return read.Refused.FirstOrDefault(refused => IsItem(refused.Item, fill.Uuid)) is { } kept
                 ? Refuse(browser, pairing.Id, AuditMethod.Blocked, kept.Reason, origin, item: kept.Item.Name)
                 : Refuse(browser, pairing.Id, AuditMethod.OutOfScope, "the item does not match this page", origin);
         }
@@ -624,17 +912,50 @@ public sealed class SessionBrowsers : IBrowserRequests
             return Refuse(browser, pairing.Id, AuditMethod.VaultChanged, "the item could not be read as the vault's file holds it", origin, item: item.Name);
         }
 
-        if (login.Username.Value is not { } username || login.Password.Value is not { } password)
+        // Only the parts the page shows are read out and must fill, so a username-only page needs no password that can leave.
+        var wantsUsername = fill.Parts.HasFlag(LoginParts.Username);
+        var wantsPassword = fill.Parts.HasFlag(LoginParts.Password);
+
+        if ((wantsUsername && login.Username.Value is null) || (wantsPassword && login.Password.Value is null))
         {
-            var unfilled = $"its {(login.Username.Value is null ? "username" : "password")} {login.Username.Refusal ?? login.Password.Refusal}";
+            var unfilled = wantsUsername && login.Username.Value is null
+                ? $"its username {login.Username.Refusal}"
+                : $"its password {login.Password.Refusal}";
             return Refuse(browser, pairing.Id, AuditMethod.Unfillable, unfilled, origin, item: item.Name);
         }
 
-        var reply = new BrowserFillReply(BrowserOutcome.Done, string.Empty) { Logins = [new BrowserLogin(username, password, login.Entry.Title, item.Name.Uuid!)] };
+        if (!TryReadCode(vault, item.Name.Uuid!, fill.Parts.HasFlag(LoginParts.Totp), out var holdsCode, out var code))
+        {
+            return Refuse(browser, pairing.Id, AuditMethod.VaultChanged, "the item could not be read as the vault's file holds it", origin, item: item.Name);
+        }
+
+        if (fill.Parts.HasFlag(LoginParts.Totp) && code.Length == 0)
+        {
+            return Refuse(browser, pairing.Id, AuditMethod.Unfillable, "it has no one-time code keypaste can make", origin, item: item.Name);
+        }
+
+        var now = _clock.GetUtcNow();
+        var left = (fill.Continuing?.Left ?? LoginParts.All) & ~fill.Parts & (holdsCode ? LoginParts.All : ~LoginParts.Totp);
+        var next = left != LoginParts.None && lookup.Page.Site is { } site
+            ? new ContinuedFill(pairing.Id, item.Name.Uuid!, fill.Continuing?.PickedOn ?? lookup.Page, site, left, now + ContinuedFill.Window)
+            : null;
+
+        var released = new BrowserLogin(wantsUsername ? login.Username.Value! : string.Empty, wantsPassword ? login.Password.Value! : string.Empty, login.Entry.Title, item.Name.Uuid!) { Totp = code };
+        var reply = new BrowserFillReply(BrowserOutcome.Done, string.Empty)
+        {
+            Logins = [released],
+            ContinueSite = next?.Site ?? string.Empty,
+            ContinueSeconds = next is null ? 0 : (int)ContinuedFill.Window.TotalSeconds,
+        };
 
         if (!ApproverProtocol.Fits(reply))
         {
             return Refuse(browser, pairing.Id, AuditMethod.Undeliverable, "the login would not fit one reply", origin, item: item.Name);
+        }
+
+        if (fill.Continuing is { } continuing && !_pairings.TryTake(continuing, next))
+        {
+            return Refuse(browser, pairing.Id, AuditMethod.OutOfScope, "the fill it continues was continued already", origin, item: item.Name);
         }
 
         if (!_lifetime.TryCommitAfter(waiting))
@@ -642,9 +963,60 @@ public sealed class SessionBrowsers : IBrowserRequests
             return Refuse(browser, pairing.Id, AuditMethod.VaultLocked, "the vault was locked before the login was filled", origin, BrowserOutcome.Locked, item.Name);
         }
 
-        _pairings.Used(pairing.Id, _clock.GetUtcNow());
+        if (fill.Continuing is null)
+        {
+            _pairings.Continue(pairing.Id, next);
+        }
+
+        _pairings.Used(pairing.Id, now);
         _narrate?.Invoke($"filled a login on {origin} for {pairing.Id}");
-        return _recorder.Recorded(reply, [FillLine(browser, pairing.Id, item.Name, origin, AuditDecision.Granted, AuditMethod.Picked, "the person picked it in the page's list")]);
+
+        var framed = fill.Top is { } top ? $" in a sign-in frame on {top}" : string.Empty;
+        var parts = fill.Parts == (LoginParts.Username | LoginParts.Password) ? string.Empty : $", its {ContinuedFill.Described(fill.Parts)}";
+        var (method, reason) = fill.Continuing is { } continued
+            ? (AuditMethod.Continued, $"it continued, within two minutes, the person's pick on {continued.PickedOn}{parts}{framed}")
+            : (AuditMethod.Picked, $"the person picked it in the page's list{parts}{framed}");
+
+        return _recorder.Recorded(reply, [FillLine(browser, pairing.Id, item.Name, origin, AuditDecision.Granted, method, reason)]);
+    }
+
+    /// <summary>
+    /// Reads whether the item holds a one-time code keypaste can make and, when <paramref name="compute"/>, its current code; the seed
+    /// goes no further than the settings, disposed here. False when the vault differs from its file.
+    /// </summary>
+    private bool TryReadCode(Vault vault, string uuid, bool compute, out bool holds, out string code)
+    {
+        holds = false;
+        code = string.Empty;
+        TotpSpec? spec = null;
+
+        try
+        {
+            if (vault.ReadSavedLoginTotp(uuid, out spec, out _) != SavedRead.Current)
+            {
+                return false;
+            }
+
+            holds = spec is not null;
+
+            if (compute && spec is not null)
+            {
+                code = spec.Code(_clock).Value;
+            }
+
+            return true;
+        }
+        catch (Exception failure) when (failure is not ObjectDisposedException)
+        {
+            // Settings keypaste cannot make a code from make none, as an agent's request for one is refused (law 7).
+            holds = false;
+            code = string.Empty;
+            return true;
+        }
+        finally
+        {
+            spec?.Dispose();
+        }
     }
 
     private static bool IsItem(BrowserItem item, string uuid) =>

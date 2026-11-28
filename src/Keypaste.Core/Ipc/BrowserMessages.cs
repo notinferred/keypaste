@@ -54,11 +54,20 @@ public sealed record BrowserCheckRequest(string Pairing, string IdentificationKe
 /// </summary>
 /// <param name="Pairing">The pairing's id.</param>
 /// <param name="IdentificationKey">The pairing's identification key, in base64.</param>
-/// <param name="Url">The tab's URL as the browser reports it to the extension.</param>
+/// <param name="Url">The address of the page the logins are for, as the browser reports it to the extension: the tab's, or a frame's own.</param>
 public sealed record BrowserListRequest(string Pairing, string IdentificationKey, string Url)
 {
     /// <summary>The URL the page's form posts to, as the extension reports it, or null when it named none.</summary>
     public string? SubmitUrl { get; init; }
+
+    /// <summary>The tab's URL as the browser reports it, when <see cref="Url"/> is a frame's of another origin; otherwise null.</summary>
+    public string? TopUrl { get; init; }
+
+    /// <summary>
+    /// Whether keypaste may ask the person to trust a sign-in frame of another site it neither knows nor was told to trust; false
+    /// when the extension's fill shortcut reached into the frame, which the person never pointed at, so such a frame is refused.
+    /// </summary>
+    public bool AsksTrust { get; init; } = true;
 
     /// <summary>The vault this connection attached to.</summary>
     public string Vault { get; init; } = string.Empty;
@@ -68,7 +77,7 @@ public sealed record BrowserListRequest(string Pairing, string IdentificationKey
 
     /// <summary>A description with the key left out.</summary>
     /// <returns>The pairing and the page.</returns>
-    public override string ToString() => $"BrowserListRequest {{ Pairing = {Pairing}, Url = {Url}, SubmitUrl = {SubmitUrl} }}";
+    public override string ToString() => $"BrowserListRequest {{ Pairing = {Pairing}, Url = {Url}, SubmitUrl = {SubmitUrl}, TopUrl = {TopUrl}, AsksTrust = {AsksTrust} }}";
 }
 
 /// <summary>One login a page's list shows: its names, and nothing that fills.</summary>
@@ -99,15 +108,62 @@ public sealed record BrowserListReply(BrowserOutcome Outcome, string Reason)
     public string Warning { get; init; } = string.Empty;
 }
 
+/// <summary>Which of a login's parts a page shows, and so which leave keypaste for it.</summary>
+public enum BrowserFill
+{
+    /// <summary>The username and the password, as every fill was before an extension said which a page shows.</summary>
+    Both = 0,
+
+    /// <summary>The username alone: the page shows no password field.</summary>
+    Username = 1,
+
+    /// <summary>The password alone: the page shows no username field.</summary>
+    Password = 2,
+
+    /// <summary>The item's current one-time code alone, never its seed.</summary>
+    Totp = 3,
+}
+
+/// <summary>What the vault's owner tells a browser's attachment it decides beyond what keypaste 1.0.0 did, so a relay forwards only those.</summary>
+public static class BrowserFeatures
+{
+    /// <summary>A fill names the parts the page shows (<see cref="BrowserReleaseRequest.Fill"/>).</summary>
+    public const string Fill = "fill";
+
+    /// <summary>A fill may continue the last one (<see cref="BrowserReleaseRequest.Continued"/>).</summary>
+    public const string Continued = "continued";
+
+    /// <summary>A list or a fill may be for a frame of another origin than its tab (<see cref="BrowserListRequest.TopUrl"/>).</summary>
+    public const string Frames = "frames";
+
+    /// <summary>A fill may be an item's one-time code (<see cref="BrowserFill.Totp"/>).</summary>
+    public const string Totp = "totp";
+
+    /// <summary>The most features an attachment is told.</summary>
+    public const int MaximumCount = 16;
+
+    /// <summary>Every feature this owner decides.</summary>
+    public static IReadOnlyList<string> All { get; } = [Fill, Continued, Frames, Totp];
+}
+
 /// <summary>Asks the vault's owner to fill the one login the person picked in a page's list, under the one pairing the relay checked.</summary>
 /// <param name="Pairing">The pairing's id.</param>
 /// <param name="IdentificationKey">The pairing's identification key, in base64.</param>
-/// <param name="Url">The tab's URL as the browser reports it to the extension.</param>
-/// <param name="Uuid">The picked item's UUID.</param>
+/// <param name="Url">The address of the page the login is for, as the browser reports it to the extension: the tab's, or a frame's own.</param>
+/// <param name="Uuid">The picked item's UUID, or for a continued fill the item of the fill it continues.</param>
 public sealed record BrowserReleaseRequest(string Pairing, string IdentificationKey, string Url, string Uuid)
 {
     /// <summary>The URL the page's form posts to, as the extension reports it, or null when it named none.</summary>
     public string? SubmitUrl { get; init; }
+
+    /// <summary>The tab's URL as the browser reports it, when <see cref="Url"/> is a frame's of another origin; otherwise null.</summary>
+    public string? TopUrl { get; init; }
+
+    /// <summary>Which of the login's parts the page shows, so only those leave keypaste.</summary>
+    public BrowserFill Fill { get; init; }
+
+    /// <summary>Whether this fill continues the last one in the same tab, with no list and no pick of its own.</summary>
+    public bool Continued { get; init; }
 
     /// <summary>The vault this connection attached to.</summary>
     public string Vault { get; init; } = string.Empty;
@@ -117,7 +173,8 @@ public sealed record BrowserReleaseRequest(string Pairing, string Identification
 
     /// <summary>A description with the key left out.</summary>
     /// <returns>The pairing, the page and the item.</returns>
-    public override string ToString() => $"BrowserReleaseRequest {{ Pairing = {Pairing}, Url = {Url}, SubmitUrl = {SubmitUrl}, Uuid = {Uuid} }}";
+    public override string ToString() =>
+        $"BrowserReleaseRequest {{ Pairing = {Pairing}, Url = {Url}, SubmitUrl = {SubmitUrl}, TopUrl = {TopUrl}, Uuid = {Uuid}, Fill = {Fill}, Continued = {Continued} }}";
 }
 
 /// <summary>What a person asked keypaste to show from a page's list.</summary>
@@ -169,14 +226,17 @@ public sealed record BrowserReply(BrowserOutcome Outcome, string Reason)
     public string? Pairing { get; init; }
 }
 
-/// <summary>One login released to a browser: an item's username and password, its title and its UUID, and nothing else of it.</summary>
-/// <param name="Login">The item's username.</param>
-/// <param name="Password">The item's password.</param>
+/// <summary>One login released to a browser: of an item's username, password and current one-time code those the page shows, its title and its UUID, and nothing else of it.</summary>
+/// <param name="Login">The item's username, or empty when the page shows no username field.</param>
+/// <param name="Password">The item's password, or empty when the page shows no password field.</param>
 /// <param name="Name">The item's title.</param>
 /// <param name="Uuid">The item's UUID, as KeePassXC writes one.</param>
-/// <remarks>A record prints every member, so the password and username are left out of its description.</remarks>
+/// <remarks>A record prints every member, so the password, the code and the username are left out of its description.</remarks>
 public sealed record BrowserLogin(string Login, string Password, string Name, string Uuid)
 {
+    /// <summary>The item's current one-time code, for a page's one-time-code field, never its seed; otherwise empty.</summary>
+    public string Totp { get; init; } = string.Empty;
+
     /// <summary>A description with the username and password left out.</summary>
     /// <returns>The item's UUID.</returns>
     public override string ToString() => $"BrowserLogin {{ Uuid = {Uuid} }}";
@@ -189,6 +249,12 @@ public sealed record BrowserFillReply(BrowserOutcome Outcome, string Reason)
 {
     /// <summary>The login released, at most one; none unless <see cref="Outcome"/> is <see cref="BrowserOutcome.Done"/>.</summary>
     public IReadOnlyList<BrowserLogin> Logins { get; init; } = [];
+
+    /// <summary>The registrable domain on whose pages the next click or fill shortcut in the same tab may continue this fill, or empty when nothing is left to.</summary>
+    public string ContinueSite { get; init; } = string.Empty;
+
+    /// <summary>How many seconds it may, or 0 when nothing continues.</summary>
+    public int ContinueSeconds { get; init; }
 
     /// <summary>A description with the logins left out.</summary>
     /// <returns>The outcome and how many logins it carries.</returns>

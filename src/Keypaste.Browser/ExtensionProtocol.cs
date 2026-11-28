@@ -29,6 +29,9 @@ internal static class ExtensionProtocol
     /// <summary>KeePassXC's word for true, which the protocol writes as a string.</summary>
     internal const string True = "true";
 
+    /// <summary>KeePassXC's word for false, written as a string as <see cref="True"/> is.</summary>
+    internal const string False = "false";
+
     /// <summary>
     /// Each action keypaste refuses, answered by the relay itself and never sent to the vault's owner, with the code KeePassXC
     /// answers its own refusal of that action with.

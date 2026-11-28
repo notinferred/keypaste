@@ -763,9 +763,15 @@ public static partial class ApproverProtocol
             // A hash is a SHA-256 in lowercase hex, and only an attachment carries one.
             var databaseHash = Optional(root, "database_hash");
 
+            // Optional so an owner before them still attaches, with none; bounded, and only an attachment carries them.
+            IReadOnlyList<string>? features = null;
+            var featured = root.TryGetProperty("browser_features", out _);
+
             if (refused == session is { Length: > 0 }
                 || ownerVersion?.Length > AttachClient.MaximumLength
-                || (databaseHash is not null && (refused || databaseHash.Length != 64 || !databaseHash.All(char.IsAsciiHexDigitLower))))
+                || (databaseHash is not null && (refused || databaseHash.Length != 64 || !databaseHash.All(char.IsAsciiHexDigitLower)))
+                || (featured && (refused || !TryStrings(root, "browser_features", out features)
+                    || features.Count > BrowserFeatures.MaximumCount || features.Any(feature => feature.Length is 0 or > AttachClient.MaximumLength))))
             {
                 return false;
             }
@@ -773,7 +779,7 @@ public static partial class ApproverProtocol
             var answered = refused
                 ? AttachReply.Refused(Enum.IsDefined((AuditMethod)method) ? (AuditMethod)method : AuditMethod.Failed, reason)
                 : AttachReply.To(session!);
-            reply = answered with { OwnerVersion = ownerVersion, DatabaseHash = databaseHash };
+            reply = answered with { OwnerVersion = ownerVersion, DatabaseHash = databaseHash, BrowserFeatures = features };
 
             return true;
         }

@@ -111,6 +111,15 @@ New in the sidebar offers Login, API key, Environment, Card and Note, and More t
 
 The password generator, opened from a password field, makes random characters or an EFF word-list passphrase.
 
+### Fill in your browser
+
+Pair keypaste's extension once per browser by pressing Pair this browser… in it and confirming the same code in keypaste. Then a click on keypaste's key icon in a login field lists that site's logins from every open vault, and a pick fills at once.
+
+- **The fill shortcut.** ⌃⇧U on a Mac, or Alt+Shift+U on Windows and Linux, does what a click on the key icon does, in the field you're typing in or, with none, in the page's first login field, the username, or the password when the page shows no username. On the next page of a sign-in it fills the part left with no list. On a page whose sign-in form is in a frame, it opens the list there when keypaste already fills that frame, and never asks about trusting one. Your browser's settings for extension shortcuts change the keys.
+- **Only what the page shows.** A page with only a username field gets the username, and the password stays in keypaste until a page shows its field.
+- **The next page.** Within two minutes, a click on the key icon in the password field of the same site, in the same tab, fills that login's password with no list; a one-time-code field after it gets the item's current code. Each part fills once, and keypaste logs it.
+- **Sign-in frames.** A sign-in form in a frame of the page's own site fills as the page does, over `https` only; keypaste fills no frame of another address over `http`. One from another site inside a page, such as Apple's on iCloud, is offered only that site's logins. keypaste asks once whether to trust it ("Trust sign-in from idmsa.apple.com on www.icloud.com?") unless it already knows it; Settings › Browser fill lists the frames you trusted, and Remove makes keypaste ask again.
+
 ### Edit an item
 
 Edit, change the fields, then Save.
@@ -247,6 +256,7 @@ The app keeps this computer's settings in `~/.keypaste` (or `KEYPASTE_HOME`), be
 | `projects.json` | Each project's saved directory and command |
 | `recommendations.json` | Dismissed findings |
 | `save-counts/` | Each vault's last seen save count, so an older copy is noticed |
+| `browsers.json` | Browser pairings, as a hash of each extension's key, and the sign-in frames you trusted, each sealed by the vaults open when it was made |
 
 ## Keyboard shortcuts
 

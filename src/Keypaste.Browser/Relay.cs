@@ -53,6 +53,7 @@ internal sealed class Relay : IAsyncDisposable
     private RelayVault? _reached;
     private Pairing? _paired;
     private string? _databaseHash;
+    private IReadOnlyList<string> _features = [];
     private bool _toldLocked;
 
     private Relay(RelayOptions options, Stream output)
@@ -263,7 +264,10 @@ internal sealed class Relay : IAsyncDisposable
             : Error(GetDatabaseHash, ExtensionError.DatabaseHashNotReceived);
     }
 
-    /// <summary>The hash and the pairing an answer to <c>associate</c> or <c>test-associate</c> carries, as KeePassXC's does.</summary>
+    /// <summary>
+    /// The hash and the pairing an answer to <c>associate</c> or <c>test-associate</c> carries, as KeePassXC's does, and the features
+    /// the owner decides that this relay forwards, so the extension asks for no more.
+    /// </summary>
     private void WritePaired(Utf8JsonWriter writer, string pairing)
     {
         if (_databaseHash is { } hash)
@@ -272,7 +276,18 @@ internal sealed class Relay : IAsyncDisposable
         }
 
         writer.WriteString("id", pairing);
+        writer.WriteStartArray("features");
+
+        foreach (var feature in _features)
+        {
+            writer.WriteStringValue(feature);
+        }
+
+        writer.WriteEndArray();
     }
+
+    /// <summary>Whether the owner this relay attached to last decides a feature, so a request member that needs it may be forwarded.</summary>
+    private bool Decides(string feature) => _features.Contains(feature, StringComparer.Ordinal);
 
     private async Task<byte[]> AssociateAsync(Dictionary<string, string> inner, byte[] replyNonce, bool knock, CancellationToken stop)
     {
@@ -348,7 +363,15 @@ internal sealed class Relay : IAsyncDisposable
             return refusal!;
         }
 
-        var request = new BrowserListRequest(page.Paired.Id, page.Paired.Key, page.Url) { SubmitUrl = page.SubmitUrl, Vault = VaultPath, Session = page.Session };
+        var request = new BrowserListRequest(page.Paired.Id, page.Paired.Key, page.Url)
+        {
+            SubmitUrl = page.SubmitUrl,
+            TopUrl = page.TopUrl,
+            // The extension's fill shortcut reaching into a frame says askTrust false, so an unknown frame is refused, never asked about.
+            AsksTrust = inner.GetValueOrDefault("askTrust") != False,
+            Vault = VaultPath,
+            Session = page.Session,
+        };
 
         if (ApproverProtocol.Encode(request).Length > MessageFramer.MaximumPayloadBytes)
         {
@@ -371,12 +394,31 @@ internal sealed class Relay : IAsyncDisposable
         }
     }
 
-    /// <summary>Asks for the one login the person picked, which keypaste fills at once.</summary>
+    /// <summary>
+    /// Asks for the one login the person picked, which keypaste fills at once, or for the part of it the last fill in the tab left,
+    /// with only the parts the page shows; a <c>fill</c> or <c>continued</c> the owner does not decide is refused, never dropped, so
+    /// an older owner never releases more than the extension asked for.
+    /// </summary>
     private async Task<byte[]> GetLoginAsync(Dictionary<string, string> inner, byte[] replyNonce, bool knock, CancellationToken stop)
     {
         if (inner.GetValueOrDefault("uuid") is not { } uuid || !IsPairing(uuid))
         {
             return Error(GetLogin, ExtensionError.NoLoginsFound);
+        }
+
+        BrowserFill? fill = inner.GetValueOrDefault("fill") switch
+        {
+            null or "both" => BrowserFill.Both,
+            "username" => BrowserFill.Username,
+            "password" => BrowserFill.Password,
+            "totp" => BrowserFill.Totp,
+            _ => null,
+        };
+        var continued = inner.GetValueOrDefault("continued") == True;
+
+        if (fill is not { } parts)
+        {
+            return Error(GetLogin, ExtensionError.IncorrectAction);
         }
 
         var (page, refusal) = await PageAsync(GetLogin, inner, knock, stop).ConfigureAwait(false);
@@ -386,7 +428,22 @@ internal sealed class Relay : IAsyncDisposable
             return refusal!;
         }
 
-        var request = new BrowserReleaseRequest(page.Paired.Id, page.Paired.Key, page.Url, uuid) { SubmitUrl = page.SubmitUrl, Vault = VaultPath, Session = page.Session };
+        if ((inner.ContainsKey("fill") && !Decides(BrowserFeatures.Fill))
+            || (parts == BrowserFill.Totp && !Decides(BrowserFeatures.Totp))
+            || (continued && !Decides(BrowserFeatures.Continued)))
+        {
+            return Error(GetLogin, ExtensionError.ActionCancelledOrDenied);
+        }
+
+        var request = new BrowserReleaseRequest(page.Paired.Id, page.Paired.Key, page.Url, uuid)
+        {
+            SubmitUrl = page.SubmitUrl,
+            TopUrl = page.TopUrl,
+            Fill = parts,
+            Continued = continued,
+            Vault = VaultPath,
+            Session = page.Session,
+        };
 
         if (ApproverProtocol.Encode(request).Length > MessageFramer.MaximumPayloadBytes)
         {
@@ -398,7 +455,7 @@ internal sealed class Relay : IAsyncDisposable
         switch (reply)
         {
             case { Outcome: BrowserOutcome.Done, Logins: [var login] }:
-                return Sealed(GetLogin, replyNonce, writer => WriteLogins(writer, [login], page.Paired.Id));
+                return Sealed(GetLogin, replyNonce, writer => WriteFill(writer, reply, login, page.Paired.Id));
             case { Outcome: BrowserOutcome.Done }:
                 return Error(GetLogin, ExtensionError.NoLoginsFound);
             case { Outcome: BrowserOutcome.NotPaired }:
@@ -478,7 +535,15 @@ internal sealed class Relay : IAsyncDisposable
             return (null, Error(action, ExtensionError.AssociationFailed));
         }
 
-        return (new PageRequest(paired, session, url, inner.GetValueOrDefault("submitUrl")), null);
+        // A frame's own address with the tab's beside it, which an owner that does not decide frames would take for the tab's.
+        var topUrl = inner.GetValueOrDefault("topUrl");
+
+        if (topUrl is not null && (topUrl.Length == 0 || !Decides(BrowserFeatures.Frames)))
+        {
+            return (null, Error(action, ExtensionError.ActionCancelledOrDenied));
+        }
+
+        return (new PageRequest(paired, session, url, inner.GetValueOrDefault("submitUrl")) { TopUrl = topUrl }, null);
     }
 
     /// <summary>Locks as <c>keypaste lock</c> does, asking nobody; the link's end then tells the extension it is locked.</summary>
@@ -562,6 +627,7 @@ internal sealed class Relay : IAsyncDisposable
             if (await _link.AttachAsync(request, stop).ConfigureAwait(false) is { Attached: true, Session: { } session } attached)
             {
                 _databaseHash = attached.DatabaseHash;
+                _features = [.. BrowserFeatures.All.Where(feature => attached.BrowserFeatures?.Contains(feature, StringComparer.Ordinal) == true)];
 
                 if (_toldLocked)
                 {
@@ -620,6 +686,7 @@ internal sealed class Relay : IAsyncDisposable
     {
         var link = _link;
         _link = null;
+        _features = [];
 
         if (link is not null)
         {
@@ -701,23 +768,29 @@ internal sealed class Relay : IAsyncDisposable
         writer.WriteString("id", pairing);
     }
 
-    /// <summary>The logins as KeePassXC lists them, each with only its username, title, password and UUID, never its group, a TOTP code or another field.</summary>
-    private static void WriteLogins(Utf8JsonWriter writer, IReadOnlyList<BrowserLogin> logins, string pairing)
+    /// <summary>
+    /// The one login as KeePassXC lists logins, with only its username, title, password and UUID, and its current one-time code when
+    /// that was asked for, never its group, a seed or another field; then where and for how long the next click may continue it.
+    /// </summary>
+    private static void WriteFill(Utf8JsonWriter writer, BrowserFillReply reply, BrowserLogin login, string pairing)
     {
-        writer.WriteNumber("count", logins.Count);
+        writer.WriteNumber("count", 1);
         writer.WriteStartArray("entries");
+        writer.WriteStartObject();
+        writer.WriteString("login", login.Login);
+        writer.WriteString("name", login.Name);
+        writer.WriteString("password", login.Password);
+        writer.WriteString("uuid", login.Uuid);
 
-        foreach (var login in logins)
+        if (login.Totp.Length > 0)
         {
-            writer.WriteStartObject();
-            writer.WriteString("login", login.Login);
-            writer.WriteString("name", login.Name);
-            writer.WriteString("password", login.Password);
-            writer.WriteString("uuid", login.Uuid);
-            writer.WriteEndObject();
+            writer.WriteString("totp", login.Totp);
         }
 
+        writer.WriteEndObject();
         writer.WriteEndArray();
+        writer.WriteString("continueSite", reply.ContinueSite);
+        writer.WriteNumber("continueSeconds", reply.ContinueSeconds);
         writer.WriteString("id", pairing);
     }
 
@@ -829,5 +902,9 @@ internal sealed class Relay : IAsyncDisposable
     private sealed record Pairing(string Id, string Key, string Session);
 
     /// <summary>What a list or a pick names of the page, under the pairing proven in this unlock.</summary>
-    private sealed record PageRequest(Pairing Paired, string Session, string Url, string? SubmitUrl);
+    private sealed record PageRequest(Pairing Paired, string Session, string Url, string? SubmitUrl)
+    {
+        /// <summary>The tab's address when <see cref="Url"/> is a frame's of another origin, or null.</summary>
+        public string? TopUrl { get; init; }
+    }
 }

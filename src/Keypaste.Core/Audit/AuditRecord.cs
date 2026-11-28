@@ -18,7 +18,7 @@ public enum AuditDecision
 /// <see cref="Prompt"/> with <see cref="AuditDecision.Denied"/> means a person said no, and only
 /// <see cref="Busy"/> and <see cref="TimedOut"/> mean nobody got to it.
 /// Only <see cref="Exposure"/>, <see cref="Prompt"/>, <see cref="Allowed"/>, <see cref="AlwaysAllowed"/>, <see cref="Automatic"/>,
-/// <see cref="Token"/>, <see cref="Narrowing"/>, <see cref="RulesChanged"/>, <see cref="Merged"/>, <see cref="Removed"/> and <see cref="Picked"/> ever accompany <see cref="AuditDecision.Granted"/>.
+/// <see cref="Token"/>, <see cref="Narrowing"/>, <see cref="RulesChanged"/>, <see cref="Merged"/>, <see cref="Removed"/>, <see cref="Picked"/> and <see cref="Continued"/> ever accompany <see cref="AuditDecision.Granted"/>.
 /// <see cref="Allowed"/>, <see cref="Automatic"/> and <see cref="AlwaysAllowed"/> are the releases no person saw, so they must
 /// never be logged as <see cref="Prompt"/>, which claims a person acted on this request.
 /// Adding a member means adding a case to <c>AuditLog.Wire</c>.
@@ -187,6 +187,13 @@ public enum AuditMethod
     /// <summary>A project's run started because the person pressed Run, or Run again, in keypaste's own window or menu, which no other program can press.</summary>
     /// <remarks>Nobody was shown a card about this run, so it is never written as <see cref="Prompt"/>; a protected stage's run is always asked.</remarks>
     Pressed = 41,
+
+    /// <summary>
+    /// A part of a login filled in a paired browser with no pick of its own, because it continued, within two minutes on the same
+    /// site, a fill the person picked: the password after the username, or the one-time code.
+    /// </summary>
+    /// <remarks>The continuation is the extension's word, as the pick was, so it is never written as <see cref="Prompt"/>.</remarks>
+    Continued = 42,
 }
 
 /// <summary>How many lookups of one tool with one decision a summary line folds.</summary>

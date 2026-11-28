@@ -763,4 +763,9 @@
   <data name="TheShortcutOpens" xml:space="preserve"><value>The shortcut opens</value></data>
   <data name="TheShortcutOpensHelp" xml:space="preserve"><value>Quick search copies an item's password and hands you back to the app you were in. The keypaste window opens on Items with its search ready.</value></data>
   <data name="TheKeypasteWindow" xml:space="preserve"><value>The keypaste window</value></data>
+  <data name="TrustedSignInFrames" xml:space="preserve"><value>Trusted sign-in frames</value></data>
+  <data name="StopTrustingValue" xml:space="preserve"><value>Stop trusting sign-in from {0}?</value></data>
+  <data name="ConfirmStopTrustingValue" xml:space="preserve"><value>Confirm no longer trusting sign-in from {0}</value></data>
+  <data name="RemoveEllipsis" xml:space="preserve"><value>Remove…</value></data>
+  <data name="RemoveTrustValue" xml:space="preserve"><value>Remove the trust of sign-in from {0}</value></data>
 </root>

@@ -33,7 +33,7 @@ Out of scope: same-user attackers reading unlocked memory, audit records and key
 | The audit log as evidence | T-5, T-6, T-16, T-53 |
 | Agent settings | T-3, T-15, T-36, T-41 |
 | The vault's contents and its newest state | T-26, T-29, T-43, T-54, T-57 |
-| Logins released to a browser, and browser pairings | T-48 to T-50, T-58 to T-60 |
+| Logins released to a browser, and browser pairings | T-48 to T-50, T-58 to T-60, T-62 |
 | Scoped tokens, share links and launch passes | T-32 to T-34, T-42 |
 | That a download is its tagged source | T-9, T-21 |
 
@@ -642,7 +642,7 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Threat.** A page made to look like the item's site gets its login filled: a lookalike domain, another tenant of a shared host, a hostile subdomain, plain `http`, or a form posting elsewhere.
 
-**Mitigation.** The extension takes the address from the browser's tab and refuses login forms in cross-origin frames. An item matches only its own host or subdomains within one registrable domain, on the same scheme and port. On `http` pages, single-label hosts and forms posting to another site, keypaste's list warns before the pick.
+**Mitigation.** The extension takes the address from the browser's tab, and a frame's from the browser's word for the frame, never the page's. A frame is offered only its own logins, never the tab's: an `https` one of the page's own site, the same registrable domain and scheme, as that site's page, and one of another site only as T-62 says. An item matches only its own host or subdomains within one registrable domain, on the same scheme and port. On `http` pages, single-label hosts and forms posting to another site, keypaste's list warns before the pick.
 
 **Limit.** A person can fill a lookalike they misread. Whoever controls a subdomain of the item's site gets its login when the person picks it there, and anyone on the network can answer for an `http` page.
 
@@ -650,11 +650,11 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 ### T-59 — keypaste believes the extension about which page asks, and whether the person picked
 
-**Threat.** A page tricks the person into a click on keypaste's list, by clickjacking as Marek Tóth showed at DEF CON 33 in 2025, or a process holding a pairing's key names any page and claims the person picked.
+**Threat.** A page tricks the person into a click on keypaste's list, by clickjacking as Marek Tóth showed at DEF CON 33 in 2025, or a process holding a pairing's key names any page and claims the person picked. A sign-in split across pages adds a click with no list: a page of the same site the person moves to, or makes them move to, gets the rest of the login.
 
-**Mitigation.** Only a trusted click on keypaste's key icon lists logins, in a list the page can neither read nor restyle. A pick counts only on a list that has been visible, topmost and unobscured for half a second. The pick is the person's answer, and the fill is logged with the page's origin as `picked`.
+**Mitigation.** Only a trusted click on keypaste's key icon, or the browser's own fill shortcut, which no page can press, lists logins, in a list the page can neither read nor restyle. A pick counts only on a list that has been visible, topmost and unobscured for half a second. The pick is the person's answer, it releases only the fields the page shows, and the fill is logged with the page's origin as `picked`. The owner, not the extension, decides a continued fill: after a granted fill, the next trusted click on the key icon, or press of the fill shortcut, in the same tab may fill each part left (the password after the username, or the one-time code) once, for the same pairing and item, within two minutes on a page of the same registrable domain and scheme that the item still matches, and each is logged as `continued` with the origin it was picked on.
 
-**Limit.** keypaste sees only the extension's word, not the page or the click. A process holding a pairing's key lists any site's login names and receives any of them by claiming a pick. keypaste attributes a browser pairing's lines to the person, so when an AI agent drives the person's browser, its fills are logged as the person's.
+**Limit.** keypaste sees only the extension's word, not the page, the tab or the click. A process holding a pairing's key lists any site's login names and receives any of them by claiming a pick. For two minutes after a fill, any page of the same registrable domain gets the parts left with one click on the key icon and no list, so whoever controls a subdomain of the item's site can collect the password after the person filled the username on the real one. keypaste attributes a browser pairing's lines to the person, so when an AI agent drives the person's browser, its fills are logged as the person's.
 
 **Status.** Unreleased.
 
@@ -662,11 +662,21 @@ An agent lists the item titles its bridge's `--expose` reaches and asks for a fi
 
 **Threat.** A malicious or compromised extension build, a compromised store account or the browser itself receives every login released to a browser.
 
-**Mitigation.** keypaste answers only its own extension's builds and binds each pairing to its build. A release carries only the picked item's username, password, title and UUID. The extension is keypaste's published fork and keeps no password after filling.
+**Mitigation.** keypaste answers only its own extension's builds and binds each pairing to its build. A release carries only the picked item's title and UUID and, of its username, password and current one-time code, those the page shows; a username-only page gets no password, and the extension never receives a one-time code's seed. The extension is keypaste's published fork and keeps no password or code after filling.
 
 **Limit.** Once released, the extension and the page hold the password, and an update could send it anywhere. keypaste cannot verify the code the browser runs.
 
 **Status.** Unreleased; the extension is not yet in a store.
+
+### T-62 — A sign-in frame of another site
+
+**Threat.** A page shows a sign-in form in a frame from another site (another registrable domain, or another scheme), as iCloud shows Apple's, and a page that is neither gets that frame's logins filled: a hostile page frames a real sign-in frame and draws over it or makes it transparent to steal a click or what is typed (clickjacking), a frame the person trusted later serves other content or is taken over, a page that trusted a frame is itself compromised, or keypaste's built-in list of sign-in frames trusts more than it should.
+
+**Mitigation.** An `https` frame of the page's own site, the same registrable domain and scheme, is answered by the same site as the page, so keypaste fills it as that site's page, with no question; a frame of another origin over `http`, of the same site or not, is refused. What follows is about frames of another site. The extension asks keypaste about a frame of another origin only when it is `https` and not sandboxed, with the frame's address and the tab's from the browser, never the page; any other frame is refused before keypaste is asked. keypaste offers the frame only its own site's logins, by the same matching rules as a page (T-58), never the tab's, so trusting a frame never releases a login of the page around it. The owner decides the trust, never the extension: a frame is offered logins only when it is on keypaste's built-in list for that page (Apple's `idmsa.apple.com` on `www.icloud.com` and `icloud.com`), or the person trusted it in keypaste's own window, outside the browser, which names the frame and the page by host ("Trust sign-in from idmsa.apple.com on www.icloud.com?"), for that pairing, page host and frame host. A refusal holds the same question back as an agent's refusal does (T-11). The trust is kept in `browsers.json`, sealed by every unlocked vault as pairings are, bound to its pairing's key, so another program writing it in proves nothing and removing or re-pairing the pairing removes it. Settings › Browser fill lists each trusted frame with Remove, and each trust, refusal and removal is logged. A fill inside the frame keeps T-59's rules: a trusted click, an unobscured list, and a line naming the frame's origin and the page it was in. The fill shortcut, pressed with no field focused on a page with no login field of its own, reaches into a frame the person never pointed at, so it asks with the trust question off: keypaste lists such a frame only when it fills it already, and otherwise refuses and logs it, asking nobody. Each entry of the built-in list names its reason in the source, and one is added only with that reason.
+
+**Limit.** Whoever controls a host of the page's own site can frame that site's sign-in in its page with no question, as it can already serve the sign-in itself (T-58). keypaste cannot see what the frame or the page draws. A trusted frame's own site, or whoever controls its host later, gets its own site's logins there as any page of that site does, and a page that trusted a frame can still overlay it or read what the person types into it; the list's half-second visibility check covers keypaste's list, not the frame beneath. The trust names hosts, not paths, so every page of the trusted host is trusted on every page of the other. The built-in list trusts Apple's frame on those pages for everyone without asking, so a compromise of those hosts reaches every keypaste user at once. A process holding a pairing's key names any frame and page, as it names any page (T-59).
+
+**Status.** Unreleased.
 
 ## Known limits
 

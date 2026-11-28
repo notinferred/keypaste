@@ -1808,6 +1808,16 @@ public sealed class ScreenRenderer
         };
         DrawWindow(new PairingWindow(new PairingViewModel(pairing)), output, "91m-pairing");
         DrawWindow(new PairingWindow(new PairingViewModel(pairing with { TakenNames = ["Chrome on work laptop"] })), output, "91m2-pairing-name-taken");
+        DrawWindow(
+            new FrameTrustWindow(new FrameTrustViewModel(new FrameTrustPrompt
+            {
+                Identity = Core.Browser.BrowserIdentity.ChromeWebStore,
+                Pairing = "Chrome on work laptop",
+                Top = "www.icloud.com",
+                Frame = "idmsa.apple.com",
+            })),
+            output,
+            "91m3-frame-trust");
     }
 
     private static void DrawWindow(PromptWindow window, string output, string name)

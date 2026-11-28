@@ -11,6 +11,13 @@ namespace Keypaste.Core.Browser;
 /// <param name="Created">When it was paired.</param>
 public sealed record BrowserPairing(string Id, BrowserIdentity Identity, DateTimeOffset Created);
 
+/// <summary>A sign-in frame of another origin that a pairing's browser may be filled in, as the person trusted it in keypaste.</summary>
+/// <param name="Pairing">The pairing's name.</param>
+/// <param name="Top">The host of the tab's page the frame is in.</param>
+/// <param name="Frame">The frame's own host, whose logins it is offered.</param>
+/// <param name="Created">When the person trusted it.</param>
+public sealed record FrameTrust(string Pairing, string Top, string Frame, DateTimeOffset Created);
+
 /// <summary>What checking a pairing the extension presents came to.</summary>
 public enum PairingCheck
 {
@@ -130,6 +137,11 @@ public static class PairingCode
 /// A write seals every pairing any unlocked vault vouches for under every unlocked vault, so a vault unlocked beside one that
 /// vouches takes the pairings over at the next write. Removing a pairing removes it for every vault. A vault's first write here
 /// also removes the pairings earlier versions kept inside it, in <see cref="ReservedGroups.Browsers"/>, which nothing reads now.
+/// </para>
+/// <para>
+/// The sign-in frames the person trusted (<see cref="FrameTrust"/>) are sealed the same way, each over its pairing's key hash, so
+/// a frame counts only while its pairing does, a pairing paired again under the same name trusts none, and removing a pairing
+/// removes them (THREATS.md T-62).
 /// </para>
 /// </remarks>
 /// <param name="path">The pairings file.</param>
@@ -273,14 +285,14 @@ public sealed class BrowserPairings(string path)
 
         return TryChange(
             vaults,
-            vouched =>
+            (vouched, frames) =>
             {
                 if (PairingNames.Problem(id, vouched.Select(stored => stored.Pairing.Id)) is { } invalid)
                 {
-                    return (null, invalid);
+                    return (null, frames, invalid);
                 }
 
-                return ([.. vouched, added], string.Empty);
+                return ([.. vouched, added], frames, string.Empty);
             },
             out problem);
     }
@@ -299,10 +311,12 @@ public sealed class BrowserPairings(string path)
 
         var changed = TryChange(
             vaults,
-            vouched =>
+            (vouched, frames) =>
             {
                 found = vouched.FirstOrDefault(stored => string.Equals(stored.Pairing.Id, id, StringComparison.Ordinal))?.Pairing;
-                return found is null ? (null, "no pairing has this name any more") : ([.. vouched.Where(stored => stored.Pairing != found)], string.Empty);
+                return found is null
+                    ? (null, frames, "no pairing has this name any more")
+                    : ([.. vouched.Where(stored => stored.Pairing != found)], [.. frames.Where(stored => stored.Trust.Pairing != id)], string.Empty);
             },
             out problem);
 
@@ -315,7 +329,108 @@ public sealed class BrowserPairings(string path)
     /// <param name="problem">Why nothing was sealed, or empty.</param>
     /// <returns>Whether the file now holds the seals.</returns>
     public bool TryAdopt(IReadOnlyList<PairingVault> vaults, out string problem) =>
-        TryChange(vaults, vouched => (vouched, string.Empty), out problem);
+        TryChange(vaults, (vouched, frames) => (vouched, frames, string.Empty), out problem);
+
+    /// <summary>The sign-in frames the person trusted for pairings any of the vaults vouches for.</summary>
+    /// <param name="vaults">The unlocked vaults.</param>
+    /// <returns>The frames, by pairing, page and frame; none when the file cannot be read.</returns>
+    public IReadOnlyList<FrameTrust> Frames(IReadOnlyList<Vault> vaults)
+    {
+        ArgumentNullException.ThrowIfNull(vaults);
+
+        return Load(out var held) == Loaded.Read
+            ? [.. VouchedFrames(held, vaults).Select(stored => stored.Trust)
+                .OrderBy(trust => trust.Pairing, StringComparer.Ordinal).ThenBy(trust => trust.Top, StringComparer.Ordinal).ThenBy(trust => trust.Frame, StringComparer.Ordinal)]
+            : [];
+    }
+
+    /// <summary>Whether the person trusted, for a pairing, a frame from one host in pages of another.</summary>
+    /// <param name="vaults">The unlocked vaults, any of which may vouch for it.</param>
+    /// <param name="pairing">The pairing's name.</param>
+    /// <param name="top">The host of the tab's page.</param>
+    /// <param name="frame">The frame's host.</param>
+    /// <returns>Whether a vault vouches for that trust and its pairing.</returns>
+    public bool Trusts(IReadOnlyList<Vault> vaults, string pairing, string top, string frame)
+    {
+        ArgumentNullException.ThrowIfNull(vaults);
+        ArgumentNullException.ThrowIfNull(pairing);
+        ArgumentNullException.ThrowIfNull(top);
+        ArgumentNullException.ThrowIfNull(frame);
+
+        return Load(out var held) == Loaded.Read
+            && VouchedFrames(held, vaults).Any(stored => stored.Trust.Pairing == pairing && stored.Trust.Top == top && stored.Trust.Frame == frame);
+    }
+
+    /// <summary>Records the person's trust of a frame from one host in pages of another for a pairing, for every unlocked vault, the first of which must save.</summary>
+    /// <param name="vaults">The unlocked vaults, the one asked first.</param>
+    /// <param name="pairing">The pairing's name, which a vault must vouch for.</param>
+    /// <param name="top">The host of the tab's page.</param>
+    /// <param name="frame">The frame's host.</param>
+    /// <param name="now">When it is trusted.</param>
+    /// <param name="problem">Why nothing was recorded, or empty.</param>
+    /// <returns>Whether the file holds the trust.</returns>
+    public bool TryTrust(IReadOnlyList<PairingVault> vaults, string pairing, string top, string frame, DateTimeOffset now, out string problem)
+    {
+        ArgumentNullException.ThrowIfNull(pairing);
+        ArgumentNullException.ThrowIfNull(top);
+        ArgumentNullException.ThrowIfNull(frame);
+
+        if (!IsHost(top) || !IsHost(frame))
+        {
+            problem = "a frame is trusted only by its host and its page's";
+            return false;
+        }
+
+        return TryChange(
+            vaults,
+            (vouched, frames) =>
+            {
+                if (vouched.FirstOrDefault(stored => stored.Pairing.Id == pairing) is not { } owner)
+                {
+                    return (null, frames, "no pairing has this name any more");
+                }
+
+                if (frames.Any(stored => stored.Trust.Pairing == pairing && stored.Trust.Top == top && stored.Trust.Frame == frame))
+                {
+                    return (vouched, frames, string.Empty);
+                }
+
+                var added = new StoredFrame(new FrameTrust(pairing, top, frame, Truncated(now)), owner.KeyHash, new Dictionary<string, string>(StringComparer.Ordinal));
+                return (vouched, [.. frames, added], string.Empty);
+            },
+            out problem);
+    }
+
+    /// <summary>Removes the person's trust of a frame for a pairing, for every vault, counting up every unlocked vault, the first of which must save.</summary>
+    /// <param name="vaults">The unlocked vaults, the one asked first.</param>
+    /// <param name="pairing">The pairing's name.</param>
+    /// <param name="top">The host of the tab's page.</param>
+    /// <param name="frame">The frame's host.</param>
+    /// <param name="removed">The trust removed, when there was one.</param>
+    /// <param name="problem">Why nothing was removed, or empty.</param>
+    /// <returns>Whether a trust was removed.</returns>
+    public bool TryDistrust(IReadOnlyList<PairingVault> vaults, string pairing, string top, string frame, [NotNullWhen(true)] out FrameTrust? removed, out string problem)
+    {
+        ArgumentNullException.ThrowIfNull(pairing);
+        ArgumentNullException.ThrowIfNull(top);
+        ArgumentNullException.ThrowIfNull(frame);
+
+        FrameTrust? found = null;
+
+        var changed = TryChange(
+            vaults,
+            (vouched, frames) =>
+            {
+                found = frames.FirstOrDefault(stored => stored.Trust.Pairing == pairing && stored.Trust.Top == top && stored.Trust.Frame == frame)?.Trust;
+                return found is null
+                    ? (null, frames, "keypaste no longer trusts that frame")
+                    : (vouched, [.. frames.Where(stored => stored.Trust != found)], string.Empty);
+            },
+            out problem);
+
+        removed = changed ? found : null;
+        return removed is not null;
+    }
 
     /// <summary>The SHA-256 of an identification key's 32 bytes in lowercase hex, or null when the text is not a key in base64.</summary>
     /// <param name="identificationKey">The key as the extension sends it.</param>
@@ -356,6 +471,28 @@ public sealed class BrowserPairings(string path)
         return Convert.ToHexStringLower(HMACSHA256.HashData(key, buffer.ToArray()));
     }
 
+    /// <summary>The seal a vault's key gives a trusted frame for a home at a count, bound to its pairing's key hash.</summary>
+    internal static string Seal(byte[] key, string home, ulong count, FrameTrust trust, string keyHash)
+    {
+        using var buffer = new MemoryStream();
+
+        using (var json = new Utf8JsonWriter(buffer))
+        {
+            json.WriteStartArray();
+            json.WriteStringValue("keypaste browsers.json frame 1");
+            json.WriteStringValue(home);
+            json.WriteStringValue(count.ToString(CultureInfo.InvariantCulture));
+            json.WriteStringValue(trust.Pairing);
+            json.WriteStringValue(keyHash);
+            json.WriteStringValue(trust.Top);
+            json.WriteStringValue(trust.Frame);
+            json.WriteStringValue(Timestamp(trust.Created));
+            json.WriteEndArray();
+        }
+
+        return Convert.ToHexStringLower(HMACSHA256.HashData(key, buffer.ToArray()));
+    }
+
     /// <summary>The name a vault's seals go under in the file, which names the vault's key without giving it.</summary>
     internal static string SealId(byte[] key) =>
         Convert.ToHexStringLower(HMACSHA256.HashData(key, Encoding.ASCII.GetBytes("keypaste browsers.json id")))[..32];
@@ -366,6 +503,23 @@ public sealed class BrowserPairings(string path)
 
         return held.Pairings.Where(stored => vouchers.Any(voucher => Holds(stored, held.Home, voucher.Key, voucher.Count)));
     }
+
+    /// <summary>The trusted frames a vault seals whose pairing, of the same key, a vault vouches for.</summary>
+    private static IEnumerable<StoredFrame> VouchedFrames(Held held, IReadOnlyList<Vault> vaults)
+    {
+        var vouchers = vaults.Select(vault => Voucher(vault, held.Home)).OfType<(byte[] Key, ulong Count)>().ToList();
+        var pairings = Vouched(held, vaults).ToList();
+
+        return VouchedFrames(held, vouchers, pairings);
+    }
+
+    private static IEnumerable<StoredFrame> VouchedFrames(Held held, List<(byte[] Key, ulong Count)> vouchers, IReadOnlyList<Stored> pairings) =>
+        held.Frames.Where(stored =>
+            pairings.Any(pairing => pairing.Pairing.Id == stored.Trust.Pairing && pairing.KeyHash == stored.KeyHash)
+            && vouchers.Any(voucher => stored.Seals.TryGetValue(SealId(voucher.Key), out var seal)
+                && CryptographicOperations.FixedTimeEquals(
+                    Encoding.ASCII.GetBytes(Seal(voucher.Key, held.Home, voucher.Count, stored.Trust, stored.KeyHash)),
+                    Encoding.ASCII.GetBytes(seal))));
 
     private static bool Holds(Stored stored, string home, byte[] key, ulong count) =>
         stored.Seals.TryGetValue(SealId(key), out var seal)
@@ -412,7 +566,10 @@ public sealed class BrowserPairings(string path)
     /// Under the file's lease, applies an edit to the pairings the vaults vouch for, counts up each vault, the first of which must
     /// save, and writes the file sealed under each vault that saved; a vault that did not keeps the seals it had.
     /// </summary>
-    private bool TryChange(IReadOnlyList<PairingVault> vaults, Func<IReadOnlyList<Stored>, (IReadOnlyList<Stored>? Kept, string Problem)> edit, out string problem)
+    private bool TryChange(
+        IReadOnlyList<PairingVault> vaults,
+        Func<IReadOnlyList<Stored>, IReadOnlyList<StoredFrame>, (IReadOnlyList<Stored>? Kept, IReadOnlyList<StoredFrame> KeptFrames, string Problem)> edit,
+        out string problem)
     {
         ArgumentNullException.ThrowIfNull(vaults);
 
@@ -442,8 +599,10 @@ public sealed class BrowserPairings(string path)
             return false;
         }
 
-        var vouched = Vouched(held, [.. vaults.Select(vault => vault.Vault)]).ToList();
-        var (kept, refused) = edit(vouched);
+        List<Vault> open = [.. vaults.Select(vault => vault.Vault)];
+        var vouched = Vouched(held, open).ToList();
+        var vouchedFrames = VouchedFrames(held, open).ToList();
+        var (kept, edited, refused) = edit(vouched, vouchedFrames);
 
         if (kept is null)
         {
@@ -451,8 +610,16 @@ public sealed class BrowserPairings(string path)
             return false;
         }
 
+        // A frame is sealed only beside its pairing, so one whose pairing goes goes with it.
+        List<StoredFrame> keptFrames = [.. edited.Where(stored => kept.Any(pairing => pairing.Pairing.Id == stored.Trust.Pairing && pairing.KeyHash == stored.KeyHash))];
         var outgoing = vouched.Except(kept).ToHashSet();
         List<Stored> pairings = [.. held.Pairings.Where(stored => !outgoing.Contains(stored)).Concat(kept.Except(held.Pairings))];
+        var outgoingFrames = vouchedFrames.Except(keptFrames).ToHashSet();
+        List<StoredFrame> frames =
+        [
+            .. held.Frames.Where(stored => !outgoingFrames.Contains(stored) && pairings.Any(pairing => pairing.Pairing.Id == stored.Trust.Pairing && pairing.KeyHash == stored.KeyHash)),
+            .. keptFrames.Except(held.Frames),
+        ];
 
         for (var index = 0; index < vaults.Count; index++)
         {
@@ -478,9 +645,19 @@ public sealed class BrowserPairings(string path)
                     stored.Seals[id] = Seal(voucher.Key, held.Home, voucher.Count, stored.Pairing, stored.KeyHash);
                 }
             }
+
+            foreach (var stored in frames)
+            {
+                stored.Seals.Remove(id);
+
+                if (keptFrames.Contains(stored))
+                {
+                    stored.Seals[id] = Seal(voucher.Key, held.Home, voucher.Count, stored.Trust, stored.KeyHash);
+                }
+            }
         }
 
-        return TryWrite(held with { Pairings = pairings }, out problem);
+        return TryWrite(held with { Pairings = pairings, Frames = frames }, out problem);
     }
 
     /// <summary>Counts up a vault's writes for this home, making its key and retiring the pairings it kept itself in the same save, and returns the key and the new count.</summary>
@@ -616,7 +793,11 @@ public sealed class BrowserPairings(string path)
                 return Loaded.Garbled;
             }
 
-            held = new Held(homeId, [.. pairings.EnumerateArray().Select(Read).OfType<Stored>()]);
+            // An earlier version wrote no frames, and rewrites the file without them.
+            IReadOnlyList<StoredFrame> frames = root.TryGetProperty("frames", out var trusted) && trusted.ValueKind == JsonValueKind.Array
+                ? [.. trusted.EnumerateArray().Select(ReadFrame).OfType<StoredFrame>()]
+                : [];
+            held = new Held(homeId, [.. pairings.EnumerateArray().Select(Read).OfType<Stored>()]) { Frames = frames };
             return Loaded.Read;
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException)
@@ -646,12 +827,48 @@ public sealed class BrowserPairings(string path)
             || !record.TryGetProperty("created", out var created)
             || !DateTimeOffset.TryParseExact(created.GetString(), _timestampFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var createdAt)
             || !record.TryGetProperty("key", out var key) || key.GetString() is not { Length: 64 } hash || !hash.All(char.IsAsciiHexDigitLower)
-            || !record.TryGetProperty("seals", out var seals) || seals.ValueKind != JsonValueKind.Object)
+            || ReadSeals(record) is not { } seals)
         {
             return null;
         }
 
-        var sealed_ = new Dictionary<string, string>(StringComparer.Ordinal);
+        return new Stored(new BrowserPairing(id, identity, createdAt), hash, seals);
+    }
+
+    /// <summary>One trusted frame, or null when it does not read back whole.</summary>
+    private static StoredFrame? ReadFrame(JsonElement record)
+    {
+        try
+        {
+            if (record.ValueKind != JsonValueKind.Object
+                || !record.TryGetProperty("pairing", out var name) || name.GetString() is not { } pairing || PairingNames.Problem(pairing, []) is not null
+                || !record.TryGetProperty("top", out var topElement) || topElement.GetString() is not { } top || !IsHost(top)
+                || !record.TryGetProperty("frame", out var frameElement) || frameElement.GetString() is not { } frame || !IsHost(frame)
+                || !record.TryGetProperty("created", out var created)
+                || !DateTimeOffset.TryParseExact(created.GetString(), _timestampFormat, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var createdAt)
+                || !record.TryGetProperty("key", out var key) || key.GetString() is not { Length: 64 } hash || !hash.All(char.IsAsciiHexDigitLower)
+                || ReadSeals(record) is not { } seals)
+            {
+                return null;
+            }
+
+            return new StoredFrame(new FrameTrust(pairing, top, frame, createdAt), hash, seals);
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>A record's seals by seal id, or null when they do not read back whole.</summary>
+    private static Dictionary<string, string>? ReadSeals(JsonElement record)
+    {
+        if (!record.TryGetProperty("seals", out var seals) || seals.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        var read = new Dictionary<string, string>(StringComparer.Ordinal);
 
         foreach (var seal in seals.EnumerateObject())
         {
@@ -660,11 +877,15 @@ public sealed class BrowserPairings(string path)
                 return null;
             }
 
-            sealed_[seal.Name] = value;
+            read[seal.Name] = value;
         }
 
-        return new Stored(new BrowserPairing(id, identity, createdAt), hash, sealed_);
+        return read;
     }
+
+    /// <summary>A host as <see cref="WebOrigin"/> reads one: lowercase ASCII, with an IPv6 address in brackets, and no longer than a DNS name.</summary>
+    internal static bool IsHost(string text) =>
+        text.Length is > 0 and <= 255 && text.All(c => char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || c is '.' or '-' or ':' or '[' or ']');
 
     private bool TryWrite(Held held, out string problem)
     {
@@ -684,14 +905,22 @@ public sealed class BrowserPairings(string path)
                 json.WriteString("identity", stored.Pairing.Identity.Caller);
                 json.WriteString("created", Timestamp(stored.Pairing.Created));
                 json.WriteString("key", stored.KeyHash);
-                json.WriteStartObject("seals");
-
-                foreach (var (id, seal) in stored.Seals.OrderBy(pair => pair.Key, StringComparer.Ordinal))
-                {
-                    json.WriteString(id, seal);
-                }
-
+                WriteSeals(json, stored.Seals);
                 json.WriteEndObject();
+            }
+
+            json.WriteEndArray();
+            json.WriteStartArray("frames");
+
+            foreach (var stored in held.Frames)
+            {
+                json.WriteStartObject();
+                json.WriteString("pairing", stored.Trust.Pairing);
+                json.WriteString("top", stored.Trust.Top);
+                json.WriteString("frame", stored.Trust.Frame);
+                json.WriteString("created", Timestamp(stored.Trust.Created));
+                json.WriteString("key", stored.KeyHash);
+                WriteSeals(json, stored.Seals);
                 json.WriteEndObject();
             }
 
@@ -712,6 +941,18 @@ public sealed class BrowserPairings(string path)
         }
     }
 
+    private static void WriteSeals(Utf8JsonWriter json, Dictionary<string, string> seals)
+    {
+        json.WriteStartObject("seals");
+
+        foreach (var (id, seal) in seals.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            json.WriteString(id, seal);
+        }
+
+        json.WriteEndObject();
+    }
+
     private static string NewHome() => Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(16));
 
     private static string Timestamp(DateTimeOffset at) => at.UtcDateTime.ToString(_timestampFormat, CultureInfo.InvariantCulture);
@@ -720,8 +961,15 @@ public sealed class BrowserPairings(string path)
         new(now.UtcTicks - (now.UtcTicks % TimeSpan.TicksPerSecond), TimeSpan.Zero);
 
     /// <summary>What the file says: this home's identity and each record as read.</summary>
-    private sealed record Held(string Home, IReadOnlyList<Stored> Pairings);
+    private sealed record Held(string Home, IReadOnlyList<Stored> Pairings)
+    {
+        /// <summary>The trusted frames as read.</summary>
+        public IReadOnlyList<StoredFrame> Frames { get; init; } = [];
+    }
 
     /// <summary>A record: the pairing, its key's hash and each vault's seal by that vault's seal id.</summary>
     private sealed record Stored(BrowserPairing Pairing, string KeyHash, Dictionary<string, string> Seals);
+
+    /// <summary>A trusted frame: the trust, its pairing's key hash and each vault's seal by that vault's seal id.</summary>
+    private sealed record StoredFrame(FrameTrust Trust, string KeyHash, Dictionary<string, string> Seals);
 }

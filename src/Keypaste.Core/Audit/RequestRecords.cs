@@ -71,6 +71,9 @@ public enum BrowserAct
 
     /// <summary>A page's list of its logins by name, which releases nothing that fills.</summary>
     List = 5,
+
+    /// <summary>The person's trust of a sign-in frame of another site, or its removal.</summary>
+    Trust = 6,
 }
 
 /// <summary>The audit line of each kind of agent request, built here for every process that writes one.</summary>
@@ -618,6 +621,7 @@ public static class RequestRecords
                     BrowserAct.Remove => "remove",
                     BrowserAct.Fill => "fill",
                     BrowserAct.List => BrowserListField,
+                    BrowserAct.Trust => "trust",
                     _ => "pair",
                 },
             },

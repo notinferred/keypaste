@@ -400,6 +400,28 @@ public sealed class TerminalApprovalChannelTests
         Assert.StartsWith("[d] deny  [y] pair", rig.Prompt.PromptsSeen[0], StringComparison.Ordinal);
     }
 
+    /// <summary>A sign-in frame's question names the frame, the page and the pairing, and only y trusts it.</summary>
+    [Theory]
+    [InlineData("y", ApprovalAnswer.ApprovedOnce)]
+    [InlineData("", ApprovalAnswer.Denied)]
+    [InlineData("o", ApprovalAnswer.Denied)]
+    public async Task ASignInFrame_ShowsTheFrameThePageAndThePairing_AndOnlyYTrustsIt(string answer, ApprovalAnswer expected)
+    {
+        var rig = Build(answer);
+
+        var said = await rig.Channel.AskAsync(
+            new FrameTrustPrompt { Identity = Keypaste.Core.Browser.BrowserIdentity.ChromeWebStore, Pairing = "laptop", Top = "www.icloud.com", Frame = "idmsa.apple.com" },
+            Token);
+
+        Assert.Equal(expected, said);
+        var shown = rig.Stderr.ToString();
+        Assert.Contains("keypaste: trust sign-in from idmsa.apple.com on www.icloud.com?", shown, StringComparison.Ordinal);
+        Assert.Contains("  sign-in from  idmsa.apple.com", shown, StringComparison.Ordinal);
+        Assert.Contains("  shown on      www.icloud.com", shown, StringComparison.Ordinal);
+        Assert.Contains("  browser       laptop", shown, StringComparison.Ordinal);
+        Assert.StartsWith("[d] deny  [y] trust", rig.Prompt.PromptsSeen[0], StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task A_Denies_WhereNothingOffersIt_AndH_IsNoAnswerAtAll()
     {

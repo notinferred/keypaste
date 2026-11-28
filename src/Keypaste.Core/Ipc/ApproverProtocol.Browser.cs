@@ -163,12 +163,21 @@ public static partial class ApproverProtocol
             || !TryBrowserField(root, "pairing", out var pairing)
             || !TryBrowserField(root, "identification_key", out var key)
             || !TryString(root, "url", out var url)
-            || !TrySubmitUrl(root))
+            || !TrySubmitUrl(root)
+            || !TryTopUrl(root)
+            || !TryAsksTrust(root, out var asksTrust))
         {
             return false;
         }
 
-        request = new BrowserListRequest(pairing, key, url) { SubmitUrl = Optional(root, "submit_url"), Vault = vault, Session = session };
+        request = new BrowserListRequest(pairing, key, url)
+        {
+            SubmitUrl = Optional(root, "submit_url"),
+            TopUrl = Optional(root, "top_url"),
+            AsksTrust = asksTrust,
+            Vault = vault,
+            Session = session,
+        };
         return true;
     }
 
@@ -185,12 +194,23 @@ public static partial class ApproverProtocol
             || !TryBrowserField(root, "identification_key", out var key)
             || !TryString(root, "url", out var url)
             || !TryBrowserField(root, "uuid", out var uuid)
-            || !TrySubmitUrl(root))
+            || !TrySubmitUrl(root)
+            || !TryTopUrl(root)
+            || !TryFill(root, out var fill)
+            || !TryContinued(root, out var continued))
         {
             return false;
         }
 
-        request = new BrowserReleaseRequest(pairing, key, url, uuid) { SubmitUrl = Optional(root, "submit_url"), Vault = vault, Session = session };
+        request = new BrowserReleaseRequest(pairing, key, url, uuid)
+        {
+            SubmitUrl = Optional(root, "submit_url"),
+            TopUrl = Optional(root, "top_url"),
+            Fill = fill,
+            Continued = continued,
+            Vault = vault,
+            Session = session,
+        };
         return true;
     }
 
@@ -333,7 +353,8 @@ public static partial class ApproverProtocol
                 || !root.TryGetProperty("logins", out var rows)
                 || rows.ValueKind != JsonValueKind.Array
                 || rows.GetArrayLength() > 1
-                || (outcome != BrowserOutcome.Done && rows.GetArrayLength() > 0))
+                || (outcome != BrowserOutcome.Done && rows.GetArrayLength() > 0)
+                || !TryContinuation(root, out var continueSite, out var continueSeconds))
             {
                 return false;
             }
@@ -346,17 +367,78 @@ public static partial class ApproverProtocol
                     || !TryString(row, "login", out var login)
                     || !TryString(row, "password", out var password)
                     || !TryString(row, "name", out var name)
-                    || !TryString(row, "uuid", out var uuid))
+                    || !TryString(row, "uuid", out var uuid)
+                    || (row.TryGetProperty("totp", out _) && !TryString(row, "totp", out _)))
                 {
                     return false;
                 }
 
-                logins.Add(new BrowserLogin(login, password, name, uuid));
+                logins.Add(new BrowserLogin(login, password, name, uuid) { Totp = Optional(row, "totp") ?? string.Empty });
             }
 
-            reply = new BrowserFillReply(outcome, reason) { Logins = logins };
+            reply = new BrowserFillReply(outcome, reason) { Logins = logins, ContinueSite = continueSite, ContinueSeconds = continueSeconds };
             return true;
         }
+    }
+
+    /// <summary>A tab's URL beside a frame's, which a request may leave out or send as null, as an owner before frames never read it.</summary>
+    private static bool TryTopUrl(JsonElement root) =>
+        !root.TryGetProperty("top_url", out var top) || top.ValueKind == JsonValueKind.Null || TryString(root, "top_url", out _);
+
+    /// <summary>The parts a fill is for, both when a relay from before them named none.</summary>
+    private static bool TryFill(JsonElement root, out BrowserFill fill)
+    {
+        fill = BrowserFill.Both;
+
+        if (!root.TryGetProperty("fill", out _))
+        {
+            return true;
+        }
+
+        if (!TryInteger(root, "fill", out var number) || !Enum.IsDefined((BrowserFill)number))
+        {
+            return false;
+        }
+
+        fill = (BrowserFill)number;
+        return true;
+    }
+
+    /// <summary>Whether a fill continues the last one; only an explicit <c>true</c> says it does.</summary>
+    /// <summary>Whether a frame's trust may be asked: yes unless the list says otherwise.</summary>
+    private static bool TryAsksTrust(JsonElement root, out bool asks)
+    {
+        asks = true;
+
+        return !root.TryGetProperty("asks_trust", out _) || TryBoolean(root, "asks_trust", out asks);
+    }
+
+    private static bool TryContinued(JsonElement root, out bool continued)
+    {
+        continued = false;
+
+        return !root.TryGetProperty("continued", out _) || TryBoolean(root, "continued", out continued);
+    }
+
+    /// <summary>Where and for how long a fill may be continued: neither from an owner before continuations, and a site, a host name of at most 253 characters, only with a time.</summary>
+    private static bool TryContinuation(JsonElement root, out string site, out int seconds)
+    {
+        site = string.Empty;
+        seconds = 0;
+
+        if (!root.TryGetProperty("continue_site", out _) && !root.TryGetProperty("continue_seconds", out _))
+        {
+            return true;
+        }
+
+        if (!TryString(root, "continue_site", out var named) || !TryInteger(root, "continue_seconds", out seconds)
+            || named.Length > 253 || seconds < 0 || (named.Length == 0) != (seconds == 0))
+        {
+            return false;
+        }
+
+        site = named;
+        return true;
     }
 
     /// <summary>A form's URL, which a request may leave out or send as null.</summary>

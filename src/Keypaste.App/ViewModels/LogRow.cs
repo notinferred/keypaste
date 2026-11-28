@@ -214,6 +214,7 @@ internal sealed record LogRow
                 // Written by a keypaste that remembered the logins filled on each site.
                 "unallow" => "Asks again before filling",
                 "list" => "Listed logins by name",
+                "trust" => Is(entry.Method, "removed") ? "Stopped trusting a sign-in frame" : entry.Granted ? "Trusted a sign-in frame" : "Asked to trust a sign-in frame",
                 _ => entry.Granted ? "Paired a browser" : "Asked to pair",
             },
             "vault_merge" => "Merged another program's save",
@@ -302,6 +303,7 @@ internal sealed record LogRow
             "narrowing" => ("Narrowed", LogTone.Muted),
             "picked" => ("You picked it in the page", LogTone.Ok),
             "pressed" => (entry.Reason.EndsWith(RequestRecords.OpenTerminalPressed, StringComparison.Ordinal) ? "You pressed Open terminal" : "You pressed Run", LogTone.Ok),
+            "continued" => ("Continued your pick", LogTone.Ok),
             "merged" => ("Merged", LogTone.Muted),
             "token" => (Strings.TokenResult, LogTone.Info),
             "share-created" => (Strings.Shared, LogTone.Muted),

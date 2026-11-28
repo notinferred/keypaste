@@ -1,5 +1,6 @@
 using Keypaste.App.Globalization;
 using Keypaste.App.Session;
+using Keypaste.Core.Browser;
 using Keypaste.Core.Ownership;
 
 namespace Keypaste.App.ViewModels;
@@ -22,9 +23,25 @@ internal sealed partial class PairingItem(string name, string browser, string id
     internal partial bool IsConfirmingRemove { get; set; }
 }
 
+/// <summary>A sign-in frame of another site the person trusted, as Settings lists it.</summary>
+/// <param name="trust">What this computer records.</param>
+internal sealed partial class FrameTrustItem(FrameTrust trust) : ObservableObject
+{
+    internal FrameTrust Trust { get; } = trust;
+
+    /// <summary>The frame and the page it is trusted on: idmsa.apple.com on www.icloud.com.</summary>
+    internal string Name { get; } = $"{trust.Frame} on {trust.Top}";
+
+    /// <summary>The pairing and when it was trusted: Chrome on Mac · trusted 2026-11-25.</summary>
+    internal string Summary { get; } = $"{trust.Pairing} · trusted {PersonTime.Date(trust.Created.ToLocalTime())}";
+
+    [ObservableProperty]
+    internal partial bool IsConfirmingRemove { get; set; }
+}
+
 /// <summary>
 /// Settings › Browser fill: how a browser pairs, from keypaste's extension, and the pairings this computer holds for the vaults
-/// open here, each with its last use and Remove.
+/// open here, each with its last use and Remove, and the sign-in frames of other sites the person trusted, each with Remove.
 /// </summary>
 /// <remarks>
 /// Nothing here starts a pairing: pressing Connect in the extension brings keypaste's confirmation. A pairing made or removed
@@ -47,8 +64,12 @@ internal sealed partial class BrowserFillViewModel : ObservableObject, IDisposab
         AskRemoveCommand = new RelayCommand<PairingItem>(row => SetConfirming(row, true), row => row is not null);
         CancelRemoveCommand = new RelayCommand<PairingItem>(row => SetConfirming(row, false), row => row is not null);
         RemoveCommand = new RelayCommand<PairingItem>(Remove, row => row is not null);
+        AskRemoveFrameCommand = new RelayCommand<FrameTrustItem>(row => SetConfirming(row, true), row => row is not null);
+        CancelRemoveFrameCommand = new RelayCommand<FrameTrustItem>(row => SetConfirming(row, false), row => row is not null);
+        RemoveFrameCommand = new RelayCommand<FrameTrustItem>(RemoveFrame, row => row is not null);
 
         Rows = Read();
+        Frames = ReadFrames();
         _authority.PairingsChanged += OnPairingsChanged;
     }
 
@@ -65,6 +86,21 @@ internal sealed partial class BrowserFillViewModel : ObservableObject, IDisposab
     [NotifyPropertyChangedFor(nameof(HasRows), nameof(HasNoRows))]
     internal partial IReadOnlyList<PairingItem> Rows { get; private set; } = [];
 
+    /// <summary>Asks in the row before removing its trust.</summary>
+    internal RelayCommand<FrameTrustItem> AskRemoveFrameCommand { get; }
+
+    internal RelayCommand<FrameTrustItem> CancelRemoveFrameCommand { get; }
+
+    /// <summary>Removes the person's trust of one sign-in frame, having been confirmed, so keypaste asks before it lists logins there again.</summary>
+    internal RelayCommand<FrameTrustItem> RemoveFrameCommand { get; }
+
+    /// <summary>The sign-in frames of other sites the person trusted, by pairing, page and frame.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasFrames))]
+    internal partial IReadOnlyList<FrameTrustItem> Frames { get; private set; } = [];
+
+    internal bool HasFrames => Frames.Count > 0;
+
     internal bool HasRows => Rows.Count > 0;
 
     internal bool HasNoRows => Rows.Count == 0;
@@ -78,7 +114,11 @@ internal sealed partial class BrowserFillViewModel : ObservableObject, IDisposab
 
     public void Dispose() => _authority.PairingsChanged -= OnPairingsChanged;
 
-    private void OnPairingsChanged(object? sender, EventArgs e) => _post(() => Rows = Read());
+    private void OnPairingsChanged(object? sender, EventArgs e) => _post(() =>
+    {
+        Rows = Read();
+        Frames = ReadFrames();
+    });
 
     private static void SetConfirming(PairingItem? row, bool confirming)
     {
@@ -87,6 +127,30 @@ internal sealed partial class BrowserFillViewModel : ObservableObject, IDisposab
             row.IsConfirmingRemove = confirming;
         }
     }
+
+    private static void SetConfirming(FrameTrustItem? row, bool confirming)
+    {
+        if (row is not null)
+        {
+            row.IsConfirmingRemove = confirming;
+        }
+    }
+
+    private void RemoveFrame(FrameTrustItem? row)
+    {
+        if (row is null)
+        {
+            return;
+        }
+
+        var removed = _authority.RemoveFrameTrust(row.Trust);
+        Message = removed.Removed
+            ? $"keypaste no longer trusts sign-in from {row.Name}. It asks again before listing logins there."
+            : $"Sign-in from {row.Name} is still trusted: {removed.Reason?.TrimEnd('.')}. Try again.";
+        Frames = ReadFrames();
+    }
+
+    private IReadOnlyList<FrameTrustItem> ReadFrames() => [.. _authority.FrameTrusts().Select(trust => new FrameTrustItem(trust))];
 
     private void Remove(PairingItem? row)
     {
@@ -100,6 +164,7 @@ internal sealed partial class BrowserFillViewModel : ObservableObject, IDisposab
             ? $"Removed the pairing {row.Name}. That browser has to pair again before it can ask for anything."
             : $"The pairing {row.Name} was not removed: {removed.Reason?.TrimEnd('.')}. Try again.";
         Rows = Read();
+        Frames = ReadFrames();
     }
 
     private IReadOnlyList<PairingItem> Read() =>

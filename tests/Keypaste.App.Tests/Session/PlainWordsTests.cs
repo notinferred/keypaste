@@ -432,6 +432,13 @@ public sealed partial class PlainWordsTests
             SuggestedName = "Chrome on work laptop",
             TakenNames = ["Chrome on work laptop"],
         })));
+        yield return ("a sign-in frame's trust", new FrameTrustWindow(new FrameTrustViewModel(new FrameTrustPrompt
+        {
+            Identity = Core.Browser.BrowserIdentity.ChromeWebStore,
+            Pairing = "Chrome on work laptop",
+            Top = "www.icloud.com",
+            Frame = "idmsa.apple.com",
+        })));
     }
 
     [Fact]

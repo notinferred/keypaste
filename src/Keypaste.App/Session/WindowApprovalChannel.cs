@@ -157,6 +157,15 @@ internal sealed class WindowApprovalChannel(
         return answer == ApprovalAnswer.ApprovedOnce ? new PairingAnswer(answer, request.Name) : new PairingAnswer(answer, null);
     }
 
+    /// <summary>Asks the person whether a sign-in frame of another site may be offered its own logins in a page, in a prompt window of its own.</summary>
+    public ValueTask<ApprovalAnswer> AskAsync(FrameTrustPrompt prompt, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(prompt);
+
+        var request = new FrameTrustViewModel(prompt);
+        return ShowAsync(request, () => new FrameTrustWindow(request), cancellationToken);
+    }
+
     /// <summary>Whether a prompt waits for the person's answer or is on its way to the screen, which no file dropped on the main window or system dialog goes ahead of.</summary>
     internal bool IsAsking => Volatile.Read(ref _screen.Queued) > 0 || _screen.Showing is { Request.IsAnswered: false };
 

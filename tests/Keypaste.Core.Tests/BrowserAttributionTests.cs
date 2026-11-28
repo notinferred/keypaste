@@ -7,9 +7,9 @@ using Xunit;
 namespace Keypaste.Core.Tests;
 
 /// <summary>
-/// Which audit lines the person's browser made, as the lines the owner writes read back: every pairing, check, lookup and
-/// fill, never an agent's request or a pairing the person removed in keypaste, and a lookup only where the browser asked
-/// which logins match a page. The Agents screen counts none of them as an agent.
+/// Which audit lines the person's browser made, as the lines the owner writes read back: every pairing, check, lookup, fill
+/// and trust of a sign-in frame, never an agent's request or a pairing or trust the person removed in keypaste, and a lookup
+/// only where the browser asked which logins match a page. The Agents screen counts none of them as an agent.
 /// </summary>
 public sealed class BrowserAttributionTests : IDisposable
 {
@@ -67,12 +67,27 @@ public sealed class BrowserAttributionTests : IDisposable
         Assert.Equal([true, false, false, false, false, false], entries.Select(entry => entry.IsBrowserLookup));
     }
 
-    /// <summary>A pairing removed in keypaste is the person's act there, and an agent's request, a listing of names included, is never the browser's.</summary>
+    /// <summary>The parts a fill continued, a one-time code among them, and the person's answer to a sign-in frame's trust fill or list nothing by name, so none is a lookup.</summary>
+    [Fact]
+    public void A_continued_fill_a_codes_fill_and_a_frames_trust_are_the_browsers_and_no_lookup()
+    {
+        var entries = Written(
+            RequestRecords.BrowserFill(_chrome, _pairing, null, _origin, AuditDecision.Granted, AuditMethod.Continued, $"it continued, within two minutes, the person's pick on {_origin}, its password", _session, _vault),
+            RequestRecords.BrowserFill(_chrome, _pairing, null, _origin, AuditDecision.Granted, AuditMethod.Picked, "the person picked it in the page's list, its one-time code", _session, _vault),
+            RequestRecords.Browser(_chrome, _pairing, BrowserAct.Trust, AuditDecision.Granted, AuditMethod.Prompt, "a person trusted idmsa.apple.com on www.icloud.com", _session, _vault),
+            RequestRecords.Browser(_chrome, _pairing, BrowserAct.Trust, AuditDecision.Denied, AuditMethod.Prompt, "a person refused to trust idmsa.apple.com on www.icloud.com", _session, _vault));
+
+        Assert.All(entries, entry => Assert.True(entry.ByBrowser, entry.Reason));
+        Assert.All(entries, entry => Assert.False(entry.IsBrowserLookup, entry.Reason));
+    }
+
+    /// <summary>A pairing or a frame's trust removed in keypaste is the person's act there, and an agent's request, a listing of names included, is never the browser's.</summary>
     [Fact]
     public void A_removed_pairing_and_an_agents_requests_are_not_the_browsers()
     {
         var entries = Written(
             RequestRecords.Browser(_chrome, _pairing, BrowserAct.Remove, AuditDecision.Granted, AuditMethod.Removed, "the person removed the pairing in keypaste", _session, _vault),
+            RequestRecords.Browser(_chrome, _pairing, BrowserAct.Trust, AuditDecision.Granted, AuditMethod.Removed, "the person removed their trust of idmsa.apple.com on www.icloud.com in keypaste", _session, _vault),
             RequestRecords.Listing(_claude, AuditDecision.Granted, AuditMethod.Exposure, "listed 3 item names", ["**"], _session, _vault),
             RequestRecords.Credential(_claude, "Work/github", "password", "sign in", AuditDecision.Granted, AuditMethod.Prompt, "a person approved this request", "Work/github", ["**"], _session, _vault));
 

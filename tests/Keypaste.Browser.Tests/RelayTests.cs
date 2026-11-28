@@ -655,6 +655,112 @@ public sealed class RelayTests
         Assert.Equal(0, await rig.Running.WaitAsync(_wait, Token));
     }
 
+    /// <summary>
+    /// The extension asks only for what keypaste decides, so each pairing and check names the features the owner said it decides
+    /// that this relay forwards, and none from an owner before them.
+    /// </summary>
+    [Fact]
+    public async Task The_features_the_owner_decides_come_with_each_pairing_and_check_and_an_older_owner_s_none()
+    {
+        await using var olderRig = await RelayRig.KeyedAsync();
+        var older = await CheckAsync(olderRig, Key());
+        await using var rig = await RelayRig.KeyedAsync();
+        rig.Owner.Features = [BrowserFeatures.Fill, "a feature this relay does not know", BrowserFeatures.Totp];
+
+        var check = await CheckAsync(rig, Key());
+        var paired = await rig.Browser.RequestAsync("associate", new JsonObject { ["key"] = rig.Browser.PublicKey, ["idKey"] = Key() }, Token);
+
+        Assert.Empty(older.Message!["features"]!.AsArray());
+        Assert.Equal([BrowserFeatures.Fill, BrowserFeatures.Totp], check.Message!["features"]!.AsArray().Select(feature => (string?)feature));
+        Assert.Equal([BrowserFeatures.Fill, BrowserFeatures.Totp], paired.Message!["features"]!.AsArray().Select(feature => (string?)feature));
+    }
+
+    [Fact]
+    public async Task A_fill_of_the_parts_a_page_shows_a_continuation_and_a_frame_reach_the_owner_and_a_code_and_where_it_continues_come_back()
+    {
+        await using var rig = await RelayRig.KeyedAsync();
+        rig.Owner.Features = BrowserFeatures.All;
+        rig.Owner.FillReply = new BrowserFillReply(BrowserOutcome.Done, string.Empty)
+        {
+            Logins = [new BrowserLogin(string.Empty, string.Empty, "Apple Account", "0123456789abcdef0123456789abcdef") { Totp = "492039" }],
+            ContinueSite = "apple.com",
+            ContinueSeconds = 120,
+        };
+        var key = Key();
+        await CheckAsync(rig, key);
+
+        await rig.Browser.RequestAsync("get-logins", new JsonObject { ["url"] = "https://idmsa.apple.com/signin", ["topUrl"] = "https://www.icloud.com/", ["askTrust"] = "false" }, Token);
+        var code = await rig.Browser.RequestAsync(
+            "get-login",
+            new JsonObject
+            {
+                ["url"] = "https://idmsa.apple.com/signin",
+                ["topUrl"] = "https://www.icloud.com/",
+                ["uuid"] = "0123456789abcdef0123456789abcdef",
+                ["fill"] = "totp",
+                ["continued"] = "true",
+            },
+            Token);
+        var username = await rig.Browser.RequestAsync("get-login", new JsonObject { ["url"] = "https://github.com/login", ["uuid"] = "0123456789abcdef0123456789abcdef", ["fill"] = "username" }, Token);
+        var unknown = await rig.Browser.RequestAsync("get-login", new JsonObject { ["url"] = "https://github.com/login", ["uuid"] = "0123456789abcdef0123456789abcdef", ["fill"] = "notes" }, Token);
+
+        var asked = rig.Owner.Asked;
+        Assert.Equal(
+            new BrowserListRequest(_pairing, key, "https://idmsa.apple.com/signin") { TopUrl = "https://www.icloud.com/", AsksTrust = false, Vault = rig.VaultPath, Session = "session-one" },
+            Assert.IsType<BrowserListRequest>(asked[^3]));
+        Assert.Equal(
+            new BrowserReleaseRequest(_pairing, key, "https://idmsa.apple.com/signin", "0123456789abcdef0123456789abcdef")
+            {
+                TopUrl = "https://www.icloud.com/",
+                Fill = BrowserFill.Totp,
+                Continued = true,
+                Vault = rig.VaultPath,
+                Session = "session-one",
+            },
+            Assert.IsType<BrowserReleaseRequest>(asked[^2]));
+        Assert.Equal((BrowserFill.Username, false), (Assert.IsType<BrowserReleaseRequest>(asked[^1]).Fill, ((BrowserReleaseRequest)asked[^1]).Continued));
+        Assert.Equal("12", unknown.ErrorCode);
+
+        var entry = Assert.Single(code.Message!["entries"]!.AsArray())!.AsObject();
+        Assert.Equal(new[] { "login", "name", "password", "totp", "uuid" }, entry.Select(member => member.Key).Order(StringComparer.Ordinal));
+        Assert.Equal("492039", (string?)entry["totp"]);
+        Assert.Equal(("apple.com", 120), ((string?)code.Message["continueSite"], (int)code.Message["continueSeconds"]!));
+        Assert.NotNull(username.Message);
+    }
+
+    /// <summary>An owner that does not decide them would take a part for the whole login, a continuation for a pick and a frame for its tab, so none reaches it.</summary>
+    [Theory]
+    [InlineData("get-login", "fill", "username")]
+    [InlineData("get-login", "fill", "both")]
+    [InlineData("get-login", "continued", "true")]
+    [InlineData("get-login", "topUrl", "https://www.icloud.com/")]
+    [InlineData("get-logins", "topUrl", "https://www.icloud.com/")]
+    public async Task What_the_owner_does_not_decide_is_refused_with_error_6_and_reaches_no_owner(string action, string member, string value)
+    {
+        await using var rig = await RelayRig.KeyedAsync();
+        await CheckAsync(rig, Key());
+        var asked = rig.Owner.Asked.Count;
+
+        var answer = await rig.Browser.RequestAsync(action, new JsonObject { ["url"] = "https://idmsa.apple.com/signin", ["uuid"] = "0123456789abcdef0123456789abcdef", [member] = value }, Token);
+
+        Assert.Equal("6", answer.ErrorCode);
+        Assert.Equal(asked, rig.Owner.Asked.Count);
+    }
+
+    [Fact]
+    public async Task A_code_the_owner_does_not_decide_is_refused_even_where_it_decides_parts()
+    {
+        await using var rig = await RelayRig.KeyedAsync();
+        rig.Owner.Features = [BrowserFeatures.Fill];
+        await CheckAsync(rig, Key());
+        var asked = rig.Owner.Asked.Count;
+
+        var answer = await rig.Browser.RequestAsync("get-login", new JsonObject { ["url"] = "https://github.com/login", ["uuid"] = "0123456789abcdef0123456789abcdef", ["fill"] = "totp" }, Token);
+
+        Assert.Equal("6", answer.ErrorCode);
+        Assert.Equal(asked, rig.Owner.Asked.Count);
+    }
+
     private static async Task<Answer> CheckAsync(RelayRig rig, string key)
     {
         var check = await rig.Browser.RequestAsync("test-associate", Pairing(key), Token);

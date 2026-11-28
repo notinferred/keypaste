@@ -94,7 +94,8 @@ It refuses to start without its audit log. It then holds the unlocked vault and 
 - `Relay.cs` speaks the extension's protocol; `NativeMessages.cs` frames messages and `NonceLedger.cs` keeps nonces. It sends the owner only typed requests over `Core/Ipc/BrowserLink.cs` and writes no audit line.
 - `RelayOptions.cs` picks the owners it may reach from `app.toml`'s local account.
 - The NaCl box is `Sodium.cs` alone, over libsodium, which [build-libsodium.sh](../scripts/build-libsodium.sh) builds from its signed release. `KnownAnswers.cs` holds the vectors `keypaste --selftest` checks.
-- On the owner's side, `Core/Ownership/SessionBrowsers.cs` handles pairing, list, release and show. `Core/Browser/BrowserPairings.cs` keeps pairings in `browsers.json`, sealed under each unlocked vault's key.
+- On the owner's side, `Core/Ownership/SessionBrowsers.cs` handles pairing, list, release and show. `Core/Browser/BrowserPairings.cs` keeps pairings in `browsers.json`, sealed under each unlocked vault's key, and the sign-in frames the person trusted beside them.
+- The owner tells a browser's attachment what it decides beyond 1.0.0 (`BrowserFeatures` in `Core/Ipc/BrowserMessages.cs`), and the relay forwards only those: a fill of the parts a page shows, a fill that continues the last (`Core/Browser/ContinuedFill.cs`, kept by `OwnerPairings`), a frame of another origin (`Core/Browser/SignInFrames.cs` is the built-in list) and a one-time code.
 
 ### keypaste run
 

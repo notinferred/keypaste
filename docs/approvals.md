@@ -177,6 +177,7 @@ The next record starts a new file. Check the archive with `keypaste log verify -
 | `prompt` | You answered |
 | `picked` | A login filled at your pick in keypaste's list in the page |
 | `pressed` | A run you started with Run, Open terminal or Run again in the app |
+| `continued` | The part left of a login you picked, filled by your next click or fill shortcut in the same tab, on the same site, within two minutes |
 | `allowed` / `blocked` | Released or refused without asking by a setting or kept answer |
 | `exposure` | A listing |
 | `out-of-scope` | Out of reach or absent, one answer for both |
@@ -187,7 +188,7 @@ The next record starts a new file. Check the archive with `keypaste log verify -
 | `timed-out` / `cancelled` / `busy` / `cooldown` | No answer, withdrawn, queue full, refused a moment ago |
 | `undeliverable` / `unfillable` / `unchanged` | Too large, a placeholder unfilled, nothing to write |
 | `token`, `share-created`, `share-revoked` | A scoped token's release, a share link made or revoked |
-| `not-armed`, `not-paired`, `removed` | Browser pairing refusals and removal |
+| `not-armed`, `not-paired`, `removed` | Browser pairing refusals, and the removal of a pairing or of a sign-in frame's trust |
 | `invalid-request` / `failed` / `not-initialized` | Bad arguments, an error, a call before the handshake |
 
 v0.3.0 lines may carry `grant-cache`, `policy` or `policy-limit`, which 1.0.0 never writes.

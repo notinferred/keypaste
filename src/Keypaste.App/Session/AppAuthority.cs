@@ -181,6 +181,14 @@ internal sealed class AppAuthority : IDisposable
     /// <returns>Whether it was removed, and why not.</returns>
     internal Core.Ownership.PairingRemoval RemovePairing(string id) => _host.RemovePairing(id);
 
+    /// <summary>The sign-in frames of other sites the person trusted for this computer's pairings.</summary>
+    internal IReadOnlyList<Core.Browser.FrameTrust> FrameTrusts() => _host.FrameTrusts();
+
+    /// <summary>Removes the person's trust of a sign-in frame, saving and recording it.</summary>
+    /// <param name="trust">The trust, as <see cref="FrameTrusts"/> listed it.</param>
+    /// <returns>Whether it was removed, and why not.</returns>
+    internal Core.Ownership.PairingRemoval RemoveFrameTrust(Core.Browser.FrameTrust trust) => _host.RemoveFrameTrust(trust);
+
     /// <summary>The MCP clients attached to the live session, as they describe themselves (display only).</summary>
     internal IReadOnlyList<Core.Clients.ConnectedClient> Clients => _host.Clients;
 

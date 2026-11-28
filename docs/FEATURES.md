@@ -94,6 +94,8 @@ Every row is 1.0.0. [The desktop guide](desktop.md) describes the app. Screens a
 | Capability | Note |
 |---|---|
 | Browser fill: pair keypaste's extension once per browser, then fill a site's logins from every open vault | Tested in Chrome, Edge, Brave, Firefox and LibreWolf under test IDs; not in any store (8.1g) ([T-48]) |
+| A pick fills only the fields the page shows, and a sign-in split across pages continues with the next click, the password or the one-time code, within two minutes on the same site | Unreleased: extension 1.0.1 ([T-59]) |
+| An https sign-in frame of the page's own site fills as the page; one from another site is offered its own logins once keypaste knows it or you trust it | Unreleased: extension 1.0.1; Apple's frame on iCloud is built in ([T-62]) |
 
 ## KeePassXC compatibility
 
@@ -143,5 +145,7 @@ These tests run against source; `v0.3.0` passed its own release's gate. This is 
 [T-43]: ../THREATS.md#t-43--a-terminal-asks-the-owner-to-change-the-vault
 [T-44]: ../THREATS.md#t-44--quick-unlock-stands-in-for-the-master-password-after-a-lock
 [T-48]: ../THREATS.md#t-48--the-browser-relay-holds-released-passwords-in-plaintext-and-anything-can-start-it-or-ask-to-pair
+[T-59]: ../THREATS.md#t-59--keypaste-believes-the-extension-about-which-page-asks-and-whether-the-person-picked
+[T-62]: ../THREATS.md#t-62--a-sign-in-frame-of-another-site
 [T-51]: ../THREATS.md#t-51--a-notification-is-read-by-more-than-the-person
 [T-54]: ../THREATS.md#t-54--an-agent-asks-the-person-to-save-a-value

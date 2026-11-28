@@ -118,6 +118,12 @@ public sealed record AttachReply(string? Session, AuditMethod? Refusal, string R
     /// </summary>
     public string? DatabaseHash { get; init; }
 
+    /// <summary>
+    /// For a browser's attachment, what this owner decides beyond keypaste 1.0.0, from <see cref="Ipc.BrowserFeatures"/>, so a relay
+    /// forwards only those; null for any other attachment, a refusal, or an owner older than this field.
+    /// </summary>
+    public IReadOnlyList<string>? BrowserFeatures { get; init; }
+
     /// <summary>A connection attached to a session.</summary>
     /// <param name="session">The session's identifier.</param>
     /// <returns>The reply.</returns>
